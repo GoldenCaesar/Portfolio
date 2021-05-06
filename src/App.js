@@ -40,7 +40,6 @@ function App() {
               <p>- CONNECTED -</p><br/>
             <p>System Developer(s) (SYSDEVS) - S. Miller</p>
             <p>Full Stack(s) (WEBDEVS) - A. Mitchell</p>
-            <p>Cascading Styler Inspired by M. Richardson</p>
           </div>
       </header>
       <p className="clear"><br /></p>
