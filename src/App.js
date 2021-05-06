@@ -21,7 +21,7 @@ function App() {
 <div class="overlay"></div>
   <div class="scanline"></div>
   <section class="screen">
-  <div class="" id="loading" style="overflow-y: auto;"></div>
+  <div class="" id="loading"  {/*style="overflow-y: auto;"*/}></div> 
   <div class="hide" id="allContent">
   <div class="wrapper">	
     <div class="content clearfix">
