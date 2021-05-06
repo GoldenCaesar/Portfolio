@@ -1,0 +1,29 @@
+{
+  "name": "Portfolio",
+  "version": "1.0.0",
+  "description": "Founder, Stephen Miller",
+  "main": "NCODE.html",
+  "scripts": {
+    "start": "node NCODE.html",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GoldenCaesar/Portfolio.git"
+  },
+  "author": "Stephen Miller & Andrew Mitchell",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/GoldenCaesar/Portfolio/issues"
+  },
+  "homepage": "https://github.com/GoldenCaesar/Portfolio#readme",
+  "devDependencies": {
+    "eslint": "^7.24.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.22.1"
+  },
+  "dependencies": {
+    "atob": "^2.1.2",
+    "btoa": "^1.2.1",
+  }
+}
