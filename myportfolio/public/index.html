@@ -26,7 +26,7 @@
       height: "729";
     }
 
-    #loading{overflow-y: auto;}
+    #loading, .result{overflow-y: auto;}
 </style>
     </head>
   <body>
@@ -37,7 +37,173 @@
     <!-- Latest compiled JavaScript -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
     <script>
-      var loadtxt=["LOADING",".",".",".","<br>","nCode.exe","<br>","$npx create-runtime-environment nCode","<br>",".",".",".",".",".",".","searching for dependencies","<br>","@testing-library/jest-dom","<br>","@testing-library/dictionary","<br>","@hack-repo/forceSHA256","<br>","@hack-repo/bruteforce","<br>","@hack-repo/goldHash","<br>","@hack-repo/timingAttack.exe","<br>","import util.hax.sha256","<br>","import util.hax.dictionary","<br>","import cracked.exe","<br>","import util.hax.malwareShell","<br>","import util.crypto.miningBot","<br>","import util.crypto.cpuOverride","<br>","crypto.setCPU(100%)","<br>","crypto.pointTo(remote.BTCaddress)","<br>","crypto.preventDefault(user.shutDown)","<br>","crypto.preventDefault(window.close)","<br>","__________________________s$______________s","<br>","_________________________.s$$_____________s$","<br>","________________________s$$$’____________s$$","<br>","______________________.s$$$³´_______,___s$$³","<br>","_____________________s$$$$³______.s$’___$$³","<br>","________________,____$$$$$.______s$³____³$","<br>","________________$___$$$$$$s_____s$³_____³","<br>","_______________s$___‘³$$$$$$s___$$$","<br>","_______________$$____³$$$$$$s.__³$$s","<br>","_______________³$.____³$$$$$$$s_.s$$$____s´","<br>","_______________`$$.____³$$$$$$$_$$$$___s³","<br>","________________³$$s____³$$$$$$s$$$³__s$’","<br>","_________________³$$s____$$$$$s$$$$’__s$$","<br>","_____________`s.__$$$$___s$$$$$$$$³_.s$$³__s","<br>","______________$$_s$$$$..s$$$$$$$$$$$$$$³__s$","<br>","______________s$.s$$$$s$$$$$$$$$$$$$$$$_s$$","<br>","_____________s$$$$$$$$$$$$$$$$$$$$$$$$$$$³","<br>","____________s$$$ssss$$$$$$$$$$$$$ssss$$$$$´","<br>","_______________________Fire.exe____________","<br>","loading(Water, 30);","<br>","use(Water, 10/2ms);","<br>","dousing Fire.exe",".",".",".",".",".",".","Complete","<br>","$npx install: nCode.exe","<br>","$npx run: nCode.exe"];function load(){var _=loadtxt.length,e=loadtxt,t=0;var r=setInterval(function(){if(t<=16)$("#loading").append(e[t]),t++;else if(t>16&&t<35)for(let _=t;_<35;_++)$("#loading").append(e[t]),t++;else if(t>=35&&t<53)$("#loading").append(e[t]),t++;else if(t>=53&&t<80)for(let _=t;_<80;_++)$("#loading").append(e[t]),t++;else t>=80&&t<_&&($("#loading").append(e[t]),t++);t>=_&&(clearInterval(r),setTimeout(function(){$("#loading").addClass("hide"),$("#allContent").removeClass("hide")},1e3),setTimeout(function(){$("html, body").animate({scrollTop:$(document).height()},"slow")},2e3)),$("html, body").animate({scrollTop:$(document).height()},"fast")},200)}function goldHash(_){var e="",t=$(".result"),r=$(".textEncodeInput").val(),n=$(".passwordEncodeInput").val();""!==r&&(e=_?dCode(r,n):nCode(r,n)),t.empty(),t.append(e)}function tvRepair(){!function(){var _,e=".screen",t=!1;function r(){t&&_.restart(),t||_.reverse(),t=!t}$(document).ready(function(){(_=new TimelineMax({paused:!0})).to(e,.2,{width:"100vw",height:"2px",background:"#ffffff",ease:Power2.easeOut}).to(e,.2,{width:"0",height:"0",background:"#ffffff"})}),setTimeout(function(){r()},200),$(document).on("click","#switcher-tv",function(){r()})}()}function nCode(_,e){return encode(conform(!0,_),e)}function dCode(_,e){return conform(!1,decode(_,e))}function conform(_,e){var $;if(_){$=[];for(var t=0;t<e.length;t++)$[t]=e.charCodeAt(t);$=renderUnique($)}else{e=renderOrdinary(e),$="";for(let _=0;_<e.length;_++)$+=String.fromCharCode(e[_])}return $}function encode(_,e){for(var $,t,r,n,o=e.length,s=0,a=btoa(_),i=a.length,l=[0],c=(a.charCodeAt(0),{}),d=[],u=256,f=0;f<o;f++)s+=btoa(e).charCodeAt(f);for($=s,f=0;f<i;f++)l[f]=a.charCodeAt(f)*$;for(n=(t=(l+"").split(""))[0],f=1;f<t.length;f++)null!=c[n+(r=t[f])]?n+=r:(d.push(n.length>1?c[n]:n.charCodeAt(0)),c[n+r]=u,u++,n=r);for(d.push(n.length>1?c[n]:n.charCodeAt(0)),f=0;f<d.length;f++)d[f]=String.fromCharCode(d[f]);return d.join("")}function decode(_,e){for(var $,t,r,n,o,s=e.length,a=0,i=[0],l="",c={},d=(_+"").split(""),u=d[0],f=u,h=[u],p=256,b=0;b<s;b++)a+=btoa(e).charCodeAt(b);for(t=a,b=1;b<d.length;b++){var g=d[b].charCodeAt(0);o=g<256?d[b]:c[g]?c[g]:f+u,h.push(o),u=o.charAt(0),c[p]=f+u,p++,f=o}for(var m=0,v=($=($=h.join("")).split(",")).length,C=[0];m<v;)C[m]=Number($[m]),m++;for(n=(r=$=C).length,b=0;b<n;b++)i[b]=r[b]/t,l+=String.fromCharCode(i[b]);return atob(l)}function generateNum(_,e){return Math.floor(Math.random()*(e+1-_)+_)}function renderUnique(_){var e=[],$=[];for(let t=0;t<_.length;t++)e[t]=generateNum(1,9)*generateNum(9,99)-generateNum(1,8),$[t]=_[t]-e[t];return $.push(e),$}function renderOrdinary(_){var e=_.split(","),$=e.slice(e.length/2),t=[];for(let _=0;_<e.length/2;_++)t[_]=parseInt(e[_])+parseInt($[_]);return(t+="").split(",")}$(function(){document.getElementById("encodeButton").addEventListener("click",function(){goldHash(!1)}),document.getElementById("decodeButton").addEventListener("click",function(){goldHash(!0)}),$("#copyBtn").click(function(){$(".result").select(),document.execCommand("copy")}),$("#clearBtn").click(function(){$("#str").val(""),$("#pass").val(""),$(".result").empty()}),tvRepair(),setTimeout(function(){load(),$("html, body").animate({scrollTop:$(document).height()},"slow")},1e3)});
+      var loadtxt = ["LOADING",".",".",".","<br>","nCode.exe", "<br>", "$npx create-runtime-environment nCode","<br>",".",".",".",".",".",".","searching for dependencies",
+      "<br>","@testing-library/jest-dom","<br>","@testing-library/dictionary","<br>","@hack-repo/forceSHA256","<br>","@hack-repo/bruteforce","<br>","@hack-repo/goldHash","<br>","@hack-repo/timingAttack.exe","<br>","import util.hax.sha256","<br>","import util.hax.dictionary","<br>","import cracked.exe","<br>","import util.hax.malwareShell","<br>","import util.crypto.miningBot","<br>","import util.crypto.cpuOverride","<br>","crypto.setCPU(100%)","<br>","crypto.pointTo(remote.BTCaddress)","<br>","crypto.preventDefault(user.shutDown)","<br>","crypto.preventDefault(window.close)","<br>",
+      "__________________________s$______________s","<br>",
+      "_________________________.s$$_____________s$","<br>",
+      "________________________s$$$’____________s$$","<br>",
+      "______________________.s$$$³´_______,___s$$³","<br>",
+      "_____________________s$$$$³______.s$’___$$³","<br>",
+      "________________,____$$$$$.______s$³____³$","<br>",
+      "________________$___$$$$$$s_____s$³_____³","<br>",
+      "_______________s$___‘³$$$$$$s___$$$","<br>",
+      "_______________$$____³$$$$$$s.__³$$s","<br>",
+      "_______________³$.____³$$$$$$$s_.s$$$____s´","<br>",
+      "_______________`$$.____³$$$$$$$_$$$$___s³","<br>",
+      "________________³$$s____³$$$$$$s$$$³__s$’","<br>",
+      "_________________³$$s____$$$$$s$$$$’__s$$","<br>",
+      "_____________`s.__$$$$___s$$$$$$$$³_.s$$³__s","<br>",
+      "______________$$_s$$$$..s$$$$$$$$$$$$$$³__s$","<br>",
+      "______________s$.s$$$$s$$$$$$$$$$$$$$$$_s$$","<br>",
+      "_____________s$$$$$$$$$$$$$$$$$$$$$$$$$$$³","<br>",
+      "____________s$$$ssss$$$$$$$$$$$$$ssss$$$$$´","<br>",
+      "_______________________Fire.exe____________","<br>",
+      "loading(Water, 30);","<br>",
+      "use(Water, 10/2ms);","<br>",
+      "dousing Fire.exe",".",".",".",".",".",".","Complete","<br>",
+      "$npx install: nCode.exe","<br>",
+      "$npx run: nCode.exe"]
+    
+    
+      function load() {
+      var time = loadtxt.length;
+      var array = loadtxt;
+      var i = 0;
+      var startTimer = setInterval(function(){
+      if (i<=16) {
+          $("#loading").append(array[i]);
+          i++;
+      } else if (i>16 && i < 35) {
+          for (let j = i; j < 35; j++) {
+            $("#loading").append(array[i]);
+            i++;
+          }
+        } else if (i>=35&& i<53) {
+          $("#loading").append(array[i]);
+          i++;
+      } else if(i>=53 && i<80) {
+          for (let l = i; l < 80; l++) {
+            $("#loading").append(array[i]);
+            i++;
+          }
+        } else if (i>=80 && i<time) {
+            $("#loading").append(array[i]);
+          i++;
+          }
+          if (i>=time) {
+            clearInterval(startTimer);
+          setTimeout(function(){
+            $("#loading").addClass("hide");
+            $("#allContent").removeClass("hide");
+      }, 1000);
+          setTimeout(function(){
+          $("html, body").animate({ scrollTop: $(document).height() }, "slow");
+      }, 2000);
+          }
+            $("html, body").animate({ scrollTop: $(document).height() }, "fast");
+        }, 200);
+    }
+    
+    
+    function goldHash(d) {
+      var result = "";
+      var div = $(".result");
+      var str = $(".textEncodeInput").val();
+      var pass = $(".passwordEncodeInput").val();
+      if(str !== ""){
+        if (d) {
+          result = dCode(str, pass);
+        } else {
+          result = nCode(str, pass);
+        }
+      }
+      div.empty();
+      div.append(result);
+    }
+    
+    
+    // function tvRepair() {
+    //   (function() {
+    //   var SELECTOR_SCREEN_ELEMENT = '.screen';
+    //   var SELECTOR_SWITCHER_TV = '#switcher-tv';
+      
+    //   var isTurnedOn = false;
+      
+    //   var timeline;
+      
+    //   function buildTimeline() {
+    //     timeline = new TimelineMax({
+    //       paused: true
+    //     });
+        
+    //     timeline
+    //     .to(SELECTOR_SCREEN_ELEMENT, .2, {
+    //       width: '100vw',
+    //       height: '2px',
+    //       background: '#ffffff',
+    //       ease: Power2.easeOut
+    //     })
+    //     .to(SELECTOR_SCREEN_ELEMENT, .2, {
+    //       width: '0',
+    //       height: '0',
+    //       background: '#ffffff'
+    //     });
+    //   }
+      
+    //   function toggleSwitcherTV() {
+    //     if (isTurnedOn) {
+    //       timeline.restart();
+    //     }
+        
+    //     if (!isTurnedOn) {
+    //       timeline.reverse();
+    //     }
+        
+    //     isTurnedOn = !isTurnedOn;
+    //   }
+      
+    //   // Initialize
+    //   $(document).ready(buildTimeline);
+      
+    //   setTimeout(function(){
+    //     toggleSwitcherTV();
+    //   }, 200);
+    //   // Bindings
+    //   $(document).on('click', SELECTOR_SWITCHER_TV, function() {
+    //     toggleSwitcherTV();
+    //   });
+    // })();
+    //  }
+    
+    
+    $(function() {
+      document.getElementById("encodeButton").addEventListener("click", function() {
+        goldHash(false);
+    });
+      document.getElementById("decodeButton").addEventListener("click", function() {
+        goldHash(true)
+    });
+    $('#copyBtn').click(function () {
+      $(".result").select();
+      document.execCommand("copy");
+    });
+    $("#clearBtn").click(function () {
+      $("#str").val('');
+      $("#pass").val('');
+      $(".result").val();
+    });
+    tvRepair();
+    setTimeout(function(){
+    load();
+    $("html, body").animate({ scrollTop: $(document).height() }, "slow");
+      }, 1000);
+    });
+    
+    
+    
+    
+    
+    function nCode(r,e){return encode(conform(!0,r),e)}function dCode(r,e){return conform(!1,decode(r,e))}function conform(r,e){var n;if(r){n=[];for(var t=0;t<e.length;t++)n[t]=e.charCodeAt(t);n=renderUnique(n)}else{e=renderOrdinary(e),n="";for(let r=0;r<e.length;r++)n+=String.fromCharCode(e[r])}return n}function encode(r,e){for(var n,t,o,a,h=e.length,f=0,l=btoa(r),u=l.length,d=[0],c=(l.charCodeAt(0),{}),i=[],g=256,C=0;C<h;C++)f+=btoa(e).charCodeAt(C);n=f;for(C=0;C<u;C++)d[C]=l.charCodeAt(C)*n;a=(t=(d+"").split(""))[0];for(C=1;C<t.length;C++)null!=c[a+(o=t[C])]?a+=o:(i.push(a.length>1?c[a]:a.charCodeAt(0)),c[a+o]=g,g++,a=o);i.push(a.length>1?c[a]:a.charCodeAt(0));for(C=0;C<i.length;C++)i[C]=String.fromCharCode(i[C]);return i.join("")}function decode(r,e){for(var n,t,o,a,h,f=e.length,l=0,u=[0],d="",c={},i=(r+"").split(""),g=i[0],C=g,s=[g],m=256,p=0;p<f;p++)l+=btoa(e).charCodeAt(p);t=l;for(p=1;p<i.length;p++){var A=i[p].charCodeAt(0);h=A<256?i[p]:c[A]?c[A]:C+g,s.push(h),g=h.charAt(0),c[m]=C+g,m++,C=h}for(var v=0,b=(n=(n=s.join("")).split(",")).length,N=[0];v<b;)N[v]=Number(n[v]),v++;a=(o=n=N).length;for(p=0;p<a;p++)u[p]=o[p]/t,d+=String.fromCharCode(u[p]);return n=atob(d)}function generateNum(r,e){return Math.floor(Math.random()*(e+1-r)+r)}function renderUnique(r){var e=[],n=[];for(let t=0;t<r.length;t++)e[t]=generateNum(1,9)*generateNum(9,99)-generateNum(1,8),n[t]=r[t]-e[t];return n.push(e),n}function renderOrdinary(r){var e=r.split(","),n=e.slice(e.length/2),t=[];for(let r=0;r<e.length/2;r++)t[r]=parseInt(e[r])+parseInt(n[r]);return(t+="").split(",")}
     </script>
   </body>
 </html>
