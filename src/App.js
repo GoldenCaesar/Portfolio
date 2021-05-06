@@ -48,9 +48,9 @@ function App() {
         <div class="" id="nCode">
         <h1>Encode or Decode your string</h1>
         <label class="encodeLabel">String to Encode</label>
-        <textarea class="textEncodeInput" id="str" type="text" style="border-bottom: solid; margin-bottom: 1em;"></textarea>
+        <textarea class="textEncodeInput" id="str" type="text"  {/*style="border-bottom: solid; margin-bottom: 1em;"*/}></textarea> 
         <label class="passwordLabel">Password</label>
-        <input class="passwordEncodeInput" id="pass" type="text" style="border-bottom: solid; margin-bottom: 1em;"/>
+         <input class="passwordEncodeInput" id="pass" type="text" {/*style="border-bottom: solid; margin-bottom: 1em;"*/}/> 
         <button id="encodeButton">Encode</button>
         <button id="decodeButton">Decode</button>
         <br/>
