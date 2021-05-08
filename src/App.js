@@ -61,7 +61,7 @@ function App() {
         <button id="clearBtn">Clear</button>
         <h3>Result:</h3>
         <br/>
-        <textarea className="result" disabled="disabled" id=""></textarea>
+        <textarea className="result" readOnly id=""></textarea>
         </div>
       </div>
 

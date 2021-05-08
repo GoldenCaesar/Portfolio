@@ -11,9 +11,11 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 } */
-    
+    body {
+      font-size: calc(10px + 2vmin) !important;
+    }
     .textEncodeInput, .passwordEncodeInput {
-      border-bottom: solid !important; margin-bottom: 1em;
+      border: ridge rgb(6 164 15 / 50%) !important;; margin-bottom: 1em;
     }
 
     img {
