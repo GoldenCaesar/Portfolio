@@ -13,7 +13,7 @@ code {
 } */
     
     .textEncodeInput, .passwordEncodeInput {
-      border-bottom: solid; margin-bottom: 1em;
+      border-bottom: solid !important; margin-bottom: 1em;
     }
 
     img {
