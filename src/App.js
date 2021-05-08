@@ -48,7 +48,7 @@ function App() {
       <div className="goodLuck">
         <div className="" id="nCode">
         <h1>Encode or Decode your string</h1>
-        <label className="encodeLabel">String to Encode</label>
+        <label className="encodeLabel">String to Encode/Decode</label>
         <textarea className="textEncodeInput" id="str" type="text"  ></textarea> 
 {/*style="border-bottom: solid; margin-bottom: 1em;"*/}
         <label className="passwordLabel">Password</label>
