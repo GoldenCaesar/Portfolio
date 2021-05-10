@@ -22,7 +22,6 @@ function App() {
   <div className="scanline"></div>
   <section className="screen">
   <div className="" id="loading"  ></div> 
-  {/*style="overflow-y: auto;"*/}
   <div className="hide" id="allContent">
   <div className="wrapper">	
     <div className="content clearfix">
@@ -30,7 +29,6 @@ function App() {
       <div className="col one">
           <p>Demicube, INC</p>
       <img src="assets/demicube.png"  id="logo-v" />
-      {/*width="740" height="729"*/}
       </div>
           <div className="col two">
               <h4>Demicube, INC (tm) <br /> <b>H</b>ash <b>E</b>ncrypted <b>R</b>eal-Time <b>O</b>perating <b>S</b>ystem (HEROS)</h4>
@@ -50,10 +48,9 @@ function App() {
         <h1>Encode or Decode your string</h1>
         <label className="encodeLabel">String to Encode/Decode</label>
         <textarea className="textEncodeInput" id="str" type="text"  ></textarea> 
-{/*style="border-bottom: solid; margin-bottom: 1em;"*/}
         <label className="passwordLabel">Password</label>
-         <input className="passwordEncodeInput" id="pass" type="text" /> 
-{/*style="border-bottom: solid; margin-bottom: 1em;"*/}
+         <input className="passwordEncodeInput" id="pass" type="text" />
+         <br/> 
         <button id="encodeButton">Encode</button>
         <button id="decodeButton">Decode</button>
         <br/>

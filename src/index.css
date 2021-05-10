@@ -23,5 +23,9 @@ code {
       height: "729";
     }
 
+    .hide {
+      display: none;
+    }
+
     #loading{overflow-y: auto;}
 
