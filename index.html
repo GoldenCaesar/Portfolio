@@ -1,0 +1,561 @@
+<html>
+  <head>
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
+    <link
+      rel="stylesheet"
+      as="style"
+      onload="this.rel='stylesheet'"
+      href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Space+Grotesk%3Awght%40400%3B500%3B700"
+    />
+    <style>
+      img {
+        display: inline;
+      }
+      #helpButtonStringEncryption, #helpButtonPasswordManager, #helpButtonFileEncryption {
+        padding: 0.5em;
+      }
+      #toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end; /* Align toasts to the right */
+      }
+      .toast-message {
+        background-color: #333; /* Dark background */
+        color: #fff; /* White text */
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        opacity: 0.9;
+        transition: opacity 0.5s ease-out;
+      }
+      .goldhash-result {
+        margin-top: 5px;
+        margin-bottom: 10px;
+        padding: 8px;
+        background-color: #f0f0f0; /* Light grey background */
+        border: 1px solid #ddd;   /* Light grey border */
+        border-radius: 4px;
+        font-family: monospace;   /* Monospaced font for hash */
+        font-size: 0.9em;
+        color: #333;             /* Dark grey text */
+        word-wrap: break-word;    /* Wrap long hash strings */
+        min-height: 1.2em; /* Ensure it has some height even when empty */
+      }
+    </style>
+    <title>nCode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="assets/demicube.png" />
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  </head>
+  <body>
+    <div
+      class="relative flex size-full min-h-screen flex-col bg-[#131811] dark justify-between group/design-root overflow-x-hidden"
+      style='font-family: "Space Grotesk", "Noto Sans", sans-serif;'
+    >
+      <div>
+        <div class="flex items-center bg-[#131811] p-4 pb-2 justify-between">
+          <!-- Help button removed from here -->
+        </div>
+        <!-- New Outer Wrapper Div -->
+        <div class="w-full">
+          <!-- New Middle Column Div -->
+          <div class="w-full md:w-1/3 mx-auto">
+            <div style="text-align: center;">
+              <img style="display: inline" src="assets/demicube.png" />
+            </div>
+            <h1 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 text-center pb-3 pt-5">nCode</h1>
+            <p class="text-white text-base font-normal leading-normal pb-3 pt-1 px-4 text-center">Client-side encryption by Demicube.</p>
+            <div class="pb-3">
+            <div class="flex border-b border-[#43543b] px-2 gap-4 md:px-4 md:gap-8">
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-white text-white pb-[13px] pt-4" href="javascript:void(0);" onclick="showContent('stringEncryptionContent', this)">
+                  <p class="text-white text-sm font-bold leading-normal tracking-[0.015em]">String Encryption</p>
+                </a>
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-[#a6ba9c] pb-[13px] pt-4" href="javascript:void(0);" onclick="showContent('passwordManagerContent', this)">
+                  <p class="text-[#a6ba9c] text-sm font-bold leading-normal tracking-[0.015em]">Password Manager</p>
+                </a>
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-[#a6ba9c] pb-[13px] pt-4" href="javascript:void(0);" onclick="showContent('fileEncryptionContent', this)">
+                  <p class="text-[#a6ba9c] text-sm font-bold leading-normal tracking-[0.015em]">File Encryption</p>
+                </a>
+                <a class="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-[#a6ba9c] pb-[13px] pt-4" href="javascript:void(0);" onclick="showContent('transmissionEncryptionContent', this)">
+                  <p class="text-[#a6ba9c] text-sm font-bold leading-normal tracking-[0.015em]">Transmission Encryption</p>
+                </a>
+              </div>
+            </div>
+            <div id="stringEncryptionContent">
+              <div class="flex items-center justify-center px-4 pb-3 pt-1">
+                <p class="text-white text-base font-normal leading-normal">Use this tool to encrypt or decrypt text strings using a password. Ensure you remember your password, as it's the only way to retrieve your original data.</p>
+                <button id="helpButtonStringEncryption" class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-12 bg-transparent text-white gap-2 text-base font-bold leading-normal tracking-[-0.015em] min-w-0 p-0" style="margin-left: 8px;"><div class="text-white" data-icon="Question" data-size="24px" data-weight="regular"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"></path></svg></div></button>
+              </div>
+              <p id="stringEncryptionHelpText" class="text-white text-sm font-normal leading-normal px-4 py-2 bg-[#1f271b] rounded mt-2 mx-4" style="display: none;">
+                <strong>String Encryption Help:</strong><br>
+                This tab allows you to encrypt any text string using a password. The same password is required to decrypt the string.
+                The encryption process (AES-GCM) ensures that the encrypted output is unique each time, enhancing security.
+                A 'Goldhash' (SHA-256 based) of your original string and password is shown during encryption. Upon successful decryption, the Goldhash of the decrypted string and password is displayed. Matching Goldhashes confirm content integrity.
+                All operations are client-side. Encryption uses AES-GCM with a key derived via PBKDF2.
+              </p>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <label class="flex flex-col min-w-40 flex-1">
+                  <textarea
+                    id="stringInput"
+                    placeholder="String"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-36 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"
+                  style="overflow: auto"></textarea>
+                </label>
+              </div>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <label class="flex flex-col min-w-40 flex-1">
+                  <input
+                    id="passwordInput"
+                    placeholder="Password"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] h-14 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"
+                    value=""
+                  />
+                </label>
+              </div>
+              <div class="flex items-center gap-4 px-4 py-3">
+                <span class="text-white">nCode</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="modeToggle" class="sr-only peer">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                </label>
+                <span class="text-white">dCode</span>
+              </div>
+              <div class="flex px-4 py-3">
+                <button
+                  id="processButton"
+                  class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#47c10a] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em]"
+                >
+                  <span class="truncate">Process</span>
+                </button>
+              </div>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <p id="stringGoldhashResult" class="text-white text-sm font-mono leading-normal py-2 px-1"></p>
+                <label class="flex flex-col min-w-40 flex-1">
+                  <textarea
+                    id="resultOutput"
+                    placeholder="Result"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-36 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"
+                  style="overflow: auto"></textarea>
+                </label>
+              </div>
+              <div class="flex px-4 py-3">
+                <button id="clearButton" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#f0ad4e] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] mr-2"><span class="truncate">Clear</span></button>
+                <button id="copyButton" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#5bc0de] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em]"><span class="truncate">Copy</span></button>
+              </div>
+            </div>
+            <div id="passwordManagerContent" style="display:none;">
+              <div class="flex items-center justify-start px-4 pb-3 pt-1">
+                <p class="text-white text-base font-normal leading-normal">
+                  Manage your passwords securely with nCode's Password Manager. As long as you remember your Manager Password and site name, you can recover your passwords.
+                </p>
+                <button id="helpButtonPasswordManager" class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-12 bg-transparent text-white gap-2 text-base font-bold leading-normal tracking-[-0.015em] min-w-0 p-0" style="margin-left: 8px;"><div class="text-white" data-icon="Question" data-size="24px" data-weight="regular"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"></path></svg></div></button>
+              </div>
+              <p id="passwordManagerHelpText" class="text-white text-sm font-normal leading-normal px-4 py-2 bg-[#1f271b] rounded mt-2 mx-4" style="display: none;">
+                <strong>Password Manager Help:</strong><br>
+                Generate strong, unique passwords for websites using a 'Manager Password' and a 'Site Name'.
+                The same Manager Password and Site Name will always produce the same site-specific password.
+                You can copy the generated list of site names and passwords and encrypt it using the String Encryption or File Encryption tabs for secure storage.
+                Password generation uses a deterministic SHA-256 hashing method.
+              </p>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <label class="flex flex-col min-w-40 flex-1">
+                  <input
+                    id="managerPassword"
+                    placeholder="Manager Password"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#464d42] bg-[#20241e] focus:border-[#464d42] h-14 placeholder:text-[#a9b2a4] p-[15px] text-base font-normal leading-normal"
+                    value=""
+                  />
+                </label>
+              </div>
+              <h3 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Sites</h3>
+              <div id="sitesContainer" class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <label class="flex flex-col min-w-40 flex-1">
+                  <input
+                    placeholder="Site 1"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border border-[#464d42] bg-[#20241e] focus:border-[#464d42] h-14 placeholder:text-[#a9b2a4] p-[15px] text-base font-normal leading-normal site-input"
+                    value=""
+                  />
+                </label>
+                </div>
+              </div>
+              <div id="addSiteButton" class="flex items-center gap-4 bg-[#141613] px-4 min-h-14">
+                <div class="text-white flex items-center justify-center rounded-lg bg-[#2f342d] shrink-0 size-10" data-icon="Plus" data-size="24px" data-weight="regular">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
+                    <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path>
+                  </svg>
+                </div>
+                <p class="text-white text-base font-normal leading-normal flex-1 truncate">Add Site</p>
+              </div>
+              <div class="flex px-4 py-3">
+                <button
+                  id="processPasswordsButton"
+                  class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#47c10a] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em]"
+                >
+                  <span class="truncate">Process</span>
+                </button>
+                <button
+                  id="clearPasswordsButton"
+                  class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#f0ad4e] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] ml-2"
+                >
+                  <span class="truncate">Clear</span>
+                </button>
+              </div>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <label class="flex flex-col min-w-40 flex-1">
+                  <textarea
+                    id="passwordResultOutput"
+                    placeholder="Result"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-36 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"
+                  style="overflow: auto"></textarea>
+                </label>
+              </div>
+            </div>
+            <div id="fileEncryptionContent" style="display:none;">
+              <div class="flex items-center justify-start px-4 pb-3 pt-1">
+                <p class="text-white text-base font-normal leading-normal">Encrypt your files with a password to protect them from unauthorized access.</p>
+                <button id="helpButtonFileEncryption" class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-12 bg-transparent text-white gap-2 text-base font-bold leading-normal tracking-[-0.015em] min-w-0 p-0" style="margin-left: 8px;"><div class="text-white" data-icon="Question" data-size="24px" data-weight="regular"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"></path></svg></div></button>
+              </div>
+              <p id="fileEncryptionHelpText" class="text-white text-sm font-normal leading-normal px-4 py-2 bg-[#1f271b] rounded mt-2 mx-4" style="display: none;">
+                <strong>File Encryption Help:</strong><br>
+                Encrypt any file from your computer using a password. The encrypted file will download with a '.nCode' extension. Your original file remains unchanged.
+                A 'Goldhash' (SHA-256 based) of the original file and password is shown during encryption. Upon successful decryption, the Goldhash of the decrypted file and password is displayed. Matching Goldhashes confirm file integrity.
+                All operations are client-side. Encryption uses AES-GCM in chunks with a key derived via PBKDF2.
+              </p>
+              <div class="flex px-4 py-3">
+                <input type="file" id="fileInput" style="display: none;" />
+                <button
+                  id="selectFileButton"
+                  class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 px-4 flex-1 bg-[#2e3928] text-white text-sm font-bold leading-normal tracking-[0.015em]"
+                >
+                  <span class="truncate">Select File</span>
+                </button>
+              </div>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <label class="flex flex-col min-w-40 flex-1">
+                  <input
+                    id="filePasswordInput"
+                    placeholder="Password"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-white focus:outline-0 focus:ring-0 border border-[#44543b] bg-[#1f271b] focus:border-[#44543b] h-14 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"
+                    value=""
+                  />
+                </label>
+              </div>
+              <div class="flex items-center gap-4 px-4 py-3">
+                <span class="text-white">nCode</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="fileModeToggle" class="sr-only peer">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                </label>
+                <span class="text-white">dCode</span>
+              </div>
+              <div class="flex px-4 py-3">
+                <button
+                  id="fileProcessButton"
+                  class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#47c10a] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em]"
+                >
+                  <span class="truncate">Process</span>
+                </button>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 my-3">
+                <div id="fileProgressBar" class="h-2 bg-green-500 rounded w-0"></div>
+              </div>
+              <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                <p id="fileGoldhashResult" class="text-white text-sm font-mono leading-normal py-2 px-1"></p>
+                <label class="flex flex-col min-w-40 flex-1">
+                  <p class="text-white text-base font-medium leading-normal pb-2">Result</p>
+                  <textarea
+                    id="fileResultOutput"
+                    placeholder="Result"
+                    class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-36 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"
+                  style="overflow: auto"></textarea>
+                </label>
+              </div>
+              <div class="flex px-4 py-3">
+                <button id="downloadFileButton" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#5bc0de] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] mr-2"><span class="truncate">Download File</span></button>
+                <button id="clearFileButton" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#f0ad4e] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em]"><span class="truncate">Clear</span></button>
+              </div>
+            </div>
+            <div id="transmissionEncryptionContent" style="display:none;">
+              <div class="flex items-center justify-start px-4 pb-3 pt-1">
+                <p class="text-white text-base font-normal leading-normal">This tab is for encrypting and decrypting data for secure transmission. It uses asymmetric encryption (ECIES) to ensure that only the intended recipient with the corresponding private key can decrypt the data.</p>
+                <button id="helpButtonTransmissionEncryption" class="flex max-w-[480px] cursor-pointer items-center justify-center rounded h-12 bg-transparent text-white gap-2 text-base font-bold leading-normal tracking-[-0.015em] min-w-0 p-0" style="margin-left: 8px;"><div class="text-white" data-icon="Question" data-size="24px" data-weight="regular"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"></path></svg></div></button>
+              </div>
+              <p id="transmissionEncryptionHelpText" class="text-white text-sm font-normal leading-normal px-4 py-2 bg-[#1f271b] rounded mt-2 mx-4" style="display: none;">
+                <strong>Transmission Encryption Help:</strong><br>
+                This section is for exchanging encrypted data with others. It uses ECIES (Elliptic Curve Integrated Encryption Scheme), a form of asymmetric cryptography.<br>
+                <strong>Key Pair Management:</strong> Generate a new key pair (public and private keys) and protect it with a passphrase. The keys are encrypted and downloaded. You can also upload an existing encrypted key pair and decrypt it with its passphrase to load your keys into the application. Your public key can be shared with others so they can encrypt data for you. Your private key must be kept secret and is required for decryption.<br>
+                <strong>nCode Workflow (Encrypting for others):</strong> Paste the recipient's public key, then either select a file or type/paste a string to encrypt. The output will be a .nCodeTransmission file, which you can send to the recipient.<br>
+                <strong>dCode Workflow (Decrypting received data):</strong> If you have your key pair loaded (private key is available), upload the .nCodeTransmission file. The decrypted content (string or file download link) will appear.
+              </p>
+              <div class="flex items-center gap-4 px-4 py-3">
+                <span class="text-white">nCode</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="transmission-mode-toggle" class="sr-only peer">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                </label>
+                <span class="text-white">dCode</span>
+                <button id="clearKeysButton" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#f0ad4e] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] ml-3">
+                  <span class="truncate">Clear</span>
+                </button>
+              </div>
+
+              <!-- Key Pair Management Section -->
+              <div id="key-pair-management-section" class="border-t border-[#43543b] mt-4 pt-4">
+                <h3 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2">Your Key Pair Management</h3>
+
+                <div id="key-generation-group-container">
+                  <!-- This h3 replaces the generate-key-pair-button -->
+                  <h3 class="text-white text-md font-bold leading-tight tracking-[-0.015em] px-4 py-3">Generate New Key Pair</h3>
+
+                  <div id="new-key-generation-elements">
+                    <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                      <label class="flex flex-col min-w-40 flex-1">
+                        <input type="password" id="keyGenPassphraseInput" placeholder="Passphrase for Key Protection" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] h-14 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"/>
+                      </label>
+                    </div>
+
+                    <div class="flex px-4 py-3 gap-2">
+                      <button id="generateAndDownloadKeysButton" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#47c10a] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                        <span class="truncate">Generate & Encrypt Keys</span>
+                      </button>
+                    </div>
+                    <div class="goldhash-result" id="keyGenGoldhashResult"></div>
+                  </div>
+                </div>
+
+                <div class="border-t border-[#43543b] mt-4 pt-4"></div>
+
+                <div class="flex px-4 py-3">
+                  <!-- ID changed -->
+                  <input type="file" id="uploadEncryptedKeysInput" style="display: none;" accept=".nCodeKeys,.json"/>
+                  <button onclick="document.getElementById('uploadEncryptedKeysInput').click();" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#2e3928] text-white text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Upload Encrypted Key Pair (.nCodeKeys)</span>
+                  </button>
+                </div>
+
+                <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                  <label class="flex flex-col min-w-40 flex-1">
+                    <!-- ID changed -->
+                    <input type="password" id="keyLoadPassphraseInput" placeholder="Passphrase to Decrypt Key Pair" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] h-14 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal"/>
+                  </label>
+                </div>
+
+                <div class="flex px-4 py-3">
+                  <!-- ID changed -->
+                  <button id="loadKeysButton" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#47c10a] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Load Key Pair</span>
+                  </button>
+                </div>
+                <div class="goldhash-result" id="keyLoadGoldhashResult"></div>
+
+                <div class="border-t border-[#43543b] mt-4 pt-4"></div>
+
+                <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                  <label class="flex flex-col min-w-40 flex-1">
+                    <p class="text-white text-base font-medium leading-normal pb-1">Loaded Public Key:</p>
+                    <!-- ID was already correct: public-key-display-area -->
+                    <textarea id="public-key-display-area" placeholder="No public key loaded." readonly class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-24 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal" style="overflow: auto"></textarea>
+                  </label>
+                </div>
+
+                <div class="flex px-4 py-3 gap-2">
+                  <!-- ID changed -->
+                  <button id="copyPublicKeyButton" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#5bc0de] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Copy Public Key</span>
+                  </button>
+                  <!-- ID changed -->
+                  </button>
+                  <!-- The clearKeysButton was moved up -->
+                </div>
+              </div>
+              <!-- End of Key Pair Management Section -->
+
+              <!-- NCode (Encrypt) Workflow Section -->
+              <div id="ncode-section" class="border-t border-[#43543b] mt-4 pt-4">
+                <h3 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2">nCode Workflow</h3>
+
+                <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                  <label class="flex flex-col min-w-40 flex-1">
+                    <p class="text-white text-base font-medium leading-normal pb-1">Recipient's Public Key:</p>
+                    <!-- ID changed -->
+                    <textarea id="recipientPublicKeyInput" placeholder="Paste recipient's public key here" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-24 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal" style="overflow: auto"></textarea>
+                  </label>
+                </div>
+
+                <div class="flex px-4 py-3">
+                  <!-- ID changed -->
+                  <input type="file" id="ncodeFileInput" style="display: none;" />
+                  <button onclick="document.getElementById('ncodeFileInput').click();" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#2e3928] text-white text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Select File to Encrypt (Optional)</span>
+                  </button>
+                </div>
+
+                <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
+                  <label class="flex flex-col min-w-40 flex-1">
+                     <p class="text-white text-base font-medium leading-normal pb-1">Or Enter String to Encrypt:</p>
+                     <!-- ID changed -->
+                    <textarea id="ncodeStringInput" placeholder="Enter string to encrypt here" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-36 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal" style="overflow: auto"></textarea>
+                  </label>
+                </div>
+                <div class="goldhash-result" id="ncodeGoldhashResult" style="margin-top: 10px;"></div>
+                <div class="flex px-4 py-3 gap-2">
+                  <!-- ID changed -->
+                  <button id="encryptAndDownloadButton" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#47c10a] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Encrypt for Transmission</span>
+                  </button>
+                  <!-- This button might be redundant. Keeping for now. -->
+                  <button id="download-transmission-button" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#5bc0de] text-[#131811] text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Download Encrypted Transmission (.nCodeTransmission)</span>
+                  </button>
+                </div>
+              </div>
+              <!-- End of NCode Workflow Section -->
+
+              <!-- DCode (Decrypt) Workflow Section -->
+              <div id="dcode-section" style="display: none;" class="border-t border-[#43543b] mt-4 pt-4">
+                <h3 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2">dCode Workflow</h3>
+
+                <div class="flex px-4 py-3">
+                  <!-- ID changed -->
+                  <input type="file" id="dcodeFileInput" style="display: none;" accept=".nCodeTransmission,.json"/>
+                  <button onclick="document.getElementById('dcodeFileInput').click();" class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded h-10 px-4 bg-[#2e3928] text-white text-sm font-bold leading-normal tracking-[0.015em] flex-1">
+                    <span class="truncate">Upload .nCodeTransmission File</span>
+                  </button>
+                </div>
+
+                <div id="dcode-results-area" class="px-4 py-3">
+                  <!-- Added dcodeStringOutput and dcodeFilesOutput -->
+                  <textarea id="dcodeStringOutput" readonly placeholder="Decrypted string content will appear here..." class="form-input mb-3 flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded text-white focus:outline-0 focus:ring-0 border border-[#43543b] bg-[#1f271b] focus:border-[#43543b] min-h-24 placeholder:text-[#a6ba9c] p-[15px] text-base font-normal leading-normal" style="overflow: auto"></textarea>
+                  <div id="dcodeFilesOutput" placeholder="Download links for decrypted files will appear here..."></div>
+                  <p id="awaiting-decryption-message" class="text-white text-base font-normal leading-normal">Awaiting decryption...</p> <!-- This can be removed or hidden by JS later -->
+                </div>
+                <div class="goldhash-result" id="dcodeGoldhashResult" style="margin-top: 10px;"></div>
+              </div>
+              <!-- End of DCode Workflow Section -->
+            </div>
+          </div>
+        </div>
+      </div>
+                <div class="bg-[#131811] text-center p-4 mt-8">
+        <p class="text-sm text-[#a6ba9c]">
+          &copy; <span id="currentYear"></span> Demicube |
+          <a href="privacy-policy.html" class="hover:text-white">Privacy Policy</a> |
+          Version: v3.2
+        </p>
+      </div>
+      <div><div class="h-5 bg-[#131811]"></div></div>
+    </div>
+    <script>
+      function showContent(contentIdToShow, clickedLink) {
+        // Get all content sections
+        const stringEncryptionContent = document.getElementById('stringEncryptionContent');
+        const passwordManagerContent = document.getElementById('passwordManagerContent');
+        const fileEncryptionContent = document.getElementById('fileEncryptionContent');
+
+        // Hide all content sections
+        if (stringEncryptionContent) stringEncryptionContent.style.display = 'none';
+        if (passwordManagerContent) passwordManagerContent.style.display = 'none';
+        if (fileEncryptionContent) fileEncryptionContent.style.display = 'none';
+        const transmissionEncryptionContent = document.getElementById('transmissionEncryptionContent');
+        if (transmissionEncryptionContent) transmissionEncryptionContent.style.display = 'none';
+
+        // Show the selected content section
+        const selectedContent = document.getElementById(contentIdToShow);
+        if (selectedContent) {
+          selectedContent.style.display = 'block';
+        }
+
+        // Update navigation link styles
+        const allNavLinks = clickedLink.parentNode.querySelectorAll('a');
+
+        allNavLinks.forEach(link => {
+          if (link !== clickedLink) {
+            if (link.classList.contains('border-b-white') || link.classList.contains('text-white')) {
+              link.classList.remove('border-b-white', 'text-white');
+              link.classList.add('border-b-transparent', 'text-[#a6ba9c]');
+              const pTag = link.querySelector('p');
+              if (pTag) {
+                pTag.classList.remove('text-white');
+                pTag.classList.add('text-[#a6ba9c]');
+              }
+            }
+          }
+        });
+
+        clickedLink.classList.remove('border-b-transparent', 'text-[#a6ba9c]');
+        clickedLink.classList.add('border-b-white', 'text-white');
+        const clickedPTag = clickedLink.querySelector('p');
+        if (clickedPTag) {
+          clickedPTag.classList.remove('text-[#a6ba9c]');
+          clickedPTag.classList.add('text-white');
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        // Default tab setup is handled by existing HTML.
+      });
+    </script>
+    <script src="scripts/goldhash.js"></script>
+    <script src="scripts/password-manager.js"></script>
+    <script src="scripts/file-encryption.js"></script>
+    <script src="scripts/transmission.js"></script>
+    <div id="toast-container"></div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Helper function to toggle visibility
+        function toggleHelpText(buttonId, textId) {
+            const button = document.getElementById(buttonId);
+            const textElement = document.getElementById(textId);
+            if (button && textElement) {
+                button.addEventListener('click', function() {
+                    if (textElement.style.display === 'none') {
+                        textElement.style.display = 'block';
+                    } else {
+                        textElement.style.display = 'none';
+                    }
+                });
+            }
+        }
+
+        // Setup toggles for each help section
+        toggleHelpText('helpButtonStringEncryption', 'stringEncryptionHelpText');
+        toggleHelpText('helpButtonPasswordManager', 'passwordManagerHelpText');
+        toggleHelpText('helpButtonFileEncryption', 'fileEncryptionHelpText');
+        toggleHelpText('helpButtonTransmissionEncryption', 'transmissionEncryptionHelpText');
+
+        // Also, ensure help text is hidden when tabs are switched
+        // This needs to be part of the same DOMContentLoaded or a subsequent one.
+        // The existing showContent function is global, so we can access it.
+        // However, to ensure this runs after initial tab setup, it's fine here.
+        // It's better to integrate this into the existing showContent or make it more robust.
+        // For now, this will attach to the links.
+        const navLinks = document.querySelectorAll('a[onclick^="showContent"]');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                // Hide all help texts when a tab is changed
+                const allHelpTexts = [
+                    document.getElementById('stringEncryptionHelpText'),
+                    document.getElementById('passwordManagerHelpText'),
+                    document.getElementById('fileEncryptionHelpText'),
+                    document.getElementById('transmissionEncryptionHelpText')
+                ];
+                allHelpTexts.forEach(helpText => {
+                    if (helpText && helpText.style.display !== 'none') { // Check if it's not already none
+                        helpText.style.display = 'none';
+                    }
+                });
+            });
+        });
+    });
+    </script>
+  </body>
+</html>
