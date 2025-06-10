@@ -1,5 +1,8 @@
+console.log("script.js loaded");
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOMContentLoaded event fired");
     const sidebarNav = document.getElementById('sidebar-nav');
+    console.log("sidebarNav element:", sidebarNav);
     const documentsTbody = document.getElementById('documents-tbody');
     const mainContent = document.querySelector('main.ml-80');
 
@@ -166,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
+        console.log("createSidebarEntry called for name:", name, "path:", path, "type:", type, "indentLevel:", indentLevel, "isTopLevel:", isTopLevel);
         const entryDiv = document.createElement('div');
         entryDiv.style.marginLeft = `${indentLevel * 20}px`; // Indentation
 
@@ -183,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
         link.appendChild(document.createTextNode(` ${name}`));
 
         entryDiv.appendChild(link);
+        console.log("About to append entryDiv for:", name, ". parentContainer:", parentContainer, "entryDiv:", entryDiv);
         parentContainer.appendChild(entryDiv);
 
         const subfoldersContainer = document.createElement('div');
@@ -217,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     // This is a subfolder like "Jokes Folder 1"
                     clearActiveStates();
-
+                    
                     // Keep "demo_files" (parent) highlighted
                     const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
                     if (demoFilesEntryLink) {
@@ -241,10 +246,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function loadDemoFolders() {
+        console.log("loadDemoFolders called");
         if (!sidebarNav) return;
+        if (sidebarNav) console.log("sidebarNav innerHTML before changes:", sidebarNav.innerHTML);
         sidebarNav.innerHTML = '';
 
         Object.keys(demoFilesData).forEach(itemName => { // e.g., "demo_files"
+            console.log("Processing demo_files item:", demoFilesData[itemName]);
             const item = demoFilesData[itemName];
             const itemContainer = createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true); // isTopLevel = true
 
@@ -291,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 0);
         }
+        if (sidebarNav) console.log("sidebarNav innerHTML after changes:", sidebarNav.innerHTML);
     }
 
     loadDemoFolders();
