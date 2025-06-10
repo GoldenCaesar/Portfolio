@@ -1,26 +1,86 @@
 document.addEventListener('DOMContentLoaded', () => {
     const sidebarNav = document.getElementById('sidebar-nav');
     const documentsTbody = document.getElementById('documents-tbody');
-    const mainContent = document.querySelector('main.ml-80'); // Used to display file content
+    const mainContent = document.querySelector('main.ml-80');
 
-    const demoFiles = {
-        "Jokes Folder 1": {
-            "joke1.txt": "Why don't scientists trust atoms? Because they make up everything!"
-        },
-        "Jokes Folder 2": {
-            "joke2.txt": "Why did the scarecrow win an award? Because he was outstanding in his field!"
-        },
-        "Jokes Folder 3": {
-            "joke3.txt": "Why don't skeletons fight each other? They don't have the guts."
+    // 1. Restructure demoFiles
+    const demoFilesData = {
+        "demo_files": {
+            "path": "demo_files", // Store path for clarity if needed
+            "type": "folder",
+            "children": {
+                "Jokes Folder 1": {
+                    "path": "demo_files/Jokes Folder 1",
+                    "type": "folder",
+                    "children": {
+                        "joke1.txt": {
+                            "path": "demo_files/Jokes Folder 1/joke1.txt",
+                            "type": "file",
+                            "content": "Why don't scientists trust atoms? Because they make up everything!"
+                        }
+                    }
+                },
+                "Jokes Folder 2": {
+                    "path": "demo_files/Jokes Folder 2",
+                    "type": "folder",
+                    "children": {
+                        "joke2.txt": {
+                            "path": "demo_files/Jokes Folder 2/joke2.txt",
+                            "type": "file",
+                            "content": "Why did the scarecrow win an award? Because he was outstanding in his field!"
+                        }
+                    }
+                },
+                "Jokes Folder 3": {
+                    "path": "demo_files/Jokes Folder 3",
+                    "type": "folder",
+                    "children": {
+                        "joke3.txt": {
+                            "path": "demo_files/Jokes Folder 3/joke3.txt",
+                            "type": "file",
+                            "content": "Why don't skeletons fight each other? They don't have the guts."
+                        }
+                    }
+                }
+            }
         }
     };
 
-    function displayFileContent(folderName, fileName) {
-        const content = demoFiles[folderName]?.[fileName];
+    let activeSubFolderLink = null;
+
+    function clearActiveStates() {
+        document.querySelectorAll('#sidebar-nav a, #sidebar-nav div[data-folder-path]').forEach(link => {
+            link.classList.remove('bg-[#1A2B3A]', 'text-white');
+            if (link.tagName === 'A' || link.dataset.folderPath) { // Ensure we only add text-slate-300 to appropriate elements
+                 link.classList.add('text-slate-300');
+            }
+        });
+    }
+
+    function setActiveState(element) {
+        element.classList.add('bg-[#1A2B3A]', 'text-white');
+        element.classList.remove('text-slate-300');
+    }
+
+    function displayFileContent(filePath) {
+        const parts = filePath.split('/');
+        let currentLevel = demoFilesData;
+        for (let i = 0; i < parts.length; i++) {
+            if (currentLevel[parts[i]] && currentLevel[parts[i]].children) {
+                currentLevel = currentLevel[parts[i]].children;
+            } else if (currentLevel[parts[i]] && currentLevel[parts[i]].type === 'file') {
+                currentLevel = currentLevel[parts[i]];
+                break;
+            } else {
+                currentLevel = null; // Path not found
+                break;
+            }
+        }
+
+        const content = currentLevel?.content;
+        const parentFolderPath = parts.slice(0, -1).join('/');
+
         if (content && mainContent) {
-            // Clear existing content in main area (documents table, stats, etc.)
-            // For simplicity, we'll just hide the existing sections and show the file content.
-            // A more robust solution might involve a dedicated content display area.
             const sectionsToHide = mainContent.querySelectorAll('section');
             sectionsToHide.forEach(section => section.style.display = 'none');
 
@@ -28,12 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!fileContentDiv) {
                 fileContentDiv = document.createElement('div');
                 fileContentDiv.id = 'file-content-display';
-                fileContentDiv.className = 'p-8 text-slate-100'; // Basic styling
+                fileContentDiv.className = 'p-8 text-slate-100';
                 mainContent.appendChild(fileContentDiv);
             }
-            fileContentDiv.style.display = 'block'; // Show file content display
+            fileContentDiv.style.display = 'block';
 
-            // Sanitize content before inserting as HTML
             const pre = document.createElement('pre');
             pre.textContent = content;
 
@@ -41,105 +100,166 @@ document.addEventListener('DOMContentLoaded', () => {
             backButton.textContent = 'Back to Files';
             backButton.className = 'mb-4 px-4 py-2 bg-[#0c7ff2] text-white rounded hover:bg-blue-600 transition-colors';
             backButton.onclick = () => {
-                sectionsToHide.forEach(section => section.style.display = 'block'); // Or 'flex' or 'grid' depending on original
+                sectionsToHide.forEach(section => section.style.display = 'block');
                 fileContentDiv.style.display = 'none';
-                // Redisplay the folder contents
-                displayFolderContents(folderName);
+                displayFolderContents(parentFolderPath); // Go back to the folder view
             };
 
-            fileContentDiv.innerHTML = ''; // Clear previous content
+            fileContentDiv.innerHTML = '';
             fileContentDiv.appendChild(backButton);
             fileContentDiv.appendChild(pre);
-
         } else {
+            console.error('File content not found for path:', filePath);
             alert('File content not found.');
         }
     }
 
-    function displayFolderContents(folderName) {
+    function displayFolderContents(folderPath) {
         if (!documentsTbody) return;
-        documentsTbody.innerHTML = ''; // Clear previous file list
+        documentsTbody.innerHTML = '';
 
-        // Make sure sections are visible if they were hidden by file display
         const sectionsToHide = mainContent.querySelectorAll('section');
-        sectionsToHide.forEach(section => section.style.display = 'block'); // Or original display type
+        sectionsToHide.forEach(section => section.style.display = 'block');
         let fileContentDiv = document.getElementById('file-content-display');
-        if (fileContentDiv) {
-            fileContentDiv.style.display = 'none';
+        if (fileContentDiv) fileContentDiv.style.display = 'none';
+
+        const parts = folderPath.split('/');
+        let currentLevel = demoFilesData;
+        for (const part of parts) {
+            if (currentLevel[part] && currentLevel[part].children) {
+                currentLevel = currentLevel[part].children;
+            } else {
+                 console.error("Folder not found in demoFilesData:", folderPath);
+                return; // Folder not found
+            }
         }
 
-
-        const files = demoFiles[folderName];
+        const files = currentLevel;
         if (files) {
-            Object.keys(files).forEach(fileName => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-[#1A2B3A] cursor-pointer'; // Add hover effect and cursor
+            Object.keys(files).forEach(itemName => {
+                const item = files[itemName];
+                if (item.type === 'file') {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-[#1A2B3A] cursor-pointer';
 
-                const nameTd = document.createElement('td');
-                nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
-                nameTd.textContent = fileName;
+                    const nameTd = document.createElement('td');
+                    nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
+                    nameTd.textContent = itemName;
 
-                // For demo purposes, Last Modified and Size are static
-                const modifiedTd = document.createElement('td');
-                modifiedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
-                modifiedTd.textContent = '2024-03-10 10:00 AM'; // Static date
+                    const modifiedTd = document.createElement('td');
+                    modifiedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+                    modifiedTd.textContent = '2024-03-11 10:00 AM'; // Static
 
-                const sizeTd = document.createElement('td');
-                sizeTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
-                sizeTd.textContent = '1 KB'; // Static size
+                    const sizeTd = document.createElement('td');
+                    sizeTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+                    sizeTd.textContent = '1 KB'; // Static
 
-                tr.appendChild(nameTd);
-                tr.appendChild(modifiedTd);
-                tr.appendChild(sizeTd);
+                    tr.appendChild(nameTd);
+                    tr.appendChild(modifiedTd);
+                    tr.appendChild(sizeTd);
 
-                tr.addEventListener('click', () => displayFileContent(folderName, fileName));
-                documentsTbody.appendChild(tr);
+                    tr.addEventListener('click', () => displayFileContent(item.path));
+                    documentsTbody.appendChild(tr);
+                }
             });
         }
     }
 
+    function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
+        const entryDiv = document.createElement('div');
+        entryDiv.style.marginLeft = `${indentLevel * 20}px`; // Indentation
+
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
+        link.dataset.folderPath = path; // Store path for identification
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'material-icons-outlined text-slate-400';
+        iconSpan.style.fontSize = '20px';
+        iconSpan.textContent = type === 'folder' ? 'folder' : 'description'; // 'description' for file icon
+
+        link.appendChild(iconSpan);
+        link.appendChild(document.createTextNode(` ${name}`));
+
+        entryDiv.appendChild(link);
+        parentContainer.appendChild(entryDiv);
+
+        const subfoldersContainer = document.createElement('div');
+        subfoldersContainer.className = 'subfolder-container';
+        subfoldersContainer.style.display = isTopLevel ? 'block' : 'none'; // Top level (demo_files) children visible by default
+        if (isTopLevel && type === 'folder') { // Keep demo_files content (subfolders) always visible
+            link.classList.add('bg-[#1A2B3A]', 'text-white'); // Keep demo_files highlighted
+            link.classList.remove('text-slate-300');
+        }
+        entryDiv.appendChild(subfoldersContainer);
+
+
+        if (type === 'folder') {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const isTopLevelDemoFiles = path === "demo_files";
+
+                if (!isTopLevelDemoFiles) { // Only sub-folders trigger content display and active state change
+                    clearActiveStates();
+                    // Keep "demo_files" (parent) highlighted
+                     const demoFilesEntry = document.querySelector('#sidebar-nav div[data-folder-path="demo_files"] > a');
+                    if (demoFilesEntry) setActiveState(demoFilesEntry);
+
+                    setActiveState(link);
+                    activeSubFolderLink = link;
+                    displayFolderContents(path);
+                }
+
+                // Toggle subfolders for non-top-level folders that are not the one being clicked for content
+                 if (!isTopLevelDemoFiles) {
+                     const currentlyOpen = document.querySelector('.subfolder-container[style*="display: block"]');
+                     if (currentlyOpen && currentlyOpen !== subfoldersContainer) {
+                        // currentlyOpen.style.display = 'none'; // This would hide others, not desired here
+                     }
+                 }
+                 // For the main 'demo_files', its children are always shown, so no toggle needed for its own link click.
+                 // For sub-folders, they don't have further subfolders in this demo structure.
+            });
+        }
+        return subfoldersContainer;
+    }
+
+
     function loadDemoFolders() {
         if (!sidebarNav) return;
-        sidebarNav.innerHTML = ''; // Clear existing (should be empty from HTML modification)
+        sidebarNav.innerHTML = '';
 
-        Object.keys(demoFiles).forEach(folderName => {
-            const a = document.createElement('a');
-            a.href = '#'; // Prevent page navigation
-            a.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
+        Object.keys(demoFilesData).forEach(itemName => { // e.g., "demo_files"
+            const item = demoFilesData[itemName];
+            const itemContainer = createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true); // isTopLevel = true
 
-            const iconSpan = document.createElement('span');
-            iconSpan.className = 'material-icons-outlined text-slate-400';
-            iconSpan.style.fontSize = '20px';
-            iconSpan.textContent = 'folder';
-
-            a.appendChild(iconSpan);
-            a.append(` ${folderName}`); // Add folder name text node
-
-            a.addEventListener('click', (e) => {
-                e.preventDefault(); // Prevent default anchor behavior
-
-                // Remove 'bg-[#1A2B3A]' from all other links and add to current
-                document.querySelectorAll('#sidebar-nav a').forEach(link => {
-                    link.classList.remove('bg-[#1A2B3A]');
-                    link.classList.add('text-slate-300');
+            if (item.type === 'folder' && item.children) {
+                Object.keys(item.children).forEach(subItemName => { // e.g., "Jokes Folder 1"
+                    const subItem = item.children[subItemName];
+                    createSidebarEntry(subItemName, subItem.path, subItem.type, 1, itemContainer);
                 });
-                a.classList.add('bg-[#1A2B3A]');
-                a.classList.remove('text-slate-300');
-
-                displayFolderContents(folderName);
-            });
-            sidebarNav.appendChild(a);
+            }
         });
 
-        // Optionally, display contents of the first folder by default
-        if (Object.keys(demoFiles).length > 0) {
-            const firstFolderName = Object.keys(demoFiles)[0];
-            const firstFolderLink = sidebarNav.querySelector('a');
-            if (firstFolderLink) {
-                 firstFolderLink.classList.add('bg-[#1A2B3A]'); // Highlight first folder
-                 firstFolderLink.classList.remove('text-slate-300');
-            }
-            displayFolderContents(firstFolderName);
+        // Automatically display contents of the first sub-folder of "demo_files"
+        const firstDemoSubfolderPath = demoFilesData.demo_files?.children
+            ? Object.values(demoFilesData.demo_files.children)[0]?.path
+            : null;
+
+        if (firstDemoSubfolderPath) {
+            displayFolderContents(firstDemoSubfolderPath);
+            // Set active state for the first subfolder
+            setTimeout(() => { // Use timeout to ensure elements are rendered
+                const firstSubfolderLink = document.querySelector(`#sidebar-nav a[data-folder-path="${firstDemoSubfolderPath}"]`);
+                if (firstSubfolderLink) {
+                    // clearActiveStates(); // Already called or will be by click simulation
+                     const demoFilesEntry = document.querySelector('#sidebar-nav div[data-folder-path="demo_files"] > a');
+                    if (demoFilesEntry) setActiveState(demoFilesEntry); // Highlight "demo_files"
+                    setActiveState(firstSubfolderLink); // Highlight the subfolder
+                    activeSubFolderLink = firstSubfolderLink;
+                }
+            }, 0);
         }
     }
 
