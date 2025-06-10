@@ -2,7 +2,7 @@
 <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
 <link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B600%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" onload="this.rel='stylesheet'" rel="stylesheet"/>
 <title>Demicube GoldHash - File Integrity Monitor</title>
-<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<link href="../../assets/Demicube.png" rel="icon" type="image/x-icon"/>
 <meta charset="utf-8"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
@@ -97,7 +97,7 @@
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 <div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
 <p class="text-sm font-medium text-slate-400">Files Monitored</p>
-<p class="text-3xl font-bold text-slate-100">1,234</p>
+<p class="text-3xl font-bold text-slate-100" id="files-monitored-count">1,234</p>
 </div>
 <div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
 <p class="text-sm font-medium text-slate-400">Files Changed</p>
@@ -105,7 +105,7 @@
 </div>
 <div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
 <p class="text-sm font-medium text-slate-400">Log Size</p>
-<p class="text-3xl font-bold text-slate-100">10 MB</p>
+<p class="text-3xl font-bold text-slate-100" id="log-size-display">10 MB</p>
 </div>
 </div>
 </section>
