@@ -187,9 +187,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subfoldersContainer = document.createElement('div');
         subfoldersContainer.className = 'subfolder-container';
-        subfoldersContainer.style.display = isTopLevel ? 'block' : 'none'; // Top level (demo_files) children visible by default
-        if (isTopLevel && type === 'folder') { // Keep demo_files content (subfolders) always visible
-            link.classList.add('bg-[#1A2B3A]', 'text-white'); // Keep demo_files highlighted
+        // Initial state: hide "demo_files" children, show others if they were top-level (though current structure only has "demo_files" as top-level)
+        if (path === "demo_files") {
+            subfoldersContainer.style.display = 'none';
+        } else {
+            subfoldersContainer.style.display = isTopLevel ? 'block' : 'none';
+        }
+
+        // Keep demo_files itself highlighted if it's the main top-level entry, but not its children initially.
+        if (isTopLevel && path === "demo_files" && type === 'folder') {
+            link.classList.add('bg-[#1A2B3A]', 'text-white');
             link.classList.remove('text-slate-300');
         }
         entryDiv.appendChild(subfoldersContainer);
@@ -198,28 +205,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'folder') {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const isTopLevelDemoFiles = path === "demo_files";
 
-                if (!isTopLevelDemoFiles) { // Only sub-folders trigger content display and active state change
+                if (path === "demo_files") {
+                    // Toggle display of subfoldersContainer for "demo_files"
+                    const isHidden = subfoldersContainer.style.display === 'none';
+                    subfoldersContainer.style.display = isHidden ? 'block' : 'none';
+                    // Optionally, change icon
+                    iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
+                    // Do not call displayFolderContents for "demo_files" itself
+                    // Do not change active states of sub-folders here
+                } else {
+                    // This is a subfolder like "Jokes Folder 1"
                     clearActiveStates();
+
                     // Keep "demo_files" (parent) highlighted
-                     const demoFilesEntry = document.querySelector('#sidebar-nav div[data-folder-path="demo_files"] > a');
-                    if (demoFilesEntry) setActiveState(demoFilesEntry);
+                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                    if (demoFilesEntryLink) {
+                        setActiveState(demoFilesEntryLink);
+                         // Ensure its icon reflects open state if its subfolders are visible (which they would be if a child is clicked)
+                        const demoFilesSubfoldersContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                        if (demoFilesSubfoldersContainer && demoFilesSubfoldersContainer.style.display === 'block') {
+                            const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                            if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
+                        }
+                    }
 
                     setActiveState(link);
                     activeSubFolderLink = link;
                     displayFolderContents(path);
                 }
-
-                // Toggle subfolders for non-top-level folders that are not the one being clicked for content
-                 if (!isTopLevelDemoFiles) {
-                     const currentlyOpen = document.querySelector('.subfolder-container[style*="display: block"]');
-                     if (currentlyOpen && currentlyOpen !== subfoldersContainer) {
-                        // currentlyOpen.style.display = 'none'; // This would hide others, not desired here
-                     }
-                 }
-                 // For the main 'demo_files', its children are always shown, so no toggle needed for its own link click.
-                 // For sub-folders, they don't have further subfolders in this demo structure.
             });
         }
         return subfoldersContainer;
@@ -252,11 +266,27 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set active state for the first subfolder
             setTimeout(() => { // Use timeout to ensure elements are rendered
                 const firstSubfolderLink = document.querySelector(`#sidebar-nav a[data-folder-path="${firstDemoSubfolderPath}"]`);
-                if (firstSubfolderLink) {
-                    // clearActiveStates(); // Already called or will be by click simulation
-                     const demoFilesEntry = document.querySelector('#sidebar-nav div[data-folder-path="demo_files"] > a');
-                    if (demoFilesEntry) setActiveState(demoFilesEntry); // Highlight "demo_files"
-                    setActiveState(firstSubfolderLink); // Highlight the subfolder
+                const demoFilesLinkElement = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]'); // Corrected selector for the link
+
+                if (firstSubfolderLink && demoFilesLinkElement) {
+                    // Highlight "demo_files"
+                    setActiveState(demoFilesLinkElement);
+
+                    // Expand "demo_files" and update its icon
+                    const demoFilesDiv = demoFilesLinkElement.closest('div'); // Get the main div for "demo_files"
+                    if (demoFilesDiv) {
+                        const subfoldersContainer = demoFilesDiv.querySelector('.subfolder-container');
+                        if (subfoldersContainer) {
+                            subfoldersContainer.style.display = 'block';
+                        }
+                        const iconSpan = demoFilesLinkElement.querySelector('.material-icons-outlined');
+                        if (iconSpan) {
+                            iconSpan.textContent = 'folder_open';
+                        }
+                    }
+
+                    // Highlight the first subfolder
+                    setActiveState(firstSubfolderLink);
                     activeSubFolderLink = firstSubfolderLink;
                 }
             }, 0);
