@@ -1,4 +1,18 @@
 console.log("script.js loaded");
+
+// Function to recursively count files
+function countFiles(data) {
+    let count = 0;
+    for (const key in data) {
+        if (data[key].type === 'file') {
+            count++;
+        } else if (data[key].type === 'folder' && data[key].children) {
+            count += countFiles(data[key].children);
+        }
+    }
+    return count;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired");
     const sidebarNav = document.getElementById('sidebar-nav');
@@ -48,6 +62,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    // Update files monitored count
+    const filesMonitoredElement = document.getElementById('files-monitored-count');
+    if (filesMonitoredElement && typeof demoFilesData !== 'undefined' && demoFilesData.demo_files && demoFilesData.demo_files.children) {
+        const totalFiles = countFiles(demoFilesData.demo_files.children);
+        filesMonitoredElement.textContent = totalFiles.toLocaleString();
+    } else {
+        console.error("Files monitored element not found or demoFilesData structure is not as expected.");
+    }
+
+    // Update Log Size display (placeholder)
+    const logSizeElement = document.getElementById('log-size-display');
+    if (logSizeElement) {
+        // This is a placeholder value.
+        // For a live application, dynamic log size updates would typically require
+        // server-side logic to calculate directory/file sizes and an API endpoint
+        // to fetch this data, or Node.js 'fs' module if running in a Node environment
+        // with direct file system access (not applicable for client-side browser JS).
+        // Since the "Logs" folder is currently just for demonstration and might only
+        // contain a .gitkeep file, we'll set a minimal representative size.
+        logSizeElement.textContent = "1 KB"; // Representing .gitkeep or minimal folder size
+    } else {
+        console.error("Log size display element not found.");
+    }
 
     let activeSubFolderLink = null;
 
