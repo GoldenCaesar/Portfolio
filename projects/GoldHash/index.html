@@ -1,0 +1,198 @@
+<html><head>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B600%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<title>Demicube GoldHash - File Integrity Monitor</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<meta charset="utf-8"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<style>
+      .material-icons-outlined {
+        font-weight: normal;
+        font-style: normal;
+        font-size: 24px;display: inline-block;
+        line-height: 1;
+        text-transform: none;
+        letter-spacing: normal;
+        word-wrap: normal;
+        white-space: nowrap;
+        direction: ltr;-webkit-font-smoothing: antialiased;text-rendering: optimizeLegibility;-moz-osx-font-smoothing: grayscale;font-feature-settings: "liga";
+      }
+    </style>
+</head>
+<body class="bg-[#0E1923]">
+<div class="relative flex size-full min-h-screen flex-col text-white dark group/design-root overflow-x-hidden" style='font-family: Inter, "Noto Sans", sans-serif;'>
+<div class="flex h-full grow">
+<aside class="fixed left-0 top-0 z-10 flex h-full w-80 flex-col border-r border-r-[#1A2B3A] bg-[#0E1923] p-6">
+<div class="flex items-center justify-between pb-6">
+<div class="flex items-center gap-3">
+<div class="text-[#0c7ff2]" data-icon="Gear" data-size="28px" data-weight="regular">
+<span class="material-icons-outlined" style="font-size: 28px"> settings </span>
+</div>
+<h1 class="text-xl font-semibold">Settings</h1>
+</div>
+</div>
+<button class="flex w-full min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-[#0c7ff2] text-white text-sm font-semibold leading-normal tracking-[0.015em] mb-4 hover:bg-blue-600 transition-colors">
+<span class="material-icons-outlined" style="font-size: 20px"> create_new_folder </span>
+<span class="truncate">Add Folder</span>
+</button>
+<nav class="flex-grow space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 rounded-lg bg-[#1A2B3A] px-3 py-2.5 text-sm font-medium transition-colors hover:bg-[#223649]" href="#">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> folder </span>
+              /Users/johndoe/Documents
+            </a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]" href="#">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> folder </span>
+              /Users/johndoe/Downloads
+            </a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]" href="#">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> folder </span>
+              /Users/johndoe/Pictures
+            </a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]" href="#">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> folder </span>
+              /Users/johndoe/Desktop
+            </a>
+<a class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]" href="#">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> folder </span>
+              /Users/johndoe/Applications
+            </a>
+</nav>
+<div class="mt-auto space-y-2 border-t border-t-[#1A2B3A] pt-4">
+<button class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> edit </span>
+              Edit
+            </button>
+<button class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> scanner </span>
+              Scan
+            </button>
+<p class="mt-2 px-3 text-xs font-medium text-slate-400">Last scan: 2024-01-20 10:00 AM</p>
+</div>
+</aside>
+<main class="ml-80 flex-1 overflow-y-auto bg-[#101A23]">
+<header class="sticky top-0 z-10 flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#1A2B3A] bg-[#101A23]/80 px-10 py-4 backdrop-blur-md">
+<div class="flex items-center gap-3">
+<div class="size-7 text-[#0c7ff2]">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-xl font-bold leading-tight tracking-[-0.015em]">Demicube GoldHash</h2>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-sm text-slate-400">File Integrity Monitor</span>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDv-GRWPhYqxYumhKsse2e9ie-yz-SrVq32597_jQ3jIKJhXf2sCJLbug_k4COTCMCWnbEz3FSoqotmw3_m9P7oTZ6HtgfXi3SZkPsYbA01MaPicf0V-dyfnxbfdPIHEsudNYw0fEsJhK1OTGQDAwRv0OmpYUoiL9Fd8bJ79h6v7wGRchS50BfzusH1quhvxDIvCfF9ffVVG1xR98G6rqs0t0U9Hj_V-GXdgGxAmz3LImlWyZQaXLdxyb77B5i03BXY-pf17nD4VC4");'></div>
+</div>
+</header>
+<div class="p-8 @container">
+<section class="mb-8">
+<h2 class="mb-4 text-2xl font-semibold text-slate-100">Documents</h2>
+<div class="overflow-hidden rounded-lg border border-[#1A2B3A] bg-[#0E1923] shadow-lg">
+<table class="w-full">
+<thead class="bg-[#1A2B3A]">
+<tr>
+<th class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Name</th>
+<th class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                        Last Modified
+                      </th>
+<th class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Size</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#1A2B3A]">
+<tr>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100">Report.pdf</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 whitespace-nowrap px-6 py-4 text-sm text-slate-300">2024-01-15 09:00 AM</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 whitespace-nowrap px-6 py-4 text-sm text-slate-300">2.5 MB</td>
+</tr>
+<tr>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100">Presentation.pptx</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 whitespace-nowrap px-6 py-4 text-sm text-slate-300">2024-01-10 02:00 PM</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 whitespace-nowrap px-6 py-4 text-sm text-slate-300">5.0 MB</td>
+</tr>
+<tr>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100">Spreadsheet.xlsx</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 whitespace-nowrap px-6 py-4 text-sm text-slate-300">2024-01-05 11:00 AM</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 whitespace-nowrap px-6 py-4 text-sm text-slate-300">1.2 MB</td>
+</tr>
+<tr>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100">
+                        Project Proposal.docx
+                      </td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 whitespace-nowrap px-6 py-4 text-sm text-slate-300">2023-12-20 04:00 PM</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 whitespace-nowrap px-6 py-4 text-sm text-slate-300">3.8 MB</td>
+</tr>
+<tr>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100">Meeting Notes.txt</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 whitespace-nowrap px-6 py-4 text-sm text-slate-300">2023-12-15 10:00 AM</td>
+<td class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 whitespace-nowrap px-6 py-4 text-sm text-slate-300">0.5 MB</td>
+</tr>
+</tbody>
+</table>
+</div>
+<style>
+                @container (max-width: 640px) {
+                  .table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240,
+                  .table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 {
+                    display: none;
+                  }
+                }
+              </style>
+</section>
+<section class="mb-8">
+<h2 class="mb-4 text-2xl font-semibold text-slate-100">Statistics</h2>
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+<div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<p class="text-sm font-medium text-slate-400">Files Monitored</p>
+<p class="text-3xl font-bold text-slate-100">1,234</p>
+</div>
+<div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<p class="text-sm font-medium text-slate-400">Files Changed</p>
+<p class="text-3xl font-bold text-slate-100">56</p>
+</div>
+<div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<p class="text-sm font-medium text-slate-400">Log Size</p>
+<p class="text-3xl font-bold text-slate-100">10 MB</p>
+</div>
+</div>
+</section>
+<section>
+<h2 class="mb-4 text-2xl font-semibold text-slate-100">File Changes Over Time</h2>
+<div class="rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<div class="flex items-baseline justify-between">
+<div>
+<p class="text-sm font-medium text-slate-400">Total Changes</p>
+<p class="text-3xl font-bold text-slate-100">56</p>
+</div>
+<div class="flex items-center gap-1">
+<p class="text-sm text-slate-400">Last 30 Days</p>
+<p class="text-sm font-medium text-[#0BDA5B]">+10%</p>
+</div>
+</div>
+<div class="mt-6 flex min-h-[200px] flex-1 flex-col">
+<svg fill="none" height="100%" preserveAspectRatio="xMidYMax meet" viewBox="-3 0 478 150" width="100%" xmlns="http://www.w3.org/2000/svg">
+<path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V149H326.769H0V109Z" fill="url(#paint0_linear_1131_5935)"></path>
+<path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25" stroke="#0c7ff2" stroke-linecap="round" stroke-width="3"></path>
+<defs>
+<linearGradient gradientUnits="userSpaceOnUse" id="paint0_linear_1131_5935" x1="236" x2="236" y1="1" y2="149">
+<stop stop-color="#0c7ff2" stop-opacity="0.3"></stop>
+<stop offset="1" stop-color="#0c7ff2" stop-opacity="0"></stop>
+</linearGradient>
+</defs>
+</svg>
+<div class="mt-4 flex justify-around border-t border-dashed border-slate-700 pt-3">
+<p class="text-xs font-medium text-slate-400">Jan 1</p>
+<p class="text-xs font-medium text-slate-400">Jan 5</p>
+<p class="text-xs font-medium text-slate-400">Jan 10</p>
+<p class="text-xs font-medium text-slate-400">Jan 15</p>
+<p class="text-xs font-medium text-slate-400">Jan 20</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>
