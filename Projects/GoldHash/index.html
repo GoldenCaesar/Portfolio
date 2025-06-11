@@ -25,9 +25,17 @@
 <div class="flex h-full grow">
 <aside class="fixed left-0 top-0 z-10 flex h-full w-80 flex-col border-r border-r-[#1A2B3A] bg-[#0E1923] p-6">
 <div class="flex items-center justify-between pb-6">
-<div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 relative">
 <div class="text-[#0c7ff2]" data-icon="Gear" data-size="28px" data-weight="regular">
 <span class="material-icons-outlined" style="font-size: 28px"> settings </span>
+            </div>
+            <div id="settings-context-menu" class="absolute top-10 left-0 mt-2 w-48 bg-[#1A2B3A] rounded-md shadow-lg z-20 hidden">
+              <ul class="py-1">
+                <li>
+                  <a href="#" id="clear-logs-button" class="block px-4 py-2 text-sm text-slate-300 hover:bg-[#0E1923] hover:text-white">Clear Logs</a>
+                </li>
+                <!-- More items can be added here later -->
+              </ul>
 </div>
 <h1 class="text-xl font-semibold">Settings</h1>
 </div>
@@ -43,7 +51,7 @@
 <span class="material-icons-outlined text-slate-400" style="font-size: 20px"> edit </span>
               Edit
             </button>
-<button class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]">
+<button id="scan-files-button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]">
 <span class="material-icons-outlined text-slate-400" style="font-size: 20px"> scanner </span>
               Scan
             </button>
@@ -71,26 +79,18 @@
 <div class="overflow-hidden rounded-lg border border-[#1A2B3A] bg-[#0E1923] shadow-lg">
 <table class="w-full">
 <thead class="bg-[#1A2B3A]">
-<tr>
-<th class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-120 px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Name</th>
-<th class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240 px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                        Last Modified
-                      </th>
-<th class="table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Size</th>
-</tr>
+    <tr>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Name</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Current Hash</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Last Checked</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Full Path</th>
+    </tr>
 </thead>
 <tbody class="divide-y divide-[#1A2B3A]" id="documents-tbody">
 </tbody>
 </table>
 </div>
-<style>
-                @container (max-width: 640px) {
-                  .table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-240,
-                  .table-9e93adbd-9b96-4203-8d28-0f3ea4a91f97-column-360 {
-                    display: none;
-                  }
-                }
-              </style>
 </section>
 <section class="mb-8">
 <h2 class="mb-4 text-2xl font-semibold text-slate-100">Statistics</h2>
