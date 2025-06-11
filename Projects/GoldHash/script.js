@@ -469,8 +469,8 @@ function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0
     if (type === 'folder' || type === 'user-folder') {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            clearActiveStates();
-            setActiveState(link);
+            sidebarManager.clearActiveStates();
+            sidebarManager.setActiveState(link);
             activeSubFolderLink = link;
 
             if (path === "demo_files") {
@@ -491,25 +491,25 @@ function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0
             } else { // This is a subfolder of "demo_files"
                 const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
                 if (demoFilesEntryLink) {
-                    setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
+                    sidebarManager.setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
                     const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
                     if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
                     const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
                     if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'block';
                 }
-                setActiveState(link); // Then highlight the actual subfolder
+                sidebarManager.setActiveState(link); // Then highlight the actual subfolder
                 displayFolderContents(path);
             }
         });
     } else if (type === 'file') {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-             clearActiveStates();
+             sidebarManager.clearActiveStates();
              // Highlight parent folder and this file link
              const parentPath = path.substring(0, path.lastIndexOf('/'));
              const parentLink = document.querySelector(`#sidebar-nav a[data-folder-path="${parentPath}"]`);
-             setActiveState(parentLink);
-             setActiveState(link);
+             sidebarManager.setActiveState(parentLink);
+             sidebarManager.setActiveState(link);
              displayFileContent(path);
         });
     }
@@ -625,7 +625,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function clearActiveStates() {
+    const sidebarManager = {};
+
+    sidebarManager.clearActiveStates = function() {
         document.querySelectorAll('#sidebar-nav a, #sidebar-nav div[data-folder-path]').forEach(link => {
             link.classList.remove('bg-[#1A2B3A]', 'text-white');
             if (link.tagName === 'A' || link.dataset.folderPath) {
@@ -634,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function setActiveState(element) {
+    sidebarManager.setActiveState = function(element) {
         if (element) {
             element.classList.add('bg-[#1A2B3A]', 'text-white');
             element.classList.remove('text-slate-300');
@@ -693,24 +695,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (initialFolderPathToDisplay) {
             displayDocumentFiles(initialFolderPathToDisplay);
             setTimeout(() => {
-                clearActiveStates(); // Clear any prematurely set active states
+                sidebarManager.clearActiveStates(); // Clear any prematurely set active states
                 const targetLink = document.querySelector(`#sidebar-nav a[data-folder-path="${initialFolderPathToDisplay}"]`);
                 if (targetLink) {
-                    setActiveState(targetLink);
+                    sidebarManager.setActiveState(targetLink);
                     activeSubFolderLink = targetLink; // Update global active link
 
                     if (isDemoFolderSelected && initialFolderPathToDisplay !== "demo_files") {
                         // If a demo subfolder is selected, ensure "demo_files" is visually open
                         const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
                         if (demoFilesEntryLink) {
-                            setActiveState(demoFilesEntryLink); // Highlight "demo_files" as well (as parent)
+                            sidebarManager.setActiveState(demoFilesEntryLink); // Highlight "demo_files" as well (as parent)
                             const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
                             if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
                             const demoFilesSubContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
                             if (demoFilesSubContainer) demoFilesSubContainer.style.display = 'block';
 
                             // Re-set the actual targetLink active as setActiveState on demoFilesLink might have cleared others
-                            setActiveState(targetLink);
+                            sidebarManager.setActiveState(targetLink);
                         }
                     } else if (initialFolderPathToDisplay === "demo_files"){
                          // If "demo_files" itself is selected, ensure its icon is 'folder' (not 'folder_open' unless clicked)
