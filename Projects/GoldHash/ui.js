@@ -132,6 +132,12 @@ function displayActivityLog() {
                 statusTd.classList.add('text-green-400');
                 break;
             // No 'Not Scanned' case needed here as fileLog only contains scanned files
+            case 'path_updated': // New status
+                statusTd.classList.add('text-purple-400'); // Example color
+                break;
+            case 'duplicate': // New status
+                statusTd.classList.add('text-cyan-400'); // Example color
+                break;
             default:
                 statusTd.classList.add('text-slate-300');
         }
@@ -192,6 +198,13 @@ function displayLoggedFiles(logEntriesToDisplay) {
                 break;
             case 'Not Scanned': // Handle "Not Scanned" status
                 statusTd.classList.add('text-gray-500'); // Or any other appropriate color
+                break;
+            // ADD NEW CASES HERE:
+            case 'path_updated': // New status
+                statusTd.classList.add('text-purple-400'); // Example color
+                break;
+            case 'duplicate': // New status
+                statusTd.classList.add('text-cyan-400'); // Example color
                 break;
             default:
                 statusTd.classList.add('text-slate-300');
