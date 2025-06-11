@@ -579,6 +579,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false, children = null) {
+        if (type === 'file') {
+            // If it's a file, don't create a sidebar entry for it.
+            // Files will be handled by displayFolderContents when a folder is clicked.
+            return;
+        }
         console.log("createSidebarEntry called for name:", name, "path:", path, "type:", type, "indentLevel:", indentLevel, "isTopLevel:", isTopLevel);
         const entryDiv = document.createElement('div');
         entryDiv.style.marginLeft = `${indentLevel * 20}px`; // Indentation
