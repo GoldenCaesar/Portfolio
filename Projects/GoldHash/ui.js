@@ -46,6 +46,13 @@ window.demoFilesData = { // Moved from DOMContentLoaded
 
 // --- UI Display and Update Functions ---
 
+function updateFilesChangedCount(count) {
+    const filesChangedElement = document.querySelector('div.grid div:nth-child(2) p.text-3xl');
+    if (filesChangedElement) {
+        filesChangedElement.textContent = count.toLocaleString();
+    }
+}
+
 function updateFileMonitoredCount() {
     const filesMonitoredElement = document.getElementById('files-monitored-count');
     if (filesMonitoredElement && window.fileLog) {

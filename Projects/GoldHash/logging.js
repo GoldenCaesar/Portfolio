@@ -225,10 +225,9 @@ async function scanFiles() {
     if (typeof window.updateLastScanTime === "function") window.updateLastScanTime();
 
     // Update "Files Changed" count in statistics (this element is in HTML, updated by ui.js function if one exists, or directly)
-    const filesChangedElement = document.querySelector('div.grid div:nth-child(2) p.text-3xl');
-    if (filesChangedElement) {
-        const modifiedCount = window.fileLog.filter(entry => entry.status === 'modified').length;
-        filesChangedElement.textContent = modifiedCount.toLocaleString();
+    const modifiedCount = window.fileLog.filter(entry => entry.status === 'modified').length;
+    if (typeof window.updateFilesChangedCount === "function") {
+        window.updateFilesChangedCount(modifiedCount);
     }
 
     // Refresh the displayed table based on current view (call ui.js function)
@@ -252,11 +251,6 @@ async function scanFiles() {
     if (typeof window.displayActivityLog === "function") window.displayActivityLog(); // Refresh activity log
 
     console.log(`File scan complete (logging.js). New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}. Log updated.`);
-    alert(`File scan complete!
-New files: ${newFilesAdded}
-Modified files: ${filesModified}
-Verified files: ${filesVerified}
-Log has been updated.`);
 }
 
 // Ensure logging.js is loaded, then ui.js, then script.js for dependency reasons if not using modules.
@@ -273,3 +267,10 @@ Log has been updated.`);
 // The most robust way is for UI functions to always read from a single global `fileLog` (window.fileLog) managed by `logging.js`.
 // `ui.js`'s local `let fileLog = []` declaration will be removed in the next step.
 console.log("logging.js fully parsed and initialized. fileLog is now global (window.fileLog).");
+
+// Alert must be the final action after all UI updates.
+alert(`File scan complete!
+New files: ${newFilesAdded}
+Modified files: ${filesModified}
+Verified files: ${filesVerified}
+Log has been updated.`);
