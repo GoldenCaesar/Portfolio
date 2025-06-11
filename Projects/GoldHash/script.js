@@ -423,6 +423,64 @@ document.addEventListener('DOMContentLoaded', () => {
         return currentItem;
     }
 
+    // Helper function to get a folder item by its path from demoFilesData or userUploadedFolders
+    function getFolderItemByPath(path) {
+        if (!path || typeof path !== 'string') {
+            console.warn("getFolderItemByPath: Invalid path provided.");
+            return null;
+        }
+
+        // 1. Attempt to find in demoFilesData
+        // Assuming demoFilesData is accessible in this scope
+        const demoItem = findItemInData(path, demoFilesData); // findItemInData needs to be defined before this or hoisted
+        if (demoItem && demoItem.type === 'folder') {
+            return demoItem;
+        }
+
+        // 2. Attempt to find in userUploadedFolders
+        // Assuming userUploadedFolders is accessible in this scope
+        const parts = path.split('/');
+        if (parts.length === 0) return null;
+
+        let currentLevel = userUploadedFolders;
+        let item = null;
+
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (i === 0) { // First part is the top-level folder name
+                if (currentLevel[part] && currentLevel[part].path === path && currentLevel[part].type === 'folder') {
+                    // This handles the case where the path itself is a top-level folder key
+                    item = currentLevel[part];
+                    break; // Found the top-level folder itself
+                } else if (currentLevel[part] && currentLevel[part].type === 'folder') {
+                    // This handles navigating into a top-level folder
+                    currentLevel = currentLevel[part];
+                } else {
+                    currentLevel = null; // Path component not found at top level
+                    break;
+                }
+            } else { // Subsequent parts are in 'children'
+                if (currentLevel && currentLevel.children && currentLevel.children[part]) {
+                    currentLevel = currentLevel.children[part];
+                } else {
+                    currentLevel = null; // Path component not found in children
+                    break;
+                }
+            }
+        }
+
+        if (currentLevel && currentLevel.path === path && currentLevel.type === 'folder') {
+            item = currentLevel;
+        }
+
+
+        if (item && item.type === 'folder') {
+            return item;
+        }
+
+        return null; // Not found or not a folder
+    }
+
     function clearActiveStates() {
         document.querySelectorAll('#sidebar-nav a, #sidebar-nav div[data-folder-path]').forEach(link => {
             link.classList.remove('bg-[#1A2B3A]', 'text-white');
@@ -635,27 +693,10 @@ document.addEventListener('DOMContentLoaded', () => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const clickedPath = path; // Path of the folder item associated with this link
-                // Ensure findItemInData is accessible here, assuming it's defined in an outer scope within DOMContentLoaded
-                let folderItem = findItemInData(clickedPath, demoFilesData);
-                if (!folderItem) {
-                    // Try to find in userUploadedFolders
-                    const parts = clickedPath.split('/');
-                    let currentItem = userUploadedFolders[parts[0]];
-                    if (currentItem) {
-                        for (let i = 1; i < parts.length; i++) {
-                            if (currentItem.children && currentItem.children[parts[i]]) {
-                                currentItem = currentItem.children[parts[i]];
-                            } else {
-                                currentItem = null;
-                                break;
-                            }
-                        }
-                    }
-                    folderItem = currentItem;
-                }
+                const folderItem = getFolderItemByPath(clickedPath);
 
-                if (!folderItem || folderItem.type !== 'folder') {
-                    console.warn("Clicked item is not a folder or not found in data sources:", clickedPath);
+                if (!folderItem) {
+                    console.warn(`Sidebar click: Folder item not found or not a folder for path: "${clickedPath}". Result from getFolderItemByPath:`, folderItem);
                     return;
                 }
 
