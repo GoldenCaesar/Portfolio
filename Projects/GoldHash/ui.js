@@ -1,7 +1,7 @@
 // Global variables for UI, now explicitly attached to window
 window.userUploadedFolders = {}; // To store user-uploaded folder structures
 window.isEditModeActive = false; // To track if edit mode is active
-window.removeFolderEntriesFromLog = function(folderPath) { console.log('UI Placeholder: removeFolderEntriesFromLog called for:', folderPath); }; // Placeholder
+// window.removeFolderEntriesFromLog = function(folderPath) { console.log('UI Placeholder: removeFolderEntriesFromLog called for:', folderPath); }; // Placeholder // This line is removed
 window.demoFilesData = { // Moved from DOMContentLoaded
     "demo_files": {
         "path": "demo_files",
@@ -436,7 +436,7 @@ function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, 
     link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
     link.dataset.folderPath = path;
 
-    if (window.isEditModeActive && isTopLevel) {
+    if (window.isEditModeActive) {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.className = 'mr-2 h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-offset-gray-800'; // Tailwind styled checkbox
@@ -579,6 +579,68 @@ function renderSidebarForEditMode() {
     updateSidebarView(); // This will rebuild the sidebar using createSidebarEntry, which now includes checkbox logic.
 }
 
+// Helper function to delete a user-uploaded folder or subfolder by its path
+function deleteUserUploadedFolderPath(path) {
+    if (!path || typeof path !== 'string' || path.startsWith("demo_files")) {
+        // Do not attempt to delete demo files or if path is invalid
+        return false;
+    }
+
+    const parts = path.split('/');
+    if (parts.length === 0) {
+        return false;
+    }
+
+    let currentLevel = window.userUploadedFolders;
+    let parentLevel = null;
+    let partToDelete = null;
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!currentLevel[part]) {
+            // Path does not exist
+            return false;
+        }
+        if (i === parts.length - 1) {
+            // This is the target folder/file to delete
+            parentLevel = (i === 0) ? window.userUploadedFolders : currentLevel; // if top-level, parent is window.userUploadedFolders itself
+            // For subfolders, currentLevel is actually the parent of the item to be deleted,
+            // and 'part' is the key in currentLevel.children.
+            // Correction: currentLevel is the item itself if we iterate fully.
+            // We need parent of currentLevel.
+            if (i > 0) { // Subfolder
+                let obj = window.userUploadedFolders;
+                for(let k=0; k < parts.length -1; k++){
+                    obj = obj[parts[k]]?.children;
+                    if(!obj) return false; // parent path invalid
+                }
+                parentLevel = obj;
+                partToDelete = part;
+            } else { // Top-level folder
+                 parentLevel = window.userUploadedFolders;
+                 partToDelete = part;
+            }
+
+        } else {
+            // Navigate deeper
+            if (!currentLevel[part].children) {
+                // Path component is not a folder or does not have children
+                return false;
+            }
+            currentLevel = currentLevel[part].children;
+        }
+    }
+
+    if (parentLevel && partToDelete && parentLevel[partToDelete]) {
+        // Ensure the item to delete is a folder (as this function targets folders)
+        if (parentLevel[partToDelete].type === 'folder') {
+            delete parentLevel[partToDelete];
+            return true;
+        }
+    }
+    return false;
+}
+
 
 // --- DOMContentLoaded Listener and UI Logic ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -628,14 +690,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let deletedUserFolder = false;
             foldersToDelete.forEach(folderPath => {
-                if (window.userUploadedFolders[folderPath]) {
-                    delete window.userUploadedFolders[folderPath];
+                // Use the new helper function to delete user uploaded folders/subfolders
+                if (deleteUserUploadedFolderPath(folderPath)) {
                     console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
                     window.removeFolderEntriesFromLog(folderPath); // Call placeholder
                     deletedUserFolder = true;
                 } else {
-                    console.log(`Folder "${folderPath}" is not a user-uploaded folder or already deleted. Skipping deletion from UI data.`);
-                    // Optionally alert user for demo/non-user folders, e.g.
+                    console.log(`Folder "${folderPath}" is not a user-uploaded folder, already deleted, or is a demo folder. Skipping deletion from UI data.`);
+                    // Optionally alert user for demo/non-user folders if they were selectable (which they shouldn't be if logic is correct)
                     // if (folderPath.startsWith("demo_files")) {
                     //     alert(`The folder "${folderPath}" is a demo folder and cannot be deleted.`);
                     // }
