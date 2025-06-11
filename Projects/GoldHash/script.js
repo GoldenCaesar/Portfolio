@@ -91,7 +91,13 @@ function clearLogs() {
     updateLogSizeDisplay(0);
     updateFileMonitoredCount();
     displayActivityLog(fileLog);
-    displayDocumentFiles("");
+    // Reset documents view to a default state, e.g. for "demo_files" or empty
+    const activeDemoFilesLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+    if (activeDemoFilesLink) {
+        displayDocumentFiles("demo_files"); // Or a specific subfolder if that's the default
+    } else {
+        displayDocumentFiles(""); // Clears the documents table or shows a generic message
+    }
     console.log("Logs cleared.");
     alert("Logs have been cleared. Scan log will be emptied by environment if applicable.");
 }
@@ -131,6 +137,7 @@ function displayActivityLog(logEntriesToDisplay) {
             case 'modified': statusTd.classList.add('text-yellow-400'); break;
             case 'newly_added': statusTd.classList.add('text-blue-400'); break;
             case 'verified': statusTd.classList.add('text-green-400'); break;
+            case 'error_reading': statusTd.classList.add('text-red-500'); break;
             default: statusTd.classList.add('text-slate-300');
         }
 
@@ -150,7 +157,6 @@ function displayActivityLog(logEntriesToDisplay) {
     });
 }
 
-// New function to display files in the "Documents" section for a specific folder
 function displayDocumentFiles(folderPath) {
     const documentsTbody = document.getElementById('documents-tbody');
     if (!documentsTbody) {
@@ -158,79 +164,147 @@ function displayDocumentFiles(folderPath) {
         return;
     }
     documentsTbody.innerHTML = '';
+    let filesToList = [];
 
-    if (!fileLog || fileLog.length === 0) {
+    const createRow = (file) => {
         const tr = documentsTbody.insertRow();
-        const cell = tr.insertCell();
-        cell.colSpan = 5;
-        cell.textContent = 'No files monitored. Scan demo files or add a folder.';
-        cell.className = 'px-6 py-4 text-center text-slate-400';
-        return;
+        tr.className = 'hover:bg-[#1A2B3A]';
+
+        const nameTd = tr.insertCell();
+        nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
+        nameTd.textContent = file.name;
+
+        const statusTd = tr.insertCell();
+        statusTd.className = 'whitespace-nowrap px-6 py-4 text-sm';
+        statusTd.textContent = file.status;
+        if (file.status === 'Never Scanned') {
+            statusTd.classList.add('text-slate-400');
+        } else {
+            switch (file.status) {
+                case 'modified': statusTd.classList.add('text-yellow-400'); break;
+                case 'newly_added': statusTd.classList.add('text-blue-400'); break;
+                case 'verified': statusTd.classList.add('text-green-400'); break;
+                case 'error_reading': statusTd.classList.add('text-red-500'); break;
+                default: statusTd.classList.add('text-slate-300');
+            }
+        }
+
+        const hashTd = tr.insertCell();
+        hashTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 font-mono';
+        hashTd.textContent = file.hash && file.hash !== 'N/A' ? file.hash.substring(0, 12) + '...' : 'N/A';
+        hashTd.title = file.hash && file.hash !== 'N/A' ? file.hash : "";
+
+        const lastCheckedTd = tr.insertCell();
+        lastCheckedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+        lastCheckedTd.textContent = file.lastChecked;
+
+        const pathTd = tr.insertCell();
+        pathTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 overflow-hidden text-ellipsis';
+        pathTd.textContent = file.path;
+        pathTd.title = file.path;
+    };
+
+    if (folderPath.startsWith("demo_files")) { // Covers "demo_files" and "demo_files/Subfolder"
+        const parts = folderPath.split('/');
+        let currentLevel = demoFilesData;
+        let targetName = parts[parts.length-1];
+
+        if (folderPath === "demo_files") { // Special case for the root "demo_files"
+            currentLevel = demoFilesData.demo_files.children;
+        } else { // For subfolders like "demo_files/Jokes Folder 1"
+            // Traverse to the correct folder in demoFilesData
+            // parts[0] is "demo_files", parts[1] is "Jokes Folder 1", etc.
+            let tempCurrentLevel = demoFilesData.demo_files.children;
+            for (let i = 1; i < parts.length; i++) { // Start from 1 to skip "demo_files" itself
+                if (tempCurrentLevel && tempCurrentLevel[parts[i]] && tempCurrentLevel[parts[i]].type === 'folder') {
+                    tempCurrentLevel = tempCurrentLevel[parts[i]].children;
+                } else {
+                    tempCurrentLevel = null; // Path not found or not a folder
+                    break;
+                }
+            }
+            currentLevel = tempCurrentLevel;
+        }
+
+        if (currentLevel && typeof currentLevel === 'object') {
+            Object.values(currentLevel).forEach(item => {
+                if (item.type === 'file') {
+                    const logEntry = fileLog.find(entry => entry.currentPath === item.path);
+                    if (logEntry) {
+                        filesToList.push({
+                            name: item.path.substring(item.path.lastIndexOf('/') + 1),
+                            status: logEntry.status,
+                            hash: logEntry.currentHash,
+                            lastChecked: logEntry.lastHashCheckTime ? new Date(logEntry.lastHashCheckTime).toLocaleString() : 'N/A',
+                            path: item.path
+                        });
+                    } else {
+                        filesToList.push({
+                            name: item.path.substring(item.path.lastIndexOf('/') + 1),
+                            status: 'Never Scanned',
+                            hash: 'N/A',
+                            lastChecked: 'N/A',
+                            path: item.path
+                        });
+                    }
+                }
+            });
+        }
+    } else if (folderPath.startsWith("user/")) {
+        // For user folders, list files found in fileLog.
+        // Pre-scan listing from handle is complex for sync display; handled by "scan to see files" message.
+        const filesFromLogForUserFolder = fileLog.filter(entry => {
+            // Check if entry.currentPath starts with folderPath + "/" or is exactly folderPath (if folderPath itself is a file, though unlikely for folders)
+            return entry.currentPath.startsWith(folderPath + "/") || entry.currentPath === folderPath;
+        });
+
+        if (filesFromLogForUserFolder.length > 0) {
+            filesFromLogForUserFolder.forEach(logEntry => {
+                 // Ensure we only list direct children if folderPath is a directory path
+                const relativePath = logEntry.currentPath.substring(folderPath.length + 1);
+                if (!relativePath.includes('/')) { // Only direct children
+                    filesToList.push({
+                        name: logEntry.currentPath.substring(logEntry.currentPath.lastIndexOf('/') + 1),
+                        status: logEntry.status,
+                        hash: logEntry.currentHash,
+                        lastChecked: logEntry.lastHashCheckTime ? new Date(logEntry.lastHashCheckTime).toLocaleString() : 'N/A',
+                        path: logEntry.currentPath
+                    });
+                }
+            });
+        }
+        // Message for empty or unscanned user folders will be handled by the generic block below
     }
 
-    let filesInFolder = [];
-    if (folderPath && folderPath !== "demo_files" && folderPath !== "") {
-        filesInFolder = fileLog.filter(entry => {
-            const parentPath = entry.currentPath.substring(0, entry.currentPath.lastIndexOf('/'));
-            return parentPath === folderPath;
-        });
-    } else if (folderPath === "demo_files") {
+    if (filesToList.length > 0) {
+        filesToList.sort((a, b) => a.name.localeCompare(b.name)); // Sort files alphabetically by name
+        filesToList.forEach(createRow);
+    } else if (folderPath && folderPath !== "") {
         const tr = documentsTbody.insertRow();
         const cell = tr.insertCell();
         cell.colSpan = 5;
-        cell.textContent = 'Select a specific sub-folder to view its documents.';
+        if (folderPath === "demo_files") {
+             cell.textContent = 'Select a specific sub-folder to view its documents.';
+        } else if (folderPath.startsWith("user/")) {
+            const userFolderExists = userAddedFolders.some(f => f.path === folderPath);
+            if (userFolderExists) {
+                 cell.textContent = 'Folder is empty or has not been scanned yet. Click "Scan" to populate.';
+            } else {
+                 cell.textContent = 'This user folder is not recognized or no longer accessible.';
+            }
+        } else {
+             cell.textContent = 'No files found in this folder, or folder is empty.';
+        }
         cell.className = 'px-6 py-4 text-center text-slate-400';
-        return;
-    } else {
+    } else { // Default message when no folderPath is specified or it's empty
         const tr = documentsTbody.insertRow();
         const cell = tr.insertCell();
         cell.colSpan = 5;
         cell.textContent = 'Select a folder from the sidebar to view its documents.';
         cell.className = 'px-6 py-4 text-center text-slate-400';
-        return;
-    }
-
-    if (filesInFolder.length === 0 && folderPath && folderPath !== "demo_files") {
-        const tr = documentsTbody.insertRow();
-        const cell = tr.insertCell();
-        cell.colSpan = 5;
-        cell.textContent = 'No files found in this folder.';
-        cell.className = 'px-6 py-4 text-center text-slate-400';
-    } else {
-        filesInFolder.forEach(entry => {
-            const tr = documentsTbody.insertRow();
-            tr.className = 'hover:bg-[#1A2B3A]';
-
-            const nameTd = tr.insertCell();
-            nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
-            nameTd.textContent = entry.currentPath.substring(entry.currentPath.lastIndexOf('/') + 1);
-
-            const statusTd = tr.insertCell();
-            statusTd.className = 'whitespace-nowrap px-6 py-4 text-sm';
-            statusTd.textContent = entry.status;
-            switch (entry.status) {
-                case 'modified': statusTd.classList.add('text-yellow-400'); break;
-                case 'newly_added': statusTd.classList.add('text-blue-400'); break;
-                case 'verified': statusTd.classList.add('text-green-400'); break;
-                default: statusTd.classList.add('text-slate-300');
-            }
-
-            const hashTd = tr.insertCell();
-            hashTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 font-mono';
-            hashTd.textContent = entry.currentHash ? entry.currentHash.substring(0, 12) + '...' : 'N/A';
-            hashTd.title = entry.currentHash || "";
-
-            const lastCheckedTd = tr.insertCell();
-            lastCheckedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
-            lastCheckedTd.textContent = entry.lastHashCheckTime ? new Date(entry.lastHashCheckTime).toLocaleString() : 'N/A';
-
-            const pathTd = tr.insertCell();
-            pathTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 overflow-hidden text-ellipsis';
-            pathTd.textContent = entry.currentPath;
-            pathTd.title = entry.currentPath;
-        });
     }
 }
+
 
 function displayFolderContents(folderPath) {
     const mainContent = document.querySelector('main.ml-80');
@@ -248,16 +322,18 @@ function displayFolderContents(folderPath) {
 function displayFileContent(filePath) {
     const parts = filePath.split('/');
     let currentLevel = demoFilesData;
+    // Traverse demoFilesData to find the file content
+    // This logic assumes file content is only for demo files
     for (let i = 0; i < parts.length; i++) {
-        if (currentLevel[parts[i]] && currentLevel[parts[i]].children) {
-            currentLevel = currentLevel[parts[i]].children;
-        } else if (currentLevel[parts[i]] && currentLevel[parts[i]].type === 'file') {
+        if (parts[i] === "demo_files" && i === 0) { // Start with the 'demo_files' root
+            currentLevel = demoFilesData.demo_files;
+            if (parts.length === 1) break; // Path is just "demo_files"
+            currentLevel = currentLevel.children; // Move to children of "demo_files"
+        } else if (currentLevel && currentLevel[parts[i]]) {
             currentLevel = currentLevel[parts[i]];
-            break;
-        } else if (i === 0 && demoFilesData[parts[i]]){
-             currentLevel = demoFilesData[parts[i]];
-        }
-         else {
+            if (currentLevel.type === 'file') break; // Found the file
+            if (currentLevel.type === 'folder') currentLevel = currentLevel.children; // Move to children of this folder
+        } else {
             currentLevel = null;
             break;
         }
@@ -294,6 +370,8 @@ function displayFileContent(filePath) {
         backButton.onclick = () => {
             sectionsToHide.forEach(section => section.style.display = 'block');
             fileContentDiv.style.display = 'none';
+            // When going back, call displayDocumentFiles for the parent folder
+            // This ensures the "Documents" section is correctly re-rendered.
             displayDocumentFiles(parentFolderPath);
         };
 
@@ -302,6 +380,7 @@ function displayFileContent(filePath) {
         fileContentDiv.appendChild(pre);
     } else {
         console.error('File content not found for path:', filePath, "or demoFilesData structure error.");
+        alert('File content not found. This feature is primarily for demo files.');
     }
 }
 
@@ -340,10 +419,7 @@ function displayUserAddedFoldersInSidebar() {
     userAddedFolders.forEach(folder => {
         // Ensure it's not already added (e.g., if this function is called multiple times)
         if (!document.querySelector(`#sidebar-nav a[data-folder-path="${folder.path}"]`)) {
-            // Use a modified version of createSidebarEntry or a new function if structure is very different
-            // For now, let's assume createSidebarEntry can handle it with the correct type
             createSidebarEntry(folder.name, folder.path, folder.type || 'folder', 0, sidebarNav, true);
-             // The 'true' for isTopLevel might need adjustment based on desired sidebar structure
         }
     });
 }
@@ -354,9 +430,20 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired");
     const sidebarNav = document.getElementById('sidebar-nav');
 
-    loadUserAddedFoldersFromStorage(); // Load user folders first
+    // Order of operations on DOMContentLoaded:
+    // 1. Load data from localStorage (logs, user folders)
+    // 2. Display logs (Activity Log)
+    // 3. Define demoFilesData
+    // 4. Render sidebar (demo folders first, then user folders)
+    // 5. Determine and set initial folder view in Documents section
+    // 6. Update UI counts/stats
 
-    demoFilesData = {
+    loadLogsFromStorage();
+    displayActivityLog(fileLog); // Display activity early
+
+    loadUserAddedFoldersFromStorage(); // Loads user folder data
+
+    demoFilesData = { // Define demo data
         "demo_files": {
             "path": "demo_files",
             "type": "folder",
@@ -398,9 +485,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    loadLogsFromStorage();
-    displayActivityLog(fileLog);
-    displayUserAddedFoldersInSidebar(); // Display loaded user folders
+    // loadDemoFolders will now handle initial sidebar rendering for demo files,
+    // then user files, then determine and set the initial documents view.
+    loadDemoFolders();
 
     updateFileMonitoredCount();
     updateLogSizeDisplayOnLoad();
@@ -410,11 +497,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (addFolderButton) {
         addFolderButton.addEventListener('click', async () => {
             try {
+                if (typeof window.showDirectoryPicker !== 'function') {
+                    alert("Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge.");
+                    return;
+                }
                 const directoryHandle = await window.showDirectoryPicker();
                 if (directoryHandle) {
-                    // Check if folder already exists (by path, which we'll derive from name for simplicity here)
-                    // More robust path generation might be needed in a real app.
-                    const folderPath = `user/${directoryHandle.name}`; // Simulate a path
+                    const folderPath = `user/${directoryHandle.name}`;
                     const existingFolder = userAddedFolders.find(f => f.path === folderPath);
 
                     if (existingFolder) {
@@ -424,25 +513,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const newFolder = {
                         name: directoryHandle.name,
-                        path: folderPath, // This path is conceptual for the browser.
-                        handle: directoryHandle, // Keep the handle for scanning
-                        type: 'user-folder' // Distinguish from demo folders
+                        path: folderPath,
+                        handle: directoryHandle,
+                        type: 'user-folder'
                     };
                     userAddedFolders.push(newFolder);
                     saveUserAddedFoldersToStorage();
-                    // Add to sidebar immediately
                     createSidebarEntry(newFolder.name, newFolder.path, newFolder.type, 0, sidebarNav, true);
-
-                    // Optionally, trigger a scan or display its contents
-                    // For now, just adding to sidebar. User can click to view/scan.
-                    alert(`Folder "${directoryHandle.name}" added. You can now select it in the sidebar.`);
+                    alert(`Folder "${directoryHandle.name}" added. You can now select it in the sidebar. Please scan to see its files.`);
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
                     console.log("User cancelled folder selection.");
                 } else {
                     console.error("Error adding folder:", error);
-                    alert("Error adding folder. See console for details.");
+                    alert("Error adding folder. See console for details. Your browser might not support this feature or there was a permission issue.");
                 }
             }
         });
@@ -460,8 +545,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setActiveState(element) {
-        element.classList.add('bg-[#1A2B3A]', 'text-white');
-        element.classList.remove('text-slate-300');
+        if (element) {
+            element.classList.add('bg-[#1A2B3A]', 'text-white');
+            element.classList.remove('text-slate-300');
+        }
     }
 
     function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
@@ -476,13 +563,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const iconSpan = document.createElement('span');
         iconSpan.className = 'material-icons-outlined text-slate-400';
         iconSpan.style.fontSize = '20px';
-        // Adjust icon based on type
+
         if (type === 'user-folder') {
-            iconSpan.textContent = 'folder_special'; // Example for user folder
+            iconSpan.textContent = 'folder_special';
         } else if (type === 'folder') {
             iconSpan.textContent = 'folder';
         } else {
-            iconSpan.textContent = 'description';
+            iconSpan.textContent = 'description'; // File
         }
 
         link.appendChild(iconSpan);
@@ -492,50 +579,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const subfoldersContainer = document.createElement('div');
         subfoldersContainer.className = 'subfolder-container';
-        if (path === "demo_files" || type === 'user-folder') { // User folders are also top-level initially, no sub-sub-folders for them in this iteration
-            subfoldersContainer.style.display = 'none'; // Children (if any for user folders) start hidden
+
+        // User folders are top-level and don't have expandable sub-folders in this design
+        // Demo files root is expandable. Its children (sub-folders) are not further expandable.
+        if (path === "demo_files") {
+            subfoldersContainer.style.display = 'none'; // demo_files children start hidden
+        } else if (type === 'folder' && item.children) { // A demo sub-folder
+             subfoldersContainer.style.display = 'none'; // No sub-sub-folders for demo files shown
         } else {
-            subfoldersContainer.style.display = isTopLevel ? 'block' : 'none';
+            // User folders and files don't have subfolder containers or are not expandable
+             subfoldersContainer.style.display = 'none';
         }
 
         entryDiv.appendChild(subfoldersContainer);
 
-        if (type === 'folder' || type === 'user-folder') { // Handle clicks for demo folders and user folders
+        if (type === 'folder' || type === 'user-folder') {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (path === "demo_files") {  // Special handling for the root "demo_files"
+                clearActiveStates();
+                setActiveState(link);
+                activeSubFolderLink = link;
+
+                if (path === "demo_files") {
                     const isHidden = subfoldersContainer.style.display === 'none';
                     subfoldersContainer.style.display = isHidden ? 'block' : 'none';
-                    iconSpan.textContent = isHidden ? 'folder_open' : (type === 'user-folder' ? 'folder_special' : 'folder');
-                    clearActiveStates();
-                    setActiveState(link);
-                    activeSubFolderLink = null;
-                    displayFolderContents(path); // Show "select subfolder" message for demo_files
-                } else if (type === 'user-folder') { // User-added folders
-                    clearActiveStates();
-                    setActiveState(link);
-                    activeSubFolderLink = link; // Track active user folder
-                    displayFolderContents(path); // Display contents (which will be empty until scanned and fileLog populated for this path)
-                } else { // This is a subfolder of "demo_files"
-                    clearActiveStates();
+                    iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
+                    displayFolderContents(path);
+                } else if (type === 'user-folder') {
+                    // For user folders, ensure the "demo_files" entry is closed if it was open
                     const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
                     if (demoFilesEntryLink) {
-                        setActiveState(demoFilesEntryLink);
+                        const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                        if (demoFilesIcon) demoFilesIcon.textContent = 'folder';
+                        const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                        if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'none';
+                    }
+                    displayFolderContents(path);
+                } else { // This is a subfolder of "demo_files"
+                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                    if (demoFilesEntryLink) {
+                        setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
                         const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
                         if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
                         const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
                         if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'block';
                     }
-                    setActiveState(link);
-                    activeSubFolderLink = link;
+                    setActiveState(link); // Then highlight the actual subfolder
                     displayFolderContents(path);
                 }
             });
-        } else if (type === 'file') { // File clicks (currently only for demo files)
+        } else if (type === 'file') {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                  clearActiveStates();
-                 // Potentially highlight parent folder as well
+                 // Highlight parent folder and this file link
+                 const parentPath = path.substring(0, path.lastIndexOf('/'));
+                 const parentLink = document.querySelector(`#sidebar-nav a[data-folder-path="${parentPath}"]`);
+                 setActiveState(parentLink);
                  setActiveState(link);
                  displayFileContent(path);
             });
@@ -545,53 +645,86 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadDemoFolders() {
         if (!sidebarNav) return;
-        sidebarNav.innerHTML = '';
+        sidebarNav.innerHTML = ''; // Clear sidebar
 
+        // Render Demo Folders & Files
         Object.keys(demoFilesData).forEach(itemName => {
-            const item = demoFilesData[itemName];
+            const item = demoFilesData[itemName]; // "demo_files"
             const itemContainer = createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true);
             if (item.type === 'folder' && item.children) {
                 Object.keys(item.children).forEach(subItemName => {
-                    const subItem = item.children[subItemName];
-                    createSidebarEntry(subItemName, subItem.path, subItem.type, 1, itemContainer);
+                    const subItem = item.children[subItemName]; // "Jokes Folder 1", etc.
+                    const subItemContainer = createSidebarEntry(subItemName, subItem.path, subItem.type, 1, itemContainer);
+                    if (subItem.type === 'folder' && subItem.children) {
+                        Object.keys(subItem.children).forEach(fileName => {
+                            const fileItem = subItem.children[fileName]; // "joke1.txt"
+                            createSidebarEntry(fileName, fileItem.path, fileItem.type, 2, subItemContainer);
+                        });
+                    }
                 });
             }
         });
 
-        const firstDemoSubfolderPath = demoFilesData.demo_files?.children
-            ? Object.values(demoFilesData.demo_files.children)[0]?.path
-            : null;
+        // Render User Added Folders
+        displayUserAddedFoldersInSidebar(); // This function adds user folders to sidebarNav
 
-        if (firstDemoSubfolderPath) {
-            displayFolderContents(firstDemoSubfolderPath);
+        // Determine and set initial folder view for Documents section
+        let initialFolderPathToDisplay = null;
+        let isDemoFolderSelected = false;
 
+        const firstDemoFolder = demoFilesData.demo_files;
+        if (firstDemoFolder) {
+            const firstDemoSubfolder = firstDemoFolder.children ? Object.values(firstDemoFolder.children)[0] : null;
+            if (firstDemoSubfolder && firstDemoSubfolder.type === 'folder') {
+                initialFolderPathToDisplay = firstDemoSubfolder.path; // e.g., "demo_files/Jokes Folder 1"
+                isDemoFolderSelected = true;
+            } else if (firstDemoFolder.children && Object.values(firstDemoFolder.children).some(f => f.type === 'file')){
+                // If no subfolders, but "demo_files" has direct files, select "demo_files" itself.
+                initialFolderPathToDisplay = firstDemoFolder.path; // "demo_files"
+                isDemoFolderSelected = true;
+            }
+        }
+
+        if (!initialFolderPathToDisplay && userAddedFolders.length > 0) {
+            initialFolderPathToDisplay = userAddedFolders[0].path; // e.g., "user/MyFolder1"
+            isDemoFolderSelected = false;
+        }
+
+        if (initialFolderPathToDisplay) {
+            displayDocumentFiles(initialFolderPathToDisplay);
             setTimeout(() => {
-                const firstSubfolderLink = document.querySelector(`#sidebar-nav a[data-folder-path="${firstDemoSubfolderPath}"]`);
-                const demoFilesLinkElement = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                clearActiveStates(); // Clear any prematurely set active states
+                const targetLink = document.querySelector(`#sidebar-nav a[data-folder-path="${initialFolderPathToDisplay}"]`);
+                if (targetLink) {
+                    setActiveState(targetLink);
+                    activeSubFolderLink = targetLink; // Update global active link
 
-                if (demoFilesLinkElement) {
-                    setActiveState(demoFilesLinkElement);
-                    const demoFilesDiv = demoFilesLinkElement.closest('div');
-                    if (demoFilesDiv) {
-                        const subContainer = demoFilesDiv.querySelector('.subfolder-container');
-                        if (subContainer) subContainer.style.display = 'block';
-                        const icon = demoFilesLinkElement.querySelector('.material-icons-outlined');
-                        if (icon) icon.textContent = 'folder_open';
+                    if (isDemoFolderSelected && initialFolderPathToDisplay !== "demo_files") {
+                        // If a demo subfolder is selected, ensure "demo_files" is visually open
+                        const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                        if (demoFilesEntryLink) {
+                            setActiveState(demoFilesEntryLink); // Highlight "demo_files" as well (as parent)
+                            const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                            if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
+                            const demoFilesSubContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                            if (demoFilesSubContainer) demoFilesSubContainer.style.display = 'block';
+
+                            // Re-set the actual targetLink active as setActiveState on demoFilesLink might have cleared others
+                            setActiveState(targetLink);
+                        }
+                    } else if (initialFolderPathToDisplay === "demo_files"){
+                         // If "demo_files" itself is selected, ensure its icon is 'folder' (not 'folder_open' unless clicked)
+                        const demoFilesIcon = targetLink.querySelector('.material-icons-outlined');
+                        if (demoFilesIcon && targetLink.closest('div').querySelector('.subfolder-container').style.display !== 'block') {
+                            demoFilesIcon.textContent = 'folder';
+                        }
                     }
-                }
-                if (firstSubfolderLink) {
-                    setActiveState(firstSubfolderLink);
-                    activeSubFolderLink = firstSubfolderLink;
                 }
             }, 0);
         } else {
-            displayFolderContents("demo_files");
-            const demoFilesLinkElement = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
-            if (demoFilesLinkElement) setActiveState(demoFilesLinkElement);
+            displayDocumentFiles(""); // Display a default empty/welcome message
         }
     }
-
-    loadDemoFolders();
 
     // Helper function to recursively collect files from a user-selected directory handle
     async function _collectFilesFromUserFolder(folderHandle, basePath, filesArray) {
@@ -601,24 +734,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (entry.kind === 'file') {
                     try {
                         const file = await entry.getFile();
-                        const content = await file.text(); // Or handle binary files appropriately
+                        const content = await file.text();
                         filesArray.push({ path: entryPath, content: content, source: "user" });
                     } catch (fileError) {
                         console.error(`Error reading file ${entryPath}:`, fileError);
-                        // Optionally, add a log entry indicating this file couldn't be processed
                         const errorEntry = {
-                            appID: generateAppUniqueID(),
-                            osID: "os-id-error",
-                            currentPath: entryPath,
-                            initialDiscoveryTime: new Date().toISOString(),
-                            lastHashCheckTime: new Date().toISOString(),
-                            lastModifiedSystem: new Date().toISOString(),
-                            currentHash: "ERROR_READING_FILE",
-                            hashHistory: [],
-                            status: 'error_reading'
+                            appID: generateAppUniqueID(), osID: "os-id-error", currentPath: entryPath,
+                            initialDiscoveryTime: new Date().toISOString(), lastHashCheckTime: new Date().toISOString(),
+                            lastModifiedSystem: new Date().toISOString(), currentHash: "ERROR_READING_FILE",
+                            hashHistory: [], status: 'error_reading'
                         };
-                        // Decide if you want to push error entries to fileLog directly or handle differently
-                        // For now, just logging the error.
+                        fileLog.push(errorEntry); // Add error entry to main fileLog
                     }
                 } else if (entry.kind === 'directory') {
                     await _collectFilesFromUserFolder(entry, entryPath, filesArray);
@@ -626,7 +752,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error(`Error iterating folder ${basePath}:`, error);
-            // Could create a log entry for the folder itself if iteration fails
         }
     }
 
@@ -637,28 +762,29 @@ document.addEventListener('DOMContentLoaded', () => {
         let filesToProcess = [];
 
         // 1. Process Demo Files
-        function _internalCollectDemoFiles(currentLevelChildren) {
-            for (const key in currentLevelChildren) {
-                const item = currentLevelChildren[key];
+        function _internalCollectDemoFiles(obj, pathPrefix = "") {
+            for (const key in obj) {
+                const item = obj[key];
+                const currentPath = pathPrefix ? `${pathPrefix}/${key}` : key;
                 if (item.type === 'file') {
                     filesToProcess.push({ path: item.path, content: item.content || "", source: "demo" });
                 } else if (item.type === 'folder' && item.children) {
-                    _internalCollectDemoFiles(item.children);
+                    _internalCollectDemoFiles(item.children, item.path);
                 }
             }
         }
         if (demoFilesData && demoFilesData.demo_files && demoFilesData.demo_files.children) {
-            _internalCollectDemoFiles(demoFilesData.demo_files.children);
+             _internalCollectDemoFiles(demoFilesData.demo_files.children, "demo_files");
         }
+
 
         // 2. Process User Added Folders
         for (const userFolder of userAddedFolders) {
-            if (userFolder.handle) { // Only scan if we have a live handle
+            if (userFolder.handle) {
                 console.log(`Scanning user folder: ${userFolder.path}`);
                 await _collectFilesFromUserFolder(userFolder.handle, userFolder.path, filesToProcess);
             } else {
-                console.warn(`Skipping scan for ${userFolder.path}: No active directory handle. Please re-add the folder if you want to scan it.`);
-                // Optionally, create a specific log entry for this folder indicating it needs re-adding.
+                console.warn(`Skipping scan for ${userFolder.path}: No active directory handle. Please re-add the folder.`);
             }
         }
 
@@ -692,7 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 const appID = generateAppUniqueID();
-                const osID = getOSFileID(fileItem.path);
+                const osID = getOSFileID(fileItem.path); // This is a simulated ID
                 const currentHash = await generateSHA256(fileItem.content);
                 if (currentHash === null) { console.error(`Skipping new ${fileItem.path} (hash error).`); continue; }
 
@@ -718,20 +844,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let currentActiveDocFolderPath = "";
-        if (activeSubFolderLink && activeSubFolderLink.dataset.folderPath) {
-            currentActiveDocFolderPath = activeSubFolderLink.dataset.folderPath;
-        } else {
-            const demoFilesLinkActive = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"].bg-\[\#1A2B3A\].text-white');
-            if (demoFilesLinkActive) {
-                 currentActiveDocFolderPath = "demo_files";
-            }
+        const currentActiveLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white');
+        if (currentActiveLink && currentActiveLink.dataset.folderPath) {
+            currentActiveDocFolderPath = currentActiveLink.dataset.folderPath;
+        } else { // Fallback or determine default if nothing is active
+            currentActiveDocFolderPath = demoFilesData.demo_files?.children ? Object.values(demoFilesData.demo_files.children)[0]?.path : "demo_files";
         }
         displayDocumentFiles(currentActiveDocFolderPath);
 
         displayActivityLog(fileLog);
 
         console.log(`Scan complete. New: ${newFilesAdded}, Mod: ${filesModified}, Ver: ${filesVerified}.`);
-        alert(`Scan Complete!\nNew: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}`);
+        if (newFilesAdded > 0 || filesModified > 0) {
+            alert(`Scan Complete!\nNew files: ${newFilesAdded}\nModified files: ${filesModified}\nVerified files: ${filesVerified}`);
+        } else {
+            alert(`Scan Complete! All monitored files verified. Total verified: ${filesVerified}`);
+        }
     }
 
     const scanButton = document.getElementById('scan-files-button');
