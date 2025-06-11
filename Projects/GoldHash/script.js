@@ -83,6 +83,7 @@ function loadLogsFromStorage() {
     // Update UI based on loaded logs
     updateFileMonitoredCount();
     updateLogSizeDisplayOnLoad();
+    displayActivityLog(); // Display activity log on load
 }
 
 function updateLastScanTime() {
@@ -112,10 +113,78 @@ function clearLogs() {
 
     // Update UI
     updateLogSizeDisplay(0);
+    updateFileMonitoredCount(); // Ensure count is updated to 0
+    displayActivityLog(); // Refresh activity log view
 
     console.log("Logs cleared.");
     alert("Logs have been cleared (simulated for browser). The scan.log file will be emptied by the environment.");
 }
+
+// --- Activity Log Display Function ---
+function displayActivityLog() {
+    const activityTbody = document.getElementById('activity-tbody');
+    if (!activityTbody) {
+        console.error("activity-tbody element not found!");
+        return;
+    }
+    activityTbody.innerHTML = ''; // Clear existing rows
+
+    if (!fileLog || fileLog.length === 0) {
+        const tr = activityTbody.insertRow();
+        const cell = tr.insertCell();
+        cell.colSpan = 5; // Adjusted to 5 columns: File Name, Status, Hash, Last Checked, Path
+        cell.textContent = 'No activity logged yet.';
+        cell.className = 'px-6 py-4 text-center text-slate-400';
+        return;
+    }
+
+    fileLog.forEach(entry => {
+        const tr = activityTbody.insertRow();
+        tr.className = 'hover:bg-[#1A2B3A]'; // Consistent hover effect
+
+        // File Name
+        const nameTd = tr.insertCell();
+        nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
+        nameTd.textContent = entry.currentPath.substring(entry.currentPath.lastIndexOf('/') + 1);
+
+        // Status
+        const statusTd = tr.insertCell();
+        statusTd.className = 'whitespace-nowrap px-6 py-4 text-sm';
+        statusTd.textContent = entry.status;
+        switch (entry.status) {
+            case 'modified':
+                statusTd.classList.add('text-yellow-400');
+                break;
+            case 'newly_added':
+                statusTd.classList.add('text-blue-400');
+                break;
+            case 'verified':
+                statusTd.classList.add('text-green-400');
+                break;
+            // No 'Not Scanned' case needed here as fileLog only contains scanned files
+            default:
+                statusTd.classList.add('text-slate-300');
+        }
+
+        // Current Hash
+        const hashTd = tr.insertCell();
+        hashTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 font-mono';
+        hashTd.textContent = entry.currentHash ? entry.currentHash.substring(0, 12) + '...' : 'N/A';
+        hashTd.title = entry.currentHash || "";
+
+        // Last Checked Time
+        const lastCheckedTd = tr.insertCell();
+        lastCheckedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+        lastCheckedTd.textContent = entry.lastHashCheckTime ? new Date(entry.lastHashCheckTime).toLocaleString() : 'N/A';
+
+        // Full Path
+        const pathTd = tr.insertCell();
+        pathTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 overflow-hidden text-ellipsis';
+        pathTd.textContent = entry.currentPath;
+        pathTd.title = entry.currentPath;
+    });
+}
+// --- End Activity Log Display Function ---
 
 // Function to recursively count files
 // This function might become redundant if file counts are solely derived from fileLog length.
@@ -166,6 +235,9 @@ function displayLoggedFiles(logEntriesToDisplay) {
                 break;
             case 'verified':
                 statusTd.classList.add('text-green-400');
+                break;
+            case 'Not Scanned': // Handle "Not Scanned" status
+                statusTd.classList.add('text-gray-500'); // Or any other appropriate color
                 break;
             default:
                 statusTd.classList.add('text-slate-300');
@@ -243,6 +315,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // is now handled by loadLogsFromStorage(), so direct updates here are removed.
 
     let activeSubFolderLink = null;
+
+    // Helper function to find an item in demoFilesData by its path
+    function findItemInData(targetPath, dataRoot) {
+        const parts = targetPath.split('/');
+        if (parts.length === 0) return null;
+
+        let currentItem = dataRoot[parts[0]]; // Handles the first part, e.g., "demo_files"
+        if (!currentItem) return null;
+
+        for (let i = 1; i < parts.length; i++) {
+            if (currentItem.children && currentItem.children[parts[i]]) {
+                currentItem = currentItem.children[parts[i]];
+            } else {
+                return null; // Path component not found
+            }
+        }
+        return currentItem;
+    }
 
     function clearActiveStates() {
         document.querySelectorAll('#sidebar-nav a, #sidebar-nav div[data-folder-path]').forEach(link => {
@@ -324,21 +414,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const sectionsToUnhide = document.querySelectorAll('main.ml-80 section');
         sectionsToUnhide.forEach(section => section.style.display = 'block');
 
-        let filteredLogEntries = [];
-        if (fileLog && fileLog.length > 0) {
-            if (folderPath === "demo_files" || folderPath === "") {
-                // If "demo_files" (the root in sidebar) is clicked, show all logs from "demo_files/"
-                // Or if folderPath is empty (e.g. initial load before selection), show all.
-                // This condition might need refinement based on how root/all files view is triggered.
-                // For now, "demo_files" path means show everything under "demo_files/".
-                filteredLogEntries = fileLog.filter(entry => entry.currentPath.startsWith("demo_files/"));
+        const filesForDisplay = [];
+        let currentFolderChildren = {};
+
+        // Navigate demoFilesData to find the correct folder based on folderPath
+        if (folderPath === "demo_files" || folderPath === "") {
+            currentFolderChildren = demoFilesData.demo_files.children || {};
+        } else {
+            const pathParts = folderPath.split('/'); // e.g., "demo_files/Jokes Folder 1"
+            let currentLevel = demoFilesData;
+            for (const part of pathParts) {
+                if (currentLevel[part] && currentLevel[part].type === 'folder') {
+                    currentLevel = currentLevel[part];
+                } else if (currentLevel.children && currentLevel.children[part] && currentLevel.children[part].type === 'folder') {
+                    currentLevel = currentLevel.children[part];
+                } else {
+                    // If path part not found or not a folder, break
+                    console.warn(`Path part "${part}" not found or not a folder in demoFilesData for path "${folderPath}".`);
+                    currentLevel = null;
+                    break;
+                }
+            }
+            if (currentLevel && currentLevel.children) {
+                currentFolderChildren = currentLevel.children;
             } else {
-                // For specific subfolders like "demo_files/Jokes Folder 1"
-                filteredLogEntries = fileLog.filter(entry => entry.currentPath.startsWith(folderPath + "/"));
+                console.warn(`Could not find children for folderPath: "${folderPath}" in demoFilesData.`);
+                currentFolderChildren = {}; // Default to empty if path is invalid or folder has no children
             }
         }
 
-        displayLoggedFiles(filteredLogEntries);
+        // console.log(`Displaying contents for path: ${folderPath}, found children:`, Object.keys(currentFolderChildren));
+
+        for (const itemName in currentFolderChildren) {
+            const item = currentFolderChildren[itemName];
+            if (item.type === 'file') {
+                const fileDisplayData = {
+                    name: itemName,
+                    currentPath: item.path,
+                    status: "Not Scanned",
+                    currentHash: "N/A",
+                    lastHashCheckTime: "N/A"
+                };
+
+                // Try to find this file in fileLog
+                const loggedFile = fileLog.find(logEntry => logEntry.currentPath === item.path);
+                if (loggedFile) {
+                    fileDisplayData.status = loggedFile.status;
+                    fileDisplayData.currentHash = loggedFile.currentHash;
+                    fileDisplayData.lastHashCheckTime = loggedFile.lastHashCheckTime;
+                }
+                filesForDisplay.push(fileDisplayData);
+            }
+        }
+        displayLoggedFiles(filesForDisplay);
     }
 
     function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
@@ -383,35 +511,79 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'folder') {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
+                const clickedPath = path; // Path of the folder item associated with this link
+                // Ensure findItemInData is accessible here, assuming it's defined in an outer scope within DOMContentLoaded
+                const folderItem = findItemInData(clickedPath, demoFilesData);
 
-                if (path === "demo_files") {
-                    // Toggle display of subfoldersContainer for "demo_files"
-                    const isHidden = subfoldersContainer.style.display === 'none';
-                    subfoldersContainer.style.display = isHidden ? 'block' : 'none';
-                    // Optionally, change icon
-                    iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
-                    // Do not call displayFolderContents for "demo_files" itself
-                    // Do not change active states of sub-folders here
+                if (!folderItem || folderItem.type !== 'folder') {
+                    console.warn("Clicked item is not a folder or not found in demoFilesData:", clickedPath);
+                    return;
+                }
+
+                const subfoldersContainer = link.closest('div').querySelector('.subfolder-container');
+                const iconElement = link.querySelector('.material-icons-outlined'); // Get icon from the link itself
+
+                let isNowExpanded = false;
+                if (subfoldersContainer) {
+                    if (subfoldersContainer.style.display === 'none') {
+                        subfoldersContainer.style.display = 'block';
+                        if (iconElement) iconElement.textContent = 'folder_open';
+                        isNowExpanded = true;
+                    } else {
+                        subfoldersContainer.style.display = 'none';
+                        if (iconElement) iconElement.textContent = 'folder';
+                        isNowExpanded = false;
+                    }
                 } else {
-                    // This is a subfolder like "Jokes Folder 1"
-                    clearActiveStates();
-                    
-                    // Keep "demo_files" (parent) highlighted
-                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
-                    if (demoFilesEntryLink) {
-                        setActiveState(demoFilesEntryLink);
-                         // Ensure its icon reflects open state if its subfolders are visible (which they would be if a child is clicked)
-                        const demoFilesSubfoldersContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
-                        if (demoFilesSubfoldersContainer && demoFilesSubfoldersContainer.style.display === 'block') {
-                            const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
-                            if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
+                    // If there's no subfoldersContainer, it implies it's a leaf folder or structure is unexpected.
+                    // We might still want to treat it as "expanded" for content display purposes.
+                    isNowExpanded = true;
+                }
+
+                if (isNowExpanded) {
+                    let pathToDisplay = clickedPath;
+                    let targetLinkElement = link; // Default to the clicked link
+
+                    // If the clicked folder has sub-folders, try to select and display the first one.
+                    let firstSubFolderPath = null;
+                    if (folderItem.children) {
+                        for (const childName in folderItem.children) {
+                            const childItem = folderItem.children[childName];
+                            if (childItem.type === 'folder') {
+                                firstSubFolderPath = childItem.path;
+                                break;
+                            }
                         }
                     }
 
-                    setActiveState(link);
-                    activeSubFolderLink = link;
-                    displayFolderContents(path);
+                    if (firstSubFolderPath) {
+                        const firstSubfolderLinkElem = document.querySelector(`#sidebar-nav a[data-folder-path="${firstSubFolderPath}"]`);
+                        if (firstSubfolderLinkElem) {
+                            pathToDisplay = firstSubFolderPath;
+                            targetLinkElement = firstSubfolderLinkElem;
+                        } else {
+                            // If the DOM element for the first subfolder isn't found (e.g., not yet rendered or an issue),
+                            // it will default to displaying the content of the clicked folder itself (pathToDisplay = clickedPath).
+                            console.warn("DOM element for first subfolder not found:", firstSubFolderPath);
+                        }
+                    }
+
+                    clearActiveStates();
+                    // Special handling for "demo_files" itself: it should remain visually "active" if one of its children is active.
+                    if (targetLinkElement.dataset.folderPath !== "demo_files" && targetLinkElement.dataset.folderPath.startsWith("demo_files/")) {
+                        const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                        if (demoFilesEntryLink) {
+                             setActiveState(demoFilesEntryLink); // Keep "demo_files" (parent) highlighted
+                             const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                             if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open'; // Ensure its icon is open
+                        }
+                    }
+                    setActiveState(targetLinkElement);
+                    activeSubFolderLink = targetLinkElement;
+                    displayFolderContents(pathToDisplay);
                 }
+                // If !isNowExpanded (folder was collapsed), we don't need to change the displayed content or active state.
+                // The content area will continue to show what was last selected.
             });
         }
         return subfoldersContainer;
@@ -585,17 +757,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Refresh the displayed table based on current view
-        let currentActiveFolderPath = "demo_files"; // Default or determine from active link
-        const activeLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white');
-        if (activeLink && activeLink.dataset.folderPath) {
-            currentActiveFolderPath = activeLink.dataset.folderPath;
-        } else {
-            // If no specific subfolder link is active, check if the main "demo_files" is active
-             const demoFilesActiveLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"].bg-\\[\\#1A2B3A\\].text-white');
-             if (demoFilesActiveLink) currentActiveFolderPath = "demo_files";
-        }
-        displayFolderContents(currentActiveFolderPath);
+            let currentActiveFolderPath = "demo_files";
+            // Determine active folder path more reliably, considering sub-folder links first
+            const activeSubFolderLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path^="demo_files/"]');
+            const activeDemoFilesLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path="demo_files"]');
 
+            if (activeSubFolderLink && activeSubFolderLink.dataset.folderPath) {
+                currentActiveFolderPath = activeSubFolderLink.dataset.folderPath;
+            } else if (activeDemoFilesLink && activeDemoFilesLink.dataset.folderPath) {
+                 // This case implies "demo_files" itself is selected, but not a sub-folder.
+                 // The logic in displayFolderContents should handle "demo_files" to list its direct children.
+                currentActiveFolderPath = activeDemoFilesLink.dataset.folderPath;
+            } else if (activeSubFolderLink) { // Fallback if dataset.folderPath is missing for some reason
+                currentActiveFolderPath = activeSubFolderLink.innerText.trim(); // Less ideal, relies on text
+        }
+            // If no link is active, currentActiveFolderPath remains "demo_files" (or other sensible default)
+            // console.log("Determined active folder path for refresh:", currentActiveFolderPath);
+        displayFolderContents(currentActiveFolderPath);
+        displayActivityLog(); // Refresh activity log after scan
 
         console.log(`File scan complete. New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}. Log updated.`);
         alert(`File scan complete!\nNew files: ${newFilesAdded}\nModified files: ${filesModified}\nVerified files: ${filesVerified}\nLog has been updated.`);
