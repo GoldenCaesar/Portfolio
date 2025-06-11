@@ -1,4 +1,4 @@
-console.log("script.js loaded");More actions
+console.log("script.js loaded");
 
 let fileLog = []; // Global variable for storing log data
 let userUploadedFolders = {}; // To store user-uploaded folder structures
@@ -694,7 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const clickedPath = path; // Path of the folder item associated with this link
    const folderItem = getFolderItemByPath(clickedPath);
- if (!folderItem) {Add commentMore actions
+ if (!folderItem) {
                     console.warn(`Sidebar click: Folder item not found or not a folder for path: "${clickedPath}". Result from getFolderItemByPath:`, folderItem);
                     return;
                 }
