@@ -194,6 +194,11 @@ async function scanFiles() {
     let newFilesAdded = 0;
     let filesModified = 0;
     let filesVerified = 0;
+    let pathsUpdated = 0;
+    let duplicatesFound = 0;
+
+    // Create a Set of all paths in the current scan for efficient lookup
+    const currentScanPaths = new Set(filesToProcess.map(f => f.path));
 
     for (const fileItem of filesToProcess) {
         let fileContent;
@@ -232,24 +237,62 @@ async function scanFiles() {
             }
         } else {
             const appID = generateAppUniqueID();
-            // const osID = getOSFileID(fileItem.path); // OSFileID might not be meaningful for webkitRelativePath
-            const hashExists = window.fileLog.some(entry => entry.currentHash === currentHash || (entry.hashHistory && entry.hashHistory.includes(currentHash)));
-            if (hashExists) {
-                console.warn(`Hash for new file ${fileItem.path} (${currentHash}) already exists in logs under a different path (logging.js).`);
+            // Path not found in log - check for hash match for rename/move/duplicate detection
+            const hashMatchEntryIndex = window.fileLog.findIndex(entry => entry.currentHash === currentHash);
+            const hashMatchEntry = hashMatchEntryIndex !== -1 ? window.fileLog[hashMatchEntryIndex] : null;
+
+            if (hashMatchEntry) {
+                // Hash found, but path is new. Potential rename/move or duplicate.
+                console.log(`Content of ${fileItem.path} (hash: ${currentHash}) already exists in log, currently at ${hashMatchEntry.currentPath}.`);
+
+                if (!currentScanPaths.has(hashMatchEntry.currentPath)) {
+                    // Scenario A: Rename/Move Detection
+                    // The path previously associated with this hash is NOT in the current scan list.
+                    console.log(`File at ${hashMatchEntry.currentPath} seems to have been moved/renamed to ${fileItem.path}. Updating log entry.`);
+                    window.fileLog[hashMatchEntryIndex].previousPaths = window.fileLog[hashMatchEntryIndex].previousPaths || [];
+                    window.fileLog[hashMatchEntryIndex].previousPaths.push(window.fileLog[hashMatchEntryIndex].currentPath);
+                    window.fileLog[hashMatchEntryIndex].currentPath = fileItem.path;
+                    window.fileLog[hashMatchEntryIndex].status = 'path_updated'; // New status
+                    window.fileLog[hashMatchEntryIndex].lastHashCheckTime = currentTime;
+                    window.fileLog[hashMatchEntryIndex].lastModifiedSystem = currentTime; // Or use fileItem.lastModified if available
+                    pathsUpdated++;
+                } else {
+                    // Scenario B: Duplicate/Alternate Path
+                    // The path previously associated with this hash IS ALSO in the current scan list. This is a duplicate.
+                    console.warn(`DUPLICATE: File ${fileItem.path} has same content as ${hashMatchEntry.currentPath}. Creating new entry with 'duplicate' status.`);
+                    const appID = generateAppUniqueID();
+                    const newLogEntry = {
+                        appID: appID,
+                        currentPath: fileItem.path,
+                        initialDiscoveryTime: currentTime,
+                        lastHashCheckTime: currentTime,
+                        lastModifiedSystem: currentTime,
+                        currentHash: currentHash,
+                        hashHistory: [],
+                        previousPaths: [], // Initialize for new duplicate entry
+                        status: 'duplicate', // New status
+                        originalPath: hashMatchEntry.currentPath // Optional: link to the original
+                    };
+                    window.fileLog.push(newLogEntry);
+                    duplicatesFound++;
+                }
+            } else {
+                // Hash not found - this is a genuinely new file.
+                const appID = generateAppUniqueID();
+                const newLogEntry = {
+                    appID: appID,
+                    currentPath: fileItem.path,
+                    initialDiscoveryTime: currentTime,
+                    lastHashCheckTime: currentTime,
+                    lastModifiedSystem: currentTime,
+                    currentHash: currentHash,
+                    hashHistory: [],
+                    previousPaths: [], // Initialize for new entry
+                    status: 'newly_added'
+                };
+                window.fileLog.push(newLogEntry);
+                newFilesAdded++;
             }
-            const newLogEntry = {
-                appID: appID,
-                // osID: osID,
-                currentPath: fileItem.path,
-                initialDiscoveryTime: currentTime,
-                lastHashCheckTime: currentTime,
-                lastModifiedSystem: currentTime, // Or fileItem.fileObject.lastModified for user files
-                currentHash: currentHash,
-                hashHistory: [], // Initialize as empty array
-                status: 'newly_added'
-            };
-            window.fileLog.push(newLogEntry); // Use global fileLog
-            newFilesAdded++;
         }
     }
 
@@ -287,7 +330,7 @@ async function scanFiles() {
     if (typeof window.displayFolderContents === "function") window.displayFolderContents(currentActiveFolderPath);
     if (typeof window.displayActivityLog === "function") window.displayActivityLog(); // Refresh activity log
 
-    console.log(`File scan complete (logging.js). New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}. Log updated.`);
+    console.log(`File scan complete (logging.js). New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}, Paths Updated: ${pathsUpdated}, Duplicates Found: ${duplicatesFound}. Log updated.`);
 }
 
 // Ensure logging.js is loaded, then ui.js, then script.js for dependency reasons if not using modules.
@@ -310,4 +353,6 @@ alert(`File scan complete!
 New files: ${newFilesAdded}
 Modified files: ${filesModified}
 Verified files: ${filesVerified}
+Paths Updated: ${pathsUpdated}
+Duplicates Found: ${duplicatesFound}
 Log has been updated.`);
