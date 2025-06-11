@@ -1099,7 +1099,7 @@ function toggleFolderCheckboxes(show) {
             deleteButton.disabled = true;
         }
     }
-    updateSidebarView(); // This will trigger re-rendering of the sidebar
+    window.updateSidebarView(); // This will trigger re-rendering of the sidebar
 }
 
 // Helper function to remove a folder from a nested data structure (like userUploadedFolders)
