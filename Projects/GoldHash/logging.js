@@ -97,6 +97,43 @@ function clearLogs() {
     alert("Logs have been cleared. (logging.js)");
 }
 
+window.removeFolderEntriesFromLog = function(folderPath) {
+    if (!folderPath || typeof folderPath !== 'string') {
+        console.error("removeFolderEntriesFromLog: Invalid folderPath provided.", folderPath);
+        return;
+    }
+    console.log(`Attempting to remove log entries for folder: "${folderPath}" (logging.js)...`);
+    const originalLogLength = window.fileLog.length;
+
+    // Filter out entries that are within the folder (path starts with folderPath + '/')
+    // Also filter out entries that match the folderPath itself (in case a folder path was somehow logged as a file)
+    window.fileLog = window.fileLog.filter(entry => {
+        return !entry.currentPath.startsWith(folderPath + '/') && entry.currentPath !== folderPath;
+    });
+
+    const removedCount = originalLogLength - window.fileLog.length;
+    if (removedCount > 0) {
+        console.log(`Removed ${removedCount} log entries associated with folder "${folderPath}" (logging.js).`);
+        saveLogsToStorage(); // Persist the changes
+
+        // Update UI elements that depend on fileLog
+        if (typeof updateFileMonitoredCount === 'function') {
+            updateFileMonitoredCount();
+            console.log("Called updateFileMonitoredCount from removeFolderEntriesFromLog (logging.js).");
+        }
+        if (typeof updateLogSizeDisplayOnLoad === 'function') { // Or a more direct size update if available
+            updateLogSizeDisplayOnLoad();
+            console.log("Called updateLogSizeDisplayOnLoad from removeFolderEntriesFromLog (logging.js).");
+        }
+        if (typeof displayActivityLog === 'function') {
+            displayActivityLog();
+            console.log("Called displayActivityLog from removeFolderEntriesFromLog (logging.js).");
+        }
+    } else {
+        console.log(`No log entries found or removed for folder "${folderPath}" (logging.js).`);
+    }
+};
+
 // --- File Scanning Function (moved from script.js) ---
 async function scanFiles() {
     console.log("Starting file scan (logging.js)...");

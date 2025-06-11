@@ -1,5 +1,7 @@
 // Global variables for UI, now explicitly attached to window
 window.userUploadedFolders = {}; // To store user-uploaded folder structures
+window.isEditModeActive = false; // To track if edit mode is active
+window.removeFolderEntriesFromLog = function(folderPath) { console.log('UI Placeholder: removeFolderEntriesFromLog called for:', folderPath); }; // Placeholder
 window.demoFilesData = { // Moved from DOMContentLoaded
     "demo_files": {
         "path": "demo_files",
@@ -434,6 +436,17 @@ function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, 
     link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
     link.dataset.folderPath = path;
 
+    if (window.isEditModeActive && isTopLevel) {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'mr-2 h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-offset-gray-800'; // Tailwind styled checkbox
+        checkbox.dataset.folderPath = path;
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent sidebar navigation when clicking checkbox
+        });
+        link.appendChild(checkbox); // Prepend checkbox
+    }
+
     const iconSpan = document.createElement('span');
     iconSpan.className = 'material-icons-outlined text-slate-400';
     iconSpan.style.fontSize = '20px';
@@ -561,15 +574,90 @@ function updateSidebarView() {
     if (sidebarNav) console.log("sidebarNav innerHTML after changes (ui.js):", sidebarNav.innerHTML.length > 100 ? sidebarNav.innerHTML.substring(0,100) + "..." : sidebarNav.innerHTML);
 }
 
+function renderSidebarForEditMode() {
+    console.log('renderSidebarForEditMode called, refreshing sidebar view.');
+    updateSidebarView(); // This will rebuild the sidebar using createSidebarEntry, which now includes checkbox logic.
+}
+
 
 // --- DOMContentLoaded Listener and UI Logic ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired from ui.js");
     const sidebarNav = document.getElementById('sidebar-nav');
     const documentsTbody = document.getElementById('documents-tbody'); // Keep for displayFolderContents
+    const editFoldersButton = document.getElementById('edit-folders-button');
+    const deleteSelectedFoldersButton = document.getElementById('delete-selected-folders-button');
 
     // Global `window.demoFilesData` is initialized at the top of ui.js
     // `fileLog` is now globally available as `window.fileLog` from `logging.js`.
+
+    if (editFoldersButton && deleteSelectedFoldersButton) {
+        editFoldersButton.addEventListener('click', () => {
+            window.isEditModeActive = !window.isEditModeActive;
+            const iconSpan = editFoldersButton.querySelector('.material-icons-outlined');
+
+            if (window.isEditModeActive) {
+                // Enter edit mode
+                editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Cancel"; // Text node is usually the last child
+                if (iconSpan) iconSpan.textContent = 'cancel';
+                deleteSelectedFoldersButton.style.display = 'flex';
+                renderSidebarForEditMode();
+            } else {
+                // Exit edit mode
+                editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Edit"; // Text node is usually the last child
+                if (iconSpan) iconSpan.textContent = 'edit';
+                deleteSelectedFoldersButton.style.display = 'none';
+                updateSidebarView(); // Redraw sidebar to remove edit mode UI
+            }
+        });
+    }
+
+    if (deleteSelectedFoldersButton && editFoldersButton) { // Ensure editFoldersButton is also available for UI reset
+        deleteSelectedFoldersButton.addEventListener('click', () => {
+            const foldersToDelete = [];
+            const checkedCheckboxes = document.querySelectorAll('#sidebar-nav input[type="checkbox"]:checked');
+
+            checkedCheckboxes.forEach(checkbox => {
+                foldersToDelete.push(checkbox.dataset.folderPath);
+            });
+
+            if (foldersToDelete.length === 0) {
+                alert('No folders selected for deletion.');
+                return;
+            }
+
+            let deletedUserFolder = false;
+            foldersToDelete.forEach(folderPath => {
+                if (window.userUploadedFolders[folderPath]) {
+                    delete window.userUploadedFolders[folderPath];
+                    console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
+                    window.removeFolderEntriesFromLog(folderPath); // Call placeholder
+                    deletedUserFolder = true;
+                } else {
+                    console.log(`Folder "${folderPath}" is not a user-uploaded folder or already deleted. Skipping deletion from UI data.`);
+                    // Optionally alert user for demo/non-user folders, e.g.
+                    // if (folderPath.startsWith("demo_files")) {
+                    //     alert(`The folder "${folderPath}" is a demo folder and cannot be deleted.`);
+                    // }
+                }
+            });
+
+            // Exit edit mode and update UI
+            window.isEditModeActive = false;
+            const editIconSpan = editFoldersButton.querySelector('.material-icons-outlined');
+            editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Edit";
+            if (editIconSpan) editIconSpan.textContent = 'edit';
+            deleteSelectedFoldersButton.style.display = 'none';
+
+            updateSidebarView();
+            if (deletedUserFolder) { // Only update logs if a user folder was actually deleted
+                displayActivityLog(); // Reflect that logs for the folder are (notionally) gone
+                updateFileMonitoredCount(); // Reflect change in monitored files
+            }
+            displayFolderContents("demo_files"); // Default to demo_files view
+            alert('Selected user folders and their logs have been removed.');
+        });
+    }
 
     // Attempt to load logs. `loadLogsFromStorage` is from `logging.js`
     // logging.js should be loaded before ui.js.
