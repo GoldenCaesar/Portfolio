@@ -625,8 +625,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    let activeSubFolderLink = null;
-
     function clearActiveStates() {
         document.querySelectorAll('#sidebar-nav a, #sidebar-nav div[data-folder-path]').forEach(link => {
             link.classList.remove('bg-[#1A2B3A]', 'text-white');
@@ -642,6 +640,8 @@ document.addEventListener('DOMContentLoaded', () => {
             element.classList.remove('text-slate-300');
         }
     }
+
+    let activeSubFolderLink = null;
 
     function loadDemoFolders() {
         if (!sidebarNav) return;
