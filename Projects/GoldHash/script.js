@@ -1,6 +1,7 @@
 console.log("script.js loaded");
 
 let fileLog = []; // Global variable for storing log data
+let userUploadedFolders = {}; // To store user-uploaded folder structures
 
 // --- Core Hashing and ID Generation Functions ---
 
@@ -293,76 +294,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("No folder selected or folder is empty.");
                 return;
             }
-            console.log(`Processing ${files.length} files from selected folder...`);
+            console.log(`Processing ${files.length} files from selected folder to display in sidebar...`);
 
-            const currentTime = new Date().toISOString();
-            let newFilesProcessed = 0;
+            let newFilesProcessedCount = 0;
 
             for (const file of files) {
-                const filePath = file.webkitRelativePath || file.name;
-                console.log(`Processing file: ${filePath}`);
-
-                const existingLogEntry = fileLog.find(entry => entry.currentPath === filePath);
-                if (existingLogEntry) {
-                    console.log(`File ${filePath} already monitored. Skipping.`);
+                const fullPath = file.webkitRelativePath; // e.g., "FolderName/subfolder/file.txt"
+                if (!fullPath) {
+                    console.warn("File with no webkitRelativePath, likely a single file selection, not a folder. Skipping for now.", file.name);
+                    // Or handle single file upload if desired in the future.
                     continue;
                 }
 
-                try {
-                    const fileContent = await readFileAsText(file);
-                    const currentHash = await generateSHA256(fileContent);
+                const pathParts = fullPath.split('/');
+                let currentLevel = userUploadedFolders;
+                let currentBuiltPath = "";
 
-                    if (currentHash === null) {
-                        console.error(`Hash generation failed for ${filePath}. Skipping.`);
-                        continue;
+                for (let i = 0; i < pathParts.length; i++) {
+                    const part = pathParts[i];
+                    currentBuiltPath += (i > 0 ? '/' : '') + part;
+
+                    if (i === pathParts.length - 1) { // It's a file
+                        if (!currentLevel[part]) { // Check if file already listed (e.g. re-upload)
+                             currentLevel[part] = {
+                                path: currentBuiltPath,
+                                type: 'file',
+                                fileObject: file // Store the File object for later scanning
+                            };
+                            newFilesProcessedCount++;
+                        }
+                    } else { // It's a directory
+                        if (!currentLevel[part]) {
+                            currentLevel[part] = {
+                                path: currentBuiltPath,
+                                type: 'folder',
+                                children: {}
+                            };
+                        } else if (currentLevel[part].type !== 'folder') {
+                            // This case should ideally not happen if paths are unique and consistent
+                            // If a file exists where a folder is expected, log an error or decide on handling
+                            console.error(`Conflict: Expected folder, found file at ${currentBuiltPath}`);
+                            // Potentially skip this path or overwrite, depending on desired strategy
+                            break;
+                        }
+                        currentLevel = currentLevel[part].children;
                     }
-
-                    const appID = generateAppUniqueID();
-                    const osID = getOSFileID(filePath);
-
-                    const newLogEntry = {
-                        appID: appID,
-                        osID: osID,
-                        currentPath: filePath,
-                        initialDiscoveryTime: currentTime,
-                        lastHashCheckTime: currentTime,
-                        lastModifiedSystem: currentTime,
-                        currentHash: currentHash,
-                        hashHistory: [],
-                        status: 'newly_added'
-                    };
-                    fileLog.push(newLogEntry);
-                    newFilesProcessed++;
-                    console.log(`Added new log entry for ${filePath}`);
-
-                } catch (error) {
-                    console.error(`Error processing file ${filePath}:`, error);
                 }
             }
 
-            if (newFilesProcessed > 0) {
-                localStorage.setItem('goldHashLog', JSON.stringify(fileLog));
-                updateFileMonitoredCount();
-                updateLogSizeDisplayOnLoad();
-
-                let currentActiveFolderPath = "demo_files";
-                if (typeof activeSubFolderLink !== 'undefined' && activeSubFolderLink && activeSubFolderLink.dataset.folderPath) {
-                     currentActiveFolderPath = activeSubFolderLink.dataset.folderPath;
-                } else {
-                    const activeDemoFilesLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path="demo_files"]');
-                    if (activeDemoFilesLink && activeDemoFilesLink.dataset.folderPath) {
-                        currentActiveFolderPath = activeDemoFilesLink.dataset.folderPath;
-                    }
-                }
-                console.log("Refreshing folder contents for path:", currentActiveFolderPath);
-                // displayFolderContents(currentActiveFolderPath); // Might not show uploaded files if view is specific to demo_files
-                displayActivityLog(); // Refresh the activity log
-
-                alert(`${newFilesProcessed} new files from the folder have been added and logged.`);
+            if (newFilesProcessedCount > 0) {
+                console.log("User uploaded folders data:", userUploadedFolders);
+                updateSidebarView();
+                alert(`Folder structure added to sidebar. ${newFilesProcessedCount} new file references captured. Files will be scanned when you click the Scan button.`);
+            } else if (files.length > 0) {
+                 alert("Selected folder and its files might have already been added or no new files were found.");
             } else {
-                alert("No new files were added from the selected folder. They might have been already monitored or the folder was empty.");
+                alert("No folder selected or the folder was empty.");
             }
 
+            // Clear the input for the next selection
             folderUploadInput.value = '';
         });
     }
@@ -515,34 +505,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const filesForDisplay = [];
         let currentFolderChildren = {};
+        let sourceDataName = ""; // To track if we are using demo or user data
 
-        // Navigate demoFilesData to find the correct folder based on folderPath
-        if (folderPath === "demo_files" || folderPath === "") {
-            currentFolderChildren = demoFilesData.demo_files.children || {};
+        // Try to find in demoFilesData first
+        const demoItem = findItemInData(folderPath, demoFilesData);
+        if (demoItem && demoItem.type === 'folder' && demoItem.children) {
+            currentFolderChildren = demoItem.children;
+            sourceDataName = "demo";
         } else {
-            const pathParts = folderPath.split('/'); // e.g., "demo_files/Jokes Folder 1"
-            let currentLevel = demoFilesData;
-            for (const part of pathParts) {
-                if (currentLevel[part] && currentLevel[part].type === 'folder') {
-                    currentLevel = currentLevel[part];
-                } else if (currentLevel.children && currentLevel.children[part] && currentLevel.children[part].type === 'folder') {
-                    currentLevel = currentLevel.children[part];
-                } else {
-                    // If path part not found or not a folder, break
-                    console.warn(`Path part "${part}" not found or not a folder in demoFilesData for path "${folderPath}".`);
-                    currentLevel = null;
+            // Try to find in userUploadedFolders
+            const parts = folderPath.split('/');
+            let currentItem = userUploadedFolders;
+            let foundInUser = true;
+            for (const part of parts) {
+                if (currentItem[part] && currentItem[part].type === 'folder') {
+                    currentItem = currentItem[part];
+                } else if (currentItem[part] && currentItem[part].children) { // Access children if currentItem is the root of a folder structure
+                     currentItem = currentItem[part].children;
+                } else if (currentItem.children && currentItem.children[part] && currentItem.children[part].type === 'folder') {
+                     currentItem = currentItem.children[part];
+                }
+                else {
+                    // Check if 'part' itself is a top-level key in userUploadedFolders and is a folder
+                    if (userUploadedFolders[part] && userUploadedFolders[part].path === folderPath && userUploadedFolders[part].type === 'folder') {
+                        currentItem = userUploadedFolders[part];
+                        // sourceDataName = "user_top"; // Special case for top-level folder itself
+                        break;
+                    }
+                    foundInUser = false;
                     break;
                 }
             }
-            if (currentLevel && currentLevel.children) {
-                currentFolderChildren = currentLevel.children;
-            } else {
-                console.warn(`Could not find children for folderPath: "${folderPath}" in demoFilesData.`);
-                currentFolderChildren = {}; // Default to empty if path is invalid or folder has no children
+
+            if (foundInUser && currentItem && currentItem.children) {
+                currentFolderChildren = currentItem.children;
+                sourceDataName = "user";
+            } else if (foundInUser && currentItem && currentItem.type === 'folder' && !currentItem.children) { // Empty user folder
+                currentFolderChildren = {};
+                sourceDataName = "user_empty";
+            }
+             else {
+                console.warn(`Could not find children for folderPath: "${folderPath}" in demoFilesData or userUploadedFolders.`);
+                currentFolderChildren = {};
             }
         }
 
-        // console.log(`Displaying contents for path: ${folderPath}, found children:`, Object.keys(currentFolderChildren));
+        console.log(`Displaying contents for path: ${folderPath} (from ${sourceDataName || 'unknown source'}), found children:`, Object.keys(currentFolderChildren));
 
         for (const itemName in currentFolderChildren) {
             const item = currentFolderChildren[itemName];
@@ -550,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fileDisplayData = {
                     name: itemName,
                     currentPath: item.path,
-                    status: "Not Scanned",
+                    status: "Not Scanned Yet", // Default for user files not yet in fileLog
                     currentHash: "N/A",
                     lastHashCheckTime: "N/A"
                 };
@@ -562,13 +570,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     fileDisplayData.currentHash = loggedFile.currentHash;
                     fileDisplayData.lastHashCheckTime = loggedFile.lastHashCheckTime;
                 }
+                // No 'else' needed here, as defaults are set for "Not Scanned Yet"
+
                 filesForDisplay.push(fileDisplayData);
             }
         }
-        displayLoggedFiles(filesForDisplay);
+        displayLoggedFiles(filesForDisplay); // This function renders the filesForDisplay array
     }
 
-    function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
+    function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false, children = null) {
         console.log("createSidebarEntry called for name:", name, "path:", path, "type:", type, "indentLevel:", indentLevel, "isTopLevel:", isTopLevel);
         const entryDiv = document.createElement('div');
         entryDiv.style.marginLeft = `${indentLevel * 20}px`; // Indentation
@@ -607,15 +617,40 @@ document.addEventListener('DOMContentLoaded', () => {
         entryDiv.appendChild(subfoldersContainer);
 
 
+        // Recursive call for children
+        if (type === 'folder' && children) {
+            Object.keys(children).forEach(childName => {
+                const childItem = children[childName];
+                // Pass childItem.children to the recursive call
+                createSidebarEntry(childName, childItem.path, childItem.type, indentLevel + 1, subfoldersContainer, false, childItem.children);
+            });
+        }
+
         if (type === 'folder') {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const clickedPath = path; // Path of the folder item associated with this link
                 // Ensure findItemInData is accessible here, assuming it's defined in an outer scope within DOMContentLoaded
-                const folderItem = findItemInData(clickedPath, demoFilesData);
+                let folderItem = findItemInData(clickedPath, demoFilesData);
+                if (!folderItem) {
+                    // Try to find in userUploadedFolders
+                    const parts = clickedPath.split('/');
+                    let currentItem = userUploadedFolders[parts[0]];
+                    if (currentItem) {
+                        for (let i = 1; i < parts.length; i++) {
+                            if (currentItem.children && currentItem.children[parts[i]]) {
+                                currentItem = currentItem.children[parts[i]];
+                            } else {
+                                currentItem = null;
+                                break;
+                            }
+                        }
+                    }
+                    folderItem = currentItem;
+                }
 
                 if (!folderItem || folderItem.type !== 'folder') {
-                    console.warn("Clicked item is not a folder or not found in demoFilesData:", clickedPath);
+                    console.warn("Clicked item is not a folder or not found in data sources:", clickedPath);
                     return;
                 }
 
@@ -689,26 +724,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function loadDemoFolders() {
-        console.log("loadDemoFolders called");
+    function updateSidebarView() {
+        console.log("updateSidebarView called");
         if (!sidebarNav) return;
-        if (sidebarNav) console.log("sidebarNav innerHTML before changes:", sidebarNav.innerHTML);
-        sidebarNav.innerHTML = '';
+        sidebarNav.innerHTML = ''; // Clear existing sidebar
 
-        Object.keys(demoFilesData).forEach(itemName => { // e.g., "demo_files"
-            console.log("Processing demo_files item:", demoFilesData[itemName]);
+        // Process demoFilesData
+        Object.keys(demoFilesData).forEach(itemName => {
             const item = demoFilesData[itemName];
-            const itemContainer = createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true); // isTopLevel = true
-
-            if (item.type === 'folder' && item.children) {
-                Object.keys(item.children).forEach(subItemName => { // e.g., "Jokes Folder 1"
-                    const subItem = item.children[subItemName];
-                    createSidebarEntry(subItemName, subItem.path, subItem.type, 1, itemContainer);
-                });
-            }
+            // createSidebarEntry will handle its own children recursively
+            createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true, item.children);
         });
 
-        // Automatically display contents of the first sub-folder of "demo_files"
+        // Process userUploadedFolders
+        Object.keys(userUploadedFolders).forEach(itemName => {
+            const item = userUploadedFolders[itemName];
+            // createSidebarEntry will handle its own children recursively
+            createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true, item.children);
+        });
+
+        // The logic for automatically displaying contents of the first sub-folder
+        // might need adjustment if userUploadedFolders can be empty or if we want a different default view.
+        // For now, retain existing logic, it will apply to demo files.
         const firstDemoSubfolderPath = demoFilesData.demo_files?.children
             ? Object.values(demoFilesData.demo_files.children)[0]?.path
             : null;
@@ -746,95 +783,117 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sidebarNav) console.log("sidebarNav innerHTML after changes:", sidebarNav.innerHTML);
     }
 
-    loadDemoFolders();
+    updateSidebarView();
 
     async function scanFiles() {
         console.log("Starting file scan (rescan logic enabled)...");
         const currentTime = new Date().toISOString();
+        const filesToProcess = []; // This will hold objects { path: string, content: string, fileObject?: File }
 
+        // 1. Collect files from demoFilesData
         // Ensure demoFilesData is available
         const currentDemoFiles = (typeof demoFilesData !== "undefined") ? demoFilesData : null;
-        if (!currentDemoFiles || !currentDemoFiles.demo_files || !currentDemoFiles.demo_files.children) {
-            console.error("demoFilesData is not available or structured as expected for scanning.");
-            alert("Error: Demo file data is not available for scanning.");
-            return;
+        if (currentDemoFiles && currentDemoFiles.demo_files && currentDemoFiles.demo_files.children) {
+            function _collectDemoFilesRecursive(currentLevelChildren) {
+                for (const key in currentLevelChildren) {
+                    const item = currentLevelChildren[key];
+                    if (item.type === 'file') {
+                        filesToProcess.push({ path: item.path, content: item.content || "" });
+                    } else if (item.type === 'folder' && item.children) {
+                        _collectDemoFilesRecursive(item.children);
+                    }
+                }
+            }
+            _collectDemoFilesRecursive(currentDemoFiles.demo_files.children);
+        } else {
+            console.warn("demoFilesData is not available or structured as expected for scanning.");
         }
 
-        const filesToProcess = [];
-        function _internalCollectFiles(currentLevelChildren) { // Renamed and simplified
-            for (const key in currentLevelChildren) {
-                const item = currentLevelChildren[key];
-                if (item.type === 'file') {
-                    filesToProcess.push({ path: item.path, content: item.content || "" });
+        // 2. Collect files from userUploadedFolders
+        function _collectUserFilesRecursive(currentLevel) {
+            for (const key in currentLevel) {
+                const item = currentLevel[key];
+                if (item.type === 'file' && item.fileObject) {
+                    // For user files, we push the path and fileObject. Content will be read async.
+                    filesToProcess.push({ path: item.path, fileObject: item.fileObject });
                 } else if (item.type === 'folder' && item.children) {
-                    _internalCollectFiles(item.children);
+                    _collectUserFilesRecursive(item.children);
                 }
             }
         }
-        _internalCollectFiles(currentDemoFiles.demo_files.children);
+        if (typeof userUploadedFolders !== "undefined") {
+            _collectUserFilesRecursive(userUploadedFolders);
+        }
 
+        if (filesToProcess.length === 0) {
+            alert("No files found to scan (neither demo files nor user-uploaded files).");
+            return;
+        }
+
+        console.log(`Collected ${filesToProcess.length} total files for scanning.`);
 
         let newFilesAdded = 0;
         let filesModified = 0;
         let filesVerified = 0;
 
         for (const fileItem of filesToProcess) {
+            let fileContent;
+            // Read content if it's a user file (has fileObject)
+            if (fileItem.fileObject) {
+                try {
+                    fileContent = await readFileAsText(fileItem.fileObject);
+                } catch (error) {
+                    console.error(`Error reading content for ${fileItem.path}:`, error);
+                    continue; // Skip this file
+                }
+            } else { // It's a demo file, content is already available
+                fileContent = fileItem.content;
+            }
+
+            const currentHash = await generateSHA256(fileContent);
+            if (currentHash === null) {
+                console.error(`Hash generation failed for ${fileItem.path}. Skipping.`);
+                continue;
+            }
+
             const existingLogEntryIndex = fileLog.findIndex(entry => entry.currentPath === fileItem.path);
 
-            if (existingLogEntryIndex !== -1) {
-                // Existing file found
+            if (existingLogEntryIndex !== -1) { // Existing file in fileLog
                 const logEntry = fileLog[existingLogEntryIndex];
-
-                const newHash = await generateSHA256(fileItem.content);
-
-                if (newHash === null) { // Hash generation failed
-                    console.error(`Skipping file ${fileItem.path} due to hash generation error.`);
-                    continue;
-                }
-
-                if (logEntry.currentHash !== newHash) {
+                if (logEntry.currentHash !== currentHash) {
                     console.log(`File ${fileItem.path} has changed.`);
                     logEntry.hashHistory.push(logEntry.currentHash);
-                    logEntry.currentHash = newHash;
+                    logEntry.currentHash = currentHash;
                     logEntry.status = 'modified';
-                    logEntry.lastModifiedSystem = currentTime;
+                    logEntry.lastModifiedSystem = currentTime; // Or use fileItem.fileObject.lastModified if reliable
                     logEntry.lastHashCheckTime = currentTime;
                     filesModified++;
                 } else {
-                    // Hash is the same, content has not changed
                     logEntry.status = 'verified';
                     logEntry.lastHashCheckTime = currentTime;
                     filesVerified++;
                 }
-            } else {
-                // New file
-                console.log(`New file detected: ${fileItem.path}`);
+            } else { // New file (not in fileLog yet)
+                console.log(`New file detected during scan: ${fileItem.path}`);
                 const appID = generateAppUniqueID();
-                const osID = getOSFileID(fileItem.path);
-                const fileContent = fileItem.content;
+                // const osID = getOSFileID(fileItem.path); // getOSFileID might not be useful for webkitRelativePath
 
-                const currentHash = await generateSHA256(fileContent);
-                if (currentHash === null) { // Hash generation failed
-                    console.error(`Skipping new file ${fileItem.path} due to hash generation error.`);
-                    continue;
-                }
-
+                // Check if this hash already exists for any other file path
                 const hashExists = fileLog.some(entry => {
                     if (entry.currentHash === currentHash) return true;
                     return entry.hashHistory.includes(currentHash);
                 });
-
                 if (hashExists) {
-                    console.warn(`Hash for new file ${fileItem.path} (${currentHash}) already exists in logs. Adding as new entry anyway.`);
+                    console.warn(`Hash for new file ${fileItem.path} (${currentHash}) already exists in logs under a different path.`);
                 }
 
                 const newLogEntry = {
                     appID: appID,
-                    osID: osID,
+                    // osID: osID, // Reconsider if osID is meaningful here
                     currentPath: fileItem.path,
                     initialDiscoveryTime: currentTime,
                     lastHashCheckTime: currentTime,
-                    lastModifiedSystem: currentTime,
+                    lastModifiedSystem: currentTime, // Or fileItem.fileObject.lastModified
                     currentHash: currentHash,
                     hashHistory: [],
                     status: 'newly_added'
@@ -846,9 +905,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         localStorage.setItem('goldHashLog', JSON.stringify(fileLog));
         updateFileMonitoredCount();
-        updateLogSizeDisplayOnLoad();
+        updateLogSizeDisplayOnLoad(); // This updates based on fileLog size
         updateLastScanTime();
 
+        // Update the "Files Changed" count in statistics
         const filesChangedElement = document.querySelector('div.grid div:nth-child(2) p.text-3xl');
         if (filesChangedElement) {
             const modifiedCount = fileLog.filter(entry => entry.status === 'modified').length;
@@ -856,27 +916,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Refresh the displayed table based on current view
-            let currentActiveFolderPath = "demo_files";
-            // Determine active folder path more reliably, considering sub-folder links first
-            const activeSubFolderLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path^="demo_files/"]');
-            const activeDemoFilesLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path="demo_files"]');
-
-            if (activeSubFolderLink && activeSubFolderLink.dataset.folderPath) {
-                currentActiveFolderPath = activeSubFolderLink.dataset.folderPath;
-            } else if (activeDemoFilesLink && activeDemoFilesLink.dataset.folderPath) {
-                 // This case implies "demo_files" itself is selected, but not a sub-folder.
-                 // The logic in displayFolderContents should handle "demo_files" to list its direct children.
-                currentActiveFolderPath = activeDemoFilesLink.dataset.folderPath;
-            } else if (activeSubFolderLink) { // Fallback if dataset.folderPath is missing for some reason
-                currentActiveFolderPath = activeSubFolderLink.innerText.trim(); // Less ideal, relies on text
+        let currentActiveFolderPath = "demo_files"; // Default
+        const activeSidebarLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path]');
+        if (activeSidebarLink && activeSidebarLink.dataset.folderPath) {
+            currentActiveFolderPath = activeSidebarLink.dataset.folderPath;
         }
-            // If no link is active, currentActiveFolderPath remains "demo_files" (or other sensible default)
-            // console.log("Determined active folder path for refresh:", currentActiveFolderPath);
-        displayFolderContents(currentActiveFolderPath);
+        console.log("Scan complete. Refreshing folder contents for path:", currentActiveFolderPath);
+        displayFolderContents(currentActiveFolderPath); // Refresh documents tab
         displayActivityLog(); // Refresh activity log after scan
 
         console.log(`File scan complete. New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}. Log updated.`);
-        alert(`File scan complete!\nNew files: ${newFilesAdded}\nModified files: ${filesModified}\nVerified files: ${filesVerified}\nLog has been updated.`);
+        alert(`File scan complete!
+New files: ${newFilesAdded}
+Modified files: ${filesModified}
+Verified files: ${filesVerified}
+Log has been updated.`);
     }
 
     const scanButton = document.getElementById('scan-files-button');
