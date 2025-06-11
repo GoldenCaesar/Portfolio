@@ -1,5 +1,7 @@
 console.log("script.js loaded");
 
+let isEditMode = false;
+let selectedFolderPaths = [];
 let fileLog = []; // Global variable for storing log data
 let userUploadedFolders = {}; // To store user-uploaded folder structures
 
@@ -277,6 +279,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadLogsFromStorage(); // Load logs at the beginning of DOMContentLoaded
     const mainContent = document.querySelector('main.ml-80');
+
+    const editFoldersButton = document.getElementById('edit-folders-button');
+    const deleteButtonPlaceholder = document.getElementById('delete-button-placeholder');
 
     const addFolderButton = document.getElementById('add-folder-button');
     const folderUploadInput = document.getElementById('folder-upload-input');
@@ -651,6 +656,37 @@ document.addEventListener('DOMContentLoaded', () => {
         link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
         link.dataset.folderPath = path; // Store path for identification
 
+        if (type === 'folder' && isEditMode) {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'folder-checkbox'; // For potential future styling
+            checkbox.style.marginRight = '8px'; // Add some space between checkbox and icon
+            checkbox.dataset.folderPath = path;
+
+            // Restore checkbox state if it was previously selected
+            if (selectedFolderPaths.includes(path)) {
+                checkbox.checked = true;
+            }
+
+            checkbox.addEventListener('change', (event) => {
+                const folderPath = event.target.dataset.folderPath;
+                if (event.target.checked) {
+                    if (!selectedFolderPaths.includes(folderPath)) {
+                        selectedFolderPaths.push(folderPath);
+                    }
+                } else {
+                    selectedFolderPaths = selectedFolderPaths.filter(p => p !== folderPath);
+                }
+
+                const deleteButton = document.getElementById('delete-selected-folders-button');
+                if (deleteButton) {
+                    deleteButton.disabled = selectedFolderPaths.length === 0;
+                }
+                console.log("Selected folder paths:", selectedFolderPaths);
+            });
+            link.prepend(checkbox); // Prepend checkbox to the link element
+        }
+
         const iconSpan = document.createElement('span');
         iconSpan.className = 'material-icons-outlined text-slate-400';
         iconSpan.style.fontSize = '20px';
@@ -1012,4 +1048,215 @@ Log has been updated.`);
             settingsContextMenu.classList.add('hidden'); // Hide menu after click
         });
     }
+
+    if (editFoldersButton && deleteButtonPlaceholder) {
+        editFoldersButton.addEventListener('click', () => {
+            isEditMode = !isEditMode; // Toggle edit mode
+
+            if (isEditMode) {
+                console.log("Entering edit mode.");
+                // Create and insert the Delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.id = 'delete-selected-folders-button';
+                deleteButton.className = 'flex w-full min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-semibold leading-normal tracking-[0.015em] mb-4 hover:bg-red-700 transition-colors'; // Adjusted classes for a distinct look
+                deleteButton.innerHTML = `
+                    <span class="material-icons-outlined" style="font-size: 20px">delete</span>
+                    <span class="truncate">Delete Selected</span>
+                `;
+                deleteButton.disabled = true; // Initially disabled
+
+                // Clear placeholder and add the new button
+                deleteButtonPlaceholder.innerHTML = ''; // Clear any previous content
+                deleteButtonPlaceholder.appendChild(deleteButton);
+
+                // Call function to show checkboxes (will be implemented in the next step)
+                toggleFolderCheckboxes(true);
+
+                // Add event listener for the dynamically created delete button
+                deleteButton.addEventListener('click', handleDeleteSelectedFolders); // handleDeleteSelectedFolders will be created later
+
+            } else {
+                console.log("Exiting edit mode.");
+                // Remove the Delete button
+                deleteButtonPlaceholder.innerHTML = '';
+
+                // Call function to hide checkboxes
+                toggleFolderCheckboxes(false);
+
+                // Optional: Clear any selection state if needed immediately
+                // clearFolderSelections(); // Example function call
+            }
+        });
+    }
 });
+
+function toggleFolderCheckboxes(show) {
+    console.log(`toggleFolderCheckboxes called with show = ${show}`);
+    if (!show) {
+        selectedFolderPaths = []; // Clear selections when hiding checkboxes
+        const deleteButton = document.getElementById('delete-selected-folders-button');
+        if (deleteButton) {
+            deleteButton.disabled = true;
+        }
+    }
+    updateSidebarView(); // This will trigger re-rendering of the sidebar
+}
+
+// Helper function to remove a folder from a nested data structure (like userUploadedFolders)
+function removeFolderFromDataStructure(pathToRemove, dataStructure) {
+    const parts = pathToRemove.split('/');
+    let currentLevel = dataStructure;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (currentLevel[part] && currentLevel[part].type === 'folder' && currentLevel[part].children) {
+            currentLevel = currentLevel[part].children;
+        } else {
+            // Path not found or not a folder with children, cannot delete deeper
+            console.warn(`Path part ${part} not found or not a folder in dataStructure while trying to delete ${pathToRemove}`);
+            return false; // Indicate failure or path not fully found
+        }
+    }
+
+    const folderNameToDelete = parts[parts.length - 1];
+    if (currentLevel[folderNameToDelete] && currentLevel[folderNameToDelete].path === pathToRemove) {
+        delete currentLevel[folderNameToDelete];
+        console.log(`Deleted folder ${pathToRemove} from data structure.`);
+        return true; // Indicate success
+    } else {
+        console.warn(`Folder ${folderNameToDelete} (full path: ${pathToRemove}) not found at the expected level in dataStructure.`);
+        return false; // Indicate folder not found at the final step
+    }
+}
+
+function handleDeleteSelectedFolders() {
+    console.log("handleDeleteSelectedFolders called with selected paths:", selectedFolderPaths);
+    if (selectedFolderPaths.length === 0) {
+        alert("No folders selected for deletion.");
+        return;
+    }
+
+    // Create modal elements
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'delete-confirm-modal-overlay';
+    modalOverlay.style.position = 'fixed';
+    modalOverlay.style.top = '0';
+    modalOverlay.style.left = '0';
+    modalOverlay.style.width = '100%';
+    modalOverlay.style.height = '100%';
+    modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    modalOverlay.style.display = 'flex';
+    modalOverlay.style.justifyContent = 'center';
+    modalOverlay.style.alignItems = 'center';
+    modalOverlay.style.zIndex = '1000'; // Ensure it's on top
+
+    const modalContent = document.createElement('div');
+    modalContent.style.backgroundColor = '#1A2B3A'; // Dark background
+    modalContent.style.padding = '20px';
+    modalContent.style.borderRadius = '8px';
+    modalContent.style.color = 'white'; // White text
+    modalContent.style.textAlign = 'center';
+    modalContent.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+
+    const message = document.createElement('p');
+    message.textContent = 'Do you also want to remove the corresponding log entries for the selected folder(s)?';
+    message.style.marginBottom = '20px';
+
+    const yesButton = document.createElement('button');
+    yesButton.textContent = 'Yes';
+    yesButton.className = 'px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors mr-2';
+    yesButton.style.marginRight = '10px';
+
+    const noButton = document.createElement('button');
+    noButton.textContent = 'No';
+    noButton.className = 'px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors';
+
+    // Append elements
+    modalContent.appendChild(message);
+    modalContent.appendChild(yesButton);
+    modalContent.appendChild(noButton);
+    modalOverlay.appendChild(modalContent);
+    document.body.appendChild(modalOverlay);
+
+    // Event listeners for buttons
+    yesButton.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        processDeletion(true);
+    });
+
+    noButton.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+        processDeletion(false);
+    });
+}
+
+function processDeletion(deleteLogs) {
+    console.log(`Process deletion called. Delete logs: ${deleteLogs}. Selected folders:`, selectedFolderPaths);
+
+    if (selectedFolderPaths.length === 0) {
+        console.log("No folders were selected for deletion.");
+        // Exit edit mode even if nothing was deleted, to clean up the UI
+        isEditMode = false;
+        const deleteBtnPlaceholder = document.getElementById('delete-button-placeholder');
+        if (deleteBtnPlaceholder) deleteBtnPlaceholder.innerHTML = '';
+        toggleFolderCheckboxes(false); // This also clears selectedFolderPaths and updates sidebar
+        return;
+    }
+
+    let foldersSuccessfullyRemoved = 0;
+    selectedFolderPaths.forEach(path => {
+        // For now, only attempt to remove from userUploadedFolders
+        // Deletion from demoFilesData is out of scope for this implementation
+        if (userUploadedFolders) { // Ensure userUploadedFolders exists
+            if (removeFolderFromDataStructure(path, userUploadedFolders)) {
+                foldersSuccessfullyRemoved++;
+            }
+        }
+    });
+
+    console.log(`${foldersSuccessfullyRemoved} folder(s) removed from data structure(s).`);
+
+    if (deleteLogs) {
+        const initialLogCount = fileLog.length;
+        const pathsToRemoveSet = new Set(selectedFolderPaths); // For efficient lookup
+
+        fileLog = fileLog.filter(logEntry => {
+            // Check if the log entry's path starts with any of the selected folder paths
+            return !selectedFolderPaths.some(folderPath => logEntry.currentPath.startsWith(folderPath + '/'));
+        });
+
+        localStorage.setItem('goldHashLog', JSON.stringify(fileLog));
+        console.log(`Log entries filtered. Initial count: ${initialLogCount}, New count: ${fileLog.length}. localStorage updated.`);
+        displayActivityLog(); // Refresh activity log view
+        updateFileMonitoredCount(); // Update statistics
+        updateLogSizeDisplayOnLoad(); // Update log size display
+    }
+
+    // Clear the selection list *after* processing
+    selectedFolderPaths = [];
+
+    // Update sidebar to reflect removed folders
+    updateSidebarView(); // This is important to refresh the folder list
+
+    // Exit edit mode
+    // We can directly set isEditMode and call relevant functions
+    // to avoid issues with simulated clicks or complex state management.
+    isEditMode = false;
+    const deleteButton = document.getElementById('delete-selected-folders-button');
+    if (deleteButton && deleteButton.parentElement) {
+        deleteButton.parentElement.innerHTML = ''; // Clear the delete button placeholder
+    }
+    // toggleFolderCheckboxes(false) is implicitly called by updateSidebarView
+    // when isEditMode is false, because createSidebarEntry will not add checkboxes.
+    // However, explicitly calling it ensures selection state is cleared if updateSidebarView didn't run or for safety.
+    // But since updateSidebarView *is* called, and it rebuilds based on isEditMode,
+    // and selectedFolderPaths is cleared, this should be fine.
+    // The main thing is that updateSidebarView will now render without checkboxes.
+
+    const editButton = document.getElementById('edit-folders-button');
+    if (editButton) {
+        // Optional: Change text back if it was modified, e.g., from "Done" to "Edit"
+    }
+
+    console.log("Deletion process complete. Edit mode exited.");
+    alert("Selected folders and, if chosen, their log entries have been removed.");
+}
