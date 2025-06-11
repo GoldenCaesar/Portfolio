@@ -24,6 +24,15 @@ async function generateSHA256(fileContentString) {
     }
 }
 
+async function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(file);
+    });
+}
+
 function generateAppUniqueID() {
     return 'app-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
@@ -267,6 +276,96 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadLogsFromStorage(); // Load logs at the beginning of DOMContentLoaded
     const mainContent = document.querySelector('main.ml-80');
+
+    const addFolderButton = document.getElementById('add-folder-button');
+    const folderUploadInput = document.getElementById('folder-upload-input');
+
+    if (addFolderButton && folderUploadInput) {
+        addFolderButton.addEventListener('click', () => {
+            folderUploadInput.click();
+        });
+    }
+
+    if (folderUploadInput) {
+        folderUploadInput.addEventListener('change', async (event) => {
+            const files = event.target.files;
+            if (!files.length) {
+                console.log("No folder selected or folder is empty.");
+                return;
+            }
+            console.log(`Processing ${files.length} files from selected folder...`);
+
+            const currentTime = new Date().toISOString();
+            let newFilesProcessed = 0;
+
+            for (const file of files) {
+                const filePath = file.webkitRelativePath || file.name;
+                console.log(`Processing file: ${filePath}`);
+
+                const existingLogEntry = fileLog.find(entry => entry.currentPath === filePath);
+                if (existingLogEntry) {
+                    console.log(`File ${filePath} already monitored. Skipping.`);
+                    continue;
+                }
+
+                try {
+                    const fileContent = await readFileAsText(file);
+                    const currentHash = await generateSHA256(fileContent);
+
+                    if (currentHash === null) {
+                        console.error(`Hash generation failed for ${filePath}. Skipping.`);
+                        continue;
+                    }
+
+                    const appID = generateAppUniqueID();
+                    const osID = getOSFileID(filePath);
+
+                    const newLogEntry = {
+                        appID: appID,
+                        osID: osID,
+                        currentPath: filePath,
+                        initialDiscoveryTime: currentTime,
+                        lastHashCheckTime: currentTime,
+                        lastModifiedSystem: currentTime,
+                        currentHash: currentHash,
+                        hashHistory: [],
+                        status: 'newly_added'
+                    };
+                    fileLog.push(newLogEntry);
+                    newFilesProcessed++;
+                    console.log(`Added new log entry for ${filePath}`);
+
+                } catch (error) {
+                    console.error(`Error processing file ${filePath}:`, error);
+                }
+            }
+
+            if (newFilesProcessed > 0) {
+                localStorage.setItem('goldHashLog', JSON.stringify(fileLog));
+                updateFileMonitoredCount();
+                updateLogSizeDisplayOnLoad();
+
+                let currentActiveFolderPath = "demo_files";
+                if (typeof activeSubFolderLink !== 'undefined' && activeSubFolderLink && activeSubFolderLink.dataset.folderPath) {
+                     currentActiveFolderPath = activeSubFolderLink.dataset.folderPath;
+                } else {
+                    const activeDemoFilesLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white[data-folder-path="demo_files"]');
+                    if (activeDemoFilesLink && activeDemoFilesLink.dataset.folderPath) {
+                        currentActiveFolderPath = activeDemoFilesLink.dataset.folderPath;
+                    }
+                }
+                console.log("Refreshing folder contents for path:", currentActiveFolderPath);
+                // displayFolderContents(currentActiveFolderPath); // Might not show uploaded files if view is specific to demo_files
+                displayActivityLog(); // Refresh the activity log
+
+                alert(`${newFilesProcessed} new files from the folder have been added and logged.`);
+            } else {
+                alert("No new files were added from the selected folder. They might have been already monitored or the folder was empty.");
+            }
+
+            folderUploadInput.value = '';
+        });
+    }
 
     // 1. Restructure demoFiles
     const demoFilesData = {
