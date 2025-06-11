@@ -424,6 +424,98 @@ function displayUserAddedFoldersInSidebar() {
     });
 }
 
+function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0, parentContainer, isTopLevel = false) {
+    const entryDiv = document.createElement('div');
+    entryDiv.style.marginLeft = `${indentLevel * 20}px`;
+
+    const link = document.createElement('a');
+    link.href = '#';
+    link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
+    link.dataset.folderPath = path;
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'material-icons-outlined text-slate-400';
+    iconSpan.style.fontSize = '20px';
+
+    if (type === 'user-folder') {
+        iconSpan.textContent = 'folder_special';
+    } else if (type === 'folder') {
+        iconSpan.textContent = 'folder';
+    } else {
+        iconSpan.textContent = 'description'; // File
+    }
+
+    link.appendChild(iconSpan);
+    link.appendChild(document.createTextNode(` ${name}`));
+    entryDiv.appendChild(link);
+    parentContainer.appendChild(entryDiv);
+
+    const subfoldersContainer = document.createElement('div');
+    subfoldersContainer.className = 'subfolder-container';
+
+    // User folders are top-level and don't have expandable sub-folders in this design
+    // Demo files root is expandable. Its children (sub-folders) are not further expandable.
+    if (path === "demo_files") {
+        subfoldersContainer.style.display = 'none'; // demo_files children start hidden
+    } else if (type === 'folder' && currentItemObject && currentItemObject.children) { // A demo sub-folder
+         subfoldersContainer.style.display = 'none'; // No sub-sub-folders for demo files shown
+    } else {
+        // User folders and files don't have subfolder containers or are not expandable
+         subfoldersContainer.style.display = 'none';
+    }
+
+    entryDiv.appendChild(subfoldersContainer);
+
+    if (type === 'folder' || type === 'user-folder') {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            clearActiveStates();
+            setActiveState(link);
+            activeSubFolderLink = link;
+
+            if (path === "demo_files") {
+                const isHidden = subfoldersContainer.style.display === 'none';
+                subfoldersContainer.style.display = isHidden ? 'block' : 'none';
+                iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
+                displayFolderContents(path);
+            } else if (type === 'user-folder') {
+                // For user folders, ensure the "demo_files" entry is closed if it was open
+                const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                if (demoFilesEntryLink) {
+                    const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                    if (demoFilesIcon) demoFilesIcon.textContent = 'folder';
+                    const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                    if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'none';
+                }
+                displayFolderContents(path);
+            } else { // This is a subfolder of "demo_files"
+                const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                if (demoFilesEntryLink) {
+                    setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
+                    const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                    if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
+                    const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                    if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'block';
+                }
+                setActiveState(link); // Then highlight the actual subfolder
+                displayFolderContents(path);
+            }
+        });
+    } else if (type === 'file') {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+             clearActiveStates();
+             // Highlight parent folder and this file link
+             const parentPath = path.substring(0, path.lastIndexOf('/'));
+             const parentLink = document.querySelector(`#sidebar-nav a[data-folder-path="${parentPath}"]`);
+             setActiveState(parentLink);
+             setActiveState(link);
+             displayFileContent(path);
+        });
+    }
+    return subfoldersContainer;
+}
+
 let demoFilesData;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -549,98 +641,6 @@ document.addEventListener('DOMContentLoaded', () => {
             element.classList.add('bg-[#1A2B3A]', 'text-white');
             element.classList.remove('text-slate-300');
         }
-    }
-
-    function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0, parentContainer, isTopLevel = false) {
-        const entryDiv = document.createElement('div');
-        entryDiv.style.marginLeft = `${indentLevel * 20}px`;
-
-        const link = document.createElement('a');
-        link.href = '#';
-        link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
-        link.dataset.folderPath = path;
-
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'material-icons-outlined text-slate-400';
-        iconSpan.style.fontSize = '20px';
-
-        if (type === 'user-folder') {
-            iconSpan.textContent = 'folder_special';
-        } else if (type === 'folder') {
-            iconSpan.textContent = 'folder';
-        } else {
-            iconSpan.textContent = 'description'; // File
-        }
-
-        link.appendChild(iconSpan);
-        link.appendChild(document.createTextNode(` ${name}`));
-        entryDiv.appendChild(link);
-        parentContainer.appendChild(entryDiv);
-
-        const subfoldersContainer = document.createElement('div');
-        subfoldersContainer.className = 'subfolder-container';
-
-        // User folders are top-level and don't have expandable sub-folders in this design
-        // Demo files root is expandable. Its children (sub-folders) are not further expandable.
-        if (path === "demo_files") {
-            subfoldersContainer.style.display = 'none'; // demo_files children start hidden
-        } else if (type === 'folder' && currentItemObject && currentItemObject.children) { // A demo sub-folder
-             subfoldersContainer.style.display = 'none'; // No sub-sub-folders for demo files shown
-        } else {
-            // User folders and files don't have subfolder containers or are not expandable
-             subfoldersContainer.style.display = 'none';
-        }
-
-        entryDiv.appendChild(subfoldersContainer);
-
-        if (type === 'folder' || type === 'user-folder') {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                clearActiveStates();
-                setActiveState(link);
-                activeSubFolderLink = link;
-
-                if (path === "demo_files") {
-                    const isHidden = subfoldersContainer.style.display === 'none';
-                    subfoldersContainer.style.display = isHidden ? 'block' : 'none';
-                    iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
-                    displayFolderContents(path);
-                } else if (type === 'user-folder') {
-                    // For user folders, ensure the "demo_files" entry is closed if it was open
-                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
-                    if (demoFilesEntryLink) {
-                        const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
-                        if (demoFilesIcon) demoFilesIcon.textContent = 'folder';
-                        const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
-                        if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'none';
-                    }
-                    displayFolderContents(path);
-                } else { // This is a subfolder of "demo_files"
-                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
-                    if (demoFilesEntryLink) {
-                        setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
-                        const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
-                        if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
-                        const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
-                        if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'block';
-                    }
-                    setActiveState(link); // Then highlight the actual subfolder
-                    displayFolderContents(path);
-                }
-            });
-        } else if (type === 'file') {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                 clearActiveStates();
-                 // Highlight parent folder and this file link
-                 const parentPath = path.substring(0, path.lastIndexOf('/'));
-                 const parentLink = document.querySelector(`#sidebar-nav a[data-folder-path="${parentPath}"]`);
-                 setActiveState(parentLink);
-                 setActiveState(link);
-                 displayFileContent(path);
-            });
-        }
-        return subfoldersContainer;
     }
 
     function loadDemoFolders() {
