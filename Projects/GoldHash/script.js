@@ -409,6 +409,131 @@ function loadUserAddedFoldersFromStorage() {
     }
 }
 
+// Moved createSidebarEntry function here
+function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0, parentContainer, isTopLevel = false) {
+    const entryDiv = document.createElement('div');
+    entryDiv.style.marginLeft = `${indentLevel * 20}px`;
+
+    const link = document.createElement('a');
+    link.href = '#';
+    link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
+    link.dataset.folderPath = path;
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'material-icons-outlined text-slate-400';
+    iconSpan.style.fontSize = '20px';
+
+    if (type === 'user-folder') {
+        iconSpan.textContent = 'folder_special';
+    } else if (type === 'folder') {
+        iconSpan.textContent = 'folder';
+    } else {
+        iconSpan.textContent = 'description'; // File
+    }
+
+    link.appendChild(iconSpan);
+    link.appendChild(document.createTextNode(` ${name}`));
+    entryDiv.appendChild(link);
+    parentContainer.appendChild(entryDiv);
+
+    const subfoldersContainer = document.createElement('div');
+    subfoldersContainer.className = 'subfolder-container';
+
+    // User folders are top-level and don't have expandable sub-folders in this design
+    // Demo files root is expandable. Its children (sub-folders) are not further expandable.
+    if (path === "demo_files") {
+        subfoldersContainer.style.display = 'none'; // demo_files children start hidden
+    } else if (type === 'folder' && currentItemObject && currentItemObject.children) { // A demo sub-folder
+         subfoldersContainer.style.display = 'none'; // No sub-sub-folders for demo files shown
+    } else {
+        // User folders and files don't have subfolder containers or are not expandable
+         subfoldersContainer.style.display = 'none';
+    }
+
+    entryDiv.appendChild(subfoldersContainer);
+
+    if (type === 'folder' || type === 'user-folder') {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            clearActiveStates();
+            setActiveState(link);
+            activeSubFolderLink = link;
+
+            if (path === "demo_files") {
+                const isHidden = subfoldersContainer.style.display === 'none';
+                subfoldersContainer.style.display = isHidden ? 'block' : 'none';
+                iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
+                
+                // New logic for content display
+                let contentPathToDisplay = path; // Default to "demo_files" itself
+                const demoFilesRoot = demoFilesData.demo_files;
+
+                if (isHidden && demoFilesRoot && demoFilesRoot.children) { // 'isHidden' refers to the state *before* toggling, so if it *was* hidden, it's now shown
+                    const demoSubfolderKeys = Object.keys(demoFilesRoot.children);
+                    let firstDemoSubfolderPath = null;
+                    for (const key of demoSubfolderKeys) {
+                        if (demoFilesRoot.children[key].type === 'folder') {
+                            firstDemoSubfolderPath = demoFilesRoot.children[key].path;
+                            break;
+                        }
+                    }
+                    if (firstDemoSubfolderPath) {
+                        contentPathToDisplay = firstDemoSubfolderPath;
+                        const allSubfolderLinks = link.closest('div').querySelectorAll('.subfolder-container a');
+                        allSubfolderLinks.forEach(subLink => {
+                            subLink.classList.remove('bg-[#1A2B3A]', 'text-white');
+                            subLink.classList.add('text-slate-300'); // Ensure inactive style
+                        });
+
+                        const firstSubfolderLink = document.querySelector(`#sidebar-nav a[data-folder-path="${firstDemoSubfolderPath}"]`);
+                        if (firstSubfolderLink) {
+                            setActiveState(firstSubfolderLink); // setActiveState is globally available
+                        }
+                    }
+                }
+                if (!isHidden) { // If it was open and is now closing
+                   contentPathToDisplay = "demo_files"; 
+                }
+                displayFolderContents(contentPathToDisplay);
+
+            } else if (type === 'user-folder') {
+                // For user folders, ensure the "demo_files" entry is closed if it was open
+                const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                if (demoFilesEntryLink) {
+                    const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                    if (demoFilesIcon) demoFilesIcon.textContent = 'folder';
+                    const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                    if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'none';
+                }
+                displayFolderContents(path);
+            } else { // This is a subfolder of "demo_files"
+                const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
+                if (demoFilesEntryLink) {
+                    setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
+                    const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
+                    if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
+                    const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
+                    if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'block';
+                }
+                setActiveState(link); // Then highlight the actual subfolder
+                displayFolderContents(path);
+            }
+        });
+    } else if (type === 'file') {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+             clearActiveStates();
+             // Highlight parent folder and this file link
+             const parentPath = path.substring(0, path.lastIndexOf('/'));
+             const parentLink = document.querySelector(`#sidebar-nav a[data-folder-path="${parentPath}"]`);
+             setActiveState(parentLink);
+             setActiveState(link);
+             displayFileContent(path);
+        });
+    }
+    return subfoldersContainer;
+}
+
 function displayUserAddedFoldersInSidebar() {
     const sidebarNav = document.getElementById('sidebar-nav');
     if (!sidebarNav) {
@@ -442,6 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
     displayActivityLog(fileLog); // Display activity early
 
     loadUserAddedFoldersFromStorage(); // Loads user folder data
+    // createSidebarEntry was moved here from below
 
     demoFilesData = { // Define demo data
         "demo_files": {
@@ -549,100 +675,6 @@ document.addEventListener('DOMContentLoaded', () => {
             element.classList.add('bg-[#1A2B3A]', 'text-white');
             element.classList.remove('text-slate-300');
         }
-    }
-
-    function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0, parentContainer, isTopLevel = false) {
-        const entryDiv = document.createElement('div');
-        entryDiv.style.marginLeft = `${indentLevel * 20}px`;
-
-        const link = document.createElement('a');
-        link.href = '#';
-        link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
-        link.dataset.folderPath = path;
-
-        const iconSpan = document.createElement('span');
-        iconSpan.className = 'material-icons-outlined text-slate-400';
-        iconSpan.style.fontSize = '20px';
-
-        if (type === 'user-folder') {
-            iconSpan.textContent = 'folder_special';
-        } else if (type === 'folder') {
-            iconSpan.textContent = 'folder';
-        } else {
-            iconSpan.textContent = 'description'; // File
-        }
-
-        link.appendChild(iconSpan);
-        link.appendChild(document.createTextNode(` ${name}`));
-        entryDiv.appendChild(link);
-        parentContainer.appendChild(entryDiv);
-
-        const subfoldersContainer = document.createElement('div');
-        subfoldersContainer.className = 'subfolder-container';
-
-        // User folders are top-level and don't have expandable sub-folders in this design
-        // Demo files root is expandable. Its children (sub-folders) are not further expandable.
-        if (path === "demo_files") {
-            subfoldersContainer.style.display = 'none'; // demo_files children start hidden
-        } else if (type === 'folder' && currentItemObject && currentItemObject.children) { // A demo sub-folder
-             subfoldersContainer.style.display = 'none'; // No sub-sub-folders for demo files shown
-        } else {
-            // User folders and files don't have subfolder containers or are not expandable
-             subfoldersContainer.style.display = 'none';
-        }
-
-        entryDiv.appendChild(subfoldersContainer);
-
-        if (type === 'folder' || type === 'user-folder') {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                clearActiveStates();
-                setActiveState(link);
-                activeSubFolderLink = link;
-
-                if (path === "demo_files") {
-                    const isHidden = subfoldersContainer.style.display === 'none';
-                    subfoldersContainer.style.display = isHidden ? 'block' : 'none';
-                    iconSpan.textContent = isHidden ? 'folder_open' : 'folder';
-                    displayFolderContents(path);
-                } else if (type === 'user-folder') {
-                    // For user folders, ensure the "demo_files" entry is closed if it was open
-                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
-                    if (demoFilesEntryLink) {
-                        const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
-                        if (demoFilesIcon) demoFilesIcon.textContent = 'folder';
-                        const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
-                        if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'none';
-                    }
-                    displayFolderContents(path);
-                } else { // This is a subfolder of "demo_files"
-                    const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
-                    if (demoFilesEntryLink) {
-                        setActiveState(demoFilesEntryLink); // Keep "demo_files" highlighted as parent
-                        const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
-                        if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
-                        const parentDemoSubfolderContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
-                        if (parentDemoSubfolderContainer) parentDemoSubfolderContainer.style.display = 'block';
-                    }
-                    setActiveState(link); // Then highlight the actual subfolder
-                    displayFolderContents(path);
-                }
-            });
-        } else if (type === 'file') {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                 clearActiveStates();
-                 // Highlight parent folder and this file link
-                 const parentPath = path.substring(0, path.lastIndexOf('/'));
-                 const parentLink = document.querySelector(`#sidebar-nav a[data-folder-path="${parentPath}"]`);
-                 setActiveState(parentLink);
-                 setActiveState(link);
-                 displayFileContent(path);
-            });
-        }
-        return subfoldersContainer;
-    }
-
     function loadDemoFolders() {
         if (!sidebarNav) return;
         sidebarNav.innerHTML = ''; // Clear sidebar
@@ -671,54 +703,81 @@ document.addEventListener('DOMContentLoaded', () => {
         // Determine and set initial folder view for Documents section
         let initialFolderPathToDisplay = null;
         let isDemoFolderSelected = false;
+        let isDemoSubFolderSelected = false; // New flag
 
-        const firstDemoFolder = demoFilesData.demo_files;
-        if (firstDemoFolder) {
-            const firstDemoSubfolder = firstDemoFolder.children ? Object.values(firstDemoFolder.children)[0] : null;
-            if (firstDemoSubfolder && firstDemoSubfolder.type === 'folder') {
-                initialFolderPathToDisplay = firstDemoSubfolder.path; // e.g., "demo_files/Jokes Folder 1"
+        const demoFilesRoot = demoFilesData.demo_files; // Assuming demoFilesData.demo_files exists
+
+        if (demoFilesRoot && demoFilesRoot.children) {
+            const demoSubfolderKeys = Object.keys(demoFilesRoot.children);
+            let firstDemoSubfolderPath = null;
+            let demoRootHasFiles = false;
+
+            // Check if demo_files has any subfolders
+            for (const key of demoSubfolderKeys) {
+                if (demoFilesRoot.children[key].type === 'folder') {
+                    firstDemoSubfolderPath = demoFilesRoot.children[key].path;
+                    break; // Found the first subfolder
+                }
+            }
+
+            if (firstDemoSubfolderPath) {
+                initialFolderPathToDisplay = firstDemoSubfolderPath;
                 isDemoFolderSelected = true;
-            } else if (firstDemoFolder.children && Object.values(firstDemoFolder.children).some(f => f.type === 'file')){
-                // If no subfolders, but "demo_files" has direct files, select "demo_files" itself.
-                initialFolderPathToDisplay = firstDemoFolder.path; // "demo_files"
-                isDemoFolderSelected = true;
+                isDemoSubFolderSelected = true; // Mark that a subfolder is selected
+            } else {
+                // No subfolders, check if demo_files itself has files
+                for (const key of demoSubfolderKeys) {
+                    if (demoFilesRoot.children[key].type === 'file') {
+                        demoRootHasFiles = true;
+                        break;
+                    }
+                }
+                if (demoRootHasFiles) {
+                    initialFolderPathToDisplay = demoFilesRoot.path; // "demo_files"
+                    isDemoFolderSelected = true;
+                }
             }
         }
 
         if (!initialFolderPathToDisplay && userAddedFolders.length > 0) {
-            initialFolderPathToDisplay = userAddedFolders[0].path; // e.g., "user/MyFolder1"
-            isDemoFolderSelected = false;
+            initialFolderPathToDisplay = userAddedFolders[0].path;
+            isDemoFolderSelected = false; // Explicitly false
+            isDemoSubFolderSelected = false; // Explicitly false
         }
 
         if (initialFolderPathToDisplay) {
-            displayDocumentFiles(initialFolderPathToDisplay);
+            displayDocumentFiles(initialFolderPathToDisplay); // Call this before setActiveState
             setTimeout(() => {
-                clearActiveStates(); // Clear any prematurely set active states
+                clearActiveStates();
                 const targetLink = document.querySelector(`#sidebar-nav a[data-folder-path="${initialFolderPathToDisplay}"]`);
                 if (targetLink) {
                     setActiveState(targetLink);
-                    activeSubFolderLink = targetLink; // Update global active link
+                    activeSubFolderLink = targetLink;
 
-                    if (isDemoFolderSelected && initialFolderPathToDisplay !== "demo_files") {
-                        // If a demo subfolder is selected, ensure "demo_files" is visually open
+                    if (isDemoSubFolderSelected) { // A demo sub-folder is selected
                         const demoFilesEntryLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"]');
                         if (demoFilesEntryLink) {
-                            setActiveState(demoFilesEntryLink); // Highlight "demo_files" as well (as parent)
+                            setActiveState(demoFilesEntryLink); // Highlight "demo_files" as parent
                             const demoFilesIcon = demoFilesEntryLink.querySelector('.material-icons-outlined');
                             if (demoFilesIcon) demoFilesIcon.textContent = 'folder_open';
                             const demoFilesSubContainer = demoFilesEntryLink.closest('div').querySelector('.subfolder-container');
                             if (demoFilesSubContainer) demoFilesSubContainer.style.display = 'block';
-
-                            // Re-set the actual targetLink active as setActiveState on demoFilesLink might have cleared others
+                            // Re-set the actual targetLink active as setActiveState on demoFilesLink might have cleared others if not careful
                             setActiveState(targetLink);
                         }
-                    } else if (initialFolderPathToDisplay === "demo_files"){
-                         // If "demo_files" itself is selected, ensure its icon is 'folder' (not 'folder_open' unless clicked)
+                    } else if (isDemoFolderSelected && initialFolderPathToDisplay === "demo_files") { // "demo_files" root selected
                         const demoFilesIcon = targetLink.querySelector('.material-icons-outlined');
-                        if (demoFilesIcon && targetLink.closest('div').querySelector('.subfolder-container').style.display !== 'block') {
-                            demoFilesIcon.textContent = 'folder';
+                        const demoFilesSubContainer = targetLink.closest('div').querySelector('.subfolder-container');
+                        if (demoFilesIcon && demoFilesSubContainer) {
+                             // If it has children display them, otherwise it's just a folder.
+                            if (Object.keys(demoFilesData.demo_files.children).length > 0 && demoFilesSubContainer.style.display === 'block') {
+                                demoFilesIcon.textContent = 'folder_open';
+                            } else {
+                                demoFilesIcon.textContent = 'folder';
+                            }
                         }
                     }
+                    // For user folders, only the targetLink itself needs to be active, which is done by the initial setActiveState(targetLink).
                 }
             }, 0);
         } else {
