@@ -1,6 +1,125 @@
 console.log("script.js loaded");
 
+let fileLog = []; // Global variable for storing log data
+
+// --- Core Hashing and ID Generation Functions ---
+
+async function generateSHA256(fileContentString) {
+    if (typeof fileContentString !== 'string') {
+        console.error('Invalid input to generateSHA256: Expected a string.');
+        return null;
+    }
+    try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(fileContentString);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
+        return hashHex;
+    } catch (error) {
+        console.error('Error generating SHA-256 hash:', error);
+        // In a future Electron app, this might involve Node.js crypto
+        // For the browser demo, return null or a placeholder if SubtleCrypto fails
+        return null;
+    }
+}
+
+function generateAppUniqueID() {
+    return 'app-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+function getOSFileID(filePath) {
+    try {
+        // In a Node.js environment (like Electron), you might use fs.statSync(filePath).ino
+        // However, this is not available in the browser.
+        if (typeof window !== 'undefined' && typeof process === 'undefined') { // Basic check for browser-like environment
+            // console.warn("getOSFileID: OS-level file ID is not reliably accessible in a browser environment for path:", filePath);
+            return "os-id-unavailable-browser";
+        } else {
+            // Placeholder for potential future Node.js/Electron implementation
+            // For now, even if not strictly a browser, we'll return a simulated ID or null
+            // const fs = require('fs'); // This would only work in Node.js
+            // const stats = fs.statSync(filePath);
+            // return stats.ino.toString();
+            return "os-id-simulated-" + Math.random().toString(36).substr(2, 5); // Simulated for non-browser or future
+        }
+    } catch (error) {
+        console.error('Error trying to get OS File ID (expected in browser):', error.message, 'for path:', filePath);
+        return "os-id-error";
+    }
+}
+
+// --- End Core Hashing and ID Generation Functions ---
+
+function updateFileMonitoredCount() {
+    const filesMonitoredElement = document.getElementById('files-monitored-count');
+    if (filesMonitoredElement && fileLog) {
+        // Count only unique files based on appID, if relevant, or just length for now
+        filesMonitoredElement.textContent = fileLog.length.toLocaleString();
+    }
+}
+
+function updateLogSizeDisplayOnLoad() {
+    const logSizeElement = document.getElementById('log-size-display');
+    if (logSizeElement && fileLog && fileLog.length > 0) {
+        // Simulate log size based on the number of entries or string length
+        const approximateSize = JSON.stringify(fileLog).length / 1024; // Very rough KB
+        updateLogSizeDisplay(parseFloat(approximateSize.toFixed(2)));
+    } else if (logSizeElement) {
+        // If fileLog is empty or not yet loaded, set to a default small value like 0 or 1
+        updateLogSizeDisplay(0); // Default to 0KB if no logs
+    }
+}
+
+function loadLogsFromStorage() {
+    const storedLogs = localStorage.getItem('goldHashLog');
+    if (storedLogs) {
+        fileLog = JSON.parse(storedLogs);
+        console.log("Logs loaded from localStorage.");
+    } else {
+        console.log("No logs found in localStorage. Initializing empty log.");
+        fileLog = [];
+    }
+    // Update UI based on loaded logs
+    updateFileMonitoredCount();
+    updateLogSizeDisplayOnLoad();
+}
+
+function updateLastScanTime() {
+    const lastScanElement = document.querySelector('.mt-auto.space-y-2.border-t p.text-xs'); // Selector for "Last scan: ..."
+    if (lastScanElement) {
+        lastScanElement.textContent = 'Last scan: ' + new Date().toLocaleString();
+    }
+}
+
+// Function to update log size display
+function updateLogSizeDisplay(sizeInKB) {
+    const logSizeElement = document.getElementById('log-size-display');
+    if (logSizeElement) {
+        logSizeElement.textContent = sizeInKB + " KB";
+    }
+}
+
+// Function to clear logs
+function clearLogs() {
+    console.log("Clearing logs...");
+    // Reset the in-memory log array
+    fileLog = [];
+
+    // Simulate clearing the log file (actual file operation is handled by subtask environment)
+    // For the browser, we can also clear any localStorage representation
+    localStorage.removeItem('goldHashLog');
+
+    // Update UI
+    updateLogSizeDisplay(0);
+
+    console.log("Logs cleared.");
+    alert("Logs have been cleared (simulated for browser). The scan.log file will be emptied by the environment.");
+}
+
 // Function to recursively count files
+// This function might become redundant if file counts are solely derived from fileLog length.
+// For now, it's kept if other parts of the demo still use it for raw demoFilesData counting.
 function countFiles(data) {
     let count = 0;
     for (const key in data) {
@@ -13,11 +132,68 @@ function countFiles(data) {
     return count;
 }
 
+function displayLoggedFiles(logEntriesToDisplay) {
+    const documentsTbody = document.getElementById('documents-tbody');
+    if (!documentsTbody) return;
+    documentsTbody.innerHTML = ''; // Clear existing rows
+
+    if (!logEntriesToDisplay || logEntriesToDisplay.length === 0) {
+        const tr = documentsTbody.insertRow();
+        const cell = tr.insertCell();
+        cell.colSpan = 5; // Number of columns
+        cell.textContent = 'No files to display for this selection.';
+        cell.className = 'px-6 py-4 text-center text-slate-400';
+        return;
+    }
+
+    logEntriesToDisplay.forEach(entry => {
+        const tr = documentsTbody.insertRow();
+        tr.className = 'hover:bg-[#1A2B3A]';
+
+        const nameTd = tr.insertCell();
+        nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
+        nameTd.textContent = entry.currentPath.substring(entry.currentPath.lastIndexOf('/') + 1);
+
+        const statusTd = tr.insertCell();
+        statusTd.className = 'whitespace-nowrap px-6 py-4 text-sm';
+        statusTd.textContent = entry.status;
+        switch (entry.status) {
+            case 'modified':
+                statusTd.classList.add('text-yellow-400');
+                break;
+            case 'newly_added':
+                statusTd.classList.add('text-blue-400');
+                break;
+            case 'verified':
+                statusTd.classList.add('text-green-400');
+                break;
+            default:
+                statusTd.classList.add('text-slate-300');
+        }
+
+        const hashTd = tr.insertCell();
+        hashTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 font-mono';
+        hashTd.textContent = entry.currentHash ? entry.currentHash.substring(0, 12) + '...' : 'N/A';
+        hashTd.title = entry.currentHash || "";
+
+        const lastCheckedTd = tr.insertCell();
+        lastCheckedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+        lastCheckedTd.textContent = entry.lastHashCheckTime ? new Date(entry.lastHashCheckTime).toLocaleString() : 'N/A';
+
+        const pathTd = tr.insertCell();
+        pathTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 overflow-hidden text-ellipsis';
+        pathTd.textContent = entry.currentPath;
+        pathTd.title = entry.currentPath; // Show full path on hover
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired");
     const sidebarNav = document.getElementById('sidebar-nav');
     console.log("sidebarNav element:", sidebarNav);
-    const documentsTbody = document.getElementById('documents-tbody');
+    const documentsTbody = document.getElementById('documents-tbody'); // Keep this reference
+
+    loadLogsFromStorage(); // Load logs at the beginning of DOMContentLoaded
     const mainContent = document.querySelector('main.ml-80');
 
     // 1. Restructure demoFiles
@@ -63,29 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Update files monitored count
-    const filesMonitoredElement = document.getElementById('files-monitored-count');
-    if (filesMonitoredElement && typeof demoFilesData !== 'undefined' && demoFilesData.demo_files && demoFilesData.demo_files.children) {
-        const totalFiles = countFiles(demoFilesData.demo_files.children);
-        filesMonitoredElement.textContent = totalFiles.toLocaleString();
-    } else {
-        console.error("Files monitored element not found or demoFilesData structure is not as expected.");
-    }
-
-    // Update Log Size display (placeholder)
-    const logSizeElement = document.getElementById('log-size-display');
-    if (logSizeElement) {
-        // This is a placeholder value.
-        // For a live application, dynamic log size updates would typically require
-        // server-side logic to calculate directory/file sizes and an API endpoint
-        // to fetch this data, or Node.js 'fs' module if running in a Node environment
-        // with direct file system access (not applicable for client-side browser JS).
-        // Since the "Logs" folder is currently just for demonstration and might only
-        // contain a .gitkeep file, we'll set a minimal representative size.
-        logSizeElement.textContent = "1 KB"; // Representing .gitkeep or minimal folder size
-    } else {
-        console.error("Log size display element not found.");
-    }
+    // Note: The initial update of filesMonitoredElement and logSizeDisplay
+    // is now handled by loadLogsFromStorage(), so direct updates here are removed.
 
     let activeSubFolderLink = null;
 
@@ -156,54 +311,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayFolderContents(folderPath) {
-        if (!documentsTbody) return;
-        documentsTbody.innerHTML = '';
+        // documentsTbody is already scoped for DOMContentLoaded
+        if (!documentsTbody) {
+            console.error("documentsTbody is not defined in displayFolderContents");
+            return;
+        }
 
-        const sectionsToHide = mainContent.querySelectorAll('section');
-        sectionsToHide.forEach(section => section.style.display = 'block');
-        let fileContentDiv = document.getElementById('file-content-display');
-        if (fileContentDiv) fileContentDiv.style.display = 'none';
+        const fileContentDiv = document.getElementById('file-content-display');
+        if (fileContentDiv) {
+            fileContentDiv.style.display = 'none';
+        }
+        const sectionsToUnhide = document.querySelectorAll('main.ml-80 section');
+        sectionsToUnhide.forEach(section => section.style.display = 'block');
 
-        const parts = folderPath.split('/');
-        let currentLevel = demoFilesData;
-        for (const part of parts) {
-            if (currentLevel[part] && currentLevel[part].children) {
-                currentLevel = currentLevel[part].children;
+        let filteredLogEntries = [];
+        if (fileLog && fileLog.length > 0) {
+            if (folderPath === "demo_files" || folderPath === "") {
+                // If "demo_files" (the root in sidebar) is clicked, show all logs from "demo_files/"
+                // Or if folderPath is empty (e.g. initial load before selection), show all.
+                // This condition might need refinement based on how root/all files view is triggered.
+                // For now, "demo_files" path means show everything under "demo_files/".
+                filteredLogEntries = fileLog.filter(entry => entry.currentPath.startsWith("demo_files/"));
             } else {
-                 console.error("Folder not found in demoFilesData:", folderPath);
-                return; // Folder not found
+                // For specific subfolders like "demo_files/Jokes Folder 1"
+                filteredLogEntries = fileLog.filter(entry => entry.currentPath.startsWith(folderPath + "/"));
             }
         }
 
-        const files = currentLevel;
-        if (files) {
-            Object.keys(files).forEach(itemName => {
-                const item = files[itemName];
-                if (item.type === 'file') {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-[#1A2B3A] cursor-pointer';
-
-                    const nameTd = document.createElement('td');
-                    nameTd.className = 'whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-100';
-                    nameTd.textContent = itemName;
-
-                    const modifiedTd = document.createElement('td');
-                    modifiedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
-                    modifiedTd.textContent = '2024-03-11 10:00 AM'; // Static
-
-                    const sizeTd = document.createElement('td');
-                    sizeTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
-                    sizeTd.textContent = '1 KB'; // Static
-
-                    tr.appendChild(nameTd);
-                    tr.appendChild(modifiedTd);
-                    tr.appendChild(sizeTd);
-
-                    tr.addEventListener('click', () => displayFileContent(item.path));
-                    documentsTbody.appendChild(tr);
-                }
-            });
-        }
+        displayLoggedFiles(filteredLogEntries);
     }
 
     function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
@@ -341,4 +476,162 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadDemoFolders();
+
+    async function scanFiles() {
+        console.log("Starting file scan (rescan logic enabled)...");
+        const currentTime = new Date().toISOString();
+
+        // Ensure demoFilesData is available
+        const currentDemoFiles = (typeof demoFilesData !== "undefined") ? demoFilesData : null;
+        if (!currentDemoFiles || !currentDemoFiles.demo_files || !currentDemoFiles.demo_files.children) {
+            console.error("demoFilesData is not available or structured as expected for scanning.");
+            alert("Error: Demo file data is not available for scanning.");
+            return;
+        }
+
+        const filesToProcess = [];
+        function _internalCollectFiles(currentLevelChildren) { // Renamed and simplified
+            for (const key in currentLevelChildren) {
+                const item = currentLevelChildren[key];
+                if (item.type === 'file') {
+                    filesToProcess.push({ path: item.path, content: item.content || "" });
+                } else if (item.type === 'folder' && item.children) {
+                    _internalCollectFiles(item.children);
+                }
+            }
+        }
+        _internalCollectFiles(currentDemoFiles.demo_files.children);
+
+
+        let newFilesAdded = 0;
+        let filesModified = 0;
+        let filesVerified = 0;
+
+        for (const fileItem of filesToProcess) {
+            const existingLogEntryIndex = fileLog.findIndex(entry => entry.currentPath === fileItem.path);
+
+            if (existingLogEntryIndex !== -1) {
+                // Existing file found
+                const logEntry = fileLog[existingLogEntryIndex];
+
+                const newHash = await generateSHA256(fileItem.content);
+
+                if (newHash === null) { // Hash generation failed
+                    console.error(`Skipping file ${fileItem.path} due to hash generation error.`);
+                    continue;
+                }
+
+                if (logEntry.currentHash !== newHash) {
+                    console.log(`File ${fileItem.path} has changed.`);
+                    logEntry.hashHistory.push(logEntry.currentHash);
+                    logEntry.currentHash = newHash;
+                    logEntry.status = 'modified';
+                    logEntry.lastModifiedSystem = currentTime;
+                    logEntry.lastHashCheckTime = currentTime;
+                    filesModified++;
+                } else {
+                    // Hash is the same, content has not changed
+                    logEntry.status = 'verified';
+                    logEntry.lastHashCheckTime = currentTime;
+                    filesVerified++;
+                }
+            } else {
+                // New file
+                console.log(`New file detected: ${fileItem.path}`);
+                const appID = generateAppUniqueID();
+                const osID = getOSFileID(fileItem.path);
+                const fileContent = fileItem.content;
+
+                const currentHash = await generateSHA256(fileContent);
+                if (currentHash === null) { // Hash generation failed
+                    console.error(`Skipping new file ${fileItem.path} due to hash generation error.`);
+                    continue;
+                }
+
+                const hashExists = fileLog.some(entry => {
+                    if (entry.currentHash === currentHash) return true;
+                    return entry.hashHistory.includes(currentHash);
+                });
+
+                if (hashExists) {
+                    console.warn(`Hash for new file ${fileItem.path} (${currentHash}) already exists in logs. Adding as new entry anyway.`);
+                }
+
+                const newLogEntry = {
+                    appID: appID,
+                    osID: osID,
+                    currentPath: fileItem.path,
+                    initialDiscoveryTime: currentTime,
+                    lastHashCheckTime: currentTime,
+                    lastModifiedSystem: currentTime,
+                    currentHash: currentHash,
+                    hashHistory: [],
+                    status: 'newly_added'
+                };
+                fileLog.push(newLogEntry);
+                newFilesAdded++;
+            }
+        }
+
+        localStorage.setItem('goldHashLog', JSON.stringify(fileLog));
+        updateFileMonitoredCount();
+        updateLogSizeDisplayOnLoad();
+        updateLastScanTime();
+
+        const filesChangedElement = document.querySelector('div.grid div:nth-child(2) p.text-3xl');
+        if (filesChangedElement) {
+            const modifiedCount = fileLog.filter(entry => entry.status === 'modified').length;
+            filesChangedElement.textContent = modifiedCount.toLocaleString();
+        }
+
+        // Refresh the displayed table based on current view
+        let currentActiveFolderPath = "demo_files"; // Default or determine from active link
+        const activeLink = document.querySelector('#sidebar-nav a.bg-\\[\\#1A2B3A\\].text-white');
+        if (activeLink && activeLink.dataset.folderPath) {
+            currentActiveFolderPath = activeLink.dataset.folderPath;
+        } else {
+            // If no specific subfolder link is active, check if the main "demo_files" is active
+             const demoFilesActiveLink = document.querySelector('#sidebar-nav a[data-folder-path="demo_files"].bg-\\[\\#1A2B3A\\].text-white');
+             if (demoFilesActiveLink) currentActiveFolderPath = "demo_files";
+        }
+        displayFolderContents(currentActiveFolderPath);
+
+
+        console.log(`File scan complete. New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}. Log updated.`);
+        alert(`File scan complete!\nNew files: ${newFilesAdded}\nModified files: ${filesModified}\nVerified files: ${filesVerified}\nLog has been updated.`);
+    }
+
+    const scanButton = document.getElementById('scan-files-button');
+    if (scanButton) {
+        scanButton.addEventListener('click', async () => {
+            await scanFiles();
+        });
+    }
+
+    const settingsIconContainer = document.querySelector('div[data-icon="Gear"]'); // More specific selector for the gear icon's div
+    const settingsContextMenu = document.getElementById('settings-context-menu');
+
+    if (settingsIconContainer && settingsContextMenu) {
+        settingsIconContainer.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent click from bubbling to document
+            settingsContextMenu.classList.toggle('hidden');
+        });
+
+        // Close menu if clicked outside
+        document.addEventListener('click', (event) => {
+            if (!settingsContextMenu.contains(event.target) && !settingsIconContainer.contains(event.target)) {
+                settingsContextMenu.classList.add('hidden');
+            }
+        });
+    }
+
+    // Placeholder for Clear Logs button functionality
+    const clearLogsButton = document.getElementById('clear-logs-button');
+    if (clearLogsButton) {
+        clearLogsButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            clearLogs(); // Call the new function
+            settingsContextMenu.classList.add('hidden'); // Hide menu after click
+        });
+    }
 });
