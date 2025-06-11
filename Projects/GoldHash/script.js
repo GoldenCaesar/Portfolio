@@ -419,7 +419,7 @@ function displayUserAddedFoldersInSidebar() {
     userAddedFolders.forEach(folder => {
         // Ensure it's not already added (e.g., if this function is called multiple times)
         if (!document.querySelector(`#sidebar-nav a[data-folder-path="${folder.path}"]`)) {
-            createSidebarEntry(folder.name, folder.path, folder.type || 'folder', 0, sidebarNav, true);
+            createSidebarEntry(folder.name, folder.path, folder.type || 'folder', folder, 0, sidebarNav, true);
         }
     });
 }
@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     userAddedFolders.push(newFolder);
                     saveUserAddedFoldersToStorage();
-                    createSidebarEntry(newFolder.name, newFolder.path, newFolder.type, 0, sidebarNav, true);
+                    createSidebarEntry(newFolder.name, newFolder.path, newFolder.type, newFolder, 0, sidebarNav, true);
                     alert(`Folder "${directoryHandle.name}" added. You can now select it in the sidebar. Please scan to see its files.`);
                 }
             } catch (error) {
@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, isTopLevel = false) {
+    function createSidebarEntry(name, path, type, currentItemObject, indentLevel = 0, parentContainer, isTopLevel = false) {
         const entryDiv = document.createElement('div');
         entryDiv.style.marginLeft = `${indentLevel * 20}px`;
 
@@ -584,7 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Demo files root is expandable. Its children (sub-folders) are not further expandable.
         if (path === "demo_files") {
             subfoldersContainer.style.display = 'none'; // demo_files children start hidden
-        } else if (type === 'folder' && item.children) { // A demo sub-folder
+        } else if (type === 'folder' && currentItemObject && currentItemObject.children) { // A demo sub-folder
              subfoldersContainer.style.display = 'none'; // No sub-sub-folders for demo files shown
         } else {
             // User folders and files don't have subfolder containers or are not expandable
@@ -650,15 +650,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render Demo Folders & Files
         Object.keys(demoFilesData).forEach(itemName => {
             const item = demoFilesData[itemName]; // "demo_files"
-            const itemContainer = createSidebarEntry(itemName, item.path, item.type, 0, sidebarNav, true);
+            const itemContainer = createSidebarEntry(itemName, item.path, item.type, item, 0, sidebarNav, true);
             if (item.type === 'folder' && item.children) {
                 Object.keys(item.children).forEach(subItemName => {
                     const subItem = item.children[subItemName]; // "Jokes Folder 1", etc.
-                    const subItemContainer = createSidebarEntry(subItemName, subItem.path, subItem.type, 1, itemContainer);
+                    const subItemContainer = createSidebarEntry(subItemName, subItem.path, subItem.type, subItem, 1, itemContainer);
                     if (subItem.type === 'folder' && subItem.children) {
                         Object.keys(subItem.children).forEach(fileName => {
                             const fileItem = subItem.children[fileName]; // "joke1.txt"
-                            createSidebarEntry(fileName, fileItem.path, fileItem.type, 2, subItemContainer);
+                            createSidebarEntry(fileName, fileItem.path, fileItem.type, fileItem, 2, subItemContainer);
                         });
                     }
                 });
