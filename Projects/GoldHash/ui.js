@@ -365,7 +365,7 @@ function displayFileContent(filePath) {
             // Content for user files will be read asynchronously
         } else {
             console.error('File item not found in demo or user data for path:', filePath);
-            showToast('File content not found.');
+            alert('File content not found.');
             return;
         }
     }
@@ -411,17 +411,17 @@ function displayFileContent(filePath) {
                 .then(fileText => displayTheContent(fileText))
                 .catch(err => {
                     console.error("Error reading user file for display:", err);
-                    showToast('Error reading file content.');
+                    alert('Error reading file content.');
                 });
         } else {
             console.error("readFileAsText function is not available. Cannot display user file content.");
-            showToast("Cannot display content for this file as a required function (readFileAsText) is missing.");
+            alert("Cannot display content for this file as a required function (readFileAsText) is missing.");
         }
     } else if (content) {
         displayTheContent(content);
     } else {
         console.error('File content not available for path:', filePath);
-        showToast('File content not available.');
+        alert('File content not available.');
     }
 }
 
@@ -748,59 +748,52 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (foldersToDelete.length === 0) {
-                showToast('No folders selected for deletion.');
+                alert('No folders selected for deletion.');
                 return;
             }
 
             // Confirmation dialog for log entries
-            showInputDialog({
-                title: 'Confirm Log Deletion',
-                message: "Do you also want to remove the log entries for the selected folder(s)? Clicking 'Cancel' will keep the logs.",
-                buttons: [
-                    { text: 'Remove Logs', value: true, class: 'confirm' },
-                    { text: 'Keep Logs', value: false, class: 'cancel' }
-                ],
-                callback: function(confirmLogDeletion) {
-                    let deletedUserFolder = false;
-                    foldersToDelete.forEach(folderPath => {
-                        // Use the new helper function to delete user uploaded folders/subfolders
-                        if (deleteUserUploadedFolderPath(folderPath)) {
-                            console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
-                            if (confirmLogDeletion) {
-                                window.removeFolderEntriesFromLog(folderPath); // Call placeholder
-                            }
-                            deletedUserFolder = true;
-                        } else {
-                            console.log(`Folder "${folderPath}" is not a user-uploaded folder, already deleted, or is a demo folder. Skipping deletion from UI data.`);
-                        }
-                    });
+            const confirmLogDeletion = window.confirm("Do you also want to remove the log entries for the selected folder(s)? Clicking 'Cancel' will keep the logs.");
+            // The variable 'confirmLogDeletion' will be used in the next step to conditionally call removeFolderEntriesFromLog.
 
-                    // Exit edit mode and update UI
-                    window.isEditModeActive = false;
-                    const editIconSpan = editFoldersButton.querySelector('.material-icons-outlined');
-                    if (editFoldersButton) { // Check if editFoldersButton exists
-                        editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Edit";
-                        if (editIconSpan) editIconSpan.textContent = 'edit';
-                    }
-                    if (deleteSelectedFoldersButton) { // Check if deleteSelectedFoldersButton exists
-                         deleteSelectedFoldersButton.style.display = 'none';
-                    }
-
-                    updateSidebarView();
-                    if (deletedUserFolder) { // Only update logs if a user folder was actually deleted
-                        displayActivityLog(); // Reflect that logs for the folder are (notionally) gone
-                        updateFileMonitoredCount(); // Reflect change in monitored files
-                    }
-                    displayFolderContents("demo_files"); // Default to demo_files view
-                    let alertMessage = "";
+            let deletedUserFolder = false;
+            foldersToDelete.forEach(folderPath => {
+                // Use the new helper function to delete user uploaded folders/subfolders
+                if (deleteUserUploadedFolderPath(folderPath)) {
+                    console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
                     if (confirmLogDeletion) {
-                        alertMessage = "Selected user folders and their log entries have been removed.";
-                    } else {
-                        alertMessage = "Selected user folders have been removed. Their log entries have been kept.";
+                        window.removeFolderEntriesFromLog(folderPath); // Call placeholder
                     }
-                    showToast(alertMessage);
+                    deletedUserFolder = true;
+                } else {
+                    console.log(`Folder "${folderPath}" is not a user-uploaded folder, already deleted, or is a demo folder. Skipping deletion from UI data.`);
+                    // Optionally alert user for demo/non-user folders if they were selectable (which they shouldn't be if logic is correct)
+                    // if (folderPath.startsWith("demo_files")) {
+                    //     alert(`The folder "${folderPath}" is a demo folder and cannot be deleted.`);
+                    // }
                 }
             });
+
+            // Exit edit mode and update UI
+            window.isEditModeActive = false;
+            const editIconSpan = editFoldersButton.querySelector('.material-icons-outlined');
+            editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Edit";
+            if (editIconSpan) editIconSpan.textContent = 'edit';
+            deleteSelectedFoldersButton.style.display = 'none';
+
+            updateSidebarView();
+            if (deletedUserFolder) { // Only update logs if a user folder was actually deleted
+                displayActivityLog(); // Reflect that logs for the folder are (notionally) gone
+                updateFileMonitoredCount(); // Reflect change in monitored files
+            }
+            displayFolderContents("demo_files"); // Default to demo_files view
+            let alertMessage = "";
+            if (confirmLogDeletion) {
+                alertMessage = "Selected user folders and their log entries have been removed.";
+            } else {
+                alertMessage = "Selected user folders have been removed. Their log entries have been kept.";
+            }
+            alert(alertMessage);
         });
     }
 
@@ -829,7 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
         folderUploadInput.addEventListener('change', async (event) => {
             const files = event.target.files;
             if (!files.length) {
-                showToast("No files selected or folder was empty.");
+                alert("No files selected or folder was empty.");
                 folderUploadInput.value = ''; // Clear input
                 return;
             }
@@ -848,7 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (filesToProcessForUpload.length === 0) {
-                showToast("No processable files found in the selection.");
+                alert("No processable files found in the selection.");
                 folderUploadInput.value = ''; // Clear input
                 return;
             }
@@ -919,7 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Adjust alert messages based on counts
             if (erroredFilesCount > 0) {
-                showToast(`Encountered errors while processing ${erroredFilesCount} file(s). These will not be added.`);
+                alert(`Encountered errors while processing ${erroredFilesCount} file(s). These will not be added.`);
             }
 
             // Determine main message based on what's being added or if all are duplicates
@@ -927,12 +920,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // This block will be entered if there are files to add.
                 // Specific messages about what was added will be constructed later.
             } else if (duplicateFileEntries.length > 0 && erroredFilesCount === 0) { // All valid files are duplicates
-                showToast("All files in the selected folder are duplicates of existing, actively managed files and will not be added.");
+                alert("All files in the selected folder are duplicates of existing, actively managed files and will not be added.");
             } else if (newFileEntries.length === 0 && duplicateFileEntries.length === 0 && erroredFilesCount === 0) {
                  if (detailedFiles.length === 0 && filesToProcessForUpload.length > 0) {
-                     showToast("Could not process any of the selected files.");
+                     alert("Could not process any of the selected files.");
                 } else if (detailedFiles.length === 0) {
-                    showToast("No files were processed from the selection.");
+                    alert("No files were processed from the selection.");
                 }
             }
             // Further specific alerts will be handled after processing newFileEntries.
@@ -1044,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
             if (alertMessage) {
-                showToast(alertMessage);
+                alert(alertMessage);
             }
             // The case for "all files are duplicates" without any new/reactivated is handled by the main if/else if block for newFileEntries.length
             // The case for only errors is handled by the erroredFilesCount alert.
@@ -1092,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 console.error("clearLogs function not found (ui.js). Ensure logging.js is loaded.");
                 // Avoid direct manipulation of fileLog here if it's managed by logging.js
-                showToast("Error: Clear logs functionality is unavailable.");
+                alert("Error: Clear logs functionality is unavailable.");
             }
             if (settingsContextMenu) settingsContextMenu.classList.add('hidden');
         });
@@ -1106,130 +1099,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 await scanFiles(); // scanFiles should handle UI updates after scanning
             } else {
                 console.error("scanFiles function not found (ui.js). Scan cannot be performed.");
-                showToast("Scan functionality is not available.");
+                alert("Scan functionality is not available.");
             }
         });
     }
 });
-
-function showToast(message, duration = 5000) {
-    const container = document.getElementById('toast-container');
-    if (!container) {
-        console.error('Toast container not found!');
-        // Fallback to alert if container is missing, though it shouldn't be
-        alert(message);
-        return;
-    }
-
-    const toast = document.createElement('div');
-    toast.className = 'toast-message'; // Apply CSS class
-    toast.textContent = message;
-
-    container.appendChild(toast);
-
-    // Automatically remove the toast after 'duration'
-    setTimeout(() => {
-        toast.style.opacity = '0'; // Start fade out
-        setTimeout(() => { // Wait for fade out to complete
-            if (toast.parentNode === container) { // Check if still child before removing
-                container.removeChild(toast);
-            }
-        }, 500); // Match opacity transition time
-    }, duration);
-}
-
-function showInputDialog(options) {
-    console.log("showInputDialog called with:", options);
-
-    // Helper function to close the dialog
-    function closeDialog(overlayElement) {
-        if (overlayElement && overlayElement.parentNode) {
-            overlayElement.parentNode.removeChild(overlayElement);
-        }
-    }
-
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'dialog-overlay';
-
-    // Create dialog box
-    const dialogBox = document.createElement('div');
-    dialogBox.className = 'dialog-box';
-
-    // Prevent overlay click from closing if dialogBox is clicked
-    dialogBox.addEventListener('click', function(event) {
-        event.stopPropagation();
-    });
-
-    // Title
-    if (options.title) {
-        const titleElement = document.createElement('h3');
-        titleElement.textContent = options.title;
-        dialogBox.appendChild(titleElement);
-    }
-
-    // Message
-    if (options.message) {
-        const messageElement = document.createElement('p');
-        messageElement.textContent = options.message;
-        dialogBox.appendChild(messageElement);
-    }
-
-    let textInput = null;
-    if (options.inputType === 'text') {
-        textInput = document.createElement('input');
-        textInput.type = 'text';
-        textInput.id = 'dialog-text-input'; // Assign a unique ID
-        if (options.placeholder) {
-            textInput.placeholder = options.placeholder;
-        }
-        // Insert input before the buttons container placeholder (which will be created next)
-        // For now, append and it will be ordered before buttons are added to their specific container
-        dialogBox.appendChild(textInput);
-    }
-
-    // Buttons container
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.className = 'dialog-buttons';
-    dialogBox.appendChild(buttonsContainer); // Add it to the dialog box structure
-
-    if (options.buttons && Array.isArray(options.buttons)) {
-        options.buttons.forEach(buttonObj => {
-            const buttonElement = document.createElement('button');
-            buttonElement.textContent = buttonObj.text;
-            buttonElement.classList.add('dialog-box-button'); // Base class for all dialog buttons
-            if (buttonObj.class) {
-                buttonElement.classList.add(buttonObj.class); // Specific class (e.g., 'confirm', 'cancel')
-            }
-
-            buttonElement.addEventListener('click', () => {
-                let inputValue = null;
-                if (textInput) {
-                    inputValue = textInput.value;
-                }
-                if (typeof options.callback === 'function') {
-                    if (textInput) {
-                        options.callback(buttonObj.value, inputValue);
-                    } else {
-                        options.callback(buttonObj.value);
-                    }
-                }
-                closeDialog(overlay);
-            });
-            buttonsContainer.appendChild(buttonElement);
-        });
-    }
-
-    // Add click listener to overlay to close dialog (optional, good UX)
-    overlay.addEventListener('click', function() {
-        closeDialog(overlay);
-    });
-
-    // Append dialog to overlay, and overlay to body
-    overlay.appendChild(dialogBox);
-    document.body.appendChild(overlay);
-}
-
 console.log("ui.js loaded and DOMContentLoaded setup complete.");
 
 // Make sure readFileAsText is globally available if displayFileContent needs it for user files.
