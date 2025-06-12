@@ -141,7 +141,11 @@ function clearLogs() {
         // Or, we can assume displayActivityLog() is enough for now.
     }
 
-    alert("Logs have been cleared. (logging.js)");
+    if (typeof showCustomAlert === 'function') {
+        showCustomAlert("Logs have been cleared.", 'success', { title: 'Success' });
+    } else {
+        alert("Logs have been cleared. (logging.js) - showCustomAlert not found");
+    }
 }
 
 window.removeFolderEntriesFromLog = function(folderPath) {
@@ -243,7 +247,11 @@ async function scanFiles() {
     }
 
     if (filesToProcess.length === 0) {
-        alert("No files found to scan. Add demo files or upload folders first.");
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert("No files found to scan. Add demo files or upload folders first.", 'warning', { title: 'Scan Warning' });
+        } else {
+            alert("No files found to scan. Add demo files or upload folders first.");
+        }
         return;
     }
 
@@ -537,4 +545,8 @@ Log has been updated.`;
 }
 // Add more specific messages if needed, or refine existing ones.
 
-alert(alertMessage);
+if (typeof showCustomAlert === 'function') {
+    showCustomAlert(alertMessage, 'info', { title: 'Scan Complete' });
+} else {
+    alert(alertMessage + "\n(showCustomAlert not found)");
+}
