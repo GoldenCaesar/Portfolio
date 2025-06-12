@@ -102,7 +102,7 @@ function displayActivityLog() {
     if (!window.fileLog || window.fileLog.length === 0) {
         const tr = activityTbody.insertRow();
         const cell = tr.insertCell();
-        cell.colSpan = 5; // Adjusted to 5 columns: File Name, Status, Hash, Last Checked, Path
+        cell.colSpan = 6; // Adjusted to 6 columns
         cell.textContent = 'No activity logged yet.';
         cell.className = 'px-6 py-4 text-center text-slate-400';
         return;
@@ -153,6 +153,11 @@ function displayActivityLog() {
         lastCheckedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
         lastCheckedTd.textContent = entry.lastHashCheckTime ? new Date(entry.lastHashCheckTime).toLocaleString() : 'N/A';
 
+        // Last Modified
+        const lastModifiedTd = tr.insertCell();
+        lastModifiedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+        lastModifiedTd.textContent = entry.lastModifiedSystem ? new Date(entry.lastModifiedSystem).toLocaleString() : 'N/A';
+
         // Full Path
         const pathTd = tr.insertCell();
         pathTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 overflow-hidden text-ellipsis';
@@ -169,7 +174,7 @@ function displayLoggedFiles(logEntriesToDisplay) {
     if (!logEntriesToDisplay || logEntriesToDisplay.length === 0) {
         const tr = documentsTbody.insertRow();
         const cell = tr.insertCell();
-        cell.colSpan = 5; // Number of columns
+        cell.colSpan = 6; // Number of columns
         cell.textContent = 'No files to display for this selection.';
         cell.className = 'px-6 py-4 text-center text-slate-400';
         return;
@@ -218,6 +223,15 @@ function displayLoggedFiles(logEntriesToDisplay) {
         const lastCheckedTd = tr.insertCell();
         lastCheckedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
         lastCheckedTd.textContent = entry.lastHashCheckTime ? new Date(entry.lastHashCheckTime).toLocaleString() : 'N/A';
+
+        // Last Modified
+        const lastModifiedTd = tr.insertCell();
+        lastModifiedTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300';
+        if (entry.status === 'Not Scanned Yet' || !entry.lastModifiedSystem) {
+            lastModifiedTd.textContent = 'N/A';
+        } else {
+            lastModifiedTd.textContent = new Date(entry.lastModifiedSystem).toLocaleString();
+        }
 
         const pathTd = tr.insertCell();
         pathTd.className = 'whitespace-nowrap px-6 py-4 text-sm text-slate-300 overflow-hidden text-ellipsis';
