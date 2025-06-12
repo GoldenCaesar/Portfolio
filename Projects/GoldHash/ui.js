@@ -782,48 +782,81 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Confirmation dialog for log entries
-            const confirmLogDeletion = window.confirm("Do you also want to remove the log entries for the selected folder(s)? Clicking 'Cancel' will keep the logs.");
-            // The variable 'confirmLogDeletion' will be used in the next step to conditionally call removeFolderEntriesFromLog.
-
-            let deletedUserFolder = false;
-            foldersToDelete.forEach(folderPath => {
-                // Use the new helper function to delete user uploaded folders/subfolders
-                if (deleteUserUploadedFolderPath(folderPath)) {
-                    console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
-                    if (confirmLogDeletion) {
-                        window.removeFolderEntriesFromLog(folderPath); // Call placeholder
+            // Helper function to handle the folder deletion logic
+            function handleFolderDeletion(shouldDeleteLogEntries) {
+                let deletedUserFolderCount = 0;
+                foldersToDelete.forEach(folderPath => {
+                    if (deleteUserUploadedFolderPath(folderPath)) {
+                        console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
+                        if (shouldDeleteLogEntries) {
+                            if (typeof window.removeFolderEntriesFromLog === 'function') {
+                                window.removeFolderEntriesFromLog(folderPath);
+                            } else {
+                                console.error("window.removeFolderEntriesFromLog is not defined.");
+                            }
+                        }
+                        deletedUserFolderCount++;
+                    } else {
+                        console.log(`Folder "${folderPath}" is not a user-uploaded folder, already deleted, or is a demo folder. Skipping deletion from UI data.`);
                     }
-                    deletedUserFolder = true;
+                });
+
+                // Exit edit mode and update UI
+                window.isEditModeActive = false;
+                const editIconSpan = editFoldersButton.querySelector('.material-icons-outlined');
+                if (editFoldersButton.childNodes.length > 1) { // Ensure text node exists
+                   editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Edit";
                 } else {
-                    console.log(`Folder "${folderPath}" is not a user-uploaded folder, already deleted, or is a demo folder. Skipping deletion from UI data.`);
-                    // Optionally alert user for demo/non-user folders if they were selectable (which they shouldn't be if logic is correct)
-                    // if (folderPath.startsWith("demo_files")) {
-                    //     alert(`The folder "${folderPath}" is a demo folder and cannot be deleted.`);
-                    // }
+                   editFoldersButton.appendChild(document.createTextNode(" Edit")); // Fallback if no text node
                 }
-            });
+                if (editIconSpan) editIconSpan.textContent = 'edit';
+                deleteSelectedFoldersButton.style.display = 'none';
 
-            // Exit edit mode and update UI
-            window.isEditModeActive = false;
-            const editIconSpan = editFoldersButton.querySelector('.material-icons-outlined');
-            editFoldersButton.childNodes[editFoldersButton.childNodes.length - 1].nodeValue = " Edit";
-            if (editIconSpan) editIconSpan.textContent = 'edit';
-            deleteSelectedFoldersButton.style.display = 'none';
+                updateSidebarView();
+                if (deletedUserFolderCount > 0) {
+                    displayActivityLog();
+                    updateFileMonitoredCount();
+                }
+                displayFolderContents("demo_files"); // Default to demo_files view
 
-            updateSidebarView();
-            if (deletedUserFolder) { // Only update logs if a user folder was actually deleted
-                displayActivityLog(); // Reflect that logs for the folder are (notionally) gone
-                updateFileMonitoredCount(); // Reflect change in monitored files
+                let toastMessage = "";
+                if (deletedUserFolderCount > 0) {
+                    if (shouldDeleteLogEntries) {
+                        toastMessage = `Successfully removed ${deletedUserFolderCount} folder(s) and their log entries.`;
+                    } else {
+                        toastMessage = `Successfully removed ${deletedUserFolderCount} folder(s). Log entries were kept.`;
+                    }
+                } else {
+                    // This case might not be reached if foldersToDelete.length === 0 is checked earlier,
+                    // but good for completeness.
+                    toastMessage = "No user folders were deleted.";
+                }
+                showToast(toastMessage, deletedUserFolderCount > 0 ? 'success' : 'info');
             }
-            displayFolderContents("demo_files"); // Default to demo_files view
-            let alertMessage = "";
-            if (confirmLogDeletion) {
-                alertMessage = "Selected user folders and their log entries have been removed.";
+
+            // Use showCustomAlert for confirmation
+            if (typeof showCustomAlert === 'function') {
+                showCustomAlert("Do you also want to remove the log entries for the selected folder(s)?", 'confirm', {
+                    title: 'Confirm Log Deletion',
+                    confirmText: 'Remove Logs',
+                    cancelText: 'Keep Logs',
+                    onConfirm: () => {
+                        handleFolderDeletion(true);
+                    },
+                    onCancel: () => {
+                        handleFolderDeletion(false);
+                        // The toast message is now handled within handleFolderDeletion,
+                        // but if a specific message for cancellation *without any deletion action* is needed,
+                        // it could be added here. However, handleFolderDeletion(false) already covers the "kept logs" scenario.
+                        // If foldersToDelete was empty, it's caught earlier.
+                        // If deletion was attempted but failed for all, handleFolderDeletion's toast will reflect that.
+                    }
+                });
             } else {
-                alertMessage = "Selected user folders have been removed. Their log entries have been kept.";
+                // Fallback to window.confirm if showCustomAlert is somehow not available
+                const legacyConfirmLogDeletion = window.confirm("Do you also want to remove the log entries for the selected folder(s)? Clicking 'Cancel' will keep the logs. (showCustomAlert not found)");
+                handleFolderDeletion(legacyConfirmLogDeletion);
             }
-            showToast(alertMessage, 'success');
         });
     }
 
@@ -1245,3 +1278,218 @@ window.updateFileChangesGraph = function() {
         xAxisContainer.appendChild(p);
     });
 };
+
+// --- Custom Alert Function ---
+function showCustomAlert(message, type = 'info', options = {}) {
+    // Default options
+    const defaults = {
+        title: '',
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        placeholder: '',
+        onConfirm: null,
+        onCancel: null,
+    };
+    const settings = { ...defaults, ...options };
+
+    // --- Create Overlay ---
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+    overlay.style.zIndex = '1000'; // Ensure it's on top
+    overlay.style.display = 'flex';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+
+    // --- Create Dialog Box ---
+    const dialog = document.createElement('div');
+    dialog.style.backgroundColor = '#2d3748'; // Dark background, similar to sidebar
+    dialog.style.padding = '25px';
+    dialog.style.borderRadius = '8px';
+    dialog.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
+    dialog.style.minWidth = '300px';
+    dialog.style.maxWidth = '90%';
+    dialog.style.textAlign = 'center';
+    dialog.style.color = '#e2e8f0'; // Light text color
+    dialog.style.fontFamily = 'Arial, sans-serif'; // Basic font
+
+    // Set border color based on type (similar to Toastify)
+    switch (type) {
+        case 'success':
+            dialog.style.borderLeft = '5px solid #96c93d'; // Greenish
+            break;
+        case 'error':
+            dialog.style.borderLeft = '5px solid #ff5f6d'; // Reddish
+            break;
+        case 'warning':
+            dialog.style.borderLeft = '5px solid #f7971e'; // Orangish
+            break;
+        case 'info':
+        case 'confirm':
+        case 'prompt':
+        default:
+            dialog.style.borderLeft = '5px solid #007bff'; // Blueish
+            break;
+    }
+
+    // --- Title ---
+    if (settings.title) {
+        const titleElement = document.createElement('h3');
+        titleElement.textContent = settings.title;
+        titleElement.style.fontSize = '20px';
+        titleElement.style.fontWeight = 'bold';
+        titleElement.style.marginBottom = '15px';
+        titleElement.style.color = '#cbd5e0'; // Slightly lighter for title
+        dialog.appendChild(titleElement);
+    }
+
+    // --- Message ---
+    const messageElement = document.createElement('p');
+    messageElement.textContent = message;
+    messageElement.style.fontSize = '16px';
+    messageElement.style.marginBottom = '20px';
+    dialog.appendChild(messageElement);
+
+    // --- Input Field (for 'prompt') ---
+    let inputField = null;
+    if (type === 'prompt') {
+        inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.placeholder = settings.placeholder;
+        inputField.style.width = 'calc(100% - 20px)';
+        inputField.style.padding = '10px';
+        inputField.style.marginBottom = '20px';
+        inputField.style.border = '1px solid #4a5568'; // Darker border
+        inputField.style.borderRadius = '4px';
+        inputField.style.backgroundColor = '#1a202c'; // Very dark input bg
+        inputField.style.color = '#e2e8f0'; // Light text
+        dialog.appendChild(inputField);
+    }
+
+    // --- Buttons Container ---
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.style.marginTop = '25px';
+    buttonsContainer.style.display = 'flex';
+    buttonsContainer.style.justifyContent = 'flex-end'; // Align buttons to the right
+    buttonsContainer.style.gap = '10px'; // Space between buttons
+
+    // --- Cleanup Function ---
+    const removeAlert = () => {
+        if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+        }
+        // Remove keyboard listeners
+        document.removeEventListener('keydown', handleEscKey);
+        if (type === 'prompt' && inputField) {
+            inputField.removeEventListener('keydown', handleEnterKey);
+        }
+    };
+
+    // --- Event Handlers ---
+    const handleConfirm = () => {
+        if (settings.onConfirm) {
+            settings.onConfirm(type === 'prompt' && inputField ? inputField.value : undefined);
+        }
+        removeAlert();
+    };
+
+    const handleCancel = () => {
+        if (settings.onCancel) {
+            settings.onCancel();
+        }
+        removeAlert();
+    };
+
+    // --- Keyboard Listeners ---
+    const handleEscKey = (event) => {
+        if (event.key === 'Escape') {
+            if (type === 'confirm' || type === 'prompt' || settings.onCancel) { // If there's a cancel action
+                handleCancel();
+            } else { // For simple alerts, Esc acts as OK
+                handleConfirm();
+            }
+        }
+    };
+
+    const handleEnterKey = (event) => {
+        if (event.key === 'Enter' && type === 'prompt' && inputField) {
+            handleConfirm();
+        }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    if (type === 'prompt' && inputField) {
+        inputField.addEventListener('keydown', handleEnterKey);
+        // Focus the input field for prompt
+        setTimeout(() => inputField.focus(), 0);
+    }
+
+
+    // --- Button Generation ---
+    // Confirm Button (OK, Yes, etc.)
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = settings.confirmText;
+    confirmButton.style.padding = '10px 20px';
+    confirmButton.style.border = 'none';
+    confirmButton.style.borderRadius = '5px';
+    confirmButton.style.cursor = 'pointer';
+    confirmButton.style.fontWeight = 'bold';
+    confirmButton.style.transition = 'background-color 0.2s ease';
+
+    // Base styles for confirm button (can be overridden by type)
+    confirmButton.style.backgroundColor = '#007bff'; // Default blue
+    confirmButton.style.color = 'white';
+    confirmButton.onmouseover = () => confirmButton.style.backgroundColor = '#0056b3';
+    confirmButton.onmouseout = () => confirmButton.style.backgroundColor = '#007bff';
+
+
+    confirmButton.addEventListener('click', handleConfirm);
+    buttonsContainer.appendChild(confirmButton);
+
+    // Cancel Button (for 'confirm' and 'prompt' types)
+    if (type === 'confirm' || type === 'prompt') {
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = settings.cancelText;
+        cancelButton.style.padding = '10px 20px';
+        cancelButton.style.border = '1px solid #4a5568'; // Border for secondary button
+        cancelButton.style.borderRadius = '5px';
+        cancelButton.style.cursor = 'pointer';
+        cancelButton.style.fontWeight = 'bold';
+        cancelButton.style.backgroundColor = 'transparent'; // Transparent bg
+        cancelButton.style.color = '#cbd5e0'; // Light text
+        cancelButton.style.transition = 'background-color 0.2s ease, color 0.2s ease';
+
+        cancelButton.onmouseover = () => {
+            cancelButton.style.backgroundColor = '#4a5568'; // Darken on hover
+            cancelButton.style.color = 'white';
+        };
+        cancelButton.onmouseout = () => {
+            cancelButton.style.backgroundColor = 'transparent';
+            cancelButton.style.color = '#cbd5e0';
+        };
+
+        cancelButton.addEventListener('click', handleCancel);
+        buttonsContainer.appendChild(cancelButton); // Appended after confirm, will appear to its right due to flex-end
+                                                  // To make it appear left, insertBefore or change flex order
+        buttonsContainer.insertBefore(cancelButton, confirmButton); // Places cancel button before confirm button
+    }
+
+
+    // --- Assemble and Display ---
+    dialog.appendChild(buttonsContainer);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Auto-focus the confirm button if no input field, or if input field is not focused for some reason
+    if (type !== 'prompt') {
+         setTimeout(() => confirmButton.focus(), 0);
+    } else if (inputField && document.activeElement !== inputField) {
+        // If prompt, but input field didn't get focus, try confirm button.
+        // This is a fallback, inputField.focus() should ideally work.
+        setTimeout(() => confirmButton.focus(), 50);
+    }
+}
