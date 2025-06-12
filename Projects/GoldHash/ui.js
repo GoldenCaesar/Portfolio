@@ -46,6 +46,36 @@ window.demoFilesData = { // Moved from DOMContentLoaded
 // fileLog is now globally managed by logging.js as window.fileLog
 // UI functions will use window.fileLog directly.
 
+// --- Toast Notification Function ---
+function showToast(message, type = 'info') {
+    let backgroundColor;
+    switch (type) {
+        case 'success':
+            backgroundColor = 'linear-gradient(to right, #00b09b, #96c93d)';
+            break;
+        case 'error':
+            backgroundColor = 'linear-gradient(to right, #ff5f6d, #ffc371)';
+            break;
+        case 'warning':
+            backgroundColor = 'linear-gradient(to right, #f7971e, #ffd200)';
+            break;
+        case 'info':
+        default:
+            backgroundColor = 'linear-gradient(to right, #007bff, #00a1ff)';
+            break;
+    }
+
+    Toastify({
+        text: message,
+        duration: 5000, // 5 seconds
+        close: true,
+        gravity: "top", // `top` or `bottom`
+        position: "right", // `left`, `center` or `right`
+        backgroundColor: backgroundColor,
+        stopOnFocus: true, // Prevents dismissing of toast on hover
+    }).showToast();
+}
+
 // --- UI Display and Update Functions ---
 
 function updateFilesChangedCount(count) {
@@ -365,7 +395,7 @@ function displayFileContent(filePath) {
             // Content for user files will be read asynchronously
         } else {
             console.error('File item not found in demo or user data for path:', filePath);
-            alert('File content not found.');
+            showToast('File content not found.', 'error');
             return;
         }
     }
@@ -411,17 +441,17 @@ function displayFileContent(filePath) {
                 .then(fileText => displayTheContent(fileText))
                 .catch(err => {
                     console.error("Error reading user file for display:", err);
-                    alert('Error reading file content.');
+                    showToast('Error reading file content.', 'error');
                 });
         } else {
             console.error("readFileAsText function is not available. Cannot display user file content.");
-            alert("Cannot display content for this file as a required function (readFileAsText) is missing.");
+            showToast("Cannot display content for this file as a required function (readFileAsText) is missing.", 'error');
         }
     } else if (content) {
         displayTheContent(content);
     } else {
         console.error('File content not available for path:', filePath);
-        alert('File content not available.');
+        showToast('File content not available.', 'error');
     }
 }
 
@@ -748,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (foldersToDelete.length === 0) {
-                alert('No folders selected for deletion.');
+                showToast('No folders selected for deletion.', 'warning');
                 return;
             }
 
@@ -793,7 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alertMessage = "Selected user folders have been removed. Their log entries have been kept.";
             }
-            alert(alertMessage);
+            showToast(alertMessage, 'success');
         });
     }
 
@@ -822,7 +852,7 @@ document.addEventListener('DOMContentLoaded', () => {
         folderUploadInput.addEventListener('change', async (event) => {
             const files = event.target.files;
             if (!files.length) {
-                alert("No files selected or folder was empty.");
+                showToast("No files selected or folder was empty.", 'warning');
                 folderUploadInput.value = ''; // Clear input
                 return;
             }
@@ -841,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (filesToProcessForUpload.length === 0) {
-                alert("No processable files found in the selection.");
+                showToast("No processable files found in the selection.", 'warning');
                 folderUploadInput.value = ''; // Clear input
                 return;
             }
@@ -912,7 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Adjust alert messages based on counts
             if (erroredFilesCount > 0) {
-                alert(`Encountered errors while processing ${erroredFilesCount} file(s). These will not be added.`);
+                showToast(`Encountered errors while processing ${erroredFilesCount} file(s). These will not be added.`, 'error');
             }
 
             // Determine main message based on what's being added or if all are duplicates
@@ -920,12 +950,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // This block will be entered if there are files to add.
                 // Specific messages about what was added will be constructed later.
             } else if (duplicateFileEntries.length > 0 && erroredFilesCount === 0) { // All valid files are duplicates
-                alert("All files in the selected folder are duplicates of existing, actively managed files and will not be added.");
+                showToast("All files in the selected folder are duplicates of existing, actively managed files and will not be added.", 'info');
             } else if (newFileEntries.length === 0 && duplicateFileEntries.length === 0 && erroredFilesCount === 0) {
                  if (detailedFiles.length === 0 && filesToProcessForUpload.length > 0) {
-                     alert("Could not process any of the selected files.");
+                     showToast("Could not process any of the selected files.", 'warning');
                 } else if (detailedFiles.length === 0) {
-                    alert("No files were processed from the selection.");
+                    showToast("No files were processed from the selection.", 'warning');
                 }
             }
             // Further specific alerts will be handled after processing newFileEntries.
@@ -1029,15 +1059,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     // This means only duplicates were found, and no files to add, and no errors.
                     // The earlier specific alert for "all duplicates" would have been shown.
                     // However, if that alert was suppressed or we want a consolidated one here:
-                    alertMessage = `All files in the selected folder are duplicates of existing, actively managed files and will not be added.`;
+                    showToast(`All files in the selected folder are duplicates of existing, actively managed files and will not be added.`, 'info'); // Replacing the assignment to alertMessage
+                    alertMessage = ""; // Clear alertMessage as it's handled by showToast
                 } else {
                      alertMessage = duplicateMessage; // Only duplicates, other messages are not applicable.
                 }
             }
 
 
-            if (alertMessage) {
-                alert(alertMessage);
+            if (alertMessage) { // alertMessage might be empty if handled by the specific showToast above
+                showToast(alertMessage, 'success');
             }
             // The case for "all files are duplicates" without any new/reactivated is handled by the main if/else if block for newFileEntries.length
             // The case for only errors is handled by the erroredFilesCount alert.
@@ -1085,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 console.error("clearLogs function not found (ui.js). Ensure logging.js is loaded.");
                 // Avoid direct manipulation of fileLog here if it's managed by logging.js
-                alert("Error: Clear logs functionality is unavailable.");
+                showToast("Error: Clear logs functionality is unavailable.", 'error');
             }
             if (settingsContextMenu) settingsContextMenu.classList.add('hidden');
         });
@@ -1099,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await scanFiles(); // scanFiles should handle UI updates after scanning
             } else {
                 console.error("scanFiles function not found (ui.js). Scan cannot be performed.");
-                alert("Scan functionality is not available.");
+                showToast("Scan functionality is not available.", 'error');
             }
         });
     }
