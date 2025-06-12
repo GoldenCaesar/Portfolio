@@ -1,6 +1,8 @@
 console.log("logging.js loaded");
 
 window.fileLog = []; // Authoritative source for log data, now globally accessible
+window.totalUniqueFilesChanged = 0;
+window.totalModificationEvents = 0;
 
 // --- Core Hashing and ID Generation Functions (moved from script.js) ---
 
@@ -53,13 +55,47 @@ function getOSFileID(filePath) {
 
 function loadLogsFromStorage() {
     console.log("Attempting to load logs from localStorage (logging.js)...");
+    window.totalUniqueFilesChanged = 0; // Initialize/reset counter
+    window.totalModificationEvents = 0; // Initialize/reset counter
+
     const storedLogs = localStorage.getItem('goldHashLog');
     if (storedLogs) {
         window.fileLog = JSON.parse(storedLogs); // Use global fileLog
         console.log(`${window.fileLog.length} logs loaded from localStorage (logging.js).`);
+
+        if (window.fileLog && window.fileLog.length > 0) {
+            window.fileLog.forEach(entry => {
+                entry.modificationHistory = entry.modificationHistory || []; // Ensure for old logs
+                if (entry.modificationHistory.length > 0) {
+                    window.totalUniqueFilesChanged++;
+                }
+                window.totalModificationEvents += entry.modificationHistory.length;
+            });
+        }
+        console.log(`Calculated initial counts: totalUniqueFilesChanged = ${window.totalUniqueFilesChanged}, totalModificationEvents = ${window.totalModificationEvents}`);
+        // Add these lines for UI update:
+        if (typeof window.updateFilesChangedCount === "function") {
+            window.updateFilesChangedCount(window.totalUniqueFilesChanged);
+        }
+        if (typeof window.updateTotalChangesCount === "function") {
+            window.updateTotalChangesCount(window.totalModificationEvents);
+        }
+
     } else {
         console.log("No logs found in localStorage. Initializing empty log (logging.js).");
         window.fileLog = []; // Use global fileLog
+        // Counters are already 0 due to initialization at the function start
+        // Ensure totalUniqueFilesChanged and totalModificationEvents are explicitly zeroed here for clarity before UI update
+        window.totalUniqueFilesChanged = 0;
+        window.totalModificationEvents = 0;
+        console.log(`Initial counts: totalUniqueFilesChanged = ${window.totalUniqueFilesChanged}, totalModificationEvents = ${window.totalModificationEvents}`);
+        // Add these lines for UI update:
+        if (typeof window.updateFilesChangedCount === "function") {
+            window.updateFilesChangedCount(0);
+        }
+        if (typeof window.updateTotalChangesCount === "function") {
+            window.updateTotalChangesCount(0);
+        }
     }
     // Update UI based on loaded logs (calls functions from ui.js)
     // These UI functions should now directly use window.fileLog
@@ -76,9 +112,19 @@ function saveLogsToStorage() {
 function clearLogs() {
     console.log("Clearing logs (logging.js)...");
     window.fileLog = []; // Reset the global in-memory log array
-
     localStorage.removeItem('goldHashLog');
     console.log("Logs removed from localStorage (logging.js).");
+
+    window.totalUniqueFilesChanged = 0;
+    window.totalModificationEvents = 0;
+
+    // Add these lines for UI update:
+    if (typeof window.updateFilesChangedCount === "function") {
+        window.updateFilesChangedCount(0);
+    }
+    if (typeof window.updateTotalChangesCount === "function") {
+        window.updateTotalChangesCount(0);
+    }
 
     // Update UI (calls functions from ui.js)
     // These UI functions should now directly use window.fileLog
@@ -272,6 +318,8 @@ async function scanFiles() {
                 }
                 filesReactivated++;
             } else if (logEntry.currentHash !== currentHash) { // Path found, not reactivating, but hash changed
+                logEntry.modificationHistory = logEntry.modificationHistory || []; // Ensure it exists
+                logEntry.modificationHistory.push({ timestamp: currentTime, previousHash: logEntry.currentHash });
                 logEntry.hashHistory = logEntry.hashHistory || [];
                 logEntry.hashHistory.push(logEntry.currentHash);
                 logEntry.currentHash = currentHash;
@@ -339,13 +387,28 @@ async function scanFiles() {
                     currentHash: currentHash,
                     hashHistory: [],
                     previousPaths: [], // Initialize for new entry
-                    status: 'newly_added'
+                    status: 'newly_added',
+                    modificationHistory: [] // Add this line
                 };
                 window.fileLog.push(newLogEntry);
                 newFilesAdded++;
             }
         }
     }
+
+    console.log("Recalculating counts after scan completion...");
+    window.totalUniqueFilesChanged = 0;
+    window.totalModificationEvents = 0;
+    if (window.fileLog && window.fileLog.length > 0) {
+        window.fileLog.forEach(entry => {
+            entry.modificationHistory = entry.modificationHistory || []; // Defensive check
+            if (entry.modificationHistory.length > 0) {
+                window.totalUniqueFilesChanged++;
+            }
+            window.totalModificationEvents += entry.modificationHistory.length;
+        });
+    }
+    console.log(`Updated counts: totalUniqueFilesChanged = ${window.totalUniqueFilesChanged}, totalModificationEvents = ${window.totalModificationEvents}`);
 
     saveLogsToStorage(); // Save updated fileLog
 
@@ -356,9 +419,12 @@ async function scanFiles() {
     if (typeof window.updateLastScanTime === "function") window.updateLastScanTime();
 
     // Update "Files Changed" count in statistics (this element is in HTML, updated by ui.js function if one exists, or directly)
-    const modifiedCount = window.fileLog.filter(entry => entry.status === 'modified').length;
+    // const modifiedCount = window.fileLog.filter(entry => entry.status === 'modified').length; // This local count is no longer used for the global display
     if (typeof window.updateFilesChangedCount === "function") {
-        window.updateFilesChangedCount(modifiedCount);
+        window.updateFilesChangedCount(window.totalUniqueFilesChanged);
+    }
+    if (typeof window.updateTotalChangesCount === "function") {
+        window.updateTotalChangesCount(window.totalModificationEvents);
     }
 
     // Refresh the displayed table based on current view (call ui.js function)

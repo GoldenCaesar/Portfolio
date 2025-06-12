@@ -49,9 +49,20 @@ window.demoFilesData = { // Moved from DOMContentLoaded
 // --- UI Display and Update Functions ---
 
 function updateFilesChangedCount(count) {
-    const filesChangedElement = document.querySelector('div.grid div:nth-child(2) p.text-3xl');
+    const filesChangedElement = document.getElementById('files-changed-count');
     if (filesChangedElement) {
         filesChangedElement.textContent = count.toLocaleString();
+    } else {
+        console.warn("Element with ID 'files-changed-count' not found.");
+    }
+}
+
+function updateTotalChangesCount(count) {
+    const totalChangesElement = document.getElementById('total-changes-count');
+    if (totalChangesElement) {
+        totalChangesElement.textContent = count.toLocaleString();
+    } else {
+        console.warn("Element with ID 'total-changes-count' not found.");
     }
 }
 
