@@ -165,7 +165,12 @@ async function scanFiles() {
             for (const key in currentLevel) {
                 const item = currentLevel[key];
                 if (item.type === 'file' && item.fileObject) {
-                    filesToProcess.push({ path: item.path, fileObject: item.fileObject, source: "user" });
+                    filesToProcess.push({
+                        path: item.path,
+                        fileObject: item.fileObject,
+                        source: "user",
+                        isReactivatingLog: item.isReactivatingLog // Carry over the flag
+                    });
                 } else if (item.type === 'folder' && item.children) {
                     _collectUserFilesRecursive(item.children);
                 }
@@ -177,7 +182,12 @@ async function scanFiles() {
                  _collectUserFilesRecursive(currentUserFolders[topLevelFolder].children ? currentUserFolders[topLevelFolder].children : {});
                  // Also check if top-level item itself is a file (if structure allows)
                  if(currentUserFolders[topLevelFolder].type === 'file' && currentUserFolders[topLevelFolder].fileObject) {
-                     filesToProcess.push({ path: currentUserFolders[topLevelFolder].path, fileObject: currentUserFolders[topLevelFolder].fileObject, source: "user" });
+                     filesToProcess.push({
+                         path: currentUserFolders[topLevelFolder].path,
+                         fileObject: currentUserFolders[topLevelFolder].fileObject,
+                         source: "user",
+                         isReactivatingLog: currentUserFolders[topLevelFolder].isReactivatingLog // Carry over the flag
+                     });
                  }
             }
         }
@@ -196,6 +206,7 @@ async function scanFiles() {
     let filesVerified = 0;
     let pathsUpdated = 0;
     let duplicatesFound = 0;
+    let filesReactivated = 0; // Initialize counter
 
     // Create a Set of all paths in the current scan for efficient lookup
     const currentScanPaths = new Set(filesToProcess.map(f => f.path));
@@ -246,14 +257,29 @@ async function scanFiles() {
 
         if (existingLogEntryIndex !== -1) {
             const logEntry = window.fileLog[existingLogEntryIndex];
-            if (logEntry.currentHash !== currentHash) {
+            // Check for reactivation first, as this is a specific user intent
+            if (fileItem.isReactivatingLog === true) {
+                logEntry.status = 'reactivated';
+                logEntry.lastHashCheckTime = currentTime;
+                logEntry.lastModifiedSystem = fileItem.fileObject && fileItem.fileObject.lastModified ? new Date(fileItem.fileObject.lastModified).toISOString() : currentTime;
+
+                // If hash also changed during this "reactivation" (e.g. file was modified while "lost")
+                if (logEntry.currentHash !== currentHash) {
+                    logEntry.hashHistory = logEntry.hashHistory || [];
+                    logEntry.hashHistory.push(logEntry.currentHash);
+                    logEntry.currentHash = currentHash;
+                    console.log(`File ${fileItem.path} reactivated with a new hash.`);
+                }
+                filesReactivated++;
+            } else if (logEntry.currentHash !== currentHash) { // Path found, not reactivating, but hash changed
+                logEntry.hashHistory = logEntry.hashHistory || [];
                 logEntry.hashHistory.push(logEntry.currentHash);
                 logEntry.currentHash = currentHash;
                 logEntry.status = 'modified';
-                logEntry.lastModifiedSystem = currentTime; // Consider using file's actual lastModified if available and reliable
+                logEntry.lastModifiedSystem = fileItem.fileObject && fileItem.fileObject.lastModified ? new Date(fileItem.fileObject.lastModified).toISOString() : currentTime;
                 logEntry.lastHashCheckTime = currentTime;
                 filesModified++;
-            } else {
+            } else { // Path found, not reactivating, hash is the same
                 logEntry.status = 'verified';
                 logEntry.lastHashCheckTime = currentTime;
                 filesVerified++;
@@ -265,31 +291,44 @@ async function scanFiles() {
             const hashMatchEntry = hashMatchEntryIndex !== -1 ? window.fileLog[hashMatchEntryIndex] : null;
 
             if (hashMatchEntry) {
-                // Hash found, but path is new. Potential rename/move or duplicate.
-                console.log(`Content of ${fileItem.path} (hash: ${currentHash}) already exists in log, currently at ${hashMatchEntry.currentPath}.`);
-
-                if (!currentScanPaths.has(hashMatchEntry.currentPath)) {
-                    // Scenario A: Rename/Move Detection
-                    // The path previously associated with this hash is NOT in the current scan list.
-                    console.log(`File at ${hashMatchEntry.currentPath} seems to have been moved/renamed to ${fileItem.path}. Updating log entry.`);
-                    window.fileLog[hashMatchEntryIndex].previousPaths = window.fileLog[hashMatchEntryIndex].previousPaths || [];
-                    window.fileLog[hashMatchEntryIndex].previousPaths.push(window.fileLog[hashMatchEntryIndex].currentPath);
-                    window.fileLog[hashMatchEntryIndex].currentPath = fileItem.path;
-                    window.fileLog[hashMatchEntryIndex].status = 'path_updated'; // New status
-                    window.fileLog[hashMatchEntryIndex].lastHashCheckTime = currentTime;
-                    window.fileLog[hashMatchEntryIndex].lastModifiedSystem = currentTime; // Or use fileItem.lastModified if available
-                    pathsUpdated++;
+                // Hash found, but path is new.
+                if (fileItem.isReactivatingLog === true) {
+                    // This file is being re-added to management. Update the existing log entry.
+                    console.log(`Reactivating log for ${fileItem.path} (hash: ${currentHash}). Original path: ${hashMatchEntry.currentPath}`);
+                    if (hashMatchEntry.currentPath !== fileItem.path) {
+                        hashMatchEntry.previousPaths = hashMatchEntry.previousPaths || [];
+                        hashMatchEntry.previousPaths.push(hashMatchEntry.currentPath);
+                        hashMatchEntry.currentPath = fileItem.path;
+                    }
+                    hashMatchEntry.status = 'reactivated';
+                    hashMatchEntry.lastHashCheckTime = currentTime;
+                    hashMatchEntry.lastModifiedSystem = fileItem.fileObject && fileItem.fileObject.lastModified ? new Date(fileItem.fileObject.lastModified).toISOString() : currentTime;
+                    // It's important that window.fileLog[hashMatchEntryIndex] is the same object as hashMatchEntry
+                    // which it should be since findIndex gives the index into window.fileLog.
+                    filesReactivated++;
                 } else {
-                    // Scenario B: Duplicate/Alternate Path
-                    // The path previously associated with this hash IS ALSO in the current scan list. This is a duplicate.
-                    // Per new requirement, we do not log this specific type of duplicate in scanFiles.
-                    // The pre-scan during folder upload should handle identifying and preventing addition of such duplicates.
-                    console.warn(`DUPLICATE (Scenario B): File ${fileItem.path} has same content as ${hashMatchEntry.currentPath}. This duplicate will not be added to the log by scanFiles.`);
-                    // window.fileLog.push(newLogEntry); // REMOVED
-                    duplicatesFound++; // Still count it for the scan summary, but no new log entry.
+                    // Original logic for Scenario A (rename/move) or Scenario B (duplicate)
+                    console.log(`Content of ${fileItem.path} (hash: ${currentHash}) already exists in log, currently at ${hashMatchEntry.currentPath}.`);
+                    if (!currentScanPaths.has(hashMatchEntry.currentPath)) {
+                        // Scenario A: Rename/Move Detection
+                        console.log(`File at ${hashMatchEntry.currentPath} seems to have been moved/renamed to ${fileItem.path}. Updating log entry.`);
+                        window.fileLog[hashMatchEntryIndex].previousPaths = window.fileLog[hashMatchEntryIndex].previousPaths || [];
+                        window.fileLog[hashMatchEntryIndex].previousPaths.push(window.fileLog[hashMatchEntryIndex].currentPath);
+                        window.fileLog[hashMatchEntryIndex].currentPath = fileItem.path;
+                        window.fileLog[hashMatchEntryIndex].status = 'path_updated';
+                        window.fileLog[hashMatchEntryIndex].lastHashCheckTime = currentTime;
+                        window.fileLog[hashMatchEntryIndex].lastModifiedSystem = fileItem.fileObject && fileItem.fileObject.lastModified ? new Date(fileItem.fileObject.lastModified).toISOString() : currentTime;
+                        pathsUpdated++;
+                    } else {
+                        // Scenario B: Duplicate/Alternate Path
+                        console.warn(`DUPLICATE (Scenario B): File ${fileItem.path} has same content as ${hashMatchEntry.currentPath}. This duplicate will not be added to the log by scanFiles.`);
+                        duplicatesFound++;
+                    }
                 }
             } else {
                 // Hash not found - this is a genuinely new file.
+                // (This also handles files that had isReactivatingLog = true but their hash was NOT found in fileLog,
+                // which would be an unexpected state, but they'd be treated as new here).
                 const appID = generateAppUniqueID();
                 const newLogEntry = {
                     appID: appID,
@@ -342,7 +381,7 @@ async function scanFiles() {
     if (typeof window.displayFolderContents === "function") window.displayFolderContents(currentActiveFolderPath);
     if (typeof window.displayActivityLog === "function") window.displayActivityLog(); // Refresh activity log
 
-    console.log(`File scan complete (logging.js). New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}, Paths Updated: ${pathsUpdated}, Duplicates Found: ${duplicatesFound}. Log updated.`);
+    console.log(`File scan complete (logging.js). New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}, Paths Updated: ${pathsUpdated}, Duplicates Found: ${duplicatesFound}, Reactivated: ${filesReactivated}. Log updated.`);
 }
 
 // Ensure logging.js is loaded, then ui.js, then script.js for dependency reasons if not using modules.
@@ -367,19 +406,28 @@ Modified files: ${filesModified}
 Verified files: ${filesVerified}
 Paths Updated: ${pathsUpdated}
 Duplicates Found: ${duplicatesFound}
+Reactivated files: ${filesReactivated}
 Log has been updated.`;
 
-if (newFilesAdded === 0 && filesModified > 0) {
+if (filesReactivated > 0 && newFilesAdded === 0 && filesModified === 0 && pathsUpdated === 0) {
+    alertMessage = `Scan complete. ${filesReactivated} file(s) were reactivated from existing logs.
+Verified files: ${filesVerified}
+Duplicates Found: ${duplicatesFound}
+Log has been updated.`;
+} else if (newFilesAdded === 0 && filesModified > 0) {
     alertMessage = `Scan complete. No new files were added, but ${filesModified} file(s) were updated.
 Verified files: ${filesVerified}
 Paths Updated: ${pathsUpdated}
 Duplicates Found: ${duplicatesFound}
+Reactivated files: ${filesReactivated}
 Log has been updated.`;
 } else if (newFilesAdded === 0 && filesModified === 0 && pathsUpdated > 0) {
     alertMessage = `Scan complete. No new or modified files, but ${pathsUpdated} file path(s) were updated.
 Verified files: ${filesVerified}
 Duplicates Found: ${duplicatesFound}
+Reactivated files: ${filesReactivated}
 Log has been updated.`;
 }
+// Add more specific messages if needed, or refine existing ones.
 
 alert(alertMessage);
