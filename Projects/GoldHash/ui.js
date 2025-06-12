@@ -138,6 +138,9 @@ function displayActivityLog() {
             case 'duplicate': // New status
                 statusTd.classList.add('text-cyan-400'); // Example color
                 break;
+            case 'reactivated':
+                statusTd.classList.add('text-teal-400');
+                break;
             default:
                 statusTd.classList.add('text-slate-300');
         }
@@ -210,6 +213,9 @@ function displayLoggedFiles(logEntriesToDisplay) {
                 break;
             case 'duplicate': // New status
                 statusTd.classList.add('text-cyan-400'); // Example color
+                break;
+            case 'reactivated':
+                statusTd.classList.add('text-teal-400'); // Use the same color for consistency
                 break;
             default:
                 statusTd.classList.add('text-slate-300');
@@ -300,6 +306,25 @@ function getFolderItemByPath(path) {
     }
 
     return null; // Not found or not a folder
+}
+
+// Helper function to check if a path is actively managed (exists in demo or user data)
+function isPathActivelyManaged(filePath) {
+    console.log('isPathActivelyManaged called for:', filePath);
+    let found = false;
+
+    // Check in demoFilesData
+    if (findItemInData(filePath, window.demoFilesData)) {
+        found = true;
+    }
+
+    // If not found in demo, check in userUploadedFolders
+    if (!found && findItemInData(filePath, window.userUploadedFolders)) {
+        found = true;
+    }
+
+    console.log('isPathActivelyManaged Result:', found);
+    return found;
 }
 
 function clearActiveStates() {
@@ -831,51 +856,61 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fileContent = await window.readFileAsText(file);
                     const currentHash = await window.generateSHA256(fileContent);
                     let isDuplicate = false;
-                    // Updated duplicate check:
-                    if ((window.fileLog && window.fileLog.some(entry => entry.currentHash === currentHash)) || existingUserFileHashes.has(currentHash)) {
-                        isDuplicate = true;
+                    let isReactivatingLog = false;
+
+                    const logMatchEntry = window.fileLog ? window.fileLog.find(entry => entry.currentHash === currentHash) : null;
+
+                    if (existingUserFileHashes.has(currentHash)) {
+                        isDuplicate = true; // Duplicate within current user-managed files or simultaneous upload
+                    } else if (logMatchEntry) {
+                        if (window.isPathActivelyManaged(logMatchEntry.currentPath)) {
+                            isDuplicate = true; // Log entry exists and is actively managed
+                        } else {
+                            isReactivatingLog = true; // Log entry exists but is not actively managed
+                            // isDuplicate remains false for this specific condition, allowing re-addition
+                        }
                     }
-                    detailedFiles.push({ file, fullPath, currentHash, isDuplicate });
+                    detailedFiles.push({ file, fullPath, currentHash, isDuplicate, isReactivatingLog, error: false });
                 } catch (error) {
                     console.error(`Error processing file ${fullPath}:`, error);
                     // Optionally add to a list of errors to show to the user
-                    detailedFiles.push({ file, fullPath, currentHash: null, isDuplicate: false, error: true });
+                    detailedFiles.push({ file, fullPath, currentHash: null, isDuplicate: false, isReactivatingLog: false, error: true });
                 }
             }
 
-            let newFileEntries = detailedFiles.filter(f => !f.isDuplicate && !f.error);
+            let newFileEntries = detailedFiles.filter(f => !f.isDuplicate && !f.error); // Includes isReactivatingLog cases
             let duplicateFileEntries = detailedFiles.filter(f => f.isDuplicate && !f.error);
             let erroredFilesCount = detailedFiles.filter(f => f.error).length;
+            let reactivatedLogsCount = newFileEntries.filter(f => f.isReactivatingLog).length; // Count reactivated files among those to be added
 
-            let newFilesProcessedCount = 0;
-            let filesActuallyAddedToUserFolders = false;
+            let newFilesProcessedCount = 0; // Actual count of files added to userUploadedFolders structure
+            let filesActuallyAddedToUserFolders = false; // Flag if any file (new or reactivated) is added
 
+            // Adjust alert messages based on counts
             if (erroredFilesCount > 0) {
                 alert(`Encountered errors while processing ${erroredFilesCount} file(s). These will not be added.`);
             }
 
-            if (newFileEntries.length === 0 && duplicateFileEntries.length > 0) {
-                alert("All files in the selected folder are duplicates of existing files and will not be added.");
-            } else if (newFileEntries.length > 0 && duplicateFileEntries.length > 0) {
-                alert("Some files in the selected folder are duplicates. Only new (non-duplicate) files will be added.");
-                // Proceed to add newFileEntries
+            // Determine main message based on what's being added or if all are duplicates
+            if (newFileEntries.length > 0) { // Files to add (can be new or reactivating)
+                // This block will be entered if there are files to add.
+                // Specific messages about what was added will be constructed later.
+            } else if (duplicateFileEntries.length > 0 && erroredFilesCount === 0) { // All valid files are duplicates
+                alert("All files in the selected folder are duplicates of existing, actively managed files and will not be added.");
             } else if (newFileEntries.length === 0 && duplicateFileEntries.length === 0 && erroredFilesCount === 0) {
-                // This case implies filesToProcessForUpload was initially empty, or all files errored.
-                // Already handled by initial checks or erroredFilesCount alert.
-                // If detailedFiles is empty but filesToProcessForUpload was not, it means all errored.
-                if (detailedFiles.length === 0 && filesToProcessForUpload.length > 0) {
+                 if (detailedFiles.length === 0 && filesToProcessForUpload.length > 0) {
                      alert("Could not process any of the selected files.");
-                } else if (detailedFiles.length === 0) { // also implies filesToProcessForUpload was 0
+                } else if (detailedFiles.length === 0) {
                     alert("No files were processed from the selection.");
                 }
-                // No further action needed if no new files and no duplicates (e.g. all errored)
             }
+            // Further specific alerts will be handled after processing newFileEntries.
 
 
             if (newFileEntries.length > 0) {
-                filesActuallyAddedToUserFolders = true;
+                filesActuallyAddedToUserFolders = true; // Mark that we are attempting to add files
                 for (const fileInfo of newFileEntries) {
-                    const { file, fullPath } = fileInfo; // currentHash and isDuplicate also available if needed
+                    const { file, fullPath, isReactivatingLog } = fileInfo; // Add isReactivatingLog here
                     // Existing path building logic, adapted for fileInfo:
                     const pathParts = fullPath.split('/');
                     let currentLevel = window.userUploadedFolders;
@@ -900,14 +935,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 currentLevel[part] = {
                                     path: currentBuiltPath,
                                     type: 'file',
-                                    fileObject: file // Store the actual File object
+                                    fileObject: file, // Store the actual File object
+                                    isReactivatingLog: isReactivatingLog || false // Add this line
                                 };
                                 newFilesProcessedCount++;
                             } else { // File already exists, potentially from a partial previous upload attempt or complex scenario
                                 currentLevel[part].fileObject = file; // Update with fresh File object
+                                currentLevel[part].isReactivatingLog = isReactivatingLog || false; // Update flag
                                 console.log(`Updated fileObject for existing path during new file processing: ${currentBuiltPath}`);
-                                // If it's truly "new" based on hash, this path existing is odd, but we ensure it's updated.
-                                // newFilesProcessedCount is for genuinely new additions to the structure.
+                                // newFilesProcessedCount is for genuinely new additions to the structure if it wasn't there before.
+                                // If it was there, this is an update.
                             }
                         } else { // Directory
                             if (!currentLevel[part] || currentLevel[part].type !== 'folder') {
@@ -930,32 +967,66 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentLevel[singleFilePart] = {
                                 path: singleFilePath + '/' + singleFilePart, // e.g. "file.txt/file.txt" - this path structure is kept from original
                                 type: 'file',
-                                fileObject: file
+                                fileObject: file,
+                                isReactivatingLog: isReactivatingLog || false // Add this line
                             };
                             newFilesProcessedCount++;
                         } else {
                              currentLevel[singleFilePart].fileObject = file;
+                             currentLevel[singleFilePart].isReactivatingLog = isReactivatingLog || false; // Update flag
                              console.log(`Updated fileObject for existing single file path during new file processing: ${currentLevel[singleFilePart].path}`);
                         }
                     }
                 }
             }
 
-            if (newFilesProcessedCount > 0) {
-                console.log("User uploaded folders data updated (ui.js):", window.userUploadedFolders);
-                updateSidebarView(); // Update sidebar only if new files were actually added
-                alert(`Successfully added ${newFilesProcessedCount} new file(s).`);
-            } else if (filesActuallyAddedToUserFolders) { // newFileEntries > 0 but newFilesProcessedCount = 0 (e.g. all updated)
-                 alert("Folder structure updated. No brand new files were added to the hierarchy, but existing entries might have been refreshed.");
-            } else if (duplicateFileEntries.length > 0 && newFileEntries.length === 0 && erroredFilesCount === 0) {
-                // This specific alert for "all duplicates" is already handled above.
-                // No need for another alert here unless we want to reiterate.
-            } else if (erroredFilesCount > 0 && newFileEntries.length === 0 && duplicateFileEntries.length === 0) {
-                // Alert for errors already shown.
-            } else if (files.length > 0 && newFileEntries.length === 0 && duplicateFileEntries.length === 0 && erroredFilesCount === 0 ) {
-                 // This means files were passed in, but none were processable or all errored out without specific classification.
-                 // The earlier "No processable files" or "Could not process any" alerts should cover this.
+            // Construct final user feedback messages
+            let alertMessage = "";
+            const genuineNewFilesCount = newFilesProcessedCount - reactivatedLogsCount; // Files that are not reactivations
+
+            if (newFilesProcessedCount > 0 && reactivatedLogsCount === newFilesProcessedCount && genuineNewFilesCount === 0) {
+                // Only reactivated files
+                alertMessage = `Successfully re-added ${reactivatedLogsCount} file(s) found in existing logs.`;
+            } else if (genuineNewFilesCount > 0 && reactivatedLogsCount > 0) {
+                // Both new and reactivated files
+                alertMessage = `Successfully added ${genuineNewFilesCount} new file(s). Additionally, ${reactivatedLogsCount} file(s) were found in existing logs and re-added.`;
+            } else if (genuineNewFilesCount > 0 && reactivatedLogsCount === 0) {
+                // Only new files (no reactivations)
+                alertMessage = `Successfully added ${genuineNewFilesCount} new file(s).`;
             }
+            // This condition means newFileEntries.length > 0 was true, so filesActuallyAddedToUserFolders is true.
+
+            // Prepend duplicate message if some files were skipped due to being duplicates
+            if (duplicateFileEntries.length > 0) {
+                let duplicateMessage = `Some files were duplicates and not added. `;
+                if (alertMessage) { // If there's already a message about added/reactivated files
+                    alertMessage = duplicateMessage + alertMessage.charAt(0).toLowerCase() + alertMessage.slice(1);
+                } else if (newFileEntries.length === 0 && erroredFilesCount === 0) {
+                    // This means only duplicates were found, and no files to add, and no errors.
+                    // The earlier specific alert for "all duplicates" would have been shown.
+                    // However, if that alert was suppressed or we want a consolidated one here:
+                    alertMessage = `All files in the selected folder are duplicates of existing, actively managed files and will not be added.`;
+                } else {
+                     alertMessage = duplicateMessage; // Only duplicates, other messages are not applicable.
+                }
+            }
+
+
+            if (alertMessage) {
+                alert(alertMessage);
+            }
+            // The case for "all files are duplicates" without any new/reactivated is handled by the main if/else if block for newFileEntries.length
+            // The case for only errors is handled by the erroredFilesCount alert.
+            // The case for "no processable files" is also handled.
+
+            if (filesActuallyAddedToUserFolders) { // If any file (new or reactivated) was added to the structure
+                console.log("User uploaded folders data updated (ui.js):", window.userUploadedFolders);
+                updateSidebarView(); // Update sidebar
+            }
+            // An alert for "Folder structure updated. No brand new files..." might be redundant now with more specific messages.
+            // Consider if filesActuallyAddedToUserFolders is true but newFilesProcessedCount is 0 (e.g. only updates to existing fileObjects, not new entries)
+            // This specific scenario (updating fileObject for an already existing path in userUploadedFolders)
+            // is less common for the primary "add folder" flow and might not need a distinct alert if newFilesProcessedCount remains the key metric for "added" files.
 
 
             folderUploadInput.value = ''; // Clear input regardless of outcome
