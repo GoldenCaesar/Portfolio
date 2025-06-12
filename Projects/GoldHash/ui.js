@@ -740,12 +740,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Confirmation dialog for log entries
+            const confirmLogDeletion = window.confirm("Do you also want to remove the log entries for the selected folder(s)? Clicking 'Cancel' will keep the logs.");
+            // The variable 'confirmLogDeletion' will be used in the next step to conditionally call removeFolderEntriesFromLog.
+
             let deletedUserFolder = false;
             foldersToDelete.forEach(folderPath => {
                 // Use the new helper function to delete user uploaded folders/subfolders
                 if (deleteUserUploadedFolderPath(folderPath)) {
                     console.log(`User folder "${folderPath}" marked for deletion from UI data.`);
-                    window.removeFolderEntriesFromLog(folderPath); // Call placeholder
+                    if (confirmLogDeletion) {
+                        window.removeFolderEntriesFromLog(folderPath); // Call placeholder
+                    }
                     deletedUserFolder = true;
                 } else {
                     console.log(`Folder "${folderPath}" is not a user-uploaded folder, already deleted, or is a demo folder. Skipping deletion from UI data.`);
@@ -769,7 +775,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateFileMonitoredCount(); // Reflect change in monitored files
             }
             displayFolderContents("demo_files"); // Default to demo_files view
-            alert('Selected user folders and their logs have been removed.');
+            let alertMessage = "";
+            if (confirmLogDeletion) {
+                alertMessage = "Selected user folders and their log entries have been removed.";
+            } else {
+                alertMessage = "Selected user folders have been removed. Their log entries have been kept.";
+            }
+            alert(alertMessage);
         });
     }
 
