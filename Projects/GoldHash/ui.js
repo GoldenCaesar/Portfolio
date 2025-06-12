@@ -479,6 +479,7 @@ function displayFolderContents(folderPath) {
                 fileDisplayData.status = loggedFile.status;
                 fileDisplayData.currentHash = loggedFile.currentHash;
                 fileDisplayData.lastHashCheckTime = loggedFile.lastHashCheckTime;
+                fileDisplayData.lastModifiedSystem = loggedFile.lastModifiedSystem;
             }
             filesForDisplay.push(fileDisplayData);
         }
