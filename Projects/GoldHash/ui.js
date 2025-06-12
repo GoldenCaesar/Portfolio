@@ -1114,3 +1114,102 @@ console.log("ui.js loaded and DOMContentLoaded setup complete.");
 // and ui.js will call them.
 // Global `window.userUploadedFolders` and `window.demoFilesData` are initialized and managed within ui.js for sidebar and content display.
 // All references to `fileLog` in this script now implicitly point to `window.fileLog`.
+
+window.updateFileChangesGraph = function() {
+    const data = window.getGraphData ? window.getGraphData() : [];
+
+    const svgElement = document.getElementById('file-changes-graph-svg');
+    const strokePathElement = document.getElementById('file-changes-graph-path');
+    const fillPathElement = document.getElementById('file-changes-graph-fill-path');
+    const xAxisContainer = document.getElementById('file-changes-graph-x-axis');
+
+    if (!svgElement || !strokePathElement || !fillPathElement || !xAxisContainer) {
+        console.warn('Graph elements not found. Skipping graph update.');
+        return;
+    }
+
+    // Clear previous graph content
+    strokePathElement.setAttribute('d', '');
+    fillPathElement.setAttribute('d', '');
+    xAxisContainer.innerHTML = ''; // Clear old labels
+
+    if (!data || data.length < 2) {
+        const placeholderText = document.createElement('p');
+        placeholderText.textContent = 'Not enough data to display graph.';
+        placeholderText.className = 'text-slate-400 text-center py-10';
+        // Instead of appending to xAxisContainer, we might want a dedicated message area
+        // For now, let's put it in the x-axis container for simplicity or hide the graph section.
+        xAxisContainer.appendChild(placeholderText);
+        // Optionally hide the SVG paths if showing message in x-axis area
+        strokePathElement.style.display = 'none';
+        fillPathElement.style.display = 'none';
+        return;
+    }
+
+    strokePathElement.style.display = '';
+    fillPathElement.style.display = '';
+
+    const svgWidth = 475; // Effective width from viewBox (478 - 3, though -3 is an offset)
+    const svgHeight = 150; // Height from viewBox
+    const margin = { top: 20, right: 0, bottom: 20, left: 0 }; // Adjusted margins, viewBox handles left offset
+    const graphWidth = svgWidth - margin.left - margin.right;
+    const graphHeight = svgHeight - margin.top - margin.bottom;
+
+    const parseTime = isoString => new Date(isoString).getTime(); // Get timestamp for scaling
+
+    const firstTimestamp = parseTime(data[0].time);
+    const lastTimestamp = parseTime(data[data.length - 1].time);
+
+    const maxChanges = Math.max(...data.map(d => d.changes));
+
+    // X scale: maps time to horizontal position
+    const xScale = (time) => {
+        if (lastTimestamp === firstTimestamp) return margin.left; // Avoid division by zero if only one unique timestamp
+        return margin.left + ((parseTime(time) - firstTimestamp) / (lastTimestamp - firstTimestamp)) * graphWidth;
+    };
+
+    // Y scale: maps changes to vertical position (inverted for SVG)
+    const yScale = (changes) => {
+        if (maxChanges === 0) return svgHeight - margin.bottom; // Avoid division by zero
+        return svgHeight - margin.bottom - (changes / maxChanges) * graphHeight;
+    };
+
+    // Generate stroke path string
+    let pathD = `M ${xScale(data[0].time)} ${yScale(data[0].changes)}`;
+    data.slice(1).forEach(point => {
+        pathD += ` L ${xScale(point.time)} ${yScale(point.changes)}`;
+    });
+    strokePathElement.setAttribute('d', pathD);
+
+    // Generate fill path string
+    let fillPathD = `M ${xScale(data[0].time)} ${svgHeight - margin.bottom}`; // Start at bottom-left of first point
+    data.forEach(point => {
+        fillPathD += ` L ${xScale(point.time)} ${yScale(point.changes)}`;
+    });
+    fillPathD += ` L ${xScale(data[data.length - 1].time)} ${svgHeight - margin.bottom}`; // Line to bottom-right of last point
+    fillPathD += ` Z`; // Close path
+    fillPathElement.setAttribute('d', fillPathD);
+
+    // Generate X-axis labels (e.g., 5 labels)
+    const numLabels = 5;
+    const labelIndices = [];
+    if (data.length <= numLabels) {
+        data.forEach((_, index) => labelIndices.push(index));
+    } else {
+        for (let i = 0; i < numLabels; i++) {
+            labelIndices.push(Math.floor(i * (data.length - 1) / (numLabels - 1)));
+        }
+    }
+
+    const uniqueLabelIndices = [...new Set(labelIndices)]; // Ensure unique indices if data.length is small
+
+    uniqueLabelIndices.forEach(index => {
+        const point = data[index];
+        const date = new Date(point.time);
+        const p = document.createElement('p');
+        p.className = 'text-xs font-medium text-slate-400';
+        // Format: "Mon DD" (e.g., "Jan 15")
+        p.textContent = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        xAxisContainer.appendChild(p);
+    });
+};

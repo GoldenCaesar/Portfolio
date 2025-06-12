@@ -102,6 +102,7 @@ function loadLogsFromStorage() {
     if (typeof updateFileMonitoredCount === 'function') updateFileMonitoredCount();
     if (typeof updateLogSizeDisplayOnLoad === 'function') updateLogSizeDisplayOnLoad();
     if (typeof displayActivityLog === 'function') displayActivityLog();
+    if (typeof window.updateFileChangesGraph === 'function') window.updateFileChangesGraph();
 }
 
 function saveLogsToStorage() {
@@ -446,6 +447,7 @@ async function scanFiles() {
 
     if (typeof window.displayFolderContents === "function") window.displayFolderContents(currentActiveFolderPath);
     if (typeof window.displayActivityLog === "function") window.displayActivityLog(); // Refresh activity log
+    if (typeof window.updateFileChangesGraph === 'function') window.updateFileChangesGraph();
 
     console.log(`File scan complete (logging.js). New: ${newFilesAdded}, Modified: ${filesModified}, Verified: ${filesVerified}, Paths Updated: ${pathsUpdated}, Duplicates Found: ${duplicatesFound}, Reactivated: ${filesReactivated}. Log updated.`);
 }
@@ -463,6 +465,45 @@ async function scanFiles() {
 // or window.fileLog = fileLog (if logging.js makes fileLog global like window.fileLog = fileLog).
 // The most robust way is for UI functions to always read from a single global `fileLog` (window.fileLog) managed by `logging.js`.
 // `ui.js`'s local `let fileLog = []` declaration will be removed in the next step.
+
+function getGraphData() {
+    const allTimestamps = [];
+    if (window.fileLog && window.fileLog.length > 0) {
+        window.fileLog.forEach(fileEntry => {
+            if (fileEntry.modificationHistory && fileEntry.modificationHistory.length > 0) {
+                fileEntry.modificationHistory.forEach(mod => {
+                    allTimestamps.push(mod.timestamp);
+                });
+            }
+        });
+    }
+
+    allTimestamps.sort(); // Sort chronologically
+
+    const dataPoints = [];
+    let cumulativeChanges = 0;
+    const timestampCounts = {};
+
+    // Count occurrences of each timestamp
+    allTimestamps.forEach(ts => {
+        timestampCounts[ts] = (timestampCounts[ts] || 0) + 1;
+    });
+
+    // Get unique sorted timestamps
+    const uniqueSortedTimestamps = Object.keys(timestampCounts).sort();
+
+    uniqueSortedTimestamps.forEach(timestamp => {
+        cumulativeChanges += timestampCounts[timestamp];
+        dataPoints.push({
+            time: timestamp,
+            changes: cumulativeChanges
+        });
+    });
+
+    return dataPoints;
+}
+window.getGraphData = getGraphData;
+
 console.log("logging.js fully parsed and initialized. fileLog is now global (window.fileLog).");
 
 // Alert must be the final action after all UI updates.
