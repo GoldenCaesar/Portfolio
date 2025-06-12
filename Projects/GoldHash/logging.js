@@ -202,15 +202,38 @@ async function scanFiles() {
 
     for (const fileItem of filesToProcess) {
         let fileContent;
+        // DEBUG_REUPLOAD_VERIFICATION Start
+        if (fileItem.fileObject) {
+            console.log(`DEBUG_REUPLOAD_VERIFICATION: Processing user file: ${fileItem.path}`, {
+                name: fileItem.fileObject.name,
+                size: fileItem.fileObject.size,
+                type: fileItem.fileObject.type,
+                lastModified: fileItem.fileObject.lastModified, // Standard File API property
+                webkitRelativePath: fileItem.fileObject.webkitRelativePath
+            });
+        } else {
+            console.log(`DEBUG_REUPLOAD_VERIFICATION: Processing demo file: ${fileItem.path}`);
+        }
+        // DEBUG_REUPLOAD_VERIFICATION End
+
         if (fileItem.fileObject) { // User file
             try {
                 fileContent = await readFileAsText(fileItem.fileObject);
+                // DEBUG_REUPLOAD_VERIFICATION Start
+                console.log(`DEBUG_REUPLOAD_VERIFICATION: Content for ${fileItem.path}:`, fileContent.substring(0, 100) + (fileContent.length > 100 ? "..." : ""));
+                // DEBUG_REUPLOAD_VERIFICATION End
             } catch (error) {
                 console.error(`Error reading content for ${fileItem.path} (logging.js):`, error);
                 continue;
             }
         } else { // Demo file
             fileContent = fileItem.content;
+            // DEBUG_REUPLOAD_VERIFICATION Start
+            // For demo files, content is already available, log it if needed for consistency, though it might be less critical than user file content.
+            // Considering the request focuses on readFileAsText, this part might be optional.
+            // However, to be thorough and if fileContent is the target:
+            console.log(`DEBUG_REUPLOAD_VERIFICATION: Content for demo file ${fileItem.path}:`, (fileContent && typeof fileContent === 'string' ? fileContent.substring(0, 100) + (fileContent.length > 100 ? "..." : "") : "Content not available or not a string"));
+            // DEBUG_REUPLOAD_VERIFICATION End
         }
 
         const currentHash = await generateSHA256(fileContent);
@@ -349,10 +372,25 @@ async function scanFiles() {
 console.log("logging.js fully parsed and initialized. fileLog is now global (window.fileLog).");
 
 // Alert must be the final action after all UI updates.
-alert(`File scan complete!
+let alertMessage = `File scan complete!
 New files: ${newFilesAdded}
 Modified files: ${filesModified}
 Verified files: ${filesVerified}
 Paths Updated: ${pathsUpdated}
 Duplicates Found: ${duplicatesFound}
-Log has been updated.`);
+Log has been updated.`;
+
+if (newFilesAdded === 0 && filesModified > 0) {
+    alertMessage = `Scan complete. No new files were added, but ${filesModified} file(s) were updated.
+Verified files: ${filesVerified}
+Paths Updated: ${pathsUpdated}
+Duplicates Found: ${duplicatesFound}
+Log has been updated.`;
+} else if (newFilesAdded === 0 && filesModified === 0 && pathsUpdated > 0) {
+    alertMessage = `Scan complete. No new or modified files, but ${pathsUpdated} file path(s) were updated.
+Verified files: ${filesVerified}
+Duplicates Found: ${duplicatesFound}
+Log has been updated.`;
+}
+
+alert(alertMessage);
