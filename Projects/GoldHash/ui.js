@@ -773,12 +773,14 @@ document.addEventListener('DOMContentLoaded', () => {
         folderUploadInput.addEventListener('change', async (event) => {
             const files = event.target.files;
             if (!files.length) {
-                console.log("No folder selected or folder is empty.");
+                alert("No files selected or folder was empty.");
+                folderUploadInput.value = ''; // Clear input
                 return;
             }
-            console.log(`Processing ${files.length} files from selected folder (ui.js)...`);
+            console.log(`Starting pre-scan for ${files.length} files from selected folder (ui.js)...`);
 
-            let newFilesProcessedCount = 0;
+            let filesToProcessForUpload = [];
+            let detailedFiles = []; // To store { file, fullPath, currentHash, isDuplicate }
 
             for (const file of files) {
                 const fullPath = file.webkitRelativePath;
@@ -786,142 +788,149 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.warn("File with no webkitRelativePath (ui.js). Skipping.", file.name);
                     continue;
                 }
+                filesToProcessForUpload.push({ file, fullPath });
+            }
 
-                const pathParts = fullPath.split('/');
-                let currentLevel = window.userUploadedFolders; // Use global userUploadedFolders
-                let currentBuiltPath = "";
-                let baseFolderName = pathParts[0]; // The root folder name from the upload
+            if (filesToProcessForUpload.length === 0) {
+                alert("No processable files found in the selection.");
+                folderUploadInput.value = ''; // Clear input
+                return;
+            }
 
-                // Ensure base folder exists in userUploadedFolders
-                if (!currentLevel[baseFolderName]) {
-                    currentLevel[baseFolderName] = {
-                        path: baseFolderName,
-                        type: 'folder',
-                        children: {}
-                    };
+            console.log(`Processing ${filesToProcessForUpload.length} files for hashing...`);
+            for (const item of filesToProcessForUpload) {
+                const { file, fullPath } = item;
+                try {
+                    const fileContent = await window.readFileAsText(file);
+                    const currentHash = await window.generateSHA256(fileContent);
+                    let isDuplicate = false;
+                    if (window.fileLog && window.fileLog.some(entry => entry.currentHash === currentHash)) {
+                        isDuplicate = true;
+                    }
+                    detailedFiles.push({ file, fullPath, currentHash, isDuplicate });
+                } catch (error) {
+                    console.error(`Error processing file ${fullPath}:`, error);
+                    // Optionally add to a list of errors to show to the user
+                    detailedFiles.push({ file, fullPath, currentHash: null, isDuplicate: false, error: true });
                 }
+            }
 
-                // Navigate to the correct base folder for processing paths
-                currentLevel = currentLevel[baseFolderName].children;
-                currentBuiltPath = baseFolderName;
+            let newFileEntries = detailedFiles.filter(f => !f.isDuplicate && !f.error);
+            let duplicateFileEntries = detailedFiles.filter(f => f.isDuplicate && !f.error);
+            let erroredFilesCount = detailedFiles.filter(f => f.error).length;
+
+            let newFilesProcessedCount = 0;
+            let filesActuallyAddedToUserFolders = false;
+
+            if (erroredFilesCount > 0) {
+                alert(`Encountered errors while processing ${erroredFilesCount} file(s). These will not be added.`);
+            }
+
+            if (newFileEntries.length === 0 && duplicateFileEntries.length > 0) {
+                alert("All files in the selected folder are duplicates of existing files and will not be added.");
+            } else if (newFileEntries.length > 0 && duplicateFileEntries.length > 0) {
+                alert("Some files in the selected folder are duplicates. Only new (non-duplicate) files will be added.");
+                // Proceed to add newFileEntries
+            } else if (newFileEntries.length === 0 && duplicateFileEntries.length === 0 && erroredFilesCount === 0) {
+                // This case implies filesToProcessForUpload was initially empty, or all files errored.
+                // Already handled by initial checks or erroredFilesCount alert.
+                // If detailedFiles is empty but filesToProcessForUpload was not, it means all errored.
+                if (detailedFiles.length === 0 && filesToProcessForUpload.length > 0) {
+                     alert("Could not process any of the selected files.");
+                } else if (detailedFiles.length === 0) { // also implies filesToProcessForUpload was 0
+                    alert("No files were processed from the selection.");
+                }
+                // No further action needed if no new files and no duplicates (e.g. all errored)
+            }
 
 
-                for (let i = 1; i < pathParts.length; i++) { // Start from 1 since base folder is handled
-                    const part = pathParts[i];
-                    currentBuiltPath += '/' + part;
+            if (newFileEntries.length > 0) {
+                filesActuallyAddedToUserFolders = true;
+                for (const fileInfo of newFileEntries) {
+                    const { file, fullPath } = fileInfo; // currentHash and isDuplicate also available if needed
+                    // Existing path building logic, adapted for fileInfo:
+                    const pathParts = fullPath.split('/');
+                    let currentLevel = window.userUploadedFolders;
+                    let currentBuiltPath = "";
+                    let baseFolderName = pathParts[0];
 
-                    if (i === pathParts.length - 1) { // It's a file
-                        if (!currentLevel[part]) {
-                             currentLevel[part] = {
-                                path: currentBuiltPath, // Full path from root of userUploadedFolders
+                    if (!currentLevel[baseFolderName]) {
+                        currentLevel[baseFolderName] = {
+                            path: baseFolderName,
+                            type: 'folder',
+                            children: {}
+                        };
+                    }
+                    currentLevel = currentLevel[baseFolderName].children;
+                    currentBuiltPath = baseFolderName;
+
+                    for (let i = 1; i < pathParts.length; i++) {
+                        const part = pathParts[i];
+                        currentBuiltPath += '/' + part;
+                        if (i === pathParts.length - 1) { // File
+                            if (!currentLevel[part] || currentLevel[part].type !== 'file') {
+                                currentLevel[part] = {
+                                    path: currentBuiltPath,
+                                    type: 'file',
+                                    fileObject: file // Store the actual File object
+                                };
+                                newFilesProcessedCount++;
+                            } else { // File already exists, potentially from a partial previous upload attempt or complex scenario
+                                currentLevel[part].fileObject = file; // Update with fresh File object
+                                console.log(`Updated fileObject for existing path during new file processing: ${currentBuiltPath}`);
+                                // If it's truly "new" based on hash, this path existing is odd, but we ensure it's updated.
+                                // newFilesProcessedCount is for genuinely new additions to the structure.
+                            }
+                        } else { // Directory
+                            if (!currentLevel[part] || currentLevel[part].type !== 'folder') {
+                                currentLevel[part] = {
+                                    path: currentBuiltPath,
+                                    type: 'folder',
+                                    children: {}
+                                };
+                            }
+                            currentLevel = currentLevel[part].children;
+                        }
+                    }
+                     if (pathParts.length === 1 && file.name) { // Handles webkitRelativePath being just "filename.txt"
+                        const singleFilePart = file.name;
+                        const singleFilePath = baseFolderName; // Which is the filename itself
+
+                        // This logic implies window.userUploadedFolders[singleFilePath] was created as a folder.
+                        // And currentLevel is its children. We need to add the file into that.
+                        if (!currentLevel[singleFilePart] || currentLevel[singleFilePart].type !== 'file') {
+                            currentLevel[singleFilePart] = {
+                                path: singleFilePath + '/' + singleFilePart, // e.g. "file.txt/file.txt" - this path structure is kept from original
                                 type: 'file',
                                 fileObject: file
                             };
                             newFilesProcessedCount++;
-                        } else if (currentLevel[part] && currentLevel[part].type === 'file') {
-                            // File already exists, UPDATE its fileObject
-                            currentLevel[part].fileObject = file; // Update with the fresh File object
-                            console.log(`DEBUG_REUPLOAD_FIX: Updated fileObject for existing path: ${currentBuiltPath}`);
                         } else {
-                            // Path exists but is not a file (e.g., it's a folder). This is a conflict.
-                            console.error(`DEBUG_REUPLOAD_FIX: Path conflict: ${currentBuiltPath} exists but is not a file. Cannot update fileObject.`);
+                             currentLevel[singleFilePart].fileObject = file;
+                             console.log(`Updated fileObject for existing single file path during new file processing: ${currentLevel[singleFilePart].path}`);
                         }
-                    } else { // It's a directory
-                        if (!currentLevel[part]) {
-                            currentLevel[part] = {
-                                path: currentBuiltPath,
-                                type: 'folder',
-                                children: {}
-                            };
-                        } else if (currentLevel[part].type !== 'folder') {
-                            // Conflict: Path existed but was not a folder. Overwrite with new folder?
-                            // Or log an error. For now, let's assume this isn't the primary issue.
-                            // To be safe, one might re-initialize it as a folder:
-                            console.warn(`DEBUG_REUPLOAD_FIX: Path ${currentBuiltPath} was a ${currentLevel[part].type}, re-initializing as folder.`);
-                            currentLevel[part] = {
-                                path: currentBuiltPath,
-                                type: 'folder',
-                                children: {}
-                            };
-                        }
-                        currentLevel = currentLevel[part].children;
                     }
                 }
-                 if (pathParts.length === 1 && file.name) { 
-                     // This block handles the case where webkitRelativePath is just "filename.txt"
-                     // In this scenario, baseFolderName is "filename.txt", and currentLevel is its 'children' (which is initially {})
-                     // The loop for (let i = 1; ...) does not run.
-                     // We need to place the file directly into userUploadedFolders[baseFolderNameAsTopLevelContainer].children
-                     // Or, if we treat the "upload batch" as a flat list if only one file is "uploaded" this way.
-                     // The current structure implies pathParts[0] is always a containing folder.
-                     // If webkitRelativePath is "file.txt", pathParts = ["file.txt"]. baseFolderName = "file.txt".
-                     // currentLevel was set to window.userUploadedFolders[baseFolderName].children.
-                     // This means we are trying to add "file.txt" into a structure like:
-                     // userUploadedFolders: {
-                     //   "file.txt": { // This was created as a folder
-                     //     path: "file.txt",
-                     //     type: "folder",
-                     //     children: { /* currentLevel points here */ }
-                     //   }
-                     // }
-                     // This specific part of the original code might be problematic for single file uploads if
-                     // webkitRelativePath is just the filename.
-                     // For the re-upload fix, we ensure that if this logic path is taken, it also updates the fileObject.
-
-                     const part = file.name; // part is "file.txt"
-                     // currentBuiltPath was baseFolderName ("file.txt"). We should use the file's name for the entry in currentLevel.
-                     // The path for the file object should reflect its location.
-                     // If baseFolderName is the conceptual container, path should be "baseFolderName/part".
-                     // currentBuiltPath for the file entry should be baseFolderName + '/' + part if baseFolderName is a container.
-                     // However, if baseFolderName IS the file name itself (as pathParts[0]), then the path is just baseFolderName.
-
-                     // Re-evaluating currentBuiltPath for this specific block:
-                     // pathParts[0] is baseFolderName. If pathParts.length is 1, it means webkitRelativePath was just "filename.txt".
-                     // currentBuiltPath was initialized as baseFolderName.
-                     // The file itself is pathParts[0].
-                     // So, we are referring to window.userUploadedFolders[pathParts[0]] which should be the file entry.
-                     // This means the initial creation of `currentLevel[baseFolderName]` as a folder is incorrect for this case.
-
-                     // Given the complexity, let's focus the fix on the `fileObject` update,
-                     // assuming the existing path creation logic is what it is for now.
-                     // The original `currentBuiltPath += '/' + part;` here was highly suspicious.
-                     // Let's use the `currentBuiltPath` as it was at the start of this block (i.e., `baseFolderName`)
-                     // if this block truly represents a file at the root of the "upload batch".
-
-                     const singleFilePath = baseFolderName; // Path of the file is just its name at the root of this upload batch
-                                                            // (assuming baseFolderName is the filename here)
-
-                     if (!currentLevel[part]) { // currentLevel is children of the folder named baseFolderName
-                         currentLevel[part] = {
-                             path: singleFilePath + '/' + part, // Path would be "filename.txt/filename.txt" - still seems off.
-                                                               // Path should be just `singleFilePath` if `baseFolderName` is the file.
-                                                               // Let's stick to the provided logic pattern for paths for now.
-                                                               // The critical fix is fileObject update.
-                             type: 'file',
-                             fileObject: file
-                         };
-                         newFilesProcessedCount++;
-                         console.log(`DEBUG_REUPLOAD_FIX: Added new single file: ${singleFilePath + '/' + part}`);
-                     } else if (currentLevel[part] && currentLevel[part].type === 'file') {
-                         currentLevel[part].fileObject = file;
-                         // currentLevel[part].path = singleFilePath + '/' + part; // Ensure path is also updated if it was wrong
-                         console.log(`DEBUG_REUPLOAD_FIX: Updated fileObject for existing single file path: ${currentLevel[part].path}`);
-                     } else {
-                         console.error(`DEBUG_REUPLOAD_FIX: Path conflict for single file: ${singleFilePath + '/' + part} exists but is not a file.`);
-                     }
-                 }
             }
 
             if (newFilesProcessedCount > 0) {
-                console.log("User uploaded folders data (ui.js):", window.userUploadedFolders);
-                updateSidebarView();
-                alert(`Folder structure added/updated. ${newFilesProcessedCount} new file references captured. Scan files to process.`);
-            } else if (files.length > 0) {
-                 alert("Selected files/folder might have already been added or no new files were found.");
-            } else {
-                alert("No folder selected or the folder was empty.");
+                console.log("User uploaded folders data updated (ui.js):", window.userUploadedFolders);
+                updateSidebarView(); // Update sidebar only if new files were actually added
+                alert(`Successfully added ${newFilesProcessedCount} new file(s).`);
+            } else if (filesActuallyAddedToUserFolders) { // newFileEntries > 0 but newFilesProcessedCount = 0 (e.g. all updated)
+                 alert("Folder structure updated. No brand new files were added to the hierarchy, but existing entries might have been refreshed.");
+            } else if (duplicateFileEntries.length > 0 && newFileEntries.length === 0 && erroredFilesCount === 0) {
+                // This specific alert for "all duplicates" is already handled above.
+                // No need for another alert here unless we want to reiterate.
+            } else if (erroredFilesCount > 0 && newFileEntries.length === 0 && duplicateFileEntries.length === 0) {
+                // Alert for errors already shown.
+            } else if (files.length > 0 && newFileEntries.length === 0 && duplicateFileEntries.length === 0 && erroredFilesCount === 0 ) {
+                 // This means files were passed in, but none were processable or all errored out without specific classification.
+                 // The earlier "No processable files" or "Could not process any" alerts should cover this.
             }
-            folderUploadInput.value = ''; // Clear input
+
+
+            folderUploadInput.value = ''; // Clear input regardless of outcome
         });
     }
 

@@ -282,22 +282,11 @@ async function scanFiles() {
                 } else {
                     // Scenario B: Duplicate/Alternate Path
                     // The path previously associated with this hash IS ALSO in the current scan list. This is a duplicate.
-                    console.warn(`DUPLICATE: File ${fileItem.path} has same content as ${hashMatchEntry.currentPath}. Creating new entry with 'duplicate' status.`);
-                    const appID = generateAppUniqueID();
-                    const newLogEntry = {
-                        appID: appID,
-                        currentPath: fileItem.path,
-                        initialDiscoveryTime: currentTime,
-                        lastHashCheckTime: currentTime,
-                        lastModifiedSystem: currentTime,
-                        currentHash: currentHash,
-                        hashHistory: [],
-                        previousPaths: [], // Initialize for new duplicate entry
-                        status: 'duplicate', // New status
-                        originalPath: hashMatchEntry.currentPath // Optional: link to the original
-                    };
-                    window.fileLog.push(newLogEntry);
-                    duplicatesFound++;
+                    // Per new requirement, we do not log this specific type of duplicate in scanFiles.
+                    // The pre-scan during folder upload should handle identifying and preventing addition of such duplicates.
+                    console.warn(`DUPLICATE (Scenario B): File ${fileItem.path} has same content as ${hashMatchEntry.currentPath}. This duplicate will not be added to the log by scanFiles.`);
+                    // window.fileLog.push(newLogEntry); // REMOVED
+                    duplicatesFound++; // Still count it for the scan summary, but no new log entry.
                 }
             } else {
                 // Hash not found - this is a genuinely new file.
