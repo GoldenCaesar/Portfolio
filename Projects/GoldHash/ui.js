@@ -798,13 +798,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             console.log(`Processing ${filesToProcessForUpload.length} files for hashing...`);
+
+            // --- BEGIN ENHANCED DUPLICATE DETECTION ---
+            const existingUserFileHashes = new Set();
+            const recursivelyCollectHashes = async (folderData) => {
+                for (const key in folderData) {
+                    const entry = folderData[key];
+                    if (entry.type === 'file' && entry.fileObject) {
+                        try {
+                            const fileContent = await window.readFileAsText(entry.fileObject);
+                            const hash = await window.generateSHA256(fileContent);
+                            existingUserFileHashes.add(hash);
+                        } catch (err) {
+                            console.error(`Error reading or hashing existing user file ${entry.path} for duplicate check:`, err);
+                        }
+                    } else if (entry.type === 'folder' && entry.children) {
+                        await recursivelyCollectHashes(entry.children);
+                    }
+                }
+            };
+
+            if (window.userUploadedFolders) {
+                console.log("Pre-calculating hashes for existing user-uploaded files...");
+                await recursivelyCollectHashes(window.userUploadedFolders);
+                console.log(`Found ${existingUserFileHashes.size} unique hashes in userUploadedFolders.`);
+            }
+            // --- END ENHANCED DUPLICATE DETECTION ---
+
             for (const item of filesToProcessForUpload) {
                 const { file, fullPath } = item;
                 try {
                     const fileContent = await window.readFileAsText(file);
                     const currentHash = await window.generateSHA256(fileContent);
                     let isDuplicate = false;
-                    if (window.fileLog && window.fileLog.some(entry => entry.currentHash === currentHash)) {
+                    // Updated duplicate check:
+                    if ((window.fileLog && window.fileLog.some(entry => entry.currentHash === currentHash)) || existingUserFileHashes.has(currentHash)) {
                         isDuplicate = true;
                     }
                     detailedFiles.push({ file, fullPath, currentHash, isDuplicate });
