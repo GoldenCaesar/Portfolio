@@ -1170,6 +1170,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Settings Tab Navigation
+    const settingsNavLinks = document.querySelectorAll('#settings-overlay .settings-nav-item');
+    // Correctly select only direct children sections of the main settings content area
+    const settingsContentSections = document.querySelectorAll('#settings-overlay main > section[id^="settings-"]');
+
+    settingsNavLinks.forEach(link => {
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+
+            const navLinkTextElement = link.querySelector('p');
+            if (!navLinkTextElement) return; // Should not happen
+
+            const navLinkText = navLinkTextElement.textContent.trim();
+            const targetId = 'settings-' + navLinkText.toLowerCase() + '-content';
+
+            // Update active state for nav links
+            settingsNavLinks.forEach(nav => nav.classList.remove('active'));
+            link.classList.add('active');
+
+            // Show/hide content sections
+            settingsContentSections.forEach(section => {
+                if (section.id === targetId) {
+                    section.classList.remove('hidden');
+                } else {
+                    section.classList.add('hidden');
+                }
+            });
+        });
+    });
 });
 console.log("ui.js loaded and DOMContentLoaded setup complete.");
 
