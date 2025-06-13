@@ -218,55 +218,29 @@
 <aside class="w-64 flex-shrink-0 border-r border-[var(--border-color)] bg-[var(--background-color)] p-6">
 <h2 class="mb-6 text-xl font-semibold text-[var(--text-color)]">Settings</h2>
 <nav class="flex flex-col gap-2">
-<div class="settings-nav-item active">
-<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
-<path d="M216,130.16q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.6,107.6,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.29,107.29,0,0,0-26.25-10.86,8,8,0,0,0-7.06,1.48L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.6,107.6,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"></path>
-</svg>
+<a href="#" class="settings-nav-item active">
+<span class="material-icons-outlined">settings</span>
 <p class="text-sm leading-normal">General</p>
-</div>
-<div class="settings-nav-item">
-<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
-<path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216ZM48,184c7.7-13.24,16-43.92,16-80a64,64,0,1,1,128,0c0,36.05,8.28,66.73,16,80Z"></path>
-</svg>
-<p class="text-sm leading-normal">Notifications</p>
-</div>
-<div class="settings-nav-item">
-<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
-<path d="M220.27,158.54a8,8,0,0,0-7.7-.46,20,20,0,1,1,0-36.16A8,8,0,0,0,224,114.69V72a16,16,0,0,0-16-16H171.78a35.36,35.36,0,0,0,.22-4,36.11,36.11,0,0,0-11.36-26.24,36,36,0,0,0-60.55,23.62,36.56,36.56,0,0,0,.14,6.62H64A16,16,0,0,0,48,72v32.22a35.36,35.36,0,0,0-4-.22,36.12,36.12,0,0,0-26.24,11.36,35.7,35.7,0,0,0-9.69,27,36.08,36.08,0,0,0,33.31,33.6,35.68,35.68,0,0,0,6.62-.14V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V165.31A8,8,0,0,0,220.27,158.54ZM208,208H64V165.31a8,8,0,0,0-11.43-7.23,20,20,0,1,1,0-36.16A8,8,0,0,0,64,114.69V72h46.69a8,8,0,0,0,7.23-11.43,20,20,0,1,1,36.16,0A8,8,0,0,0,161.31,72H208v32.23a35.68,35.68,0,0,0-6.62-.14A36,36,0,0,0,204,176a35.36,35.36,0,0,0,4-.22Z"></path>
-</svg>
-<p class="text-sm leading-normal">Integrations</p>
-</div>
-<div class="settings-nav-item">
-<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
-<path d="M69.12,94.15,28.5,128l40.62,33.85a8,8,0,1,1-10.24,12.29l-48-40a8,8,0,0,1,0-12.29l48-40a8,8,0,0,1,10.24,12.3Zm176,27.7-48-40a8,8,0,1,0-10.24,12.3L227.5,128l-40.62,33.85a8,8,0,1,0,10.24,12.29l48-40a8,8,0,0,0,0-12.29ZM162.73,32.48a8,8,0,0,0-10.25,4.79l-64,176a8,8,0,0,0,4.79,10.26A8.14,8.14,0,0,0,96,224a8,8,0,0,0,7.52-5.27l64-176A8,8,0,0,0,162.73,32.48Z"></path>
-</svg>
-<p class="text-sm leading-normal">Advanced</p>
-</div>
-<div class="settings-nav-item">
-<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
-<path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"></path>
-</svg>
+</a>
+<a href="#" class="settings-nav-item">
+<span class="material-icons-outlined">scanner</span>
+<p class="text-sm leading-normal">Scans</p>
+</a>
+<a href="#" class="settings-nav-item">
+<span class="material-icons-outlined">assessment</span>
+<p class="text-sm leading-normal">Reports</p>
+</a>
+<a href="#" class="settings-nav-item">
+<span class="material-icons-outlined">info</span>
 <p class="text-sm leading-normal">About</p>
-</div>
+</a>
 </nav>
 </aside>
 <main class="flex-1 overflow-y-auto p-8">
+<section id="settings-general-content">
 <header class="mb-8">
-<h1 class="text-3xl font-bold text-[var(--text-color)]">General Settings</h1>
+<h1 class="text-3xl font-bold text-[var(--text-color)]">General</h1>
 </header>
-<section class="mb-10">
-<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Application Info</h2>
-<div class="space-y-6 max-w-md">
-<div>
-<label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="appName">Application Name</label>
-<input class="form-input-custom" id="appName" type="text" value="File Integrity Monitor"/>
-</div>
-<div>
-<label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="appVersion">Application Version</label>
-<input class="form-input-custom" id="appVersion" readonly="" type="text" value="1.0.0"/>
-</div>
-</div>
-</section>
 <section class="mb-10">
 <h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Appearance</h2>
 <div class="flex flex-wrap gap-3">
@@ -284,36 +258,54 @@
 </label>
 </div>
 </section>
+</section>
+<section id="settings-scans-content" class="hidden mb-10">
+<header class="mb-8">
+<h1 class="text-3xl font-bold text-[var(--text-color)]">Scans</h1>
+</header>
 <section class="mb-10">
-<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Language</h2>
-<div class="max-w-xs">
-<label class="sr-only mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="language">Select Language</label>
-<select class="form-input-custom appearance-none bg-[url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3e%3cpath stroke=%27%239daebe%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3e%3c/svg%3e')] bg-right-3 bg-no-repeat" id="language">
-<option value="en">English</option>
-<option value="es">Español</option>
-<option value="fr">Français</option>
+<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Schedule Scans</h2>
+<div class="space-y-6 max-w-md">
+<div>
+<label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="scanTime">Time</label>
+<input type="time" id="scanTime" class="form-input-custom" value="03:00"/>
+</div>
+<div>
+<label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="scanInterval">Interval</label>
+<select id="scanInterval" class="form-input-custom appearance-none bg-[url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3e%3cpath stroke=%27%239daebe%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3e%3c/svg%3e')] bg-right-3 bg-no-repeat">
+<option>Daily</option>
+<option>Weekly</option>
+<option>Monthly</option>
 </select>
 </div>
+</div>
 </section>
-<section>
-<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Updates</h2>
-<div class="space-y-6">
-<div class="flex items-center justify-between rounded-lg bg-[var(--input-background-color)] p-4">
+<section class="mb-10">
+<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">VirusTotal API Key</h2>
+<div class="space-y-6 max-w-md">
 <div>
-<p class="text-base font-medium text-[var(--text-color)]">Check for Updates</p>
-<p class="text-sm text-[var(--text-muted-color)]">Manually check for new application updates.</p>
+<label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="virustotalApiKey">API Key</label>
+<input type="text" id="virustotalApiKey" class="form-input-custom" placeholder="Enter your VirusTotal API Key"/>
 </div>
-<button class="button-primary">Check Now</button>
 </div>
-<div class="flex items-center justify-between rounded-lg bg-[var(--input-background-color)] p-4">
+</section>
+</section>
+<section id="settings-reports-content" class="hidden mb-10">
+<header class="mb-8">
+<h1 class="text-3xl font-bold text-[var(--text-color)]">Reports</h1>
+</header>
+</section>
+<section id="settings-about-content" class="hidden mb-10">
+<header class="mb-8">
+<h1 class="text-3xl font-bold text-[var(--text-color)]">About</h1>
+</header>
+<div class="space-y-6 max-w-md">
 <div>
-<p class="text-base font-medium text-[var(--text-color)]">Automatic Updates</p>
-<p class="text-sm text-[var(--text-muted-color)]">Automatically download and install updates.</p>
+<h2 class="text-xl font-semibold text-[var(--text-color)] mb-2">Demicube GoldHash</h2>
+<p class="text-sm text-[var(--text-muted-color)] mb-4">GoldHash is a file integrity monitoring tool that helps you detect changes to your important files.</p>
 </div>
-<label class="group switch-custom" for="autoUpdates">
-<span class="switch-custom-thumb"></span>
-<input checked="" class="sr-only" id="autoUpdates" type="checkbox"/>
-</label>
+<div>
+<button id="clear-logs-settings-button" class="button-primary">Clear Logs</button>
 </div>
 </div>
 </section>
