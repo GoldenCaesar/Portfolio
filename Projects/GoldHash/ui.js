@@ -164,26 +164,25 @@ function displayActivityLog() {
         statusTd.textContent = entry.status;
         switch (entry.status) {
             case 'modified':
-                statusTd.classList.add('text-yellow-400');
+                statusTd.classList.add('status-modified');
                 break;
             case 'newly_added':
-                statusTd.classList.add('text-blue-400');
+                statusTd.classList.add('status-newly-added');
                 break;
             case 'verified':
-                statusTd.classList.add('text-green-400');
+                statusTd.classList.add('status-verified');
                 break;
-            // No 'Not Scanned' case needed here as fileLog only contains scanned files
-            case 'path_updated': // New status
-                statusTd.classList.add('text-purple-400'); // Example color
+            case 'path_updated':
+                statusTd.classList.add('status-path-updated');
                 break;
-            case 'duplicate': // New status
-                statusTd.classList.add('text-cyan-400'); // Example color
+            case 'duplicate':
+                statusTd.classList.add('status-duplicate');
                 break;
             case 'reactivated':
-                statusTd.classList.add('text-teal-400');
+                statusTd.classList.add('status-reactivated');
                 break;
-            default:
-                statusTd.classList.add('text-slate-300');
+            default: // Includes 'Not Scanned' or any other status
+                statusTd.classList.add('status-not-scanned'); // Default or unknown status
         }
 
         // Current Hash
@@ -237,29 +236,29 @@ function displayLoggedFiles(logEntriesToDisplay) {
         statusTd.textContent = entry.status;
         switch (entry.status) {
             case 'modified':
-                statusTd.classList.add('text-yellow-400');
+                statusTd.classList.add('status-modified');
                 break;
             case 'newly_added':
-                statusTd.classList.add('text-blue-400');
+                statusTd.classList.add('status-newly-added');
                 break;
             case 'verified':
-                statusTd.classList.add('text-green-400');
+                statusTd.classList.add('status-verified');
                 break;
-            case 'Not Scanned': // Handle "Not Scanned" status
-                statusTd.classList.add('text-gray-500'); // Or any other appropriate color
+            case 'Not Scanned':
+            case 'Not Scanned Yet': // Consolidate if they mean the same
+                statusTd.classList.add('status-not-scanned');
                 break;
-            // ADD NEW CASES HERE:
-            case 'path_updated': // New status
-                statusTd.classList.add('text-purple-400'); // Example color
+            case 'path_updated':
+                statusTd.classList.add('status-path-updated');
                 break;
-            case 'duplicate': // New status
-                statusTd.classList.add('text-cyan-400'); // Example color
+            case 'duplicate':
+                statusTd.classList.add('status-duplicate');
                 break;
             case 'reactivated':
-                statusTd.classList.add('text-teal-400'); // Use the same color for consistency
+                statusTd.classList.add('status-reactivated');
                 break;
             default:
-                statusTd.classList.add('text-slate-300');
+                statusTd.classList.add('status-not-scanned'); // Fallback for any other status
         }
 
         const hashTd = tr.insertCell();
@@ -527,8 +526,11 @@ function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, 
 
     const link = document.createElement('a');
     link.href = '#';
-    link.className = 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]';
+    // Apply base classes for layout, specific color/bg classes handled by .settings-nav-item and its variants
+    link.className = 'settings-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors';
     link.dataset.folderPath = path;
+
+    // text-slate-300, hover:bg-[#1A2B3A], bg-[#1A2B3A], text-white are handled by .settings-nav-item in CSS
 
     if (window.isEditModeActive) {
         const checkbox = document.createElement('input');
@@ -561,11 +563,9 @@ function createSidebarEntry(name, path, type, indentLevel = 0, parentContainer, 
          subfoldersContainer.style.display = 'block'; // Expand top-level user folders by default
     }
 
+    // Active state for demo_files is handled by setActiveState and clearActiveStates which use CSS variables indirectly via .settings-nav-item.active
+    // No need to manually add bg-[#1A2B3A] or text-white here if .settings-nav-item.active is styled correctly with variables
 
-    if (isTopLevel && path === "demo_files" && type === 'folder') { // Default active state for demo_files
-        link.classList.add('bg-[#1A2B3A]', 'text-white');
-        link.classList.remove('text-slate-300');
-    }
     entryDiv.appendChild(subfoldersContainer);
 
     if (type === 'folder' && children) {
@@ -743,6 +743,70 @@ document.addEventListener('DOMContentLoaded', () => {
     const documentsTbody = document.getElementById('documents-tbody'); // Keep for displayFolderContents
     const editFoldersButton = document.getElementById('edit-folders-button');
     const deleteSelectedFoldersButton = document.getElementById('delete-selected-folders-button');
+
+    // Theme switching logic
+    const themeRadios = document.querySelectorAll('input[name="theme"]');
+    const bodyElement = document.body;
+    const scanIntervalSelect = document.getElementById('scanInterval');
+
+    function applyTheme(theme) {
+        bodyElement.classList.remove('light', 'dark');
+        let currentTheme = 'light'; // Default to light if system preference is not dark
+
+        if (theme === 'light') {
+            bodyElement.classList.add('light');
+            currentTheme = 'light';
+        } else if (theme === 'dark') {
+            bodyElement.classList.add('dark');
+            currentTheme = 'dark';
+        } else { // System theme
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                bodyElement.classList.add('dark');
+                currentTheme = 'dark';
+            } else {
+                bodyElement.classList.add('light');
+                currentTheme = 'light';
+            }
+        }
+
+        // Update select dropdown arrow class
+        if (scanIntervalSelect) {
+            scanIntervalSelect.classList.remove('select-arrow-dark', 'select-arrow-light');
+            if (currentTheme === 'dark') {
+                scanIntervalSelect.classList.add('select-arrow-dark');
+            } else {
+                scanIntervalSelect.classList.add('select-arrow-light');
+            }
+        }
+    }
+
+    // Load saved theme or default to system
+    const savedTheme = localStorage.getItem('theme') || 'system';
+    applyTheme(savedTheme);
+    // Update radio button to reflect the loaded theme
+    const currentRadio = document.querySelector(`input[name="theme"][value="${savedTheme}"]`);
+    if (currentRadio) {
+        currentRadio.checked = true;
+    }
+
+    themeRadios.forEach(radio => {
+        radio.addEventListener('change', (event) => {
+            const selectedTheme = event.target.value;
+            applyTheme(selectedTheme);
+            localStorage.setItem('theme', selectedTheme);
+        });
+    });
+
+    // Listen for system theme changes if "system" is selected
+    if (savedTheme === 'system') {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            const currentSelectedTheme = localStorage.getItem('theme') || 'system';
+            if (currentSelectedTheme === 'system') {
+                applyTheme('system');
+            }
+        });
+    }
+
 
     // Global `window.demoFilesData` is initialized at the top of ui.js
     // `fileLog` is now globally available as `window.fileLog` from `logging.js`.
@@ -1200,6 +1264,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     });
+
+    // Event listener for the "Clear Logs" button in the settings overlay
+    const clearLogsSettingsButton = document.getElementById('clear-logs-settings-button');
+    if (clearLogsSettingsButton) {
+        clearLogsSettingsButton.addEventListener('click', () => {
+            if (typeof clearLogs === 'function') {
+                clearLogs(); // This function is defined in logging.js and globally available
+                // Optionally, close the settings overlay after clearing logs
+                if (settingsOverlay) {
+                    settingsOverlay.classList.add('hidden');
+                }
+            } else {
+                console.error("clearLogs function not found (ui.js).");
+                showToast("Error: Clear logs functionality is unavailable.", 'error');
+            }
+        });
+    }
 });
 console.log("ui.js loaded and DOMContentLoaded setup complete.");
 
