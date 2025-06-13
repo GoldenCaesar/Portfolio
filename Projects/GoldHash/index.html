@@ -22,306 +22,183 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 <style type="text/tailwindcss">
       :root {
-        /* Default to dark theme variables */
-        --primary-color: #dce8f3; /* Light blue, good for accents on dark */
-        --secondary-color: #2b3640; /* Dark blue-grey, card backgrounds on dark */
-        --background-color: #141a1f; /* Very dark blue-grey, main background */
-        --text-color: #ffffff;       /* White, main text on dark */
-        --text-muted-color: #9daebe; /* Lighter grey, muted text on dark */
-        --border-color: #3d4d5c;     /* Medium grey, borders on dark */
-        --input-background-color: #1f272e; /* Dark grey, input backgrounds on dark */
+        --primary-color: #dce8f3;
+        --secondary-color: #2b3640;
+        --background-color: #141a1f;
+        --text-color: #ffffff;
+        --text-muted-color: #9daebe;
+        --border-color: #3d4d5c;
+        --input-background-color: #1f272e;
       }
-
-      body.light {
-        --primary-color: #0c7ff2; /* Vibrant blue, good for accents on light */
-        --secondary-color: #ffffff; /* White, card backgrounds on light */
-        --background-color: #f3f4f6; /* Light grey, main background */
-        --text-color: #1f2937;       /* Dark grey, main text on light */
-        --text-muted-color: #6b7280; /* Medium grey, muted text on light */
-        --border-color: #d1d5db;     /* Light grey, borders on light */
-        --input-background-color: #ffffff; /* White, input backgrounds on light */
-        --accent-color: #0c7ff2; /* Default accent color (blue) */
-        --accent-text-color: #ffffff; /* Text color for on-accent backgrounds */
-        --positive-change-color: #0BDA5B; /* Green for positive changes */
-        --negative-change-color: #FF5F6D; /* Red for negative changes (if needed) */
-
-        --status-modified-color: #FFB74D; /* Orange/Amber for modified */
-        --status-newly-added-color: #64B5F6; /* Blue for newly added */
-        --status-verified-color: #81C784; /* Green for verified */
-        --status-path-updated-color: #BA68C8; /* Purple for path updated */
-        --status-duplicate-color: #4DD0E1; /* Cyan for duplicate */
-        --status-reactivated-color: #4DB6AC; /* Teal for reactivated */
-        --status-not-scanned-color: #90A4AE; /* Grey for not scanned */
-      }
-
-      body.dark { /* Redefine for dark mode if they need to differ significantly */
-        --positive-change-color: #0BDA5B; /* Keep same green, usually fine on dark */
-        --status-modified-color: #FFB74D;
-        --status-newly-added-color: #64B5F6;
-        --status-verified-color: #81C784;
-        --status-path-updated-color: #BA68C8;
-        --status-duplicate-color: #4DD0E1;
-        --status-reactivated-color: #4DB6AC;
-        --status-not-scanned-color: #78909C; /* Slightly darker grey for dark mode */
-      }
-
-
-      /* General body styling for theme application */
-      body {
-        background-color: var(--background-color);
-        color: var(--text-color);
-        font-family: Inter, "Noto Sans", sans-serif;
-      }
-
-      /* Update components to use CSS variables */
-      /* Example: Sidebar, main content, headers, tables, buttons, inputs should use these vars */
 
       .settings-nav-item {
-        /* Tailwind classes like text-slate-300 are effectively overridden by var(--text-muted-color) or var(--text-color) later */
-        /* Explicitly set text color using variable for clarity and to ensure it adapts */
-        @apply flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 transition-colors;
-        color: var(--text-muted-color); /* Default state for nav items */
-      }
-      .settings-nav-item:hover {
-        background-color: var(--input-background-color); /* Use variable for hover background */
-        color: var(--text-color); /* Use variable for hover text */
+        @apply flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-slate-300 transition-colors hover:bg-[var(--input-background-color)] hover:text-white;
       }
       .settings-nav-item.active {
-        background-color: var(--input-background-color); /* Use variable for active background */
-        color: var(--text-color); /* Use variable for active text */
+        @apply bg-[var(--input-background-color)] text-white;
       }
-      .settings-nav-item svg { /* Default state for icons in nav items */
-        color: var(--text-muted-color);
+      .settings-nav-item svg {
+        @apply text-slate-400;
       }
-      .settings-nav-item:hover svg, .settings-nav-item.active svg { /* Hover and active state for icons */
-        color: var(--text-color);
+      .settings-nav-item.active svg {
+        @apply text-white;
       }
 
       .form-input-custom {
-        @apply block w-full rounded-lg border p-2.5 text-sm placeholder-[var(--text-muted-color)] focus:border-blue-500 focus:ring-blue-500;
-        border-color: var(--border-color);
-        background-color: var(--input-background-color);
-        color: var(--text-color);
+        @apply block w-full rounded-lg border border-[var(--border-color)] bg-[var(--input-background-color)] p-2.5 text-sm text-[var(--text-color)] placeholder-[var(--text-muted-color)] focus:border-blue-500 focus:ring-blue-500;
       }
 
       .radio-label-custom {
-        @apply inline-flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm font-medium peer-checked:border-blue-500;
-        border-color: var(--border-color);
-        background-color: var(--input-background-color);
-        color: var(--text-muted-color);
+        @apply inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--input-background-color)] p-3 text-sm font-medium text-[var(--text-muted-color)] hover:bg-opacity-70 peer-checked:border-blue-500 peer-checked:text-blue-500;
       }
-      .radio-label-custom:hover {
-         background-color: var(--input-background-color); /* Consider a slightly different hover if input-bg is same as card bg */
-         filter: brightness(95%); /* Example: slightly darken on hover for dark, lighten for light if needed */
+      .radio-label-custom input:checked + span {
+        @apply text-blue-500;
       }
-      body.light .radio-label-custom:hover {
-        filter: brightness(90%);
-      }
-      .radio-label-custom input:checked + span { /* Span contains the text like "Light", "Dark" */
-        color: var(--accent-color); /* Use accent color for the text of the checked radio */
-      }
-       .radio-label-custom.peer-checked\:text-blue-500 input:checked + span { /* More specific to override Tailwind if needed*/
-        color: var(--accent-color) !important;
-      }
-      .radio-label-custom.peer-checked\:border-blue-500 {
-        border-color: var(--accent-color) !important;
-      }
-
 
       .button-primary {
-        @apply min-w-[84px] cursor-pointer rounded-lg px-4 py-2 text-center text-sm font-medium focus:outline-none focus:ring-4;
-        background-color: var(--accent-color);
-        color: var(--accent-text-color);
-        /* Tailwind's hover:bg-blue-700 and focus:ring-blue-800 might need to be variable if accent-color changes drastically */
+        @apply min-w-[84px] cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-800;
       }
-      body.dark .button-primary { /* Example if hover needed to be different for dark */
-         @apply hover:bg-blue-700 focus:ring-blue-800;
-      }
-      body.light .button-primary { /* Example for light */
-         @apply hover:bg-blue-700 focus:ring-blue-800; /* Assuming current blue hover is fine for light too */
-      }
-
 
       .switch-custom {
-        @apply relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full focus-within:ring-2 focus-within:ring-blue-500;
-        background-color: var(--input-background-color);
+        @apply relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full bg-[var(--input-background-color)] focus-within:ring-2 focus-within:ring-blue-500;
       }
       .switch-custom-thumb {
-        @apply inline-block size-5 transform rounded-full transition-transform duration-200 ease-in-out;
-        background-color: var(--text-muted-color); /* Thumb color when off */
+        @apply inline-block size-5 transform rounded-full bg-slate-400 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-full group-has-[:checked]:bg-blue-500;
       }
-      .switch-custom input:checked + .switch-custom-thumb {
-        transform: translateX(100%); /* Tailwind's group-has-[:checked]:translate-x-full */
-        background-color: var(--accent-color); /* Thumb color when on */
-      }
-      body.light .switch-custom-thumb {
-        background-color: #a0aec0; /* Slightly darker than default light text-muted for better visibility */
-      }
-      body.light .switch-custom input:checked + .switch-custom-thumb {
-        background-color: var(--accent-color);
-      }
-
-      /* Status text colors in tables */
-      .status-modified { color: var(--status-modified-color); }
-      .status-newly-added { color: var(--status-newly-added-color); }
-      .status-verified { color: var(--status-verified-color); }
-      .status-path-updated { color: var(--status-path-updated-color); }
-      .status-duplicate { color: var(--status-duplicate-color); }
-      .status-reactivated { color: var(--status-reactivated-color); }
-      .status-not-scanned { color: var(--status-not-scanned-color); }
-
-      /* Graph positive change color */
-      .positive-change {
-        color: var(--positive-change-color);
-      }
-
-      /* Select dropdown arrow styling */
-      .select-arrow-dark {
-        background-image: url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3e%3cpath stroke='%239daebe%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3e%3c/svg%3e');
-      }
-      .select-arrow-light {
-        background-image: url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3e%3cpath stroke='%236b7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3e%3c/svg%3e');
-      }
-
     </style>
 </head>
-<body class="bg-[var(--background-color)] text-[var(--text-color)]">
-<div class="relative flex size-full min-h-screen flex-col text-[var(--text-color)] dark group/design-root overflow-x-hidden">
+<body class="bg-[#0E1923]">
+<div class="relative flex size-full min-h-screen flex-col text-white dark group/design-root overflow-x-hidden" style='font-family: Inter, "Noto Sans", sans-serif;'>
 <div class="flex h-full grow">
-<aside class="fixed left-0 top-0 z-10 flex h-full w-80 flex-col border-r p-6">
-    <!-- classes on aside already use vars -->
+<aside class="fixed left-0 top-0 z-10 flex h-full w-80 flex-col border-r border-r-[#1A2B3A] bg-[#0E1923] p-6">
 <div class="flex items-center justify-between pb-6">
           <div class="flex items-center gap-3 relative">
-<div class="text-[var(--primary-color)] cursor-pointer" data-icon="Gear" data-size="28px" data-weight="regular">
+<div class="text-[#0c7ff2] cursor-pointer" data-icon="Gear" data-size="28px" data-weight="regular">
 <span class="material-icons-outlined" style="font-size: 28px"> settings </span>
             </div>
-<h1 class="text-xl font-semibold">Settings</h1> <!-- Will inherit from body -->
+<h1 class="text-xl font-semibold">Settings</h1>
 </div>
 </div>
 <input type="file" id="folder-upload-input" webkitdirectory directory multiple style="display: none;" />
-<button id="add-folder-button" class="button-primary flex w-full items-center justify-center gap-2 overflow-hidden h-10 px-4 text-sm font-semibold leading-normal tracking-[0.015em] mb-4 transition-colors">
-    <!-- button-primary handles its own theme based on accent-color -->
+<button id="add-folder-button" class="flex w-full min-w-[84px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-[#0c7ff2] text-white text-sm font-semibold leading-normal tracking-[0.015em] mb-4 hover:bg-blue-600 transition-colors">
 <span class="material-icons-outlined" style="font-size: 20px"> create_new_folder </span>
 <span class="truncate">Add Folder</span>
 </button>
 <nav class="flex-grow space-y-1 overflow-y-auto" id="sidebar-nav">
-    <!-- Sidebar items are generated by JS, their classes will be updated to use CSS vars -->
 </nav>
-<div class="mt-auto space-y-2 border-t pt-4"> <!-- Uses var(--border-color) -->
-<button id="edit-folders-button" class="settings-nav-item flex w-full"> <!-- Uses .settings-nav-item which is theme aware -->
-<span class="material-icons-outlined" style="font-size: 20px"> edit </span>
+<div class="mt-auto space-y-2 border-t border-t-[#1A2B3A] pt-4">
+<button id="edit-folders-button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> edit </span>
               Edit
             </button>
-            <button id="delete-selected-folders-button" class="settings-nav-item flex w-full" style="display: none;">
-              <span class="material-icons-outlined" style="font-size: 20px"> delete_sweep </span>
+            <button id="delete-selected-folders-button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]" style="display: none;">
+              <span class="material-icons-outlined text-slate-400" style="font-size: 20px"> delete_sweep </span>
               Delete Selected
             </button>
-<button id="scan-files-button" class="settings-nav-item flex w-full">
-<span class="material-icons-outlined" style="font-size: 20px"> scanner </span>
+<button id="scan-files-button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-[#1A2B3A]">
+<span class="material-icons-outlined text-slate-400" style="font-size: 20px"> scanner </span>
               Scan
             </button>
-<p class="mt-2 px-3 text-xs font-medium text-[var(--text-muted-color)]">Last scan: 2024-01-20 10:00 AM</p>
+<p class="mt-2 px-3 text-xs font-medium text-slate-400">Last scan: 2024-01-20 10:00 AM</p>
 </div>
 </aside>
-<main class="ml-80 flex-1 overflow-y-auto"> <!-- Uses var(--background-color) -->
-<header class="sticky top-0 z-10 flex items-center justify-between whitespace-nowrap border-b border-solid bg-opacity-80 px-10 py-4 backdrop-blur-md"> <!-- uses var(--border-color) and var(--background-color) -->
+<main class="ml-80 flex-1 overflow-y-auto bg-[#101A23]">
+<header class="sticky top-0 z-10 flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#1A2B3A] bg-[#101A23]/80 px-10 py-4 backdrop-blur-md">
 <div class="flex items-center gap-3">
-<div class="size-7 text-[var(--primary-color)]">
+<div class="size-7 text-[#0c7ff2]">
 <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
 <path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"></path>
 </svg>
 </div>
-<h2 class="text-xl font-bold leading-tight tracking-[-0.015em]">Demicube GoldHash</h2> <!-- Inherits from body -->
+<h2 class="text-xl font-bold leading-tight tracking-[-0.015em]">Demicube GoldHash</h2>
 </div>
 <div class="flex items-center gap-4">
-<span class="text-sm text-[var(--text-muted-color)]">File Integrity Monitor</span>
-<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDv-GRWPhYqxYumhKsse2e9ie-yz-SrVq32597_jQ3jIKJhXf2sCJLbug_k4COTCMCWnbEz3FSoqotmw3_m9P7oTZ6HtgfXi3SZkPsYbA01MaPicf0V-dyfnxbfdPIHEsudNYw0fEsJhK1OTGQDAwRv0OmpYUoiL9Fd8bJ79h6v7wGRchS50BfzusH1quhvxDIvCfF9ffVVG1xR98G6rqs0t0U9Hj_V-GXdgGxAmz3LImlWyZQaXLdxyb77B5i03BXY-pf17nD4VC4");'></div> <!-- Uses var(--border-color) -->
+<span class="text-sm text-slate-400">File Integrity Monitor</span>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDv-GRWPhYqxYumhKsse2e9ie-yz-SrVq32597_jQ3jIKJhXf2sCJLbug_k4COTCMCWnbEz3FSoqotmw3_m9P7oTZ6HtgfXi3SZkPsYbA01MaPicf0V-dyfnxbfdPIHEsudNYw0fEsJhK1OTGQDAwRv0OmpYUoiL9Fd8bJ79h6v7wGRchS50BfzusH1quhvxDIvCfF9ffVVG1xR98G6rqs0t0U9Hj_V-GXdgGxAmz3LImlWyZQaXLdxyb77B5i03BXY-pf17nD4VC4");'></div>
 </div>
 </header>
 <div class="p-8 @container">
 <section class="mb-8">
-<h2 class="mb-4 text-2xl font-semibold">Documents</h2> <!-- Inherits -->
-<div class="overflow-hidden rounded-lg border bg-opacity-100 shadow-lg"> <!-- Uses var(--border-color), var(--secondary-color) -->
+<h2 class="mb-4 text-2xl font-semibold text-slate-100">Documents</h2>
+<div class="overflow-hidden rounded-lg border border-[#1A2B3A] bg-[#0E1923] shadow-lg">
 <table class="w-full">
-<thead class="border-b"> <!-- Uses var(--input-background-color) for bg, var(--border-color) for border -->
+<thead class="bg-[#1A2B3A]">
     <tr>
-        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Name</th>
-        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Status</th>
-        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Current Hash</th>
-        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Last Checked</th>
-        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Last Modified</th>
-        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Full Path</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Name</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Current Hash</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Last Checked</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Last Modified</th>
+        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Full Path</th>
     </tr>
 </thead>
-<tbody class="divide-y" id="documents-tbody"> <!-- Uses var(--border-color) for divide -->
-    <!-- JS populates rows. Row text color will be var(--text-color) or specific status color. -->
-    <!-- Specific status colors (e.g., text-yellow-400) will be handled by new .status-* classes -->
+<tbody class="divide-y divide-[#1A2B3A]" id="documents-tbody">
 </tbody>
 </table>
 </div>
 </section>
 <section class="mb-8">
-  <h2 class="mb-4 text-2xl font-semibold">Activity</h2> <!-- Inherits -->
-  <div class="overflow-hidden rounded-lg border bg-opacity-100 shadow-lg"> <!-- Uses vars -->
+  <h2 class="mb-4 text-2xl font-semibold text-slate-100">Activity</h2>
+  <div class="overflow-hidden rounded-lg border border-[#1A2B3A] bg-[#0E1923] shadow-lg">
     <table class="w-full">
-      <thead class="border-b"> <!-- Uses vars -->
+      <thead class="bg-[#1A2B3A]">
         <tr>
-          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Name</th>
-          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Status</th>
-          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Current Hash</th>
-          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Last Checked</th>
-          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Last Modified</th>
-          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted-color)]">Full Path</th>
+          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Name</th>
+          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
+          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Current Hash</th>
+          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Last Checked</th>
+          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Last Modified</th>
+          <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Full Path</th>
         </tr>
       </thead>
-      <tbody class="divide-y" id="activity-tbody"> <!-- Uses vars -->
-        <!-- JS populates rows. Status colors handled by .status-* classes -->
+      <tbody class="divide-y divide-[#1A2B3A]" id="activity-tbody">
+        <!-- Activity rows will be populated by JavaScript -->
       </tbody>
     </table>
   </div>
 </section>
 <section class="mb-8">
-<h2 class="mb-4 text-2xl font-semibold">Statistics</h2> <!-- Inherits -->
+<h2 class="mb-4 text-2xl font-semibold text-slate-100">Statistics</h2>
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-<div class="flex flex-col gap-2 rounded-lg border bg-opacity-100 p-6 shadow-lg"> <!-- Uses vars -->
-<p class="text-sm font-medium text-[var(--text-muted-color)]">Files Monitored</p>
-<p class="text-3xl font-bold" id="files-monitored-count">1,234</p> <!-- Inherits -->
+<div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<p class="text-sm font-medium text-slate-400">Files Monitored</p>
+<p class="text-3xl font-bold text-slate-100" id="files-monitored-count">1,234</p>
 </div>
-<div class="flex flex-col gap-2 rounded-lg border bg-opacity-100 p-6 shadow-lg"> <!-- Uses vars -->
-<p class="text-sm font-medium text-[var(--text-muted-color)]">Files Changed</p>
-<p class="text-3xl font-bold" id="files-changed-count">56</p> <!-- Inherits -->
+<div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<p class="text-sm font-medium text-slate-400">Files Changed</p>
+<p class="text-3xl font-bold text-slate-100" id="files-changed-count">56</p>
 </div>
-<div class="flex flex-col gap-2 rounded-lg border bg-opacity-100 p-6 shadow-lg"> <!-- Uses vars -->
-<p class="text-sm font-medium text-[var(--text-muted-color)]">Log Size</p>
-<p class="text-3xl font-bold" id="log-size-display">10 MB</p> <!-- Inherits -->
+<div class="flex flex-col gap-2 rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
+<p class="text-sm font-medium text-slate-400">Log Size</p>
+<p class="text-3xl font-bold text-slate-100" id="log-size-display">10 MB</p>
 </div>
 </div>
 </section>
 <section>
-<h2 class="mb-4 text-2xl font-semibold">File Changes Over Time</h2> <!-- Inherits -->
-<div class="rounded-lg border bg-opacity-100 p-6 shadow-lg"> <!-- Uses vars -->
+<h2 class="mb-4 text-2xl font-semibold text-slate-100">File Changes Over Time</h2>
+<div class="rounded-lg border border-[#1A2B3A] bg-[#0E1923] p-6 shadow-lg">
 <div class="flex items-baseline justify-between">
 <div>
-<p class="text-sm font-medium text-[var(--text-muted-color)]">Total Changes</p>
-<p class="text-3xl font-bold" id="total-changes-count">56</p> <!-- Inherits -->
+<p class="text-sm font-medium text-slate-400">Total Changes</p>
+<p class="text-3xl font-bold text-slate-100" id="total-changes-count">56</p>
 </div>
 <div class="flex items-center gap-1">
-<p class="text-sm text-[var(--text-muted-color)]">Last 30 Days</p>
-<p class="text-sm font-medium positive-change">+10%</p> <!-- Use .positive-change class -->
+<p class="text-sm text-slate-400">Last 30 Days</p>
+<p class="text-sm font-medium text-[#0BDA5B]">+10%</p>
 </div>
 </div>
 <div class="mt-6 flex min-h-[200px] flex-1 flex-col">
 <svg id="file-changes-graph-svg" fill="none" height="100%" preserveAspectRatio="xMidYMax meet" viewBox="-3 0 478 150" width="100%" xmlns="http://www.w3.org/2000/svg">
 <path id="file-changes-graph-fill-path" d="" fill="url(#paint0_linear_1131_5935)"></path>
-<path id="file-changes-graph-path" d="" stroke="var(--primary-color)" stroke-linecap="round" stroke-width="3"></path>
+<path id="file-changes-graph-path" d="" stroke="#0c7ff2" stroke-linecap="round" stroke-width="3"></path>
 <defs>
 <linearGradient gradientUnits="userSpaceOnUse" id="paint0_linear_1131_5935" x1="236" x2="236" y1="1" y2="149">
-<stop stop-color="var(--primary-color)" stop-opacity="0.3"></stop>
-<stop offset="1" stop-color="var(--primary-color)" stop-opacity="0"></stop>
+<stop stop-color="#0c7ff2" stop-opacity="0.3"></stop>
+<stop offset="1" stop-color="#0c7ff2" stop-opacity="0"></stop>
 </linearGradient>
 </defs>
 </svg>
-<div id="file-changes-graph-x-axis" class="mt-4 flex justify-around border-t border-dashed pt-3"> <!-- Uses var(--border-color) -->
+<div id="file-changes-graph-x-axis" class="mt-4 flex justify-around border-t border-dashed border-slate-700 pt-3">
 </div>
 </div>
 </div>
@@ -338,8 +215,8 @@
 
 <div id="settings-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" style='font-family: Inter, "Noto Sans", sans-serif;'>
 <div class="flex h-[90vh] max-h-[800px] w-[90vw] max-w-[1200px] flex-row overflow-hidden rounded-xl bg-[var(--background-color)] shadow-2xl">
-<aside class="w-64 flex-shrink-0 border-r bg-[var(--background-color)] p-6"> <!-- uses var(--border-color) -->
-<h2 class="mb-6 text-xl font-semibold">Settings</h2> <!-- Inherits -->
+<aside class="w-64 flex-shrink-0 border-r border-[var(--border-color)] bg-[var(--background-color)] p-6">
+<h2 class="mb-6 text-xl font-semibold text-[var(--text-color)]">Settings</h2>
 <nav class="flex flex-col gap-2">
 <a href="#" class="settings-nav-item active">
 <span class="material-icons-outlined">settings</span>
@@ -362,32 +239,32 @@
 <main class="flex-1 overflow-y-auto p-8">
 <section id="settings-general-content">
 <header class="mb-8">
-<h1 class="text-3xl font-bold">General</h1> <!-- Inherits -->
+<h1 class="text-3xl font-bold text-[var(--text-color)]">General</h1>
 </header>
 <section class="mb-10">
-<h2 class="mb-4 text-xl font-semibold">Appearance</h2> <!-- Inherits -->
+<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Appearance</h2>
 <div class="flex flex-wrap gap-3">
 <label class="radio-label-custom">
                         Light
-                        <input class="sr-only" name="theme" type="radio" value="light"/><span class="themed-radio-text">Light</span>
+                        <input class="sr-only" name="theme" type="radio" value="light"/>
 </label>
 <label class="radio-label-custom">
                         Dark
-                        <input checked="" class="sr-only" name="theme" type="radio" value="dark"/><span class="themed-radio-text">Dark</span>
+                        <input checked="" class="sr-only" name="theme" type="radio" value="dark"/>
 </label>
 <label class="radio-label-custom">
                         System
-                        <input class="sr-only" name="theme" type="radio" value="system"/><span class="themed-radio-text">System</span>
+                        <input class="sr-only" name="theme" type="radio" value="system"/>
 </label>
 </div>
 </section>
 </section>
 <section id="settings-scans-content" class="hidden mb-10">
 <header class="mb-8">
-<h1 class="text-3xl font-bold">Scans</h1> <!-- Inherits -->
+<h1 class="text-3xl font-bold text-[var(--text-color)]">Scans</h1>
 </header>
 <section class="mb-10">
-<h2 class="mb-4 text-xl font-semibold">Schedule Scans</h2> <!-- Inherits -->
+<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">Schedule Scans</h2>
 <div class="space-y-6 max-w-md">
 <div>
 <label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="scanTime">Time</label>
@@ -395,7 +272,7 @@
 </div>
 <div>
 <label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="scanInterval">Interval</label>
-<select id="scanInterval" class="form-input-custom appearance-none bg-right-3 bg-no-repeat select-arrow-dark"> <!-- Default to dark arrow, JS will toggle -->
+<select id="scanInterval" class="form-input-custom appearance-none bg-[url('data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3e%3cpath stroke=%27%239daebe%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3e%3c/svg%3e')] bg-right-3 bg-no-repeat">
 <option>Daily</option>
 <option>Weekly</option>
 <option>Monthly</option>
@@ -404,7 +281,7 @@
 </div>
 </section>
 <section class="mb-10">
-<h2 class="mb-4 text-xl font-semibold">VirusTotal API Key</h2> <!-- Inherits -->
+<h2 class="mb-4 text-xl font-semibold text-[var(--text-color)]">VirusTotal API Key</h2>
 <div class="space-y-6 max-w-md">
 <div>
 <label class="mb-1.5 block text-sm font-medium text-[var(--text-muted-color)]" for="virustotalApiKey">API Key</label>
@@ -415,16 +292,16 @@
 </section>
 <section id="settings-reports-content" class="hidden mb-10">
 <header class="mb-8">
-<h1 class="text-3xl font-bold">Reports</h1> <!-- Inherits -->
+<h1 class="text-3xl font-bold text-[var(--text-color)]">Reports</h1>
 </header>
 </section>
 <section id="settings-about-content" class="hidden mb-10">
 <header class="mb-8">
-<h1 class="text-3xl font-bold">About</h1> <!-- Inherits -->
+<h1 class="text-3xl font-bold text-[var(--text-color)]">About</h1>
 </header>
 <div class="space-y-6 max-w-md">
 <div>
-<h2 class="text-xl font-semibold mb-2">Demicube GoldHash</h2> <!-- Inherits -->
+<h2 class="text-xl font-semibold text-[var(--text-color)] mb-2">Demicube GoldHash</h2>
 <p class="text-sm text-[var(--text-muted-color)] mb-4">GoldHash is a file integrity monitoring tool that helps you detect changes to your important files.</p>
 </div>
 <div>
