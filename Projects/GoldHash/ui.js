@@ -1123,37 +1123,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateSidebarView(); // Initial sidebar render based on demoFilesData and any userUploadedFolders
 
-    // Settings Menu (gear icon)
+    // Settings Menu (gear icon) - Updated for Overlay
     const settingsIconContainer = document.querySelector('div[data-icon="Gear"]');
-    const settingsContextMenu = document.getElementById('settings-context-menu');
+    const settingsOverlay = document.getElementById('settings-overlay'); // New overlay
 
-    if (settingsIconContainer && settingsContextMenu) {
+    if (settingsIconContainer && settingsOverlay) {
         settingsIconContainer.addEventListener('click', (event) => {
-            event.stopPropagation();
-            settingsContextMenu.classList.toggle('hidden');
+            event.stopPropagation(); // Prevent click from immediately propagating to the overlay if it's somehow listening too
+            settingsOverlay.classList.toggle('hidden');
         });
-        document.addEventListener('click', (event) => {
-            if (!settingsContextMenu.contains(event.target) && !settingsIconContainer.contains(event.target)) {
-                settingsContextMenu.classList.add('hidden');
+
+        // Close overlay when clicking on the backdrop
+        settingsOverlay.addEventListener('click', (event) => {
+            if (event.target === settingsOverlay) { // Check if the click is on the backdrop itself
+                settingsOverlay.classList.add('hidden');
             }
         });
     }
 
-    // Clear Logs button in settings menu
+    // Remove or comment out the old clearLogsButton listener as its button is gone
+    /*
     const clearLogsButton = document.getElementById('clear-logs-button');
     if (clearLogsButton) {
         clearLogsButton.addEventListener('click', (event) => {
             event.preventDefault();
-            if (typeof clearLogs === 'function') { // Expected from logging.js
-                clearLogs(); // This will update window.fileLog and UI
+            if (typeof clearLogs === 'function') {
+                clearLogs();
             } else {
-                console.error("clearLogs function not found (ui.js). Ensure logging.js is loaded.");
-                // Avoid direct manipulation of fileLog here if it's managed by logging.js
+                console.error("clearLogs function not found (ui.js).");
                 showToast("Error: Clear logs functionality is unavailable.", 'error');
             }
-            if (settingsContextMenu) settingsContextMenu.classList.add('hidden');
+            // settingsContextMenu.classList.add('hidden'); // This line is for the old menu
         });
     }
+    */
 
     // Scan Files button - This button's core logic (scanFiles function) is expected in script.js
     const scanButton = document.getElementById('scan-files-button');
