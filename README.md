@@ -12,7 +12,7 @@ Welcome to my portfolio of client-side web applications. This collection showcas
 
 ## Projects
 
-Below is a list of projects currently available. Each Cybesecurity project is client-side, ensuring your data remains private and under your control. The hobby-projects will alert you when storing server side info. All of these projects can be downloaded and run offline. Thank you for checking me out and drop me an email if you have any projects you'd like to work on together!
+Below is a list of projects currently available. Each Cybersecurity project is client-side, ensuring your data remains private and under your control. The hobby-projects will alert you when storing server side info. All of these projects can be downloaded and run offline. Thank you for checking me out and drop me an email if you have any projects you'd like to work on together!
 
 ### 1. nCode - Secure Client-Side Encryption Tool
 
