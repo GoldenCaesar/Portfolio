@@ -135,4 +135,10 @@ Please be aware that nCode is an evolving project. Future updates, especially th
 It is crucial to keep a record of the version of nCode used for any specific encryption task if you anticipate needing to decrypt it in the distant future. While we strive for backward compatibility where possible, it cannot be guaranteed across major algorithm changes.
 
 ---
+
+## Known Bugs
+
+*   There are currently no known bugs. If you encounter any issues, please report them.
+
+---
 Feel free to contribute or report issues!
