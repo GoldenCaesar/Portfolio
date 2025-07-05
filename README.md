@@ -5,10 +5,10 @@ Welcome to my portfolio of client-side web applications. This collection showcas
 ## Contact Information
 
 *   **Name:** Stephen Miller
-*   **Email:** thestephenmiller@me.com
-*   **LinkedIn:** [https://linkedIn.com/in/thestephenmiller](https://linkedIn.com/in/thestephenmiller)
-*   **GitHub:** [[Link to your GitHub profile if applicable](https://github.com/GoldenCaesar)]
-*   **Website:** [https://thestephenmiller.com]
+*   **Email:** [Email Me]thestephenmiller@me.com
+*   **LinkedIn:** [LinkedIn](https://linkedIn.com/in/thestephenmiller)
+*   **GitHub:** [GitHub]https://github.com/GoldenCaesar)
+*   **Website:** [View My Portfolio](https://thestephenmiller.com)
 
 ## Projects
 
