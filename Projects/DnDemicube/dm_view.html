@@ -93,35 +93,44 @@
 
         // --- Main Map Drawing and Handling ---
         function drawDmMap() {
+            console.log("[DM View] drawDmMap() called. currentMapImage:", currentMapImage ? `Image(${currentMapImage.width}x${currentMapImage.height})` : 'null');
             if (!currentMapImage) {
+                console.log("[DM View] drawDmMap: currentMapImage is null, calling drawPlaceholder().");
                 drawPlaceholder();
                 return;
             }
 
             const imageToDraw = currentMapImage;
+            console.log("[DM View] drawDmMap: imageToDraw properties:", imageToDraw.naturalWidth, imageToDraw.naturalHeight);
             const mapContainer = document.getElementById('map-container');
-            const containerWidth = mapContainer.clientWidth - 20;
-            const containerHeight = mapContainer.clientHeight - 20;
+            const containerWidth = mapContainer.clientWidth - 20; // Account for padding
+            const containerHeight = mapContainer.clientHeight - 20; // Account for padding
+            console.log("[DM View] drawDmMap: mapContainer dimensions (clientWidth-20, clientHeight-20):", containerWidth, containerHeight);
 
-            let canvasWidth = imageToDraw.naturalWidth; // Use naturalWidth for original dimensions
+
+            let canvasWidth = imageToDraw.naturalWidth;
             let canvasHeight = imageToDraw.naturalHeight;
 
             const aspectRatio = imageToDraw.naturalWidth / imageToDraw.naturalHeight;
 
-            if (canvasWidth > containerWidth) {
+            if (canvasWidth > containerWidth && containerWidth > 0) { // Ensure containerWidth is positive
                 canvasWidth = containerWidth;
                 canvasHeight = canvasWidth / aspectRatio;
             }
-            if (canvasHeight > containerHeight) {
+            if (canvasHeight > containerHeight && containerHeight > 0) { // Ensure containerHeight is positive
                 canvasHeight = containerHeight;
                 canvasWidth = canvasHeight * aspectRatio;
             }
 
+            console.log("[DM View] drawDmMap: Calculated canvas dimensions (width, height):", canvasWidth, canvasHeight);
+
             dmCanvas.width = canvasWidth;
             dmCanvas.height = canvasHeight;
 
-            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height); // Clear before drawing
+            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+            console.log("[DM View] drawDmMap: Canvas cleared.");
             ctx.drawImage(imageToDraw, 0, 0, dmCanvas.width, dmCanvas.height);
+            console.log("[DM View] drawDmMap: Image drawn on canvas.");
 
             // Redraw existing sub-map areas
             campaignData.subMaps.forEach(subMap => {
@@ -171,15 +180,21 @@
         });
 
         uploadMapButton.addEventListener('change', (event) => {
+            console.log("[DM View] uploadMapButton 'change' event fired.");
             const file = event.target.files[0];
             if (file) {
+                console.log("[DM View] File selected:", file.name, file.type);
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    console.log("[DM View] FileReader 'onload' event fired.");
                     const img = new Image();
                     img.onload = () => {
+                        console.log("[DM View] Image 'onload' event fired. Image properties:", img.width, img.height, "src length:", e.target.result.length);
                         currentMapImage = img; // Set the global currentMapImage
+                        console.log("[DM View] currentMapImage set:", currentMapImage ? currentMapImage.width : 'null');
                         campaignData.mainMapUrl = e.target.result; // Store data URL
                         campaignData.subMaps = []; // Clear previous sub-maps
+                        console.log("[DM View] Calling drawDmMap() from uploadMapButton.");
                         drawDmMap(); // Redraws the map and any existing (now cleared) submap areas
                         if (playerWindow && !playerWindow.closed) {
                             playerWindow.postMessage({ type: 'loadMap', mapDataUrl: campaignData.mainMapUrl }, '*');
