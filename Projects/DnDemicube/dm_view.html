@@ -45,6 +45,13 @@
         .button-like-label:hover {
             background-color: #a0b4c9;
         }
+        .visibility-icon {
+            margin-right: 8px;
+            cursor: pointer;
+            display: inline-block; /* Ensures it takes space */
+            width: 20px; /* Give it a fixed width for alignment */
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -72,9 +79,9 @@
                 </div>
             </div>
 
-            <div class="sidebar-section" id="active-maps-section">
+            <div class="sidebar-section" id="active-maps-section" style="overflow-y: auto; overflow-x: auto; max-height: 200px;">
                 <h3>Active</h3>
-                <ul id="active-maps-list">
+                <ul id="active-maps-list" style="white-space: nowrap;">
                     <!-- Active maps will be listed here -->
                 </ul>
             </div>
@@ -572,41 +579,49 @@ dmCanvas.addEventListener('click', (e) => {
 
             function createMapListItem(mapNode, depth = 0) {
                 const listItem = document.createElement('li');
-                listItem.textContent = mapNode.name || `Map ID: ${mapNode.id.substring(0,8)}`;
-                listItem.style.cursor = 'pointer';
                 listItem.style.paddingLeft = `${depth * 15}px`;
+                // listItem.style.cursor = 'pointer'; // Click target is now the icon
+
+                const icon = document.createElement('span');
+                icon.classList.add('visibility-icon');
+
+                const mapNameSpan = document.createElement('span');
+                mapNameSpan.textContent = mapNode.name || `Map ID: ${mapNode.id.substring(0,8)}`;
 
                 if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id) {
                     listItem.style.fontWeight = 'bold';
+                    icon.textContent = '👁️'; // Visible icon
+                } else {
+                    icon.textContent = '🙈'; // Hidden icon
                 }
 
-                listItem.addEventListener('click', (event) => {
+                icon.addEventListener('click', (event) => {
                     event.stopPropagation();
                     if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete) {
-                        console.log("[Active List] Clicked already active map:", mapNode.name);
-                        return;
+                        console.log("[Active List Icon] Clicked icon for already active map:", mapNode.name);
+                        return; // Do nothing if already active
                     }
 
-                    console.log("[Active List] Clicked map in list:", mapNode.name);
+                    console.log("[Active List Icon] Clicked icon for map:", mapNode.name);
                     const img = new Image();
                     img.onload = () => {
                         currentlyViewedMap = mapNode;
                         currentlyDisplayedImage = img;
                         drawDmMap();
-                        updateActiveMapsList(); // Re-render list to update bolding
+                        updateActiveMapsList(); // Re-render list to update icons and bolding
                         if (playerWindow && !playerWindow.closed) {
-                            // Determine message type based on whether it's the root map or a submap
                             const messageType = mapNode.parentId ? 'showSubMap' : 'showMainMap';
                             playerWindow.postMessage({ type: messageType, mapDataUrl: mapNode.mapUrl }, '*');
                         }
                     };
                     img.onerror = () => {
-                        console.error("[Active List] Error loading map image from active list for:", mapNode.name);
-                        // Optionally, revert to a known state or show placeholder
-                        // For now, just log and the view won't change if image fails
+                        console.error("[Active List Icon] Error loading map image from icon click for:", mapNode.name);
                     };
                     img.src = mapNode.mapUrl;
                 });
+
+                listItem.appendChild(icon);
+                listItem.appendChild(mapNameSpan);
                 activeMapsList.appendChild(listItem);
 
                 if (mapNode.subMaps && mapNode.subMaps.length > 0) {
