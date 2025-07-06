@@ -59,6 +59,32 @@
             margin-bottom: 0; /* Optional: Reset default margins */
         }
         /* Individual list items will still have padding-left set by JS for hierarchy */
+        .edit-icon {
+            cursor: pointer;
+            margin-left: 8px;
+            font-size: 0.9em; /* Slightly smaller than h3 */
+            display: inline-block; /* Allows margin and proper positioning */
+        }
+        .file-action-icon {
+            cursor: pointer;
+            margin-left: 5px;
+            display: none; /* Hidden by default */
+        }
+        .file-action-icon.visible {
+            display: inline-block;
+        }
+        #active-maps-list.edit-mode-active .map-name-span:hover {
+            /* Optional: Style for map names when in edit mode, e.g., different background */
+            /* background-color: #3a4148; */ /* Example */
+        }
+        .rename-input-active {
+            /* Basic styling for the rename input field */
+            padding: 2px 4px;
+            border: 1px solid #b6cae1;
+            background-color: #15191e;
+            color: #e0e0e0;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
@@ -87,7 +113,7 @@
             </div>
 
             <div class="sidebar-section" id="active-maps-section" style="overflow-y: auto; overflow-x: auto; max-height: 200px;">
-                <h3>Active</h3>
+                <h3>Active <span id="edit-active-list-button" class="edit-icon" title="Edit list">✏️</span></h3>
                 <ul id="active-maps-list" style="white-space: nowrap;">
                     <!-- Active maps will be listed here -->
                 </ul>
@@ -145,8 +171,11 @@
         const uploadSubmapButton = document.getElementById('upload-submap-button');
         const uploadSubmapLabel = document.getElementById('upload-submap-label');
         const activeMapsList = document.getElementById('active-maps-list');
+        const editActiveListButton = document.getElementById('edit-active-list-button');
 
         let playerWindow = null;
+        let isActiveListInEditMode = false;
+        let currentlySelectedFileItemIdForEditing = null; // Stores the ID of the map item whose icons are shown
 
         // Root map object for the campaign. This structure will be nested.
         let campaignData = {
@@ -611,12 +640,13 @@ dmCanvas.addEventListener('click', (e) => {
 
                 icon.addEventListener('click', (event) => {
                     event.stopPropagation(); // Prevent triggering mapNameSpan click
+                    // If in edit mode, icon clicks should probably do nothing or be disabled
+                    if (isActiveListInEditMode) return;
+
                     if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete) {
-                        // console.log("[Active List Icon] Clicked icon for already active map:", mapNode.name);
                         return;
                     }
 
-                    // console.log("[Active List Icon] Clicked icon for map:", mapNode.name);
                     const img = new Image();
                     img.onload = () => {
                         currentlyViewedMap = mapNode;
@@ -635,15 +665,52 @@ dmCanvas.addEventListener('click', (e) => {
                 });
 
                 mapNameSpan.addEventListener('click', (event) => {
-                    event.stopPropagation(); // Prevent outer elements from handling this click if nested
-                    if (mapNode.subMaps && mapNode.subMaps.length > 0) {
-                        mapNode.isCollapsed = !mapNode.isCollapsed; // Toggle state
-                        updateActiveMapsList(); // Re-render the list
+                    event.stopPropagation();
+                    // Specific logic for mapNameSpan click will be handled in edit mode toggle function
+                    // For now, default behavior is expand/collapse OR trigger file edit mode
+                    if (!isActiveListInEditMode) {
+                        if (mapNode.subMaps && mapNode.subMaps.length > 0) {
+                            mapNode.isCollapsed = !mapNode.isCollapsed; // Toggle state
+                            updateActiveMapsList(); // Re-render the list
+                        }
+                    } else {
+                        // In edit mode, clicking the name will show/hide icons
+                        toggleFileActionIcons(mapNode.id, listItem);
                     }
                 });
 
                 contentWrapper.appendChild(icon);
                 contentWrapper.appendChild(mapNameSpan);
+
+                // Add file action icons (edit, delete)
+                const fileEditIcon = document.createElement('span');
+                fileEditIcon.classList.add('file-action-icon', 'file-edit-icon');
+                fileEditIcon.setAttribute('data-mapid', mapNode.id);
+                fileEditIcon.textContent = '✏️';
+                fileEditIcon.title = 'Rename';
+                fileEditIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    initiateRename(mapNode, listItem, mapNameSpan, contentWrapper);
+                });
+
+                const fileDeleteIcon = document.createElement('span');
+                fileDeleteIcon.classList.add('file-action-icon', 'file-delete-icon');
+                fileDeleteIcon.setAttribute('data-mapid', mapNode.id);
+                fileDeleteIcon.textContent = '❌';
+                fileDeleteIcon.title = 'Delete';
+                fileDeleteIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleDeleteMap(mapNode.id);
+                });
+
+                // Make icons visible if this item is selected for editing in edit mode
+                if (isActiveListInEditMode && currentlySelectedFileItemIdForEditing === mapNode.id) {
+                    fileEditIcon.classList.add('visible');
+                    fileDeleteIcon.classList.add('visible');
+                }
+
+                contentWrapper.appendChild(fileEditIcon);
+                contentWrapper.appendChild(fileDeleteIcon);
                 listItem.appendChild(contentWrapper);
 
                 // Display child count if collapsed
@@ -818,6 +885,325 @@ dmCanvas.addEventListener('click', (e) => {
         function generateUniqueId() {
             return `map_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         }
+
+        // --- Edit Active List Functionality ---
+        editActiveListButton.addEventListener('click', () => {
+            isActiveListInEditMode = !isActiveListInEditMode;
+            if (isActiveListInEditMode) {
+                editActiveListButton.textContent = '💾'; // Save/Done icon
+                editActiveListButton.title = 'Finish editing';
+                // Potentially add a class to active-maps-list to change cursor or style
+                activeMapsList.classList.add('edit-mode-active');
+            } else {
+                editActiveListButton.textContent = '✏️';
+                editActiveListButton.title = 'Edit list';
+                hideAllFileActionIcons();
+                currentlySelectedFileItemIdForEditing = null;
+                activeMapsList.classList.remove('edit-mode-active');
+                // If a rename input is active, finalize or cancel it here (advanced)
+            }
+            updateActiveMapsList(); // Re-render to apply/remove any edit-mode specific states if needed
+        });
+
+        function hideAllFileActionIcons() {
+            document.querySelectorAll('#active-maps-list .file-action-icon.visible').forEach(icon => {
+                icon.classList.remove('visible');
+            });
+            // If an input field is active for renaming, remove it and restore the span
+            const activeInput = activeMapsList.querySelector('.rename-input-active');
+            if (activeInput) {
+                const mapId = activeInput.dataset.mapid;
+                const mapNode = findMapById(mapId);
+                if (mapNode) {
+                    // Restore original name display (or save if that's the desired UX on exiting main edit mode)
+                    const listItem = activeInput.closest('li');
+                    const nameSpan = listItem.querySelector(`span[data-mapid="${mapId}"].map-name-span-placeholder`); // Need to ensure mapNameSpan has a way to be identified
+                    if (nameSpan) nameSpan.style.display = 'inline';
+                    activeInput.remove();
+                }
+            }
+        }
+
+        // Placeholder for now, will be fleshed out in step 4
+        function toggleFileActionIcons(mapId, listItemElement) {
+            console.log(`[Edit Mode] toggleFileActionIcons for map: ${mapId}. List item:`, listItemElement);
+
+            // If a rename input is active on a *different* item, finalize/cancel it.
+            const activeRenameInput = activeMapsList.querySelector('.rename-input-active');
+            if (activeRenameInput && activeRenameInput.dataset.mapid !== mapId) {
+                // Simulate blur to finalize or cancel the rename
+                activeRenameInput.blur();
+            }
+
+            // Determine if we are about to show icons for a new item or hide for the current.
+            const isSameItem = currentlySelectedFileItemIdForEditing === mapId;
+
+            // Hide icons for any other item that might have them visible
+            if (currentlySelectedFileItemIdForEditing && !isSameItem) {
+                const previouslySelectedListItem = activeMapsList.querySelector(`li [data-mapid="${currentlySelectedFileItemIdForEditing}"]`)?.closest('li');
+                if (previouslySelectedListItem) {
+                    previouslySelectedListItem.querySelectorAll('.file-action-icon').forEach(ic => ic.classList.remove('visible'));
+                }
+            }
+
+            // Toggle icons for the current item
+            const icons = listItemElement.querySelectorAll('.file-action-icon');
+            let areIconsNowVisible = false;
+            icons.forEach(icon => {
+                icon.classList.toggle('visible');
+                if (icon.classList.contains('visible')) {
+                    areIconsNowVisible = true;
+                }
+            });
+
+            if (areIconsNowVisible) {
+                currentlySelectedFileItemIdForEditing = mapId;
+            } else {
+                currentlySelectedFileItemIdForEditing = null;
+            }
+        }
+
+        function initiateRename(mapNode, listItemElement, nameSpanElement, contentWrapperElement) {
+            // If there's already an input field for this item, don't create another
+            if (contentWrapperElement.querySelector('.rename-input-active')) {
+                return;
+            }
+            // If another item is being renamed, finalize that first by blurring its input
+            const existingInput = activeMapsList.querySelector('.rename-input-active');
+            if (existingInput) {
+                existingInput.blur(); // This should trigger save/cancel
+            }
+
+            nameSpanElement.style.display = 'none'; // Hide the original name span
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = mapNode.name;
+            input.classList.add('rename-input-active'); // Class to identify active input
+            input.setAttribute('data-mapid', mapNode.id); // Store mapId for reference
+            input.style.marginLeft = nameSpanElement.style.marginLeft; // Keep indentation
+            input.style.width = 'calc(100% - 40px)'; // Adjust width as needed, considering icons
+
+            // Insert input before the file action icons within the contentWrapper
+            const firstActionIcon = contentWrapperElement.querySelector('.file-action-icon');
+            if (firstActionIcon) {
+                contentWrapperElement.insertBefore(input, firstActionIcon);
+            } else { // Should not happen if icons are present
+                contentWrapperElement.appendChild(input);
+            }
+
+            input.focus();
+            input.select();
+
+            const finalizeRename = () => {
+                const newName = input.value.trim();
+                // Remove input and show span regardless of save success to clean up UI
+                input.remove();
+                nameSpanElement.style.display = 'inline'; // Show original span position
+
+                if (newName && newName !== mapNode.name) {
+                    console.log(`Renaming map '${mapNode.name}' (ID: ${mapNode.id}) to '${newName}'`);
+                    mapNode.name = newName;
+                    // No need to call updateActiveMapsList() immediately if we update the span directly
+                    // However, if IDs or other fundamental aspects change, a full update is safer.
+                    // For now, just update the text content of the existing span.
+                    nameSpanElement.textContent = newName; // Update display name
+
+                    // If the renamed map is currently viewed, reflect this
+                    if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id) {
+                        // Potentially update other UI elements that display the current map's name
+                    }
+                    // If player view is open and showing this map, update it (more complex, for later)
+                    if (playerWindow && !playerWindow.closed && currentlyViewedMap && currentlyViewedMap.id === mapNode.id) {
+                        // This is a simplification. Player view might need more context or a specific message type.
+                        // playerWindow.postMessage({ type: 'mapRenamed', mapId: mapNode.id, newName: newName, mapDataUrl: mapNode.mapUrl }, '*');
+                    }
+                     updateActiveMapsList(); // Re-render to ensure all parts of UI are consistent
+                } else if (!newName) {
+                    alert("Map name cannot be empty.");
+                    nameSpanElement.textContent = mapNode.name; // Revert to old name display
+                }
+                // Else, name didn't change or was invalid but handled, UI is reset.
+            };
+
+            input.addEventListener('blur', () => {
+                finalizeRename();
+                // Ensure action icons for this item remain visible as per currentlySelectedFileItemIdForEditing logic
+                if (currentlySelectedFileItemIdForEditing === mapNode.id) {
+                    listItemElement.querySelectorAll('.file-action-icon').forEach(ic => ic.classList.add('visible'));
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    finalizeRename();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    input.value = mapNode.name; // Revert to original name
+                    finalizeRename(); // This will just clean up the UI
+                }
+            });
+        }
+
+        function removeMapById(mapIdToRemove, currentSearchNode = campaignData) {
+            // Check if the currentSearchNode itself is the one to remove (only for subMaps)
+            // The root campaignData object cannot be "removed" by its parent, it's handled separately.
+
+            if (currentSearchNode.subMaps && currentSearchNode.subMaps.length > 0) {
+                const originalLength = currentSearchNode.subMaps.length;
+                currentSearchNode.subMaps = currentSearchNode.subMaps.filter(subMap => {
+                    if (subMap.id === mapIdToRemove) {
+                        console.log(`[Delete] Removing map '${subMap.name}' (ID: ${mapIdToRemove}) from parent '${currentSearchNode.name}'.`);
+                        return false; // Exclude this map
+                    }
+                    return true; // Keep this map
+                });
+
+                if (currentSearchNode.subMaps.length < originalLength) {
+                    return true; // Indicates a map was found and removed at this level
+                }
+
+                // If not removed at this level, recurse into children
+                for (const subMap of currentSearchNode.subMaps) {
+                    if (removeMapById(mapIdToRemove, subMap)) {
+                        return true; // Map was found and removed in a deeper branch
+                    }
+                }
+            }
+            return false; // Map not found in this branch
+        }
+
+        function handleDeleteMap(mapIdToDelete) {
+            const mapToDelete = findMapById(mapIdToDelete);
+            if (!mapToDelete) {
+                console.warn(`[Delete] Map with ID ${mapIdToDelete} not found.`);
+                return;
+            }
+
+            const confirmationMessage = `Are you sure you want to remove the map "${mapToDelete.name}"? This will also remove all its sub-maps.`;
+            if (!confirm(confirmationMessage)) {
+                return;
+            }
+
+            console.log(`[Delete] User confirmed deletion for map '${mapToDelete.name}' (ID: ${mapIdToDelete})`);
+
+            let parentOfDeletedMap = null;
+
+            if (mapIdToDelete === campaignData.id) {
+                // Handle deletion of the root map
+                console.log("[Delete] Root map deletion requested. Resetting campaign data.");
+                const oldRootName = campaignData.name;
+                campaignData = {
+                    id: generateUniqueId(), // Generate a new ID for a new "empty" root
+                    parentId: null,
+                    name: "Main Map", // Reset to default name
+                    mapUrl: null,
+                    naturalWidth: 0,
+                    naturalHeight: 0,
+                    subMaps: []
+                };
+                currentlyViewedMap = campaignData; // View the new empty root
+                currentlyDisplayedImage = null;
+
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'clearMap' }, '*'); // Or load a placeholder
+                }
+                 // Clear selection as the context is gone
+                currentlySelectedFileItemIdForEditing = null;
+
+
+            } else {
+                // Find the parent to update currentlyViewedMap if needed
+                if (mapToDelete.parentId) {
+                    parentOfDeletedMap = findMapById(mapToDelete.parentId);
+                }
+
+                const removed = removeMapById(mapIdToDelete, campaignData); // Pass campaignData as the starting node
+
+                if (!removed) {
+                    console.error(`[Delete] Failed to remove map ${mapIdToDelete} programmatically, though it was found initially.`);
+                    return; // Should not happen if findMapById worked
+                }
+
+                 // If the currently selected item for editing was the one deleted
+                if (currentlySelectedFileItemIdForEditing === mapIdToDelete) {
+                    currentlySelectedFileItemIdForEditing = null;
+                }
+
+                // Determine what to display next
+                let newMapToView = null;
+                if (currentlyViewedMap && isNodeOrChildOf(mapIdToDelete, currentlyViewedMap.id)) {
+                    // If the currently viewed map IS the deleted map OR a child of the deleted map
+                    newMapToView = parentOfDeletedMap || campaignData; // Go to parent or root
+                } else {
+                    // Currently viewed map is not affected directly, keep it.
+                    newMapToView = currentlyViewedMap;
+                }
+
+                if (newMapToView && newMapToView.mapUrl) {
+                    const img = new Image();
+                    img.onload = () => {
+                        currentlyViewedMap = newMapToView;
+                        currentlyDisplayedImage = img;
+                        drawDmMap();
+                        updateActiveMapsList(); // Update list after map is drawn and state is set
+                        if (playerWindow && !playerWindow.closed) {
+                             playerWindow.postMessage({ type: newMapToView.parentId ? 'showSubMap' : 'showMainMap', mapDataUrl: newMapToView.mapUrl }, '*');
+                        }
+                    };
+                    img.onerror = () => { // Fallback if image load fails
+                        console.error("[Delete] Error loading image for new view after delete. Resetting to root.");
+                        currentlyViewedMap = campaignData; // Default to root
+                        currentlyDisplayedImage = null; // Clear image if root has no mapUrl
+                        if (campaignData.mapUrl) { // Try to load root map image
+                           const rootImg = new Image();
+                           rootImg.onload = () => { currentlyDisplayedImage = rootImg; drawDmMap(); updateActiveMapsList();};
+                           rootImg.onerror = () => { drawPlaceholder(); updateActiveMapsList();};
+                           rootImg.src = campaignData.mapUrl;
+                        } else {
+                           drawPlaceholder(); // If root has no map, draw placeholder
+                           updateActiveMapsList();
+                        }
+                    };
+                    img.src = newMapToView.mapUrl;
+                } else { // newMapToView might be the (potentially empty) root, or mapUrl is null
+                    currentlyViewedMap = newMapToView || campaignData; // Ensure currentlyViewedMap is set
+                    currentlyDisplayedImage = null;
+                    drawDmMap(); // This will likely call drawPlaceholder if mapUrl is null
+                    updateActiveMapsList();
+                    if (playerWindow && !playerWindow.closed) {
+                        if (currentlyViewedMap.mapUrl) {
+                            playerWindow.postMessage({ type: currentlyViewedMap.parentId ? 'showSubMap' : 'showMainMap', mapDataUrl: currentlyViewedMap.mapUrl }, '*');
+                        } else {
+                            playerWindow.postMessage({ type: 'clearMap' }, '*');
+                        }
+                    }
+                }
+            }
+
+            // Common updates for both root and submap deletion
+            if (mapIdToDelete !== campaignData.id) { // Avoid double update if root was reset
+                 updateActiveMapsList();
+                 drawDmMap(); // Ensure canvas reflects the change
+            }
+        }
+
+        // Helper to check if nodeId is targetId or a child of targetId
+        function isNodeOrChildOf(nodeId, targetId, searchStartNode = campaignData) {
+            if (nodeId === targetId) return true;
+
+            const targetNode = findMapById(targetId, searchStartNode);
+            if (!targetNode || !targetNode.subMaps) return false;
+
+            for (const subMap of targetNode.subMaps) {
+                if (isNodeOrChildOf(nodeId, subMap.id, subMap)) { // Check if nodeId is subMap.id or its child
+                    return true;
+                }
+            }
+            return false;
+        }
+
 
     </script>
 </body>
