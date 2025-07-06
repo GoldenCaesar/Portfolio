@@ -45,6 +45,29 @@
         .button-like-label:hover {
             background-color: #a0b4c9;
         }
+        #active-maps-list ul { /* Prevent nested lists from having bullets or default padding */
+            list-style-type: none;
+            padding-left: 0;
+            margin-left: 0; /* Adjust if needed, but direct children of li usually handle indent */
+        }
+        #active-maps-list > li > ul { /* Target only direct UL children of the top-level LIs for specific indentation if createMapListItem's padding isn't enough */
+             /* padding-left: 15px; /* Example if direct style wasn't used */
+        }
+        .selected-map {
+            font-weight: bold;
+        }
+        /* Direct child selector to prevent checkmark from appearing on parent LIs if a child UL's LI is selected */
+        #active-maps-list > li.selected-map > span::before,
+        #active-maps-list > li > ul > li.selected-map > span::before { /* Adjust selector for deeper levels if needed */
+            content: "✓ ";
+            margin-right: 4px; /* Space between checkmark and text */
+            font-weight: normal; /* Ensure checkmark itself isn't double-bolded if parent is bold */
+        }
+        /* To ensure the text and potential checkmark are on the same line and allow ::before */
+        #active-maps-list li > span {
+            display: inline-block; /* Or flex, if more complex alignment is needed */
+        }
+
     </style>
 </head>
 <body>
@@ -572,12 +595,15 @@ dmCanvas.addEventListener('click', (e) => {
 
             function createMapListItem(mapNode, depth = 0) {
                 const listItem = document.createElement('li');
-                listItem.textContent = mapNode.name || `Map ID: ${mapNode.id.substring(0,8)}`;
+                const textSpan = document.createElement('span'); // Create a span for the text
+                textSpan.textContent = mapNode.name || `Map ID: ${mapNode.id.substring(0,8)}`;
+                listItem.appendChild(textSpan); // Append span to li
                 listItem.style.cursor = 'pointer';
                 listItem.style.paddingLeft = `${depth * 15}px`;
 
                 if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id) {
-                    listItem.style.fontWeight = 'bold';
+                    // listItem.style.fontWeight = 'bold'; // Removed direct style
+                    listItem.classList.add('selected-map'); // Add class instead
                 }
 
                 listItem.addEventListener('click', (event) => {
