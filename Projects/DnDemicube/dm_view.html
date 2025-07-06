@@ -52,6 +52,13 @@
             width: 20px; /* Give it a fixed width for alignment */
             text-align: center;
         }
+        #active-maps-list, #active-maps-list ul {
+            list-style-type: none;
+            padding-left: 0; /* Reset default browser padding for ULs */
+            margin-top: 0; /* Optional: Reset default margins */
+            margin-bottom: 0; /* Optional: Reset default margins */
+        }
+        /* Individual list items will still have padding-left set by JS for hierarchy */
     </style>
 </head>
 <body>
@@ -579,36 +586,43 @@ dmCanvas.addEventListener('click', (e) => {
 
             function createMapListItem(mapNode, depth = 0) {
                 const listItem = document.createElement('li');
-                listItem.style.paddingLeft = `${depth * 15}px`;
-                // listItem.style.cursor = 'pointer'; // Click target is now the icon
+                // listItem.style.paddingLeft is not needed here if contentWrapper handles it
+
+                const contentWrapper = document.createElement('div');
+                contentWrapper.style.paddingLeft = `${depth * 20}px`; // Indentation for the whole line (icon + text)
+                contentWrapper.style.display = 'flex';
+                contentWrapper.style.alignItems = 'center';
 
                 const icon = document.createElement('span');
                 icon.classList.add('visibility-icon');
+                icon.style.cursor = 'pointer';
+                icon.style.marginRight = '5px'; // Space between icon and name text
 
                 const mapNameSpan = document.createElement('span');
                 mapNameSpan.textContent = mapNode.name || `Map ID: ${mapNode.id.substring(0,8)}`;
+                mapNameSpan.style.cursor = 'pointer'; // Make name clickable for collapse/expand
 
                 if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id) {
-                    listItem.style.fontWeight = 'bold';
+                    mapNameSpan.style.fontWeight = 'bold'; // Bold the text, not the whole li
                     icon.textContent = '👁️'; // Visible icon
                 } else {
                     icon.textContent = '🙈'; // Hidden icon
                 }
 
                 icon.addEventListener('click', (event) => {
-                    event.stopPropagation();
+                    event.stopPropagation(); // Prevent triggering mapNameSpan click
                     if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete) {
-                        console.log("[Active List Icon] Clicked icon for already active map:", mapNode.name);
-                        return; // Do nothing if already active
+                        // console.log("[Active List Icon] Clicked icon for already active map:", mapNode.name);
+                        return;
                     }
 
-                    console.log("[Active List Icon] Clicked icon for map:", mapNode.name);
+                    // console.log("[Active List Icon] Clicked icon for map:", mapNode.name);
                     const img = new Image();
                     img.onload = () => {
                         currentlyViewedMap = mapNode;
                         currentlyDisplayedImage = img;
                         drawDmMap();
-                        updateActiveMapsList(); // Re-render list to update icons and bolding
+                        updateActiveMapsList();
                         if (playerWindow && !playerWindow.closed) {
                             const messageType = mapNode.parentId ? 'showSubMap' : 'showMainMap';
                             playerWindow.postMessage({ type: messageType, mapDataUrl: mapNode.mapUrl }, '*');
@@ -620,22 +634,42 @@ dmCanvas.addEventListener('click', (e) => {
                     img.src = mapNode.mapUrl;
                 });
 
-                listItem.appendChild(icon);
-                listItem.appendChild(mapNameSpan);
-                activeMapsList.appendChild(listItem);
+                mapNameSpan.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent outer elements from handling this click if nested
+                    if (mapNode.subMaps && mapNode.subMaps.length > 0) {
+                        mapNode.isCollapsed = !mapNode.isCollapsed; // Toggle state
+                        updateActiveMapsList(); // Re-render the list
+                    }
+                });
 
-                if (mapNode.subMaps && mapNode.subMaps.length > 0) {
-                    const subList = document.createElement('ul');
-                    mapNode.subMaps.forEach(subMap => {
-                        subList.appendChild(createMapListItem(subMap, depth + 1));
-                    });
-                    listItem.appendChild(subList);
+                contentWrapper.appendChild(icon);
+                contentWrapper.appendChild(mapNameSpan);
+                listItem.appendChild(contentWrapper);
+
+                // Display child count if collapsed
+                if (mapNode.isCollapsed && mapNode.subMaps && mapNode.subMaps.length > 0) {
+                    const countSpan = document.createElement('span');
+                    countSpan.textContent = ` (+${mapNode.subMaps.length})`;
+                    countSpan.style.marginLeft = '5px';
+                    mapNameSpan.appendChild(countSpan);
                 }
-                return listItem;
+
+                activeMapsList.appendChild(listItem); // Append the main LI to the root UL
+
+                // If not collapsed and has subMaps, render them in a nested UL
+                if (!mapNode.isCollapsed && mapNode.subMaps && mapNode.subMaps.length > 0) {
+                    const subList = document.createElement('ul');
+                    // CSS should ensure subList has no bullets and no extra padding beyond what createMapListItem provides
+                    mapNode.subMaps.forEach(subMap => {
+                        subList.appendChild(createMapListItem(subMap, depth + 1)); // Children are one level deeper
+                    });
+                    listItem.appendChild(subList); // Append the UL of children to the parent LI
+                }
+                return listItem; // Return the LI, important for recursive calls to append to subList
             }
 
-            if (campaignData && campaignData.mapUrl) { // Only build list if there's a root map
-                createMapListItem(campaignData);
+            if (campaignData && campaignData.mapUrl) {
+                createMapListItem(campaignData, 0); // Initial call for the root map, depth 0
             }
         }
 
