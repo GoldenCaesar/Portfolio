@@ -542,26 +542,40 @@ dmCanvas.addEventListener('click', (e) => {
                             subMapItem.style.fontWeight = 'bold';
                         }
                         subMapItem.addEventListener('click', () => {
-                            if (dmDisplayingSubMapUrl !== subMap.mapUrl) { // Only switch if not already on this submap
-                                dmDisplayingSubMapUrl = subMap.mapUrl;
-                                dmDisplayingSubMapImage = new Image();
-                                dmDisplayingSubMapImage.onload = () => {
-                                    drawDmMap();
-                                    updateActiveMapsList(); // Re-render list
-                                };
-                                dmDisplayingSubMapImage.onerror = () => {
-                                    console.error("Error loading submap image for DM view from active list.");
-                                    dmDisplayingSubMapUrl = null; // Revert to main map on error
-                                    dmDisplayingSubMapImage = null;
-                                    drawDmMap();
-                                    updateActiveMapsList(); // Re-render list
-                                };
-                                dmDisplayingSubMapImage.src = subMap.mapUrl;
+                            // If this submap is already active and its image is loaded, do nothing
+                            if (dmDisplayingSubMapUrl === subMap.mapUrl && dmDisplayingSubMapImage && dmDisplayingSubMapImage.src === subMap.mapUrl && dmDisplayingSubMapImage.complete) {
+                                console.log("[Active List] Clicked already active and loaded sub-map:", subMap.name);
+                                return;
+                            }
+                            console.log("[Active List] Clicked sub-map in list:", subMap.name, "Target URL:", subMap.mapUrl);
+
+                            dmDisplayingSubMapUrl = subMap.mapUrl; // Tentatively set, image might fail to load
+                            const newSubImage = new Image();
+                            newSubImage.onload = () => {
+                                dmDisplayingSubMapImage = newSubImage; // Assign once fully loaded
+                                console.log("[Active List] Sub-map image loaded, calling drawDmMap for:", subMap.name);
+                                drawDmMap(); // Draw the new sub-map
 
                                 if (playerWindow && !playerWindow.closed) {
                                     playerWindow.postMessage({ type: 'showSubMap', mapDataUrl: subMap.mapUrl }, '*');
+                                    console.log("[Active List] Sent sub-map to player:", subMap.name);
                                 }
-                            }
+                                console.log("[Active List] Updating list after drawing sub-map:", subMap.name);
+                                updateActiveMapsList(); // Refresh bolding
+                            };
+                            newSubImage.onerror = () => {
+                                console.error("[Active List] Error loading submap image from active list for:", subMap.name);
+                                // If this failed load was for the URL we just tried to set
+                                if (dmDisplayingSubMapUrl === subMap.mapUrl) {
+                                    dmDisplayingSubMapUrl = null; // Revert to main map display logic
+                                    dmDisplayingSubMapImage = null;
+                                }
+                                drawDmMap(); // Redraw whatever is current (likely main map or placeholder)
+                                updateActiveMapsList(); // Still update list to reflect potential reversion
+                            };
+                            newSubImage.src = subMap.mapUrl;
+                            // dmDisplayingSubMapImage is not set to newSubImage here yet, only in onload.
+                            // This means if updateActiveMapsList was called synchronously here, it might not see the *new* image yet.
                         });
                         subMapListElement.appendChild(subMapItem);
                     });
