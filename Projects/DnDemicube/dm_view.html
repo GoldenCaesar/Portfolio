@@ -497,7 +497,7 @@ dmCanvas.addEventListener('click', (e) => {
                         loadCampaignInput.value = null; // Reset file input
                     }
                 };
-                reader.onerror = ()_ => {
+                reader.onerror = () => {
                     console.error("Error reading campaign file.");
                     alert("Error reading campaign file.");
                     loadCampaignInput.value = null; // Reset file input
