@@ -541,7 +541,8 @@ dmCanvas.addEventListener('click', (e) => {
                         if (dmDisplayingSubMapUrl === subMap.mapUrl) { // This sub-map is active
                             subMapItem.style.fontWeight = 'bold';
                         }
-                        subMapItem.addEventListener('click', () => {
+                        subMapItem.addEventListener('click', (event) => {
+                            event.stopPropagation(); // Prevent click from reaching canvas
                             // If this submap is already active and its image is loaded, do nothing
                             if (dmDisplayingSubMapUrl === subMap.mapUrl && dmDisplayingSubMapImage && dmDisplayingSubMapImage.src === subMap.mapUrl && dmDisplayingSubMapImage.complete) {
                                 console.log("[Active List] Clicked already active and loaded sub-map:", subMap.name);
