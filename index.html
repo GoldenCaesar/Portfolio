@@ -1,108 +1,42 @@
-<html>
-  <head>
-    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
-    <link
-      rel="stylesheet"
-      as="style"
-      onload="this.rel='stylesheet'"
-      href="https://fonts.googleapis.com/css2?display=swap&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900&amp;family=Plus+Jakarta+Sans%3Awght%40400%3B500%3B700%3B800"
-    />
-
-    <title>The Stephen Miller</title>
-    <link rel="icon" type="image/png" href="./assets/Demicube.png">
-
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  </head>
-  <body>
-    <div
-      class="relative flex size-full min-h-screen flex-col bg-white justify-between group/design-root overflow-x-hidden"
-      style='font-family: "Plus Jakarta Sans", "Noto Sans", sans-serif;'
-    >
-      <div class="px-4">
-        <div class="flex items-center bg-white p-4 pb-2 justify-between">
-
-          <div class="flex w-12 items-center justify-end">
-
-          </div>
-        </div>
-        <div class="flex p-4 @container">
-          <div class="flex w-full flex-col gap-4 items-center">
-            <div class="flex gap-4 flex-col items-center">
-              <div
-                class="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-32 w-32"
-                style='background-image: url("assets/headshot.jpg");'
-              ></div>
-              <div class="flex flex-col items-center justify-center justify-center">
-  <p class="text-[#141414] text-[22px] font-bold leading-tight tracking-[-0.015em] text-center">Stephen Miller</p>
-  <p class="text-[#757575] text-base font-normal leading-normal text-center">Full Stack Security Analyst</p>
-  <p class="text-[#757575] text-base font-normal leading-normal text-center">Whidbey Island, Washington</p>
-              </div>
+    <title>DnDemicube - DM View</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h2>DM Tools</h2>
+            <div class="sidebar-section">
+                <input type="file" id="uploadMapInput" accept="image/*" style="display: none;">
+                <button id="uploadMapBtn">Upload Main Map</button>
             </div>
-          </div>
-        </div>
-        <p class="text-[#141414] text-base font-normal leading-normal pb-3 pt-1 px-4 text-center">
-          I’m a jack of all trades, based in the beautiful Whidbey Island area, and specializing in functional security and machine learning web design. Let's get creative!
-        </p>
-        <h2 class="text-[#141414] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Contact</h2>
-    <button onclick="window.location.href = 'mailto:thestephenmiller@me.com';" class="flex items-center justify-center gap-4 bg-gray-200 hover:bg-gray-300 text-black font-medium py-3 px-4 rounded-lg w-full min-h-14 text-base">
-          <div class="text-[#141414] flex items-center justify-center rounded-lg bg-[#f2f2f2] shrink-0 size-10" data-icon="Envelope" data-size="24px" data-weight="regular">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
-              <path
-                d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48Zm-96,85.15L52.57,64H203.43ZM98.71,128,40,181.81V74.19Zm11.84,10.85,12,11.05a8,8,0,0,0,10.82,0l12-11.05,58,53.15H52.57ZM157.29,128,216,74.18V181.82Z"
-              ></path>
-            </svg>
-          </div>
-          <p class="text-[#141414] text-base font-normal leading-normal truncate">thestephenmiller@me.com</p>
-    </button>
-    <button onclick="window.open('https://linkedIn.com/in/thestephenmiller', '_blank');" class="flex items-center justify-center gap-4 bg-gray-200 hover:bg-gray-300 text-black font-medium py-3 px-4 rounded-lg w-full min-h-14 text-base mt-2">
-      <div class="text-[#141414] flex items-center justify-center rounded-lg bg-[#f2f2f2] shrink-0 size-10" data-icon="LinkedIn" data-size="24px" data-weight="regular">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
-        </svg>
-      </div>
-      <p class="text-[#141414] text-base font-normal leading-normal truncate">linkedIn.com/in/thestephenmiller</p>
-    </button>
-        <h2 class="text-[#141414] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Projects</h2>
-        <div class="flex overflow-y-auto [-ms-scrollbar-style:none] [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden">
-          <div class="flex items-stretch p-4 gap-3">
-            <div class="flex h-full flex-1 flex-col gap-4 rounded-lg min-w-60">
-              <a href="Projects/nCode/nCode.html" class="flex h-full flex-col gap-4">
-                <div
-                  class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col"
-                  style='background-image: url("assets/project-nCode.png");'
-                ></div>
-                <p class="text-[#141414] text-base font-medium leading-normal">nCode</p>
-              </a>
+            <div class="sidebar-section">
+                <h3>Edit Map</h3>
+                <div id="editMapControls">
+                    <!-- Controls for selecting area and linking maps will go here -->
+                    <p>Select an area on the map, then upload a map to link to it.</p>
+                    <input type="file" id="uploadSubMapInput" accept="image/*" style="display: none;">
+                    <button id="linkSubMapBtn" disabled>Upload Linked Map</button>
+                </div>
             </div>
-            <a href="Projects/GoldHash/index.html" class="flex h-full flex-1 flex-col gap-4 rounded-lg min-w-60">
-              <div
-                class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col"
-                style='background-image: url("assets/project-goldhash.png");'
-              ></div>
-              <p class="text-[#141414] text-base font-medium leading-normal">GoldHash</p>
-            </a>
-            <a href="/Projects/DnDemicube/index.html" class="flex h-full flex-1 flex-col gap-4 rounded-lg min-w-60">
-              <div
-                class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col"
-                style='background-image: url("assets/project-DnDemicube.png");'
-              ></div>
-              <p class="text-[#141414] text-base font-medium leading-normal">DnDemicube</p>
-              <p class="text-[#757575] text-sm font-normal leading-normal">A D&D companion app for tracking character stats, dice rolls, and inventory.</p>
-            </a>
-            <div class="flex h-full flex-1 flex-col gap-4 rounded-lg min-w-60">
-              <div
-                class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col"
-                style='background-image: url("./assets/project-comingsoon.png");'
-              ></div>
-              <p class="text-[#141414] text-base font-medium leading-normal">Coming Soon!</p>
+            <div class="sidebar-section">
+                <button id="openPlayerViewBtn">Open Player View</button>
             </div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="h-5 bg-white"></div>
-      </div>
+            <div class="sidebar-section">
+                <h3>Campaign Data</h3>
+                <button id="saveCampaignBtn">Save Campaign</button>
+                <input type="file" id="loadCampaignInput" accept=".json" style="display: none;">
+                <button id="loadCampaignBtn">Load Campaign</button>
+            </div>
+        </aside>
+        <main class="main-content">
+            <canvas id="dmCanvas"></canvas>
+        </main>
     </div>
-  </body>
+    <script src="script.js"></script>
+</body>
 </html>

@@ -1,0 +1,96 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    height: 100%;
+    overflow: hidden; /* Prevent scrollbars on body */
+}
+
+.container {
+    display: flex;
+    height: 100vh; /* Full viewport height */
+}
+
+.sidebar {
+    width: 250px;
+    background-color: #f0f0f0;
+    padding: 15px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    overflow-y: auto; /* Allow sidebar to scroll if content exceeds height */
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.sidebar h2 {
+    margin-top: 0;
+    font-size: 1.5em;
+    text-align: center;
+}
+
+.sidebar h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+}
+
+.sidebar-section {
+    margin-bottom: 20px;
+}
+
+.sidebar-section button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+.sidebar-section button:hover {
+    background-color: #0056b3;
+}
+
+.sidebar-section button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.sidebar-section p {
+    font-size: 0.9em;
+    color: #333;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 0; /* Remove padding if canvas is to touch edges */
+    display: flex; /* To center canvas, if needed, or manage its size */
+    justify-content: center; /* Center canvas horizontally */
+    align-items: center; /* Center canvas vertically */
+    overflow: hidden; /* Prevent main content area from causing scrollbars */
+    background-color: #e9e9e9; /* Light background for canvas area */
+}
+
+#dmCanvas {
+    max-width: 100%;
+    max-height: 100%;
+    /* The actual width and height will be set by JavaScript based on the uploaded image */
+    /* Add a border to see the canvas element before an image is loaded */
+    border: 1px solid #ccc;
+    object-fit: contain; /* Ensures the image is scaled correctly within the canvas dimensions */
+}
+
+/* Basic styles for player.html canvas */
+#playerCanvas {
+    max-width: 100%;
+    max-height: 100vh; /* Player canvas can take full viewport height */
+    display: block; /* Remove extra space below canvas */
+    margin: auto; /* Center canvas if it's smaller than window */
+    border: 1px solid #bbb;
+    object-fit: contain;
+}
