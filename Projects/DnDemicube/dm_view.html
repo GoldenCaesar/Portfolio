@@ -133,18 +133,40 @@
         const activeMapsList = document.getElementById('active-maps-list');
 
         let playerWindow = null;
-        let currentMapImage = null;
-        let dmDisplayingSubMapUrl = null; // Added to track if DM is viewing a submap
-        let dmDisplayingSubMapImage = null; // Added to hold the Image object for the submap
+
+        // Root map object for the campaign. This structure will be nested.
         let campaignData = {
-            mainMapName: "Main Map", // Default name
-            mainMapUrl: null,
-            subMaps: [] // { area: {x, y, w, h, originalImgW, originalImgH}, mapUrl: dataUrl, name: "Sub Map X" }
+            id: 'root_map_id', // Unique ID for the root map
+            parentId: null, // Root map has no parent
+            name: "Main Map",
+            mapUrl: null,
+            naturalWidth: 0,
+            naturalHeight: 0,
+            subMaps: [] // Each element is a map object
+            // Example subMap object:
+            // {
+            // id: 'unique_submap_id',
+            // parentId: 'parent_map_id',
+            // name: "Sub Map Name",
+            // mapUrl: "data:...",
+            // naturalWidth: 0, // natural width of this submap image
+            // naturalHeight: 0, // natural height of this submap image
+            // area: { x, y, w, h, originalImgW, originalImgH }, // Area defined on the parent map
+            // subMaps: [] // Further nested submaps
+            // }
         };
+
+        // Reference to the map object currently being viewed/edited on the DM canvas
+        let currentlyViewedMap = campaignData; // Initially, the main map is viewed
+        let currentlyDisplayedImage = null; // Holds the Image object for the currentlyViewedMap.mapUrl
 
         let isSelectingArea = false;
         let selectionStart = null;
-        let currentSelectionRect = null; // For storing the current selection before assigning a submap
+        // Stores the area selection (in canvas coordinates) temporarily before converting to image-relative
+        let tempSelectionCanvasRect = null;
+        // Stores the image-relative area selected on currentlyViewedMap, ready for new submap creation
+        let pendingSubmapArea = null;
+
 
         // --- Main Map Drawing and Handling ---
         function drawDmMap() {
@@ -152,33 +174,23 @@
             const containerWidth = mapContainer.clientWidth - 20; // Account for padding
             const containerHeight = mapContainer.clientHeight - 20; // Account for padding
 
-            let imageToDraw = null;
-            let originalWidth = 0;
-            let originalHeight = 0;
-
-            if (dmDisplayingSubMapUrl && dmDisplayingSubMapImage && dmDisplayingSubMapImage.complete) {
-                console.log("[DM View] drawDmMap() called for SubMap. Image:", dmDisplayingSubMapImage ? `Image(${dmDisplayingSubMapImage.width}x${dmDisplayingSubMapImage.height})` : 'null');
-                imageToDraw = dmDisplayingSubMapImage;
-                originalWidth = dmDisplayingSubMapImage.naturalWidth;
-                originalHeight = dmDisplayingSubMapImage.naturalHeight;
-            } else if (currentMapImage && currentMapImage.complete) {
-                console.log("[DM View] drawDmMap() called for MainMap. Image:", currentMapImage ? `Image(${currentMapImage.width}x${currentMapImage.height})` : 'null');
-                imageToDraw = currentMapImage;
-                originalWidth = currentMapImage.naturalWidth;
-                originalHeight = currentMapImage.naturalHeight;
-            } else {
-                console.log("[DM View] drawDmMap: No image available (neither main nor submap), calling drawPlaceholder().");
+            if (!currentlyViewedMap || !currentlyViewedMap.mapUrl || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) {
+                console.log("[DM View] drawDmMap: No valid map or image for currentlyViewedMap, calling drawPlaceholder(). Current map ID:", currentlyViewedMap ? currentlyViewedMap.id : "N/A");
                 drawPlaceholder();
                 return;
             }
+
+            const imageToDraw = currentlyDisplayedImage;
+            const originalWidth = imageToDraw.naturalWidth;
+            const originalHeight = imageToDraw.naturalHeight;
             
-            if (originalWidth === 0 || originalHeight === 0) { // Image might not be fully loaded yet or is invalid
-                 console.log("[DM View] drawDmMap: Original image dimensions are zero. Calling drawPlaceholder().");
-                drawPlaceholder(); // Or some other fallback
+            if (originalWidth === 0 || originalHeight === 0) {
+                console.log("[DM View] drawDmMap: Original image dimensions are zero for", currentlyViewedMap.name, ". Calling drawPlaceholder().");
+                drawPlaceholder();
                 return;
             }
 
-            console.log("[DM View] drawDmMap: imageToDraw properties:", originalWidth, originalHeight);
+            console.log(`[DM View] drawDmMap for: ${currentlyViewedMap.name} (ID: ${currentlyViewedMap.id}). Image: ${originalWidth}x${originalHeight}`);
             console.log("[DM View] drawDmMap: mapContainer dimensions (clientWidth-20, clientHeight-20):", containerWidth, containerHeight);
 
             let canvasWidth = originalWidth;
@@ -199,50 +211,41 @@
             dmCanvas.height = canvasHeight;
 
             ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-            console.log("[DM View] drawDmMap: Canvas cleared.");
             ctx.drawImage(imageToDraw, 0, 0, dmCanvas.width, dmCanvas.height);
-            console.log("[DM View] drawDmMap: Image drawn on canvas.");
+            console.log("[DM View] drawDmMap: Image drawn on canvas for", currentlyViewedMap.name);
 
-            // If drawing the main map, also draw sub-map areas and selection rectangle
-            if (!dmDisplayingSubMapUrl && currentMapImage) {
-                campaignData.subMaps.forEach(subMap => {
-                    // Ensure the area's original dimensions match the current main map's original dimensions
-                    // This check is important if a campaign is loaded with a main map that might have
-                    // different natural dimensions than the one active when submap areas were defined.
-                    // For simplicity, we'll assume they are consistent for now or that submap areas
-                    // are always defined relative to currentMapImage.naturalWidth/Height.
-                    if (subMap.area.originalImgW === currentMapImage.naturalWidth && subMap.area.originalImgH === currentMapImage.naturalHeight) {
-                        drawSubMapArea(subMap.area, currentMapImage.naturalWidth, currentMapImage.naturalHeight);
+            // Draw sub-map areas defined on the currentlyViewedMap
+            if (currentlyViewedMap.subMaps && currentlyViewedMap.subMaps.length > 0) {
+                currentlyViewedMap.subMaps.forEach(subMap => {
+                    // subMap.area is defined relative to currentlyViewedMap's natural dimensions
+                    if (subMap.area.originalImgW === originalWidth && subMap.area.originalImgH === originalHeight) {
+                        drawSubMapArea(subMap.area, originalWidth, originalHeight);
                     } else {
-                        // This case might require re-scaling or warning the user.
-                        // For now, we'll attempt to draw it using the stored original dimensions,
-                        // but it might be misaligned if the main map image changed fundamentally.
-                        console.warn("SubMap area was defined for a main map of different dimensions. Display might be inaccurate.");
-                        drawSubMapArea(subMap.area, subMap.area.originalImgW, subMap.area.originalImgH);
+                        console.warn(`SubMap area for '${subMap.name}' was defined for a parent map of different dimensions. Expected ${subMap.area.originalImgW}x${subMap.area.originalImgH}, got ${originalWidth}x${originalHeight}. Display might be inaccurate.`);
+                        // Attempt to draw anyway, or decide on a strategy (e.g., skip drawing, attempt scaling)
+                         drawSubMapArea(subMap.area, subMap.area.originalImgW, subMap.area.originalImgH); // Fallback to its own recorded original dimensions
                     }
                 });
+            }
 
-                if (isSelectingArea && selectionStart && currentSelectionRect) {
-                    // currentSelectionRect during selection is in canvas coordinates, so direct drawing is fine.
-                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(currentSelectionRect.x, currentSelectionRect.y, currentSelectionRect.w, currentSelectionRect.h);
-                }
+            // Draw temporary selection rectangle if in selection mode
+            if (isSelectingArea && selectionStart && tempSelectionCanvasRect) {
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(tempSelectionCanvasRect.x, tempSelectionCanvasRect.y, tempSelectionCanvasRect.w, tempSelectionCanvasRect.h);
             }
         }
 
         // --- Sub Map Area Drawing ---
-        // Modified to accept original image dimensions for scaling
-        function drawSubMapArea(area, baseImageNaturalWidth, baseImageNaturalHeight) {
-            if (!dmCanvas.width || !dmCanvas.height) return; // Canvas not ready
+        // Modified to accept original image dimensions of the PARENT map for scaling
+        function drawSubMapArea(area, parentMapNaturalWidth, parentMapNaturalHeight) {
+            if (!dmCanvas.width || !dmCanvas.height || !parentMapNaturalWidth || !parentMapNaturalHeight) return; // Canvas or parent dimensions not ready
 
-            // Scale factor based on current display size vs original image size when area was defined
-            // The area's originalImgW/H should correspond to baseImageNaturalWidth/Height
-            const scaleX = dmCanvas.width / baseImageNaturalWidth;
-            const scaleY = dmCanvas.height / baseImageNaturalHeight;
+            const scaleX = dmCanvas.width / parentMapNaturalWidth;
+            const scaleY = dmCanvas.height / parentMapNaturalHeight;
 
             ctx.strokeStyle = 'rgba(0, 255, 0, 0.7)'; // Green for existing submap areas
-            ctx.lineWidth = 3; // Make it a bit thicker
+            ctx.lineWidth = 3;
             ctx.strokeRect(area.x * scaleX, area.y * scaleY, area.w * scaleX, area.h * scaleY);
         }
 
@@ -251,67 +254,61 @@
             if (playerWindow && !playerWindow.closed) {
                 playerWindow.focus();
             } else {
-                // Opens in a new tab or window, standard behavior. '_blank' is key.
                 playerWindow = window.open('player_view.html', '_blank');
-                // If a main map is already loaded in campaignData, send it
-                if (campaignData.mainMapUrl) {
-                    // Ensure playerWindow is fully opened and ready
+                if (currentlyViewedMap && currentlyViewedMap.mapUrl) {
                     const checkPlayerWindowReady = setInterval(() => {
                         if (playerWindow && playerWindow.closed === false && playerWindow.postMessage) {
                             clearInterval(checkPlayerWindowReady);
-                            playerWindow.postMessage({ type: 'loadMap', mapDataUrl: campaignData.mainMapUrl }, '*');
+                            // Send the currently DM-viewed map to player on open
+                            playerWindow.postMessage({ type: 'loadMap', mapDataUrl: currentlyViewedMap.mapUrl }, '*');
                         } else if (!playerWindow || playerWindow.closed) {
-                            // Window was closed before it could be messaged
                             clearInterval(checkPlayerWindowReady);
                         }
-                    }, 200); // Check every 200ms
-                    // Timeout to prevent indefinite interval if window fails to open or is blocked
+                    }, 200);
                     setTimeout(() => clearInterval(checkPlayerWindowReady), 5000);
                 }
             }
         });
 
         uploadMapButton.addEventListener('change', (event) => {
-            console.log("[DM View] uploadMapButton 'change' event fired.");
             const file = event.target.files[0];
             if (file) {
-                console.log("[DM View] File selected:", file.name, file.type);
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    console.log("[DM View] FileReader 'onload' event fired.");
                     const img = new Image();
                     img.onload = () => {
-                        console.log("[DM View] Image 'onload' event fired. Image properties:", img.width, img.height, "src length:", e.target.result.length);
-                        currentMapImage = img; // Set the global currentMapImage
-                        console.log("[DM View] currentMapImage set:", currentMapImage ? currentMapImage.width : 'null');
-                        campaignData.mainMapUrl = e.target.result; // Store data URL
-                        campaignData.mainMapName = file.name.split('.')[0] || "Main Map"; // Use filename as name
-                        campaignData.subMaps = []; // Clear previous sub-maps
-                        console.log("[DM View] Calling drawDmMap() from uploadMapButton.");
-                        drawDmMap(); // Redraws the map and any existing (now cleared) submap areas
-                        updateActiveMapsList(); // Update the list
+                        // This is the MAIN map upload, so it re-initializes campaignData
+                        campaignData = {
+                            id: generateUniqueId(), // Generate a unique ID
+                            parentId: null,
+                            name: file.name.split('.')[0] || "Main Map",
+                            mapUrl: e.target.result,
+                            naturalWidth: img.naturalWidth,
+                            naturalHeight: img.naturalHeight,
+                            subMaps: []
+                        };
+                        currentlyViewedMap = campaignData; // Set the new main map as currently viewed
+                        currentlyDisplayedImage = img; // Set the displayed image object
+
+                        console.log("[DM View] Main map uploaded:", campaignData.name, `(${campaignData.naturalWidth}x${campaignData.naturalHeight})`);
+                        drawDmMap();
+                        updateActiveMapsList();
                         if (playerWindow && !playerWindow.closed) {
-                            playerWindow.postMessage({ type: 'loadMap', mapDataUrl: campaignData.mainMapUrl }, '*');
+                            playerWindow.postMessage({ type: 'loadMap', mapDataUrl: campaignData.mapUrl }, '*');
                         }
                     };
-                    img.onerror = () => {
-                        console.error("Error loading image for DM view.");
-                        alert("Error loading image.");
-                    };
+                    img.onerror = () => { console.error("Error loading image for main map."); alert("Error loading image."); };
                     img.src = e.target.result;
                 };
-                reader.onerror = () => {
-                    console.error("Error reading file.");
-                    alert("Error reading file.");
-                };
+                reader.onerror = () => { console.error("Error reading file."); alert("Error reading file."); };
                 reader.readAsDataURL(file);
             }
         });
 
         // --- Area Selection Logic ---
         newSubmapButton.addEventListener('click', () => {
-            if (!currentMapImage) {
-                alert("Please upload a main map first.");
+            if (!currentlyViewedMap || !currentlyViewedMap.mapUrl || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) {
+                alert("Please ensure the current map is fully loaded before adding a submap.");
                 return;
             }
             isSelectingArea = !isSelectingArea;
@@ -320,45 +317,45 @@
                 dmCanvas.style.cursor = 'crosshair';
                 uploadSubmapButton.style.display = 'none';
                 uploadSubmapLabel.style.display = 'none';
-                currentSelectionRect = null; // Clear any pending selection rectangle for submap assignment
+                pendingSubmapArea = null; // Clear any previously stored pending area
+                tempSelectionCanvasRect = null; // Clear canvas selection drawing rect
             } else {
                 newSubmapButton.textContent = "New Sub Map";
                 dmCanvas.style.cursor = 'default';
-                selectionStart = null; // Clear selection start point
-                // currentSelectionRect is already handled or null
-                drawDmMap(); // Redraw to remove temporary selection rectangle if mouse wasn't released on canvas
+                selectionStart = null;
+                tempSelectionCanvasRect = null;
+                // If an area was selected (pendingSubmapArea is not null) but then cancelled,
+                // it will be cleared on next "New Sub Map" click.
+                // If selection was completed and upload displayed, this cancel won't affect pendingSubmapArea.
+                drawDmMap(); // Redraw to remove temporary selection rectangle
             }
         });
 
         dmCanvas.addEventListener('mousedown', (e) => {
-            if (!isSelectingArea || !currentMapImage) return;
+            if (!isSelectingArea || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
             const rect = dmCanvas.getBoundingClientRect();
-            // selectionStart is relative to the canvas, not the image
             selectionStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-            // Initialize currentSelectionRect for drawing the feedback rectangle
-            currentSelectionRect = { x: selectionStart.x, y: selectionStart.y, w: 0, h: 0 };
+            tempSelectionCanvasRect = { x: selectionStart.x, y: selectionStart.y, w: 0, h: 0 };
         });
 
         dmCanvas.addEventListener('mousemove', (e) => {
-            if (!isSelectingArea || !selectionStart || !currentMapImage) return;
+            if (!isSelectingArea || !selectionStart || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
             const rect = dmCanvas.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
 
-            currentSelectionRect.w = currentX - selectionStart.x;
-            currentSelectionRect.h = currentY - selectionStart.y;
-            drawDmMap(); // Redraw to show live selection rectangle (drawDmMap handles this)
+            tempSelectionCanvasRect.w = currentX - selectionStart.x;
+            tempSelectionCanvasRect.h = currentY - selectionStart.y;
+            drawDmMap(); // Redraw to show live selection rectangle
         });
 
         dmCanvas.addEventListener('mouseup', (e) => {
-            if (!isSelectingArea || !selectionStart || !currentMapImage) return;
+            if (!isSelectingArea || !selectionStart || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
 
             const rect = dmCanvas.getBoundingClientRect();
             const endX = e.clientX - rect.left;
             const endY = e.clientY - rect.top;
 
-            // Finalize selection rectangle, ensuring w and h are positive
-            // These are still in canvas coordinates
             let canvasSelection = {
                 x: Math.min(selectionStart.x, endX),
                 y: Math.min(selectionStart.y, endY),
@@ -366,54 +363,49 @@
                 h: Math.abs(endY - selectionStart.y)
             };
 
-            if (canvasSelection.w < 5 || canvasSelection.h < 5) { // Ignore tiny selections
+            if (canvasSelection.w < 5 || canvasSelection.h < 5) {
                 selectionStart = null;
-                currentSelectionRect = null; // Clear the drawing rectangle
+                tempSelectionCanvasRect = null;
                 isSelectingArea = false;
                 newSubmapButton.textContent = "New Sub Map";
                 dmCanvas.style.cursor = 'default';
-                drawDmMap(); // Redraw to clear any visual artifacts
+                drawDmMap();
                 return;
             }
 
-            // Convert canvas coordinates to image-relative coordinates for consistent storage
-            const scaleX = currentMapImage.naturalWidth / dmCanvas.width;
-            const scaleY = currentMapImage.naturalHeight / dmCanvas.height;
+            // Convert canvas coordinates to image-relative coordinates for the currentlyViewedMap
+            const scaleX = currentlyViewedMap.naturalWidth / dmCanvas.width;
+            const scaleY = currentlyViewedMap.naturalHeight / dmCanvas.height;
 
-            // This is the rectangle that will be stored and used for submap association
-            const imageRelativeRect = {
+            pendingSubmapArea = {
                 x: canvasSelection.x * scaleX,
                 y: canvasSelection.y * scaleY,
                 w: canvasSelection.w * scaleX,
                 h: canvasSelection.h * scaleY,
-                originalImgW: currentMapImage.naturalWidth,
-                originalImgH: currentMapImage.naturalHeight
+                originalImgW: currentlyViewedMap.naturalWidth, // Store dimensions of parent map
+                originalImgH: currentlyViewedMap.naturalHeight
             };
-
-            // currentSelectionRect is now the one to be associated with an uploaded submap
-            // but it should be the imageRelativeRect
-            currentSelectionRect = imageRelativeRect;
 
             isSelectingArea = false;
             newSubmapButton.textContent = "New Sub Map";
             dmCanvas.style.cursor = 'default';
-            selectionStart = null; // Reset for next selection
+            selectionStart = null;
+            tempSelectionCanvasRect = null; // Clear the drawing selection
 
             uploadSubmapLabel.style.display = 'block';
             uploadSubmapButton.style.display = 'block';
             uploadSubmapButton.value = null;
             uploadSubmapButton.focus();
 
-            // Redraw to clear the temporary red selection rectangle.
-            // Then draw a temporary "pending" blue rectangle for the confirmed area.
-            drawDmMap();
-            ctx.strokeStyle = 'rgba(100, 100, 255, 0.8)'; // A distinct color for pending link
+            drawDmMap(); // Redraw to clear the red selection rectangle
+            // Draw a temporary "pending link" blue rectangle for the confirmed area (in canvas coordinates)
+            ctx.strokeStyle = 'rgba(100, 100, 255, 0.8)';
             ctx.lineWidth = 2;
             ctx.strokeRect(canvasSelection.x, canvasSelection.y, canvasSelection.w, canvasSelection.h);
         });
 
         uploadSubmapButton.addEventListener('change', (event) => {
-            if (!currentSelectionRect) { // This should be the imageRelativeRect stored from mouseup
+            if (!pendingSubmapArea) {
                 alert("An area selection was not properly finalized. Please select an area again.");
                 uploadSubmapButton.style.display = 'none';
                 uploadSubmapLabel.style.display = 'none';
@@ -423,17 +415,27 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const subMapName = file.name.split('.')[0] || `Sub-Map ${campaignData.subMaps.length + 1}`;
-                    campaignData.subMaps.push({
-                        area: currentSelectionRect, // Store the image-relative rectangle
-                        mapUrl: e.target.result,
-                        name: subMapName
-                    });
-                    currentSelectionRect = null; // Clear the pending selection
-                    uploadSubmapButton.style.display = 'none';
-                    uploadSubmapLabel.style.display = 'none';
-                    drawDmMap(); // Redraw to show the new submap area permanently (green)
-                    updateActiveMapsList(); // Update the list
+                    const submapImg = new Image();
+                    submapImg.onload = () => {
+                        const newSubMap = {
+                            id: generateUniqueId(),
+                            parentId: currentlyViewedMap.id,
+                            name: file.name.split('.')[0] || `Sub-Map ${currentlyViewedMap.subMaps.length + 1}`,
+                            mapUrl: e.target.result,
+                            naturalWidth: submapImg.naturalWidth,
+                            naturalHeight: submapImg.naturalHeight,
+                            area: pendingSubmapArea, // Stored image-relative rect
+                            subMaps: []
+                        };
+                        currentlyViewedMap.subMaps.push(newSubMap);
+                        pendingSubmapArea = null; // Clear the pending area
+                        uploadSubmapButton.style.display = 'none';
+                        uploadSubmapLabel.style.display = 'none';
+                        drawDmMap(); // Redraw current map to show new submap area
+                        updateActiveMapsList();
+                    };
+                    submapImg.onerror = () => { console.error("Error loading submap image."); alert("Error loading submap image.");};
+                    submapImg.src = e.target.result;
                 };
                 reader.onerror = () => { console.error("Error reading submap file."); alert("Error reading submap file."); };
                 reader.readAsDataURL(file);
@@ -442,7 +444,7 @@
 
 // --- Canvas Click Logic for Player View Control ---
 dmCanvas.addEventListener('click', (e) => {
-    if (!currentMapImage || isSelectingArea) { // Don't trigger navigation during area selection
+    if (!currentlyDisplayedImage || !currentlyDisplayedImage.complete || isSelectingArea) {
         return;
     }
 
@@ -450,145 +452,139 @@ dmCanvas.addEventListener('click', (e) => {
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // Convert click coordinates to be relative to the original image dimensions for comparison
-    const scaleX = currentMapImage.naturalWidth / dmCanvas.width;
-    const scaleY = currentMapImage.naturalHeight / dmCanvas.height;
+    // Convert click to image-relative coordinates for currentlyViewedMap
+    const scaleX = currentlyViewedMap.naturalWidth / dmCanvas.width;
+    const scaleY = currentlyViewedMap.naturalHeight / dmCanvas.height;
     const imageRelativeClickX = clickX * scaleX;
     const imageRelativeClickY = clickY * scaleY;
 
-    let clickedSubMap = null;
-    for (const subMap of campaignData.subMaps) {
+    let clickedSubMapObject = null;
+    for (const subMap of currentlyViewedMap.subMaps) {
         const area = subMap.area;
-        // area.x, area.y, area.w, area.h are already relative to original image
         if (imageRelativeClickX >= area.x && imageRelativeClickX <= area.x + area.w &&
             imageRelativeClickY >= area.y && imageRelativeClickY <= area.y + area.h) {
-            clickedSubMap = subMap;
+            clickedSubMapObject = subMap;
             break;
         }
     }
 
-    if (clickedSubMap) {
-        console.log("DM clicked on submap area. DM view will show submap. Player view will be sent submap.");
-        dmDisplayingSubMapUrl = clickedSubMap.mapUrl;
-        dmDisplayingSubMapImage = new Image();
-        dmDisplayingSubMapImage.onload = () => {
-            drawDmMap(); // Redraw DM map with the submap
-        };
-        dmDisplayingSubMapImage.onerror = () => {
-            console.error("Error loading submap image for DM view.");
-            dmDisplayingSubMapUrl = null; // Revert
-            dmDisplayingSubMapImage = null;
-            drawDmMap(); // Redraw main map
-        };
-        dmDisplayingSubMapImage.src = dmDisplayingSubMapUrl;
-
-        if (playerWindow && !playerWindow.closed) {
-            playerWindow.postMessage({ type: 'showSubMap', mapDataUrl: clickedSubMap.mapUrl }, '*');
-        }
-    } else {
-        // Click was on the main map (or current submap), not activating a different sub-map area
-        if (dmDisplayingSubMapUrl) { // If DM was viewing a submap, switch back to main map
-            console.log("DM clicked (not on a new submap area) while viewing a submap. Switching DM and Player to main map.");
-            dmDisplayingSubMapUrl = null;
-            dmDisplayingSubMapImage = null;
-            drawDmMap(); // Redraw DM map with the main map
-            if (playerWindow && !playerWindow.closed && campaignData.mainMapUrl) {
-                playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: campaignData.mainMapUrl }, '*');
+    if (clickedSubMapObject) {
+        console.log(`DM clicked on submap area for: ${clickedSubMapObject.name}. Switching view.`);
+        // Load and display this submap
+        const img = new Image();
+        img.onload = () => {
+            currentlyViewedMap = clickedSubMapObject;
+            currentlyDisplayedImage = img;
+            drawDmMap();
+            updateActiveMapsList();
+            if (playerWindow && !playerWindow.closed) {
+                playerWindow.postMessage({ type: 'showSubMap', mapDataUrl: currentlyViewedMap.mapUrl }, '*');
             }
-        } else { // DM was already viewing the main map, and clicked on it (not a submap area)
-            console.log("DM clicked on main map (no change for DM). Ensuring player sees main map.");
-             // This case primarily ensures player is synced if they were somehow out of sync,
-             // or if it's an initial click after loading.
-            if (playerWindow && !playerWindow.closed && campaignData.mainMapUrl) {
-                playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: campaignData.mainMapUrl }, '*');
+        };
+        img.onerror = () => { console.error("Error loading image for submap:", clickedSubMapObject.name); };
+        img.src = clickedSubMapObject.mapUrl;
+
+    } else { // Click was not on a submap area of the current map
+        // If currentlyViewedMap is not the root map, navigate to its parent
+        if (currentlyViewedMap.parentId) {
+            const parentMap = findMapById(currentlyViewedMap.parentId); // Helper function needed
+            if (parentMap) {
+                console.log(`DM clicked on background of ${currentlyViewedMap.name}. Navigating to parent: ${parentMap.name}`);
+                const img = new Image();
+                img.onload = () => {
+                    currentlyViewedMap = parentMap;
+                    currentlyDisplayedImage = img;
+                    drawDmMap();
+                    updateActiveMapsList();
+                    if (playerWindow && !playerWindow.closed) {
+                        playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: currentlyViewedMap.mapUrl }, '*'); // Or 'showSubMap' if parent is also a submap
+                    }
+                };
+                img.onerror = () => { console.error("Error loading image for parent map:", parentMap.name);};
+                img.src = parentMap.mapUrl;
+            } else {
+                 console.warn("Could not find parent map with ID:", currentlyViewedMap.parentId);
+            }
+        } else {
+             console.log("DM clicked on root map background. No parent to navigate to.");
+             // Ensure player view is synced to current (root) map
+            if (playerWindow && !playerWindow.closed && currentlyViewedMap.mapUrl) {
+                playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: currentlyViewedMap.mapUrl }, '*');
             }
         }
     }
-    updateActiveMapsList(); // Update the list after a click
 });
+
 
         // --- Active Maps List Update ---
         function updateActiveMapsList() {
             activeMapsList.innerHTML = ''; // Clear existing list
 
-            if (campaignData.mainMapUrl) {
-                const mainMapItem = document.createElement('li');
-                mainMapItem.textContent = campaignData.mainMapName || "Main Map";
-                mainMapItem.style.cursor = 'pointer';
-                if (!dmDisplayingSubMapUrl) { // Main map is active
-                    mainMapItem.style.fontWeight = 'bold';
+            function createMapListItem(mapNode, depth = 0) {
+                const listItem = document.createElement('li');
+                listItem.textContent = mapNode.name || `Map ID: ${mapNode.id.substring(0,8)}`;
+                listItem.style.cursor = 'pointer';
+                listItem.style.paddingLeft = `${depth * 15}px`;
+
+                if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id) {
+                    listItem.style.fontWeight = 'bold';
                 }
-                mainMapItem.addEventListener('click', () => {
-                    if (dmDisplayingSubMapUrl) { // Only switch if not already on main map
-                        dmDisplayingSubMapUrl = null;
-                        dmDisplayingSubMapImage = null;
-                        drawDmMap();
-                        if (playerWindow && !playerWindow.closed) {
-                            playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: campaignData.mainMapUrl }, '*');
-                        }
-                        updateActiveMapsList(); // Re-render list to update active state
+
+                listItem.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete) {
+                        console.log("[Active List] Clicked already active map:", mapNode.name);
+                        return;
                     }
-                });
-                activeMapsList.appendChild(mainMapItem);
 
-                if (campaignData.subMaps.length > 0) {
-                    const subMapListElement = document.createElement('ul');
-                    campaignData.subMaps.forEach((subMap, index) => {
-                        const subMapItem = document.createElement('li');
-                        subMapItem.textContent = subMap.name || `Sub-Map ${index + 1}`;
-                        subMapItem.style.cursor = 'pointer';
-                        subMapItem.style.paddingLeft = '15px';
-                        if (dmDisplayingSubMapUrl === subMap.mapUrl) { // This sub-map is active
-                            subMapItem.style.fontWeight = 'bold';
+                    console.log("[Active List] Clicked map in list:", mapNode.name);
+                    const img = new Image();
+                    img.onload = () => {
+                        currentlyViewedMap = mapNode;
+                        currentlyDisplayedImage = img;
+                        drawDmMap();
+                        updateActiveMapsList(); // Re-render list to update bolding
+                        if (playerWindow && !playerWindow.closed) {
+                            // Determine message type based on whether it's the root map or a submap
+                            const messageType = mapNode.parentId ? 'showSubMap' : 'showMainMap';
+                            playerWindow.postMessage({ type: messageType, mapDataUrl: mapNode.mapUrl }, '*');
                         }
-                        subMapItem.addEventListener('click', (event) => {
-                            event.stopPropagation(); // Prevent click from reaching canvas
-                            // If this submap is already active and its image is loaded, do nothing
-                            if (dmDisplayingSubMapUrl === subMap.mapUrl && dmDisplayingSubMapImage && dmDisplayingSubMapImage.src === subMap.mapUrl && dmDisplayingSubMapImage.complete) {
-                                console.log("[Active List] Clicked already active and loaded sub-map:", subMap.name);
-                                return;
-                            }
-                            console.log("[Active List] Clicked sub-map in list:", subMap.name, "Target URL:", subMap.mapUrl);
+                    };
+                    img.onerror = () => {
+                        console.error("[Active List] Error loading map image from active list for:", mapNode.name);
+                        // Optionally, revert to a known state or show placeholder
+                        // For now, just log and the view won't change if image fails
+                    };
+                    img.src = mapNode.mapUrl;
+                });
+                activeMapsList.appendChild(listItem);
 
-                            dmDisplayingSubMapUrl = subMap.mapUrl; // Tentatively set, image might fail to load
-                            const newSubImage = new Image();
-                            newSubImage.onload = () => {
-                                dmDisplayingSubMapImage = newSubImage; // Assign once fully loaded
-                                console.log("[Active List] Sub-map image loaded, calling drawDmMap for:", subMap.name);
-                                drawDmMap(); // Draw the new sub-map
-
-                                if (playerWindow && !playerWindow.closed) {
-                                    playerWindow.postMessage({ type: 'showSubMap', mapDataUrl: subMap.mapUrl }, '*');
-                                    console.log("[Active List] Sent sub-map to player:", subMap.name);
-                                }
-                                console.log("[Active List] Updating list after drawing sub-map:", subMap.name);
-                                updateActiveMapsList(); // Refresh bolding
-                            };
-                            newSubImage.onerror = () => {
-                                console.error("[Active List] Error loading submap image from active list for:", subMap.name);
-                                // If this failed load was for the URL we just tried to set
-                                if (dmDisplayingSubMapUrl === subMap.mapUrl) {
-                                    dmDisplayingSubMapUrl = null; // Revert to main map display logic
-                                    dmDisplayingSubMapImage = null;
-                                }
-                                drawDmMap(); // Redraw whatever is current (likely main map or placeholder)
-                                updateActiveMapsList(); // Still update list to reflect potential reversion
-                            };
-                            newSubImage.src = subMap.mapUrl;
-                            // dmDisplayingSubMapImage is not set to newSubImage here yet, only in onload.
-                            // This means if updateActiveMapsList was called synchronously here, it might not see the *new* image yet.
-                        });
-                        subMapListElement.appendChild(subMapItem);
+                if (mapNode.subMaps && mapNode.subMaps.length > 0) {
+                    const subList = document.createElement('ul');
+                    mapNode.subMaps.forEach(subMap => {
+                        subList.appendChild(createMapListItem(subMap, depth + 1));
                     });
-                    mainMapItem.appendChild(subMapListElement);
+                    listItem.appendChild(subList);
                 }
+                return listItem;
+            }
+
+            if (campaignData && campaignData.mapUrl) { // Only build list if there's a root map
+                createMapListItem(campaignData);
             }
         }
 
 
         // Optional: Resize canvas if window size changes
         window.addEventListener('resize', () => {
-            setTimeout(() => drawDmMap(), 50); // drawDmMap will use currentMapImage
+            // Debounce or throttle this if performance becomes an issue
+            setTimeout(() => {
+                if (currentlyViewedMap && currentlyViewedMap.mapUrl && currentlyDisplayedImage && currentlyDisplayedImage.complete) {
+                    drawDmMap();
+                } else {
+                    drawPlaceholder();
+                }
+            }, 50);
         });
 
         // Initial placeholder for DM canvas until map is loaded
@@ -604,34 +600,27 @@ dmCanvas.addEventListener('click', (e) => {
             ctx.textAlign = 'center';
             ctx.fillText('Upload a main map to begin', dmCanvas.width / 2, dmCanvas.height / 2);
         }
-        drawPlaceholder();
+        drawPlaceholder(); // Initial call
 
         // --- Campaign Save/Load ---
         const saveCampaignButton = document.getElementById('save-campaign-button');
         const loadCampaignInput = document.getElementById('load-campaign-input');
-        // The label `load-campaign-label` is already handled by `for="load-campaign-input"`
 
         saveCampaignButton.addEventListener('click', () => {
-            if (!campaignData.mainMapUrl) {
+            if (!campaignData || !campaignData.mapUrl) {
                 alert("Please upload a main map before saving.");
                 return;
             }
 
-            // Sanity check: ensure all submap areas have originalImgW and originalImgH
-            for (const subMap of campaignData.subMaps) {
-                if (!subMap.area.originalImgW || !subMap.area.originalImgH) {
-                    console.error("SubMap area is missing original image dimensions:", subMap.area);
-                    alert("Error: Some submap data is incomplete. Cannot save reliably. Please re-select affected submap areas.");
-                    return;
-                }
-            }
+            // Basic validation can be added here if needed, e.g., ensuring all mapUrls are present.
+            // The structure itself should be fine for JSON.stringify.
 
-            const jsonData = JSON.stringify(campaignData, null, 2); // Pretty print JSON
+            const jsonData = JSON.stringify(campaignData, null, 2);
             const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'dndemicube-campaign.json';
+            a.download = 'dndemicube-campaign-nested.json'; // New filename for clarity
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -645,81 +634,91 @@ dmCanvas.addEventListener('click', (e) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
-                        const loadedData = JSON.parse(e.target.result);
+                        const loadedRootMap = JSON.parse(e.target.result);
 
                         // Basic validation of loaded data structure
-                        if (!loadedData.mainMapUrl || !Array.isArray(loadedData.subMaps)) {
-                            throw new Error("Invalid campaign file structure.");
+                        if (!loadedRootMap.id || !loadedRootMap.mapUrl || !Array.isArray(loadedRootMap.subMaps)) {
+                            throw new Error("Invalid campaign file structure. Root map properties missing.");
                         }
-                        // More detailed validation for subMaps can be added here if necessary
-                        loadedData.subMaps.forEach((sm, index) => {
-                            if (!sm.area || !sm.mapUrl || !sm.area.originalImgW || !sm.area.originalImgH) {
-                                throw new Error(`Invalid data for sub-map at index ${index}.`);
-                            }
-                        });
+                        // TODO: Add recursive validation for all map nodes in the loaded structure.
+                        // For now, we assume the structure is correct if root is okay.
 
+                        campaignData = loadedRootMap; // Replace current campaign data
 
-                        campaignData = loadedData;
-
-                        // Load the main map image
-                        if (campaignData.mainMapUrl) {
+                        // Load the main map image of the loaded campaign
+                        if (campaignData.mapUrl) {
                             const img = new Image();
                             img.onload = () => {
-                                currentMapImage = img;
-                                // Ensure mainMapName and subMap names are present, provide defaults if not
-                                campaignData.mainMapName = campaignData.mainMapName || "Main Map";
-                                campaignData.subMaps.forEach((sm, i) => {
-                                    sm.name = sm.name || `Sub-Map ${i + 1}`;
-                                });
-
-                                drawDmMap(); // This will draw main map and all submap areas
-                                updateActiveMapsList(); // Update the list
-
-                                // If player window is open, send the new main map
+                                currentlyViewedMap = campaignData; // View the root map of the loaded campaign
+                                currentlyDisplayedImage = img;
+                                drawDmMap();
+                                updateActiveMapsList();
                                 if (playerWindow && !playerWindow.closed) {
-                                    playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: campaignData.mainMapUrl }, '*');
-                                    // Player view defaults to main map after a campaign load
+                                    playerWindow.postMessage({ type: 'showMainMap', mapDataUrl: campaignData.mapUrl }, '*');
                                 }
-                                console.log("Campaign loaded successfully.");
+                                console.log("Campaign loaded successfully:", campaignData.name);
                             };
                             img.onerror = () => {
                                 console.error("Error loading main map image from loaded campaign data.");
-                                alert("Error loading main map from campaign file. The map image data might be corrupted or inaccessible.");
-                                // Reset to a blank state or handle error more gracefully
-                                currentMapImage = null;
-                                campaignData = { mainMapName: "Main Map", mainMapUrl: null, subMaps: [] };
+                                alert("Error loading main map from campaign file.");
+                                // Reset to a blank state
+                                campaignData = { id: 'root_reset', parentId: null, name: "Main Map", mapUrl: null, naturalWidth:0, naturalHeight:0, subMaps: [] };
+                                currentlyViewedMap = campaignData;
+                                currentlyDisplayedImage = null;
                                 drawPlaceholder();
-                                updateActiveMapsList(); // Clear the list
+                                updateActiveMapsList();
                             };
-                            img.src = campaignData.mainMapUrl;
+                            img.src = campaignData.mapUrl;
                         } else {
-                            // No main map in loaded data, reset view
-                            currentMapImage = null;
-                            campaignData = { mainMapName: "Main Map", mainMapUrl: null, subMaps: [] }; // Ensure it's reset
+                            // Should not happen if validation passed, but good for robustness
+                            campaignData = { id: 'root_empty', parentId: null, name: "Main Map", mapUrl: null, naturalWidth:0, naturalHeight:0, subMaps: [] };
+                            currentlyViewedMap = campaignData;
+                            currentlyDisplayedImage = null;
                             drawPlaceholder();
-                            updateActiveMapsList(); // Clear the list
-                            alert("Loaded campaign data does not contain a main map URL.");
+                            updateActiveMapsList();
+                            alert("Loaded campaign data does not contain a main map URL for the root map.");
                         }
                     } catch (error) {
                         console.error("Error parsing or validating campaign file:", error);
                         alert(`Failed to load campaign: ${error.message}`);
-                        // Reset to a known good state on error
-                        campaignData = { mainMapName: "Main Map", mainMapUrl: null, subMaps: [] };
-                        currentMapImage = null;
-                        drawPlaceholder();
-                        updateActiveMapsList();
+                         campaignData = { id: 'root_error', parentId: null, name: "Main Map", mapUrl: null, naturalWidth:0, naturalHeight:0, subMaps: [] };
+                         currentlyViewedMap = campaignData;
+                         currentlyDisplayedImage = null;
+                         drawPlaceholder();
+                         updateActiveMapsList();
                     } finally {
-                        loadCampaignInput.value = null; // Reset file input
+                        loadCampaignInput.value = null;
                     }
                 };
                 reader.onerror = () => {
                     console.error("Error reading campaign file.");
                     alert("Error reading campaign file.");
-                    loadCampaignInput.value = null; // Reset file input
+                    loadCampaignInput.value = null;
                 };
                 reader.readAsText(file);
             }
         });
+
+        // Helper function (to be completed in a later step, placeholder for now)
+        function findMapById(mapId, searchNode = campaignData) {
+            if (!searchNode || !mapId) return null;
+            if (searchNode.id === mapId) {
+                return searchNode;
+            }
+            if (searchNode.subMaps && searchNode.subMaps.length > 0) {
+                for (const subMap of searchNode.subMaps) {
+                    const found = findMapById(mapId, subMap);
+                    if (found) {
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function generateUniqueId() {
+            return `map_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
 
     </script>
 </body>
