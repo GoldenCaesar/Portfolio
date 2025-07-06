@@ -159,6 +159,7 @@
         // Reference to the map object currently being viewed/edited on the DM canvas
         let currentlyViewedMap = campaignData; // Initially, the main map is viewed
         let currentlyDisplayedImage = null; // Holds the Image object for the currentlyViewedMap.mapUrl
+        let intendedParentContextForNewSubmap = null; // Explicitly stores the parent for an ongoing submap addition
 
         let isSelectingArea = false;
         let selectionStart = null;
@@ -216,12 +217,14 @@
 
             // Draw sub-map areas defined on the currentlyViewedMap
             if (currentlyViewedMap.subMaps && currentlyViewedMap.subMaps.length > 0) {
+                console.log(`[DEBUG] drawDmMap: Drawing submap areas for parent '${currentlyViewedMap.name}' (ID: ${currentlyViewedMap.id}). Parent natural W/H: ${originalWidth}x${originalHeight}`);
                 currentlyViewedMap.subMaps.forEach(subMap => {
+                    console.log(`[DEBUG] drawDmMap: Checking subMap '${subMap.name}' (ID: ${subMap.id}). Area originalImgW/H: ${subMap.area.originalImgW}x${subMap.area.originalImgH}`);
                     // subMap.area is defined relative to currentlyViewedMap's natural dimensions
                     if (subMap.area.originalImgW === originalWidth && subMap.area.originalImgH === originalHeight) {
                         drawSubMapArea(subMap.area, originalWidth, originalHeight);
                     } else {
-                        console.warn(`SubMap area for '${subMap.name}' was defined for a parent map of different dimensions. Expected ${subMap.area.originalImgW}x${subMap.area.originalImgH}, got ${originalWidth}x${originalHeight}. Display might be inaccurate.`);
+                        console.warn(`[DEBUG] drawDmMap: Mismatch! SubMap area for '${subMap.name}' (ID: ${subMap.id}) was defined for a parent map of different dimensions. Expected ${subMap.area.originalImgW}x${subMap.area.originalImgH}, but parent '${currentlyViewedMap.name}' is ${originalWidth}x${originalHeight}. Display might be inaccurate.`);
                         // Attempt to draw anyway, or decide on a strategy (e.g., skip drawing, attempt scaling)
                          drawSubMapArea(subMap.area, subMap.area.originalImgW, subMap.area.originalImgH); // Fallback to its own recorded original dimensions
                     }
@@ -313,6 +316,8 @@
             }
             isSelectingArea = !isSelectingArea;
             if (isSelectingArea) {
+                intendedParentContextForNewSubmap = currentlyViewedMap; // LOCK IN THE PARENT HERE
+                console.log(`[DEBUG] newSubmapButton: Starting area selection. INTENDED PARENT is '${intendedParentContextForNewSubmap.name}' (ID: ${intendedParentContextForNewSubmap.id})`);
                 newSubmapButton.textContent = "Cancel Selection";
                 dmCanvas.style.cursor = 'crosshair';
                 uploadSubmapButton.style.display = 'none';
@@ -320,26 +325,29 @@
                 pendingSubmapArea = null; // Clear any previously stored pending area
                 tempSelectionCanvasRect = null; // Clear canvas selection drawing rect
             } else {
+                intendedParentContextForNewSubmap = null; // Clear it if cancelling
                 newSubmapButton.textContent = "New Sub Map";
                 dmCanvas.style.cursor = 'default';
                 selectionStart = null;
                 tempSelectionCanvasRect = null;
-                // If an area was selected (pendingSubmapArea is not null) but then cancelled,
-                // it will be cleared on next "New Sub Map" click.
-                // If selection was completed and upload displayed, this cancel won't affect pendingSubmapArea.
                 drawDmMap(); // Redraw to remove temporary selection rectangle
             }
         });
 
         dmCanvas.addEventListener('mousedown', (e) => {
-            if (!isSelectingArea || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
+            if (!isSelectingArea || !intendedParentContextForNewSubmap || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
+            // Ensure currentlyDisplayedImage corresponds to the intended parent for consistent experience
+            if (currentlyDisplayedImage.src !== intendedParentContextForNewSubmap.mapUrl) {
+                console.warn("[DEBUG] mousedown: currentlyDisplayedImage does not match intendedParentContextForNewSubmap. This might lead to selection on an unexpected image background.");
+                // Potentially alert or block, but for now, allow selection. Dimensions check in mouseup is key.
+            }
             const rect = dmCanvas.getBoundingClientRect();
             selectionStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
             tempSelectionCanvasRect = { x: selectionStart.x, y: selectionStart.y, w: 0, h: 0 };
         });
 
         dmCanvas.addEventListener('mousemove', (e) => {
-            if (!isSelectingArea || !selectionStart || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
+            if (!isSelectingArea || !selectionStart || !intendedParentContextForNewSubmap || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
             const rect = dmCanvas.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
@@ -350,7 +358,26 @@
         });
 
         dmCanvas.addEventListener('mouseup', (e) => {
-            if (!isSelectingArea || !selectionStart || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) return;
+            if (!isSelectingArea || !selectionStart || !intendedParentContextForNewSubmap || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) {
+                 if (!intendedParentContextForNewSubmap) {
+                    console.error("[DEBUG] dmCanvas mouseup: intendedParentContextForNewSubmap is null! This should not happen if selection was active.");
+                 }
+                return;
+            }
+
+            // Defensive check: ensure the image dimensions we are about to use are from the intended parent
+            if (currentlyDisplayedImage.src !== intendedParentContextForNewSubmap.mapUrl) {
+                console.error(`[DEBUG] dmCanvas mouseup: CRITICAL MISMATCH! currentlyDisplayedImage (${currentlyDisplayedImage.src.substring(0,30)}) is not the one from intendedParentContextForNewSubmap (${intendedParentContextForNewSubmap.mapUrl.substring(0,30)}). Aborting submap area calculation.`);
+                // Reset selection state forcefully
+                isSelectingArea = false;
+                intendedParentContextForNewSubmap = null;
+                newSubmapButton.textContent = "New Sub Map";
+                dmCanvas.style.cursor = 'default';
+                selectionStart = null;
+                tempSelectionCanvasRect = null;
+                drawDmMap();
+                return;
+            }
 
             const rect = dmCanvas.getBoundingClientRect();
             const endX = e.clientX - rect.left;
@@ -374,19 +401,25 @@
             }
 
             // Convert canvas coordinates to image-relative coordinates for the currentlyViewedMap
-            const scaleX = currentlyViewedMap.naturalWidth / dmCanvas.width;
-            const scaleY = currentlyViewedMap.naturalHeight / dmCanvas.height;
+            // Use intendedParentContextForNewSubmap for dimensions
+            const scaleX = intendedParentContextForNewSubmap.naturalWidth / dmCanvas.width;
+            const scaleY = intendedParentContextForNewSubmap.naturalHeight / dmCanvas.height;
+
+            console.log(`[DEBUG] dmCanvas mouseup: Calculating pendingSubmapArea. intendedParentContext is '${intendedParentContextForNewSubmap.name}' (ID: ${intendedParentContextForNewSubmap.id}), Natural W/H: ${intendedParentContextForNewSubmap.naturalWidth}x${intendedParentContextForNewSubmap.naturalHeight}`);
 
             pendingSubmapArea = {
                 x: canvasSelection.x * scaleX,
                 y: canvasSelection.y * scaleY,
                 w: canvasSelection.w * scaleX,
                 h: canvasSelection.h * scaleY,
-                originalImgW: currentlyViewedMap.naturalWidth, // Store dimensions of parent map
-                originalImgH: currentlyViewedMap.naturalHeight
+                originalImgW: intendedParentContextForNewSubmap.naturalWidth,
+                originalImgH: intendedParentContextForNewSubmap.naturalHeight
             };
+            console.log('[DEBUG] dmCanvas mouseup: Calculated pendingSubmapArea:', JSON.stringify(pendingSubmapArea));
 
             isSelectingArea = false;
+            // Note: intendedParentContextForNewSubmap is NOT cleared here.
+            // It's cleared if selection is cancelled OR after successful upload.
             newSubmapButton.textContent = "New Sub Map";
             dmCanvas.style.cursor = 'default';
             selectionStart = null;
@@ -405,40 +438,57 @@
         });
 
         uploadSubmapButton.addEventListener('change', (event) => {
-            if (!pendingSubmapArea) {
-                alert("An area selection was not properly finalized. Please select an area again.");
+            if (!pendingSubmapArea || !intendedParentContextForNewSubmap) { // Check intendedParentContextForNewSubmap
+                alert("An area selection or parent context was not properly finalized. Please select an area again.");
                 uploadSubmapButton.style.display = 'none';
                 uploadSubmapLabel.style.display = 'none';
+                intendedParentContextForNewSubmap = null; // Clear context if error
                 return;
             }
             const file = event.target.files[0];
             if (file) {
+                console.log(`[DEBUG] uploadSubmapButton: Fired. intendedParentContext is '${intendedParentContextForNewSubmap.name}' (ID: ${intendedParentContextForNewSubmap.id})`);
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const submapImg = new Image();
                     submapImg.onload = () => {
                         const newSubMap = {
                             id: generateUniqueId(),
-                            parentId: currentlyViewedMap.id,
-                            name: file.name.split('.')[0] || `Sub-Map ${currentlyViewedMap.subMaps.length + 1}`,
+                            parentId: intendedParentContextForNewSubmap.id, // Use locked-in parent
+                            name: file.name.split('.')[0] || `Sub-Map ${intendedParentContextForNewSubmap.subMaps.length + 1}`,
                             mapUrl: e.target.result,
                             naturalWidth: submapImg.naturalWidth,
                             naturalHeight: submapImg.naturalHeight,
-                            area: pendingSubmapArea, // Stored image-relative rect
+                            area: pendingSubmapArea,
                             subMaps: []
                         };
-                        currentlyViewedMap.subMaps.push(newSubMap);
-                        pendingSubmapArea = null; // Clear the pending area
+                        console.log('[DEBUG] uploadSubmapButton: New submap object created:', JSON.stringify(newSubMap));
+                        console.log(`[DEBUG] uploadSubmapButton: Pushing to parent '${intendedParentContextForNewSubmap.name}' (ID: ${intendedParentContextForNewSubmap.id})`);
+                        intendedParentContextForNewSubmap.subMaps.push(newSubMap); // Push to locked-in parent's subMaps
+
+                        pendingSubmapArea = null;
+                        intendedParentContextForNewSubmap = null; // Clear context after successful use
+
                         uploadSubmapButton.style.display = 'none';
                         uploadSubmapLabel.style.display = 'none';
-                        drawDmMap(); // Redraw current map to show new submap area
+                        drawDmMap();
                         updateActiveMapsList();
                     };
-                    submapImg.onerror = () => { console.error("Error loading submap image."); alert("Error loading submap image.");};
+                    submapImg.onerror = () => {
+                        console.error("Error loading submap image.");
+                        alert("Error loading submap image.");
+                        intendedParentContextForNewSubmap = null; // Clear context on error too
+                    };
                     submapImg.src = e.target.result;
                 };
-                reader.onerror = () => { console.error("Error reading submap file."); alert("Error reading submap file."); };
+                reader.onerror = () => {
+                    console.error("Error reading submap file.");
+                    alert("Error reading submap file.");
+                    intendedParentContextForNewSubmap = null; // Clear context on error too
+                };
                 reader.readAsDataURL(file);
+            } else {
+                intendedParentContextForNewSubmap = null; // Clear if no file selected
             }
         });
 
