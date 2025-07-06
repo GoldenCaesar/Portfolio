@@ -210,6 +210,7 @@
         let tempSelectionCanvasRect = null;
         // Stores the image-relative area selected on currentlyViewedMap, ready for new submap creation
         let pendingSubmapArea = null;
+        let justFinalizedSelection = false; // Flag to prevent click after selection
 
 
         // --- Main Map Drawing and Handling ---
@@ -473,6 +474,7 @@
             uploadSubmapButton.value = null;
             uploadSubmapButton.focus();
 
+            justFinalizedSelection = true; // Set the flag here
             drawDmMap(); // Redraw to clear the red selection rectangle
             // Draw a temporary "pending link" blue rectangle for the confirmed area (in canvas coordinates)
             ctx.strokeStyle = 'rgba(100, 100, 255, 0.8)';
@@ -537,6 +539,10 @@
 
 // --- Canvas Click Logic for Player View Control ---
 dmCanvas.addEventListener('click', (e) => {
+    if (justFinalizedSelection) {
+        justFinalizedSelection = false; // Reset flag and prevent click action
+        return;
+    }
     if (!currentlyDisplayedImage || !currentlyDisplayedImage.complete || isSelectingArea) {
         return;
     }
