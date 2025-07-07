@@ -58,14 +58,32 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     font-size: 0.9em; /* Slightly smaller than h3 */
     display: inline-block; /* Allows margin and proper positioning */
 }
+.uploaded-maps-list.edit-mode-active li:hover {
+    background-color: #2a3138; /* Subtle hover effect for items in edit mode */
+}
+.file-actions {
+    margin-left: 10px; /* Spacing between filename and action icons */
+}
 .file-action-icon {
     cursor: pointer;
-    margin-left: 5px;
-    display: none; /* Hidden by default */
+    margin-left: 5px; /* Spacing between icons */
+    display: none; /* Hidden by default, shown when .file-actions is displayed */
+    padding: 2px; /* Make click target slightly larger */
+    border-radius: 3px; /* Slightly rounded corners for icons if they had a background */
 }
-.file-action-icon.visible {
+.file-action-icon:hover {
+    /* background-color: #3f4c5a; */ /* Optional: Subtle hover for icons */
+    color: #b6cae1; /* Highlight icon color on hover */
+}
+/* Ensure icons within an active .file-actions span are visible */
+.edit-mode-active .file-actions .file-action-icon {
     display: inline-block;
 }
+/* Specific styling for move icons if needed, e.g., to prevent them from looking too large */
+.move-map-up, .move-map-down {
+    font-weight: bold;
+}
+
 #active-maps-list.edit-mode-active .map-name-span:hover {
     /* Optional: Style for map names when in edit mode, e.g., different background */
     /* background-color: #3a4148; */ /* Example */
