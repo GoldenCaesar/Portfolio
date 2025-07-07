@@ -212,9 +212,10 @@
         let pendingSubmapArea = null;
         let justFinalizedSelection = false; // Flag to prevent click after selection
 
-        let isReselectingArea = false; // True when user is using the 'select square' icon feature
+        let isPendingAreaReselection = false; // True when user has clicked 'reselect area' icon and needs to pick a parent
+        let isActivelyDrawingReselectedArea = false; // True after parent is chosen and user is drawing the new area
         let targetSubMapToEditForAreaReselection = null; // Stores the submap object being re-selected
-        let parentContextForAreaReselection = null; // Stores the parent map context for area re-selection
+        let confirmedParentForAreaReselection = null; // Stores the chosen parent map object for area re-selection
 
 
         // --- Main Map Drawing and Handling ---
@@ -267,29 +268,45 @@
             }
 
             // Draw temporary selection rectangle if in selection mode
-            if ((isSelectingArea || isReselectingArea) && selectionStart && tempSelectionCanvasRect) {
+            // This covers both new submap selection and active reselection drawing.
+            if ((isSelectingArea || isActivelyDrawingReselectedArea) && selectionStart && tempSelectionCanvasRect) {
                 ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; // Red for new selection
                 ctx.lineWidth = 2;
                 ctx.strokeRect(tempSelectionCanvasRect.x, tempSelectionCanvasRect.y, tempSelectionCanvasRect.w, tempSelectionCanvasRect.h);
             }
 
-            // Draw orange highlight for area being re-selected (before new selection starts)
-            if (isReselectingArea && targetSubMapToEditForAreaReselection && !selectionStart && parentContextForAreaReselection && parentContextForAreaReselection.id === currentlyViewedMap.id) {
+            // Draw orange highlight for the original area when PENDING reselection (before a new parent is active for drawing)
+            if (isPendingAreaReselection && targetSubMapToEditForAreaReselection && !isActivelyDrawingReselectedArea && !selectionStart) {
                 const areaToHighlight = targetSubMapToEditForAreaReselection.area;
-                // Ensure we scale relative to the dimensions the area was defined on,
-                // then scale to current canvas display of the parentContextForAreaReselection.
-                if (areaToHighlight.originalImgW > 0 && areaToHighlight.originalImgH > 0) {
-                    const displayScaleX = dmCanvas.width / parentContextForAreaReselection.naturalWidth;
-                    const displayScaleY = dmCanvas.height / parentContextForAreaReselection.naturalHeight;
+                const currentParentOfTarget = findMapById(targetSubMapToEditForAreaReselection.parentId);
 
-                    ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)'; // Orange
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(
-                        areaToHighlight.x * displayScaleX,
-                        areaToHighlight.y * displayScaleY,
-                        areaToHighlight.w * displayScaleX,
-                        areaToHighlight.h * displayScaleY
-                    );
+                // Only draw highlight if the currentlyViewedMap IS the actual current parent of the submap being edited.
+                if (currentParentOfTarget && currentlyViewedMap && currentParentOfTarget.id === currentlyViewedMap.id) {
+                    // Use the same scaling logic as drawSubMapArea to ensure it's drawn correctly on its actual parent
+                    if (areaToHighlight.originalImgW > 0 && areaToHighlight.originalImgH > 0 && currentlyViewedMap.naturalWidth > 0 && currentlyViewedMap.naturalHeight > 0) {
+
+                        const relativeX = areaToHighlight.x / areaToHighlight.originalImgW;
+                        const relativeY = areaToHighlight.y / areaToHighlight.originalImgH;
+                        const relativeW = areaToHighlight.w / areaToHighlight.originalImgW;
+                        const relativeH = areaToHighlight.h / areaToHighlight.originalImgH;
+
+                        const actualXonCurrentParent = relativeX * currentlyViewedMap.naturalWidth;
+                        const actualYonCurrentParent = relativeY * currentlyViewedMap.naturalHeight;
+                        const actualWonCurrentParent = relativeW * currentlyViewedMap.naturalWidth;
+                        const actualHonCurrentParent = relativeH * currentlyViewedMap.naturalHeight;
+
+                        const canvasScaleX = dmCanvas.width / currentlyViewedMap.naturalWidth;
+                        const canvasScaleY = dmCanvas.height / currentlyViewedMap.naturalHeight;
+
+                        ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)'; // Orange
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(
+                            actualXonCurrentParent * canvasScaleX,
+                            actualYonCurrentParent * canvasScaleY,
+                            actualWonCurrentParent * canvasScaleX,
+                            actualHonCurrentParent * canvasScaleY
+                        );
+                    }
                 }
             }
         }
@@ -326,33 +343,77 @@
         }
 
         function initiateAreaReselection(subMapNodeToEdit) {
-            if (!currentlyViewedMap || !currentlyViewedMap.mapUrl || !currentlyDisplayedImage || !currentlyDisplayedImage.complete) {
-                alert("Please ensure the current map (intended new parent) is fully loaded.");
-                return;
-            }
-            if (isSelectingArea) { // If already selecting for a new submap, cancel that
+            // Cancel any other ongoing selection modes
+            if (isSelectingArea) {
                 isSelectingArea = false;
                 intendedParentContextForNewSubmap = null;
                 newSubmapButton.textContent = "New Sub Map";
+                dmCanvas.style.cursor = 'default';
+                editActiveListButton.disabled = false; // Re-enable list editing
+                // Potentially redraw if a selection was being shown
+            }
+            if (isActivelyDrawingReselectedArea) {
+                isActivelyDrawingReselectedArea = false;
+                confirmedParentForAreaReselection = null;
+                dmCanvas.style.cursor = 'default';
+            }
+            // If clicking reselect for the *same* submap that is already pending, treat as cancel
+            if (isPendingAreaReselection && targetSubMapToEditForAreaReselection && targetSubMapToEditForAreaReselection.id === subMapNodeToEdit.id) {
+                isPendingAreaReselection = false;
+                targetSubMapToEditForAreaReselection = null;
+                newSubmapButton.disabled = false;
+                editActiveListButton.disabled = false; // Assuming this means the main edit icon for the list
+                dmCanvas.style.cursor = 'default';
+                drawDmMap(); // Remove orange highlight
+                return;
             }
 
-            isReselectingArea = true;
+            isPendingAreaReselection = true;
             targetSubMapToEditForAreaReselection = subMapNodeToEdit;
-            parentContextForAreaReselection = currentlyViewedMap; // The currently viewed map will be the new parent
+            // No parent context is set here yet.
 
-            dmCanvas.style.cursor = 'crosshair';
-            selectionStart = null; // Ready for new selection mousedown
+            alert(`Reselecting area for "${subMapNodeToEdit.name}". Make a map active (click its eye icon 👁️) to choose it as the new parent and define the area link.`);
+
+            // Try to make the submap's current parent active to show the orange highlight
+            const originalParentMap = findMapById(subMapNodeToEdit.parentId);
+            if (originalParentMap && originalParentMap.mapUrl) {
+                if (currentlyViewedMap && currentlyViewedMap.id === originalParentMap.id && currentlyDisplayedImage && currentlyDisplayedImage.src === originalParentMap.mapUrl && currentlyDisplayedImage.complete) {
+                    // Original parent is already viewed and loaded, just redraw to show highlight
+                    drawDmMap();
+                } else {
+                    // Load and display the original parent map
+                    const img = new Image();
+                    img.onload = () => {
+                        currentlyViewedMap = originalParentMap;
+                        currentlyDisplayedImage = img;
+                        updateActiveMapsList(); // Update list to show new active map
+                        drawDmMap(); // This will draw the map and the orange highlight
+                    };
+                    img.onerror = () => {
+                        alert("Error loading original parent map image to show current area.");
+                        // Fallback: clear pending state if we can't show context
+                        isPendingAreaReselection = false;
+                        targetSubMapToEditForAreaReselection = null;
+                    };
+                    img.src = originalParentMap.mapUrl;
+                }
+            } else {
+                // If no original parent or it has no map (e.g. root was parent and then cleared),
+                // still allow reselection but no initial orange highlight possible on original parent.
+                // The user will just have to pick a new parent.
+                drawDmMap(); // Redraw, though no orange highlight will appear if no valid parent.
+            }
+
+            dmCanvas.style.cursor = 'default'; // Not crosshair yet
+            selectionStart = null;
             tempSelectionCanvasRect = null;
             pendingSubmapArea = null;
 
-            // Hide submap upload buttons if they were visible
             uploadSubmapButton.style.display = 'none';
             uploadSubmapLabel.style.display = 'none';
-            // Optionally change text of newSubmapButton or disable it
-            newSubmapButton.disabled = true; // Disable new submap creation during reselection
-
-            alert(`Reselecting area for "${subMapNodeToEdit.name}". The current map "${parentContextForAreaReselection.name}" will be its new parent. Click and drag on the map to define the new area.`);
-            drawDmMap(); // Redraw to show orange highlight
+            newSubmapButton.disabled = true;
+            // editActiveListButton should remain enabled to allow cancelling via exiting edit mode.
+            // Individual file icons for other files should ideally be less responsive, handled by general edit mode state.
         }
 
 
@@ -383,6 +444,18 @@
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
+                        // Cancel any pending reselection if a new main map is uploaded
+                        if (isPendingAreaReselection || isActivelyDrawingReselectedArea) {
+                            alert("Area reselection cancelled due to new main map upload.");
+                            isPendingAreaReselection = false;
+                            isActivelyDrawingReselectedArea = false;
+                            targetSubMapToEditForAreaReselection = null;
+                            confirmedParentForAreaReselection = null;
+                            dmCanvas.style.cursor = 'default';
+                            newSubmapButton.disabled = false;
+                            editActiveListButton.disabled = false;
+                        }
+
                         // Preserve existing subMaps
                         const existingSubMaps = campaignData && campaignData.subMaps ? campaignData.subMaps : [];
 
@@ -458,24 +531,26 @@
         });
 
         dmCanvas.addEventListener('mousedown', (e) => {
-            let currentContextMap = null;
+            let contextMapForDrawing = null;
             if (isSelectingArea && intendedParentContextForNewSubmap) {
-                currentContextMap = intendedParentContextForNewSubmap;
-            } else if (isReselectingArea && parentContextForAreaReselection) {
-                currentContextMap = parentContextForAreaReselection;
+                contextMapForDrawing = intendedParentContextForNewSubmap;
+            } else if (isActivelyDrawingReselectedArea && confirmedParentForAreaReselection) {
+                contextMapForDrawing = confirmedParentForAreaReselection;
             }
 
-            if (!currentContextMap || !currentlyDisplayedImage || !currentlyDisplayedImage.complete || currentlyDisplayedImage.src !== currentContextMap.mapUrl) {
-                if (isReselectingArea) { // If reselecting, and context is bad, cancel reselection
-                    alert("Error with map context for reselection. Cancelling.");
-                    isReselectingArea = false;
-                    targetSubMapToEditForAreaReselection = null;
-                    parentContextForAreaReselection = null;
+            if (!contextMapForDrawing || !currentlyDisplayedImage || !currentlyDisplayedImage.complete || currentlyDisplayedImage.src !== contextMapForDrawing.mapUrl) {
+                // If context is bad during active drawing, cancel that specific mode.
+                if (isActivelyDrawingReselectedArea) {
+                    alert("Error with map context for reselection drawing. Cancelling.");
+                    isActivelyDrawingReselectedArea = false;
+                    targetSubMapToEditForAreaReselection = null; // Clear target too
+                    confirmedParentForAreaReselection = null;
                     dmCanvas.style.cursor = 'default';
                     newSubmapButton.disabled = false;
-                    editActiveListButton.disabled = false;
+                    editActiveListButton.disabled = false; // Assuming this is the main list edit toggle
                     drawDmMap();
                 }
+                // isSelectingArea for new submap has its own cancellation paths.
                 return;
             }
 
@@ -485,14 +560,14 @@
         });
 
         dmCanvas.addEventListener('mousemove', (e) => {
-            let currentContextMap = null;
+            let contextMapForDrawing = null;
             if (isSelectingArea && intendedParentContextForNewSubmap) {
-                currentContextMap = intendedParentContextForNewSubmap;
-            } else if (isReselectingArea && parentContextForAreaReselection) {
-                currentContextMap = parentContextForAreaReselection;
+                contextMapForDrawing = intendedParentContextForNewSubmap;
+            } else if (isActivelyDrawingReselectedArea && confirmedParentForAreaReselection) {
+                contextMapForDrawing = confirmedParentForAreaReselection;
             }
 
-            if (!selectionStart || !currentContextMap || !currentlyDisplayedImage || !currentlyDisplayedImage.complete || currentlyDisplayedImage.src !== currentContextMap.mapUrl) {
+            if (!selectionStart || !contextMapForDrawing || !currentlyDisplayedImage || !currentlyDisplayedImage.complete || currentlyDisplayedImage.src !== contextMapForDrawing.mapUrl) {
                 return;
             }
 
@@ -506,29 +581,29 @@
         });
 
         dmCanvas.addEventListener('mouseup', (e) => {
-            let currentContextMap = null;
-            let operationType = null; // 'newSubmap' or 'reselectArea'
+            let contextMapForFinalizing = null;
+            let operationType = null;
 
             if (isSelectingArea && selectionStart && intendedParentContextForNewSubmap) {
-                currentContextMap = intendedParentContextForNewSubmap;
+                contextMapForFinalizing = intendedParentContextForNewSubmap;
                 operationType = 'newSubmap';
-            } else if (isReselectingArea && selectionStart && parentContextForAreaReselection && targetSubMapToEditForAreaReselection) {
-                currentContextMap = parentContextForAreaReselection;
+            } else if (isActivelyDrawingReselectedArea && selectionStart && confirmedParentForAreaReselection && targetSubMapToEditForAreaReselection) {
+                contextMapForFinalizing = confirmedParentForAreaReselection;
                 operationType = 'reselectArea';
             }
 
-            if (!operationType || !currentContextMap || !currentlyDisplayedImage || !currentlyDisplayedImage.complete || currentlyDisplayedImage.src !== currentContextMap.mapUrl) {
-                // If an operation was active but context became invalid, reset appropriately
+            if (!operationType || !contextMapForFinalizing || !currentlyDisplayedImage || !currentlyDisplayedImage.complete || currentlyDisplayedImage.src !== contextMapForFinalizing.mapUrl) {
+                // Reset relevant states if something went wrong before finalizing
                 if (isSelectingArea) {
                     isSelectingArea = false;
                     intendedParentContextForNewSubmap = null;
                     newSubmapButton.textContent = "New Sub Map";
                     editActiveListButton.disabled = false;
                 }
-                if (isReselectingArea) {
-                    isReselectingArea = false;
+                if (isActivelyDrawingReselectedArea) {
+                    isActivelyDrawingReselectedArea = false;
                     targetSubMapToEditForAreaReselection = null;
-                    parentContextForAreaReselection = null;
+                    confirmedParentForAreaReselection = null;
                     newSubmapButton.disabled = false;
                     editActiveListButton.disabled = false;
                 }
@@ -554,62 +629,64 @@
                 selectionStart = null;
                 tempSelectionCanvasRect = null;
                 if (operationType === 'newSubmap') {
-                    isSelectingArea = false;
+                    isSelectingArea = false; // Cancel new submap selection
                     newSubmapButton.textContent = "New Sub Map";
                     editActiveListButton.disabled = false;
                 } else if (operationType === 'reselectArea') {
-                    // For reselection, if selection is too small, revert to showing orange highlight of old area
-                    isReselectingArea = true; // Keep it true, but reset selectionStart
-                    // parentContextForAreaReselection and targetSubMapToEditForAreaReselection remain.
+                    // For reselection, if selection is too small, it means the user failed to draw.
+                    // We keep isActivelyDrawingReselectedArea = true, so they can try again.
+                    // confirmedParentForAreaReselection and targetSubMapToEditForAreaReselection remain.
+                    // The cursor should remain crosshair.
+                    alert("Selection too small. Please try again or cancel by exiting edit mode.");
                 }
-                dmCanvas.style.cursor = (operationType === 'reselectArea') ? 'crosshair' : 'default';
-                drawDmMap();
+                // dmCanvas.style.cursor is already crosshair if isActivelyDrawingReselectedArea is true
+                drawDmMap(); // Redraw to clear the small red box
                 return;
             }
 
-            const scaleX = currentContextMap.naturalWidth / dmCanvas.width;
-            const scaleY = currentContextMap.naturalHeight / dmCanvas.height;
+            const scaleX = contextMapForFinalizing.naturalWidth / dmCanvas.width;
+            const scaleY = contextMapForFinalizing.naturalHeight / dmCanvas.height;
 
             pendingSubmapArea = {
                 x: canvasSelection.x * scaleX,
                 y: canvasSelection.y * scaleY,
                 w: canvasSelection.w * scaleX,
                 h: canvasSelection.h * scaleY,
-                originalImgW: currentContextMap.naturalWidth,
-                originalImgH: currentContextMap.naturalHeight
+                originalImgW: contextMapForFinalizing.naturalWidth,
+                originalImgH: contextMapForFinalizing.naturalHeight
             };
 
             if (operationType === 'newSubmap') {
-                isSelectingArea = false;
-                newSubmapButton.textContent = "New Sub Map";
+                isSelectingArea = false; // Finished this selection phase
+                // intendedParentContextForNewSubmap is still set for uploadSubmapButton
+                newSubmapButton.textContent = "New Sub Map"; // Reset button text
                 uploadSubmapLabel.style.display = 'block';
                 uploadSubmapButton.style.display = 'block';
                 uploadSubmapButton.value = null;
                 uploadSubmapButton.focus();
-                justFinalizedSelection = true;
-                // Draw a temporary "pending link" blue rectangle
-                drawDmMap();
-                ctx.strokeStyle = 'rgba(100, 100, 255, 0.8)';
+                justFinalizedSelection = true; // Prevent click-through
+                drawDmMap(); // Redraw to clear red selection
+                ctx.strokeStyle = 'rgba(100, 100, 255, 0.8)'; // Blue for pending link
                 ctx.lineWidth = 2;
                 ctx.strokeRect(canvasSelection.x, canvasSelection.y, canvasSelection.w, canvasSelection.h);
             } else if (operationType === 'reselectArea') {
                 targetSubMapToEditForAreaReselection.area = pendingSubmapArea;
-                targetSubMapToEditForAreaReselection.parentId = parentContextForAreaReselection.id; // Update parent ID
+                targetSubMapToEditForAreaReselection.parentId = confirmedParentForAreaReselection.id;
 
-                isReselectingArea = false;
+                isActivelyDrawingReselectedArea = false; // Finished drawing phase
                 targetSubMapToEditForAreaReselection = null;
-                parentContextForAreaReselection = null;
+                confirmedParentForAreaReselection = null;
                 pendingSubmapArea = null;
-                newSubmapButton.disabled = false; // Re-enable new submap button
-                updateActiveMapsList(); // Update list to reflect potential parent change / name
-                justFinalizedSelection = true; // Prevent immediate click-through
+                newSubmapButton.disabled = false;
+                updateActiveMapsList();
+                justFinalizedSelection = true;
             }
 
-            editActiveListButton.disabled = false; // Re-enable list editing
+            editActiveListButton.disabled = false;
             dmCanvas.style.cursor = 'default';
             selectionStart = null;
             tempSelectionCanvasRect = null;
-            drawDmMap(); // Redraw to clear selection rectangle / show new state
+            drawDmMap();
         });
 
         uploadSubmapButton.addEventListener('change', (event) => {
@@ -767,18 +844,83 @@ dmCanvas.addEventListener('click', (e) => {
                 }
 
                 icon.addEventListener('click', (event) => {
-                    event.stopPropagation(); // Prevent triggering mapNameSpan click
-                    // If in edit mode, icon clicks should probably do nothing or be disabled
-                    if (isActiveListInEditMode) return;
+                    event.stopPropagation();
 
-                    if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete) {
+                    // Standard behavior: If not in edit mode, or if no reselection is pending, just load the map.
+                    // Also, if the clicked map is already active and loaded, do nothing.
+                    if ((!isActiveListInEditMode || !isPendingAreaReselection || !targetSubMapToEditForAreaReselection) &&
+                        (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete)) {
                         return;
+                    }
+
+                    // If in edit mode AND a reselection is pending for a submap:
+                    if (isActiveListInEditMode && isPendingAreaReselection && targetSubMapToEditForAreaReselection) {
+                        // The clicked mapNode becomes the chosen parent for the submap area reselection.
+                        confirmedParentForAreaReselection = mapNode;
+                        isPendingAreaReselection = false; // Move from pending to actively drawing
+                        isActivelyDrawingReselectedArea = true;
+
+                        // Load the chosen parent map's image if it's not already the current one
+                        if (!(currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete)) {
+                            const img = new Image();
+                            img.onload = () => {
+                                currentlyViewedMap = mapNode;
+                                currentlyDisplayedImage = img;
+                                dmCanvas.style.cursor = 'crosshair';
+                                selectionStart = null;
+                                tempSelectionCanvasRect = null;
+                                pendingSubmapArea = null;
+                                updateActiveMapsList(); // Reflect new active map
+                                drawDmMap(); // Redraw (orange highlight on old parent will disappear)
+                                alert(`"${mapNode.name}" is now active. Click and drag to define the new area for "${targetSubMapToEditForAreaReselection.name}".`);
+                            };
+                            img.onerror = () => {
+                                alert("Error loading image for chosen parent map: " + mapNode.name + ". Cancelling reselection.");
+                                // Reset reselection state on error
+                                isPendingAreaReselection = false;
+                                isActivelyDrawingReselectedArea = false;
+                                targetSubMapToEditForAreaReselection = null;
+                                confirmedParentForAreaReselection = null;
+                                newSubmapButton.disabled = false; // Re-enable as reselection failed
+                                editActiveListButton.disabled = false; // Ensure this is also enabled
+                                dmCanvas.style.cursor = 'default';
+                                updateActiveMapsList();
+                                drawDmMap();
+                            };
+                            img.src = mapNode.mapUrl;
+                        } else {
+                            // Chosen parent is already active, just set up for drawing
+                            // newSubmapButton remains disabled
+                            // editActiveListButton remains enabled
+                            dmCanvas.style.cursor = 'crosshair';
+                            selectionStart = null;
+                            tempSelectionCanvasRect = null;
+                            pendingSubmapArea = null;
+                            drawDmMap(); // Redraw (orange highlight on old parent will disappear)
+                            alert(`"${mapNode.name}" is already active. Click and drag to define the new area for "${targetSubMapToEditForAreaReselection.name}".`);
+                        }
+                        // Do not proceed to the generic map loading logic below for this case.
+                        return;
+                    }
+
+                    // Generic map loading logic (if not in reselection confirmation or if not in edit mode)
+                    // If in edit mode but no reselection pending, eye icon click should still work to change view.
+                    if (currentlyViewedMap && currentlyViewedMap.id === mapNode.id && currentlyDisplayedImage && currentlyDisplayedImage.src === mapNode.mapUrl && currentlyDisplayedImage.complete) {
+                        return; // Already active and loaded
                     }
 
                     const img = new Image();
                     img.onload = () => {
                         currentlyViewedMap = mapNode;
                         currentlyDisplayedImage = img;
+                        // If a reselection was pending but this click wasn't the confirmation AND not in edit mode
+                        // (i.e., user somehow clicked eye icon outside of the intended reselection workflow), cancel pending reselection.
+                        if (isPendingAreaReselection && !isActiveListInEditMode) {
+                            isPendingAreaReselection = false;
+                            targetSubMapToEditForAreaReselection = null;
+                            newSubmapButton.disabled = false;
+                            editActiveListButton.disabled = false;
+                        }
                         drawDmMap();
                         updateActiveMapsList();
                         if (playerWindow && !playerWindow.closed) {
@@ -942,6 +1084,18 @@ dmCanvas.addEventListener('click', (e) => {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    // Cancel any pending reselection if a new campaign is loaded
+                    if (isPendingAreaReselection || isActivelyDrawingReselectedArea) {
+                        alert("Area reselection cancelled due to new campaign load.");
+                        isPendingAreaReselection = false;
+                        isActivelyDrawingReselectedArea = false;
+                        targetSubMapToEditForAreaReselection = null;
+                        confirmedParentForAreaReselection = null;
+                        dmCanvas.style.cursor = 'default';
+                        newSubmapButton.disabled = false;
+                        editActiveListButton.disabled = false;
+                    }
+
                     try {
                         const loadedRootMap = JSON.parse(e.target.result);
 
@@ -1039,7 +1193,20 @@ dmCanvas.addEventListener('click', (e) => {
                 hideAllFileActionIcons();
                 currentlySelectedFileItemIdForEditing = null;
                 activeMapsList.classList.remove('edit-mode-active');
-                // If a rename input is active, finalize or cancel it here (advanced)
+
+                // Cancel any pending or active area reselection if exiting edit mode
+                if (isPendingAreaReselection || isActivelyDrawingReselectedArea) {
+                    isPendingAreaReselection = false;
+                    isActivelyDrawingReselectedArea = false;
+                    targetSubMapToEditForAreaReselection = null;
+                    confirmedParentForAreaReselection = null;
+                    dmCanvas.style.cursor = 'default';
+                    newSubmapButton.disabled = false;
+                    // editActiveListButton is already being handled
+                    alert("Area reselection cancelled.");
+                    drawDmMap(); // Redraw to remove any visual artifacts like orange highlight
+                }
+                // If a rename input is active, finalize or cancel it here (advanced) - this is existing logic
             }
             updateActiveMapsList(); // Re-render to apply/remove any edit-mode specific states if needed
         });
