@@ -500,7 +500,7 @@
 
         // --- Area Selection Logic ---
         newSubmapButton.addEventListener('click', () => {
-            if (isReselectingArea) { // Don't allow new submap if reselecting
+            if (isPendingAreaReselection || isActivelyDrawingReselectedArea) { // Check both new states
                 alert("Please finish or cancel the current area reselection first.");
                 return;
             }
