@@ -3,9 +3,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadedMapsList = document.getElementById('uploaded-maps-list');
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
+    const mapContainer = document.getElementById('map-container'); // Get the container
     const displayedFileNames = new Set();
     const mapObjectURLs = new Map(); // To store filename -> objectURL mapping
     let isEditMode = false;
+
+    // Function to resize the canvas to fit its container
+    function resizeCanvas() {
+        if (dmCanvas && mapContainer) {
+            dmCanvas.width = mapContainer.clientWidth;
+            dmCanvas.height = mapContainer.clientHeight;
+            console.log(`Canvas resized to: ${dmCanvas.width}x${dmCanvas.height}`);
+            // If a map is currently displayed, redraw it
+            // This requires knowing which map is active. For now, let's assume
+            // we might need to add a variable to track the currently displayed map.
+            // For simplicity in this step, we won't redraw here, but this is a good spot for it.
+        }
+    }
 
     function displayMapOnCanvas(fileName) {
         if (!dmCanvas) {
@@ -316,4 +330,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Initial canvas setup
+    if (dmCanvas && mapContainer) {
+        resizeCanvas(); // Size canvas on load
+        window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
+    } else {
+        console.error("Could not find DM canvas or map container for initial sizing.");
+    }
 });
