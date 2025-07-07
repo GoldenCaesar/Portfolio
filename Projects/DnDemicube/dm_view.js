@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const dmCanvas = document.getElementById('dm-canvas');
     const mapContainer = document.getElementById('map-container'); // Get the container
     const displayedFileNames = new Set();
+
+    // Map Tools Elements
+    const mapToolsSection = document.getElementById('map-tools-section');
+    const mapToolButtons = mapToolsSection ? mapToolsSection.querySelectorAll('.map-tools-buttons button') : [];
+
     const mapObjectURLs = new Map(); // To store filename -> objectURL mapping
     let isEditMode = false;
 
@@ -19,6 +24,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // we might need to add a variable to track the currently displayed map.
             // For simplicity in this step, we won't redraw here, but this is a good spot for it.
         }
+    }
+
+    function enableMapTools() {
+        if (mapToolsSection) {
+            // mapToolsSection.classList.remove('disabled'); // Or however you manage overall section appearance
+        }
+        mapToolButtons.forEach(button => button.disabled = false);
+        console.log("Map tools enabled");
+    }
+
+    function disableMapTools() {
+        if (mapToolsSection) {
+            // mapToolsSection.classList.add('disabled'); // Or however you manage overall section appearance
+        }
+        mapToolButtons.forEach(button => button.disabled = true);
+        console.log("Map tools disabled");
     }
 
     function displayMapOnCanvas(fileName) {
@@ -49,6 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Draw image centered and scaled
             ctx.drawImage(img, 0, 0, img.width, img.height,
                           centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+
+            enableMapTools(); // Enable tools once map is displayed
         };
         img.onerror = () => {
             console.error(`Error loading image for ${fileName} from ${objectURL}`);
@@ -338,4 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error("Could not find DM canvas or map container for initial sizing.");
     }
+
+    // Initially disable map tools on load
+    disableMapTools();
 });
