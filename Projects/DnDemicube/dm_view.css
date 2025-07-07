@@ -23,6 +23,33 @@ button, input[type="file"] {
 button:hover, input[type="file"]:hover {
     background-color: #a0b4c9;
 }
+
+/* Styling for buttons in the map tools section */
+#map-tools-section .map-tools-buttons button {
+    display: block; /* Stack buttons vertically */
+    width: 100%; /* Make buttons take full width of their container */
+    margin-bottom: 5px; /* Space between buttons */
+    box-sizing: border-box; /* Ensure padding and border don't expand width */
+}
+
+#map-tools-section .map-tools-buttons button:last-child {
+    margin-bottom: 0; /* No margin for the last button */
+}
+
+/* Styling for disabled map tool buttons */
+#map-tools-section .map-tools-buttons button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #5f6a7a; /* Darker, less prominent background */
+    color: #a0a0a0; /* Greyed out text */
+}
+
+/* Ensure non-disabled buttons in map tools still use default button styles if overridden by [disabled] */
+#map-tools-section .map-tools-buttons button:not([disabled]):hover {
+    background-color: #a0b4c9; /* Standard hover from general button styles */
+}
+
+
 label { display: block; margin-bottom: 5px; }
 h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 .button-like-label {
