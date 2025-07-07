@@ -1202,11 +1202,17 @@ dmCanvas.addEventListener('click', (e) => {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    cancelSubmapDefinitionMode(); // Cancel any ongoing edit
-                    isMapManagementListInEditMode = false; // Exit edit mode for map management
-                    editMapManagementListButton.textContent = '✏️';
-                    editMapManagementListButton.title = 'Edit uploaded maps';
-
+                    // Cancel any ongoing submap definition mode from Map Management
+                    cancelSubmapDefinitionMode();
+                    // Ensure Map Management is not in edit mode
+                    if (isMapManagementListInEditMode) {
+                        isMapManagementListInEditMode = false;
+                        editMapManagementListButton.textContent = '✏️';
+                        editMapManagementListButton.title = 'Edit uploaded maps';
+                        // Re-render uploaded maps list if necessary to hide icons, though it will be fully re-rendered after load.
+                    }
+                    // The old error came from lines here trying to disable 'editActiveListButton' which is gone.
+                    // The new cancellation logic above should be sufficient.
 
                     try {
                         const loadedCampaign = JSON.parse(e.target.result);
