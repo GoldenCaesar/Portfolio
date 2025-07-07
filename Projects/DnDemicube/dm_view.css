@@ -1,0 +1,80 @@
+body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; background-color: #15191e; color: #e0e0e0; }
+#sidebar { width: 250px; background-color: #20262d; padding: 15px; border-right: 1px solid #3f4c5a; display: flex; flex-direction: column; gap: 10px; }
+.sidebar-section { margin-bottom: 20px; border-top: 1px solid #3f4c5a; padding-top: 10px; }
+.sidebar-section h3, .sidebar-section h4 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
+.tabs { display: flex; border-bottom: 1px solid #3f4c5a; margin-bottom: 10px;}
+.tab-button { background: none; border: none; padding: 10px 15px; cursor: pointer; color: #e0e0e0; font-size: 14px; border-bottom: 2px solid transparent; }
+.tab-button.active { border-bottom-color: #b6cae1; color: #b6cae1; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+#map-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 10px; }
+#dm-canvas { max-width: 100%; max-height: 100%; border: 1px solid #3f4c5a; background-color: #2a3138; }
+button, input[type="file"] {
+    padding: 8px 12px;
+    background-color: #b6cae1;
+    max-width: 100%;
+    box-sizing: border-box;
+    color: #15191e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+button:hover, input[type="file"]:hover {
+    background-color: #a0b4c9;
+}
+label { display: block; margin-bottom: 5px; }
+h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
+.button-like-label {
+    padding: 8px 12px;
+    background-color: #b6cae1;
+    color: #15191e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-block; /* To behave like a button */
+}
+.button-like-label:hover {
+    background-color: #a0b4c9;
+}
+.visibility-icon {
+    margin-right: 8px;
+    cursor: pointer;
+    display: inline-block; /* Ensures it takes space */
+    width: 20px; /* Give it a fixed width for alignment */
+    text-align: center;
+}
+#active-maps-list, #active-maps-list ul {
+    list-style-type: none;
+    padding-left: 0; /* Reset default browser padding for ULs */
+    margin-top: 0; /* Optional: Reset default margins */
+    margin-bottom: 0; /* Optional: Reset default margins */
+}
+/* Individual list items will still have padding-left set by JS for hierarchy */
+.edit-icon {
+    cursor: pointer;
+    margin-left: 8px;
+    font-size: 0.9em; /* Slightly smaller than h3 */
+    display: inline-block; /* Allows margin and proper positioning */
+}
+.file-action-icon {
+    cursor: pointer;
+    margin-left: 5px;
+    display: none; /* Hidden by default */
+}
+.file-action-icon.visible {
+    display: inline-block;
+}
+#active-maps-list.edit-mode-active .map-name-span:hover {
+    /* Optional: Style for map names when in edit mode, e.g., different background */
+    /* background-color: #3a4148; */ /* Example */
+}
+.rename-input-active {
+    /* Basic styling for the rename input field */
+    padding: 2px 4px;
+    border: 1px solid #b6cae1;
+    background-color: #15191e;
+    color: #e0e0e0;
+    border-radius: 3px;
+}
