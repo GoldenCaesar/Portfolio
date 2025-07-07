@@ -2,8 +2,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadMapsInput = document.getElementById('upload-maps-input');
     const uploadedMapsList = document.getElementById('uploaded-maps-list');
     const editMapsIcon = document.getElementById('edit-maps-icon');
+    const dmCanvas = document.getElementById('dm-canvas');
     const displayedFileNames = new Set();
+    const mapObjectURLs = new Map(); // To store filename -> objectURL mapping
     let isEditMode = false;
+
+    function displayMapOnCanvas(fileName) {
+        if (!dmCanvas) {
+            console.error("DM Canvas not found!");
+            return;
+        }
+        const objectURL = mapObjectURLs.get(fileName);
+        if (!objectURL) {
+            console.error(`ObjectURL not found for ${fileName}`);
+            return;
+        }
+
+        const ctx = dmCanvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+            // Clear canvas
+            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+
+            // Calculate scaling to fit image within canvas while maintaining aspect ratio
+            const hRatio = dmCanvas.width / img.width;
+            const vRatio = dmCanvas.height / img.height;
+            const ratio = Math.min(hRatio, vRatio);
+
+            const centerShift_x = (dmCanvas.width - img.width * ratio) / 2;
+            const centerShift_y = (dmCanvas.height - img.height * ratio) / 2;
+
+            // Draw image centered and scaled
+            ctx.drawImage(img, 0, 0, img.width, img.height,
+                          centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+        };
+        img.onerror = () => {
+            console.error(`Error loading image for ${fileName} from ${objectURL}`);
+            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height); // Clear canvas on error too
+            ctx.fillText(`Error loading: ${fileName}`, 10, 50); // Basic error message
+        };
+        img.src = objectURL;
+    }
 
     function handleDelete(item) {
         const fileName = item.dataset.fileName;
@@ -11,9 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const list = item.parentNode;
             item.remove();
             displayedFileNames.delete(fileName);
+
+            // Revoke ObjectURL
+            const objectURL = mapObjectURLs.get(fileName);
+            if (objectURL) {
+                URL.revokeObjectURL(objectURL);
+                mapObjectURLs.delete(fileName);
+            }
+
             updateMoveIconVisibility(list); // Update move icons in case first/last item changed
-            // Potentially, you might want to do more here, like removing associated map data
-            // if it's stored elsewhere.
         }
     }
 
@@ -76,9 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 listItem.dataset.fileName = newName; // Update data attribute
                 displayedFileNames.delete(originalName);
                 displayedFileNames.add(newName);
+
+                // Update ObjectURL map
+                const objectURL = mapObjectURLs.get(originalName);
+                if (objectURL) {
+                    mapObjectURLs.delete(originalName);
+                    mapObjectURLs.set(newName, objectURL);
+                }
+
                 listItem.replaceChild(textNode, input);
-                 // Potentially, you might want to update other parts of your application
-                // that rely on this filename.
             }
         } else {
             // If name is empty or unchanged, revert to original
@@ -94,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadedMapsList.classList.toggle('edit-mode-active', isEditMode);
             const mapItems = uploadedMapsList.querySelectorAll('li');
             mapItems.forEach(item => {
+                item.classList.toggle('clickable-map', !isEditMode); // Toggle clickable state
                 let actionsSpan = item.querySelector('.file-actions');
                 if (!actionsSpan && isEditMode) {
                     actionsSpan = document.createElement('span');
@@ -171,12 +223,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Store filename in a data attribute for later use (e.g. rename, delete)
                     listItem.dataset.fileName = file.name;
+                    listItem.classList.add('map-list-item'); // Add class for styling and event delegation
 
                     const textNode = document.createTextNode(file.name);
                     listItem.appendChild(textNode);
 
                     uploadedMapsList.appendChild(listItem);
                     displayedFileNames.add(file.name);
+
+                    // Create and store ObjectURL
+                    const objectURL = URL.createObjectURL(file);
+                    mapObjectURLs.set(file.name, objectURL);
+
+                    // Add clickable class if not in edit mode
+                    if (!isEditMode) {
+                        listItem.classList.add('clickable-map');
+                    }
 
                     // If edit mode is already active, add icons to the new item
                     if (isEditMode) {
@@ -234,4 +296,24 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error('Could not find the upload input or the list element. Check IDs.');
     }
+
+    // Event listener for clicking on map names to display them
+    uploadedMapsList.addEventListener('click', (event) => {
+        if (isEditMode) {
+            return; // Do nothing if in edit mode, actions are handled by icons
+        }
+
+        // Traverse up from the click target to find the parent LI (the map item)
+        let targetItem = event.target;
+        while (targetItem && targetItem.tagName !== 'LI' && targetItem !== uploadedMapsList) {
+            targetItem = targetItem.parentNode;
+        }
+
+        if (targetItem && targetItem.tagName === 'LI' && targetItem.classList.contains('map-list-item')) {
+            const fileName = targetItem.dataset.fileName;
+            if (fileName) {
+                displayMapOnCanvas(fileName);
+            }
+        }
+    });
 });

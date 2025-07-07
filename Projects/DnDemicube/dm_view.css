@@ -58,9 +58,24 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     font-size: 0.9em; /* Slightly smaller than h3 */
     display: inline-block; /* Allows margin and proper positioning */
 }
-.uploaded-maps-list.edit-mode-active li:hover {
-    background-color: #2a3138; /* Subtle hover effect for items in edit mode */
+
+/* Styling for map list items */
+.map-list-item {
+    padding: 5px 2px; /* Add some padding for easier clicking */
+    border-radius: 3px;
+    margin-bottom: 2px; /* Slight spacing between items */
 }
+
+.map-list-item.clickable-map:hover {
+    background-color: #2a3138; /* Hover effect when clickable */
+    cursor: pointer;
+}
+
+/* When in edit mode, the hover effect is different (or can be non-existent if preferred) */
+.uploaded-maps-list.edit-mode-active .map-list-item:hover {
+     background-color: #313842; /* Different hover for edit mode, or remove if not desired */
+}
+
 .file-actions {
     margin-left: 10px; /* Spacing between filename and action icons */
 }
