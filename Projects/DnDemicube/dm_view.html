@@ -216,6 +216,7 @@
         let isActivelyDrawingReselectedArea = false; // True after parent is chosen and user is drawing the new area
         let targetSubMapToEditForAreaReselection = null; // Stores the submap object being re-selected
         let confirmedParentForAreaReselection = null; // Stores the chosen parent map object for area re-selection
+        let originalParentIdForReselectionTarget = null; // Stores the original parent ID of the submap being reselected
 
 
         // --- Main Map Drawing and Handling ---
@@ -370,6 +371,7 @@
 
             isPendingAreaReselection = true;
             targetSubMapToEditForAreaReselection = subMapNodeToEdit;
+            originalParentIdForReselectionTarget = subMapNodeToEdit.parentId; // Store original parent ID
             // No parent context is set here yet.
 
             alert(`Reselecting area for "${subMapNodeToEdit.name}". Make a map active (click its eye icon 👁️) to choose it as the new parent and define the area link.`);
@@ -670,12 +672,30 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(canvasSelection.x, canvasSelection.y, canvasSelection.w, canvasSelection.h);
             } else if (operationType === 'reselectArea') {
-                targetSubMapToEditForAreaReselection.area = pendingSubmapArea;
-                targetSubMapToEditForAreaReselection.parentId = confirmedParentForAreaReselection.id;
+                const targetSubMap = targetSubMapToEditForAreaReselection;
+                const newParentMap = confirmedParentForAreaReselection;
+                const oldParentMap = findMapById(originalParentIdForReselectionTarget);
 
-                isActivelyDrawingReselectedArea = false; // Finished drawing phase
+                // Update area and parentId first
+                targetSubMap.area = pendingSubmapArea;
+                targetSubMap.parentId = newParentMap.id;
+
+                if (oldParentMap && oldParentMap.id !== newParentMap.id) {
+                    // Parent has changed: remove from old parent's list and add to new parent's list
+                    oldParentMap.subMaps = oldParentMap.subMaps.filter(sm => sm.id !== targetSubMap.id);
+                    // Ensure newParentMap.subMaps exists (it should as per campaignData structure)
+                    if (!newParentMap.subMaps) newParentMap.subMaps = [];
+                    if (!newParentMap.subMaps.find(sm => sm.id === targetSubMap.id)) {
+                        newParentMap.subMaps.push(targetSubMap);
+                    }
+                }
+                // If parent did not change, targetSubMap is already in newParentMap.subMaps (which is oldParentMap.subMaps).
+                // Its .area is updated above, and .parentId remains the same. No structural array change needed here for that case.
+
+                isActivelyDrawingReselectedArea = false;
                 targetSubMapToEditForAreaReselection = null;
                 confirmedParentForAreaReselection = null;
+                originalParentIdForReselectionTarget = null; // Clear stored original parent ID
                 pendingSubmapArea = null;
                 newSubmapButton.disabled = false;
                 updateActiveMapsList();
