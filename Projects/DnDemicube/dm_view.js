@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
     const mapContainer = document.getElementById('map-container'); // Get the container
+    const hoverLabel = document.getElementById('hover-label');
     const displayedFileNames = new Set();
 
     // Map Tools Elements
@@ -353,6 +354,48 @@ document.addEventListener('DOMContentLoaded', () => {
             if (intersect) inside = !inside;
         }
         return inside;
+    }
+
+    function handleMouseMoveOnCanvas(event) {
+        if (!currentMapDisplayData.img || !hoverLabel) return; // No map or label element
+
+        const rect = dmCanvas.getBoundingClientRect();
+        const canvasX = event.clientX - rect.left;
+        const canvasY = event.clientY - rect.top;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        let overlaysToCheck = null;
+        let currentMapName = null;
+
+        if (selectedMapInActiveView) {
+            currentMapName = selectedMapInActiveView;
+            const activeMapInstance = activeMapsData.find(am => am.fileName === currentMapName);
+            if (activeMapInstance) {
+                overlaysToCheck = activeMapInstance.overlays;
+            }
+        } else if (selectedMapInManager) {
+            currentMapName = selectedMapInManager;
+            const managerMapData = detailedMapData.get(currentMapName);
+            if (managerMapData) {
+                overlaysToCheck = managerMapData.overlays;
+            }
+        }
+
+        if (imageCoords && overlaysToCheck && overlaysToCheck.length > 0) {
+            for (let i = overlaysToCheck.length - 1; i >= 0; i--) { // Iterate in reverse for top-most
+                const overlay = overlaysToCheck[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    hoverLabel.textContent = overlay.linkedMapName;
+                    hoverLabel.style.left = `${event.clientX + 10}px`; // Position relative to viewport
+                    hoverLabel.style.top = `${event.clientY + 10}px`;
+                    hoverLabel.style.display = 'block';
+                    return; // Found an overlay, show label and exit
+                }
+            }
+        }
+
+        // If no overlay was hovered or mouse is outside image bounds for imageCoords
+        hoverLabel.style.display = 'none';
     }
 
     function handleDelete(item) {
@@ -896,6 +939,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dmCanvas && mapContainer) {
         resizeCanvas(); // Size canvas on load
         window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
+        dmCanvas.addEventListener('mousemove', handleMouseMoveOnCanvas); // Added mousemove listener
+        dmCanvas.addEventListener('mouseout', () => { // Added mouseout listener
+            if (hoverLabel) {
+                hoverLabel.style.display = 'none';
+            }
+        });
     } else {
         console.error("Could not find DM canvas or map container for initial sizing.");
     }
