@@ -232,19 +232,32 @@ document.addEventListener('DOMContentLoaded', () => {
         img.src = mapData.url;
     }
 
-    function drawOverlays(overlays) {
+    function drawOverlays(overlays, isPlayerViewContext = false) {
         if (!overlays || overlays.length === 0 || !currentMapDisplayData.img) return;
         const ctx = dmCanvas.getContext('2d');
 
         overlays.forEach(overlay => {
             if (overlay.type === 'childMapLink' && overlay.polygon) {
+                // For DM view, respect playerVisible for styling. For player view, this function won't be called if not visible.
+                // The actual filtering for player view happens before calling drawOverlays in sendMapToPlayerView.
+                if (isPlayerViewContext && (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible)) {
+                    return; // Don't draw if not player visible in player view context (though filtering should prevent this)
+                }
+
                 ctx.beginPath();
                 let currentPointsToDraw = overlay.polygon;
                 let strokeStyle = 'rgba(0, 0, 255, 0.7)'; // Default: Blue for existing links
 
+                if (selectedMapInActiveView) { // Special styling for Active View context on DM screen
+                    if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
+                        strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Red and more transparent if hidden from player
+                    } else {
+                        strokeStyle = 'rgba(0, 255, 0, 0.7)'; // Green if visible to player in Active View
+                    }
+                }
+                // Moving polygon overrides visibility-based styling for immediate feedback
                 if (isMovingPolygon && polygonBeingMoved && overlay === polygonBeingMoved.overlayRef) {
-                    strokeStyle = 'rgba(0, 255, 0, 0.9)'; // Bright green while moving
-                    // Draw based on original points plus current drag offset
+                    strokeStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow while moving (changed from green for better contrast)
                     currentPointsToDraw = polygonBeingMoved.originalPoints.map(p => ({
                         x: p.x + currentPolygonDragOffsets.x,
                         y: p.y + currentPolygonDragOffsets.y
@@ -804,12 +817,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update Mode
                     const activeMapInstance = activeMapsData.find(map => map.fileName === selectedMapInManager);
                     if (activeMapInstance) {
-                        activeMapInstance.overlays = JSON.parse(JSON.stringify(sourceMapData.overlays));
-                        console.log(`Overlays for "${selectedMapInManager}" updated in Active View.`);
+                    activeMapInstance.overlays = JSON.parse(JSON.stringify(sourceMapData.overlays)).map(overlay => ({
+                        ...overlay,
+                        playerVisible: typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true // Ensure default
+                    }));
+                    console.log(`Overlays for "${selectedMapInManager}" updated in Active View. Player visibility defaults applied/preserved.`);
 
                         // If this specific active map instance is currently displayed, refresh its view
                         if (selectedMapInActiveView === selectedMapInManager) {
                             displayMapOnCanvas(selectedMapInActiveView);
+                        // Also, resend to player view if it's the active one being updated
+                        sendMapToPlayerView(selectedMapInActiveView);
                         }
                         // No need to call renderActiveMapsList() as the list item text doesn't change.
                         updateButtonStates(); // To ensure button text/state is correct if something else changed
@@ -818,11 +836,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error('Error updating map in active list: instance not found in activeMapsData despite check.');
                     }
                 } else {
-                    // Add Mode
+                // Add Mode: Ensure playerVisible defaults to true for all new overlays
+                const newOverlays = JSON.parse(JSON.stringify(sourceMapData.overlays)).map(overlay => ({
+                    ...overlay,
+                    playerVisible: true // Default to visible for new additions
+                }));
                     activeMapsData.push({
                         fileName: sourceMapData.name,
-                        overlays: JSON.parse(JSON.stringify(sourceMapData.overlays))
+                    overlays: newOverlays
                     });
+                console.log(`Map "${sourceMapData.name}" added to Active View. Player visibility defaulted to true for overlays.`);
                     renderActiveMapsList();
                     updateButtonStates();
                 }
@@ -1465,17 +1488,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Player View Communication ---
     function sendMapToPlayerView(mapFileName) {
         if (playerWindow && !playerWindow.closed && mapFileName) {
-            const mapData = detailedMapData.get(mapFileName);
-            if (mapData && mapData.url) {
-                // Convert Object URL to base64 Data URL before sending
-                fetch(mapData.url)
+            const dmMapData = detailedMapData.get(mapFileName); // Used for the base image URL
+            const activeMapInstance = activeMapsData.find(am => am.fileName === mapFileName); // Used for overlays
+
+            if (dmMapData && dmMapData.url && activeMapInstance) {
+                fetch(dmMapData.url)
                     .then(response => response.blob())
                     .then(blob => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
                             const base64dataUrl = reader.result;
-                            playerWindow.postMessage({ type: 'loadMap', mapDataUrl: base64dataUrl }, '*');
-                            console.log(`Sent map "${mapFileName}" (as data URL) to player view.`);
+                            // Filter overlays: only send those with playerVisible !== false (or true/undefined)
+                            const visibleOverlays = activeMapInstance.overlays.filter(overlay => {
+                                return typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true;
+                            });
+                            playerWindow.postMessage({
+                                type: 'loadMap',
+                                mapDataUrl: base64dataUrl,
+                                overlays: JSON.parse(JSON.stringify(visibleOverlays)) // Send a deep copy of filtered overlays
+                            }, '*');
+                            console.log(`Sent map "${mapFileName}" (as data URL) and ${visibleOverlays.length} visible overlays to player view.`);
                         };
                         reader.onerror = () => {
                             console.error(`Error converting map "${mapFileName}" to data URL for player view.`);
@@ -1486,15 +1518,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error(`Error fetching blob for map "${mapFileName}" to send to player view:`, error);
                     });
             } else {
-                console.warn(`Could not send map to player view: Map data or URL not found for "${mapFileName}".`);
+                console.warn(`Could not send map to player view: DM Map data, URL for "${mapFileName}", or active instance not found.`);
             }
         } else {
             if (!mapFileName) {
                 console.warn("sendMapToPlayerView called without a mapFileName.");
             }
-            // Silently ignore if playerWindow is not available
         }
     }
+
+    function sendPolygonVisibilityUpdateToPlayerView(mapFileName, polygonIdentifier, isVisible) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({
+                type: 'polygonVisibilityUpdate',
+                mapFileName: mapFileName,
+                polygonIdentifier: polygonIdentifier, // This needs to be a way to uniquely ID the polygon (e.g., its points array stringified)
+                isVisible: isVisible
+            }, '*');
+            console.log(`Sent polygon visibility update to player view: Map: ${mapFileName}, Visible: ${isVisible}`);
+        }
+    }
+
 
     function sendClearMessageToPlayerView() {
         if (playerWindow && !playerWindow.closed) {
@@ -1542,7 +1586,8 @@ document.addEventListener('DOMContentLoaded', () => {
         polygonContextMenu.style.display = 'none'; // Hide previous menu first
         selectedPolygonForContextMenu = null;
 
-        if (!selectedMapInManager) { // Only active if a map is selected in Manage Maps
+        // Context menu is available if a map is selected in EITHER Manage Maps OR Active View
+        if (!selectedMapInManager && !selectedMapInActiveView) {
             return;
         }
 
@@ -1552,18 +1597,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!imageCoords) return; // Click was outside the image
 
-        const managerMapData = detailedMapData.get(selectedMapInManager);
-        if (managerMapData && managerMapData.overlays) {
-            // Iterate in reverse to catch topmost polygon if overlapping
-            for (let i = managerMapData.overlays.length - 1; i >= 0; i--) {
-                const overlay = managerMapData.overlays[i];
+        let mapToSearchForOverlays = null;
+        let overlaySource = null; // To distinguish between 'manager' and 'active'
+
+        if (selectedMapInActiveView) {
+            mapToSearchForOverlays = activeMapsData.find(am => am.fileName === selectedMapInActiveView);
+            overlaySource = 'active';
+        } else if (selectedMapInManager) {
+            mapToSearchForOverlays = detailedMapData.get(selectedMapInManager);
+            overlaySource = 'manager';
+        }
+
+        if (mapToSearchForOverlays && mapToSearchForOverlays.overlays) {
+            for (let i = mapToSearchForOverlays.overlays.length - 1; i >= 0; i--) {
+                const overlay = mapToSearchForOverlays.overlays[i];
                 if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                    selectedPolygonForContextMenu = { overlay: overlay, index: i, parentMapName: selectedMapInManager };
-                    polygonContextMenu.style.left = `${event.clientX}px`; // Use clientX/Y for viewport positioning
+                    selectedPolygonForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: mapToSearchForOverlays.name || mapToSearchForOverlays.fileName, // .name for detailedMapData, .fileName for activeMapsData
+                        source: overlaySource // 'manager' or 'active'
+                    };
+
+                    // Show/hide context menu items based on source
+                    const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
+                    const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
+                    const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
+                    const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
+
+                    if (overlaySource === 'active') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (changeChildMapItem) changeChildMapItem.style.display = 'none';
+                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
+                        if (movePolygonItem) movePolygonItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // manager source
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
+                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
+                        if (movePolygonItem) movePolygonItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
+
+                    polygonContextMenu.style.left = `${event.clientX}px`;
                     polygonContextMenu.style.top = `${event.clientY}px`;
                     polygonContextMenu.style.display = 'block';
                     console.log('Right-clicked on polygon:', selectedPolygonForContextMenu);
-                    return; // Found a polygon, show menu and stop
+                    return;
                 }
             }
         }
@@ -1586,99 +1667,133 @@ document.addEventListener('DOMContentLoaded', () => {
         const action = event.target.dataset.action;
 
         if (action && selectedPolygonForContextMenu) {
-            const { overlay, index, parentMapName } = selectedPolygonForContextMenu;
-            const parentMapData = detailedMapData.get(parentMapName);
+            const { overlay, index, parentMapName, source } = selectedPolygonForContextMenu;
+
+            // Determine the correct data source (manager vs active)
+            let parentMapData;
+            if (source === 'manager') {
+                parentMapData = detailedMapData.get(parentMapName);
+            } else if (source === 'active') {
+                parentMapData = activeMapsData.find(am => am.fileName === parentMapName);
+            }
 
             if (!parentMapData) {
-                console.error("Parent map data not found for context menu action:", parentMapName);
+                console.error(`Parent map data not found for context menu action. Name: ${parentMapName}, Source: ${source}`);
                 polygonContextMenu.style.display = 'none';
                 selectedPolygonForContextMenu = null;
                 return;
             }
 
             switch (action) {
+                case 'toggle-player-visibility':
+                    if (source === 'active') {
+                        // Ensure playerVisible property exists, default to true if not
+                        if (typeof overlay.playerVisible !== 'boolean') {
+                            overlay.playerVisible = true;
+                        }
+                        overlay.playerVisible = !overlay.playerVisible; // Toggle
+                        console.log(`Polygon visibility for "${overlay.linkedMapName}" on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
+                        alert(`Player visibility for this area is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
+
+                        // If the currently displayed map is the one that was modified, refresh its display on DM canvas
+                        if (selectedMapInActiveView === parentMapName) {
+                            displayMapOnCanvas(parentMapName);
+                            // Also, resend the entire map and visible overlays to player view for consistency
+                            sendMapToPlayerView(parentMapName);
+                        } else {
+                            // If the modified map is not currently displayed on DM canvas,
+                            // still need to inform player view if it's the one they are seeing.
+                            // This requires checking what map player view has.
+                            // For simplicity, if playerWindow is open, always send.
+                            // A more targeted approach would involve player view reporting its current map.
+                            if (playerWindow && !playerWindow.closed) {
+                                sendMapToPlayerView(parentMapName);
+                            }
+                        }
+                        // The specific sendPolygonVisibilityUpdateToPlayerView might become redundant
+                        // if sendMapToPlayerView is called, as it sends the whole state.
+                        // const polygonIdentifier = JSON.stringify(overlay.polygon);
+                        // sendPolygonVisibilityUpdateToPlayerView(parentMapName, polygonIdentifier, overlay.playerVisible);
+                    } else {
+                        console.warn("Toggle Player Visibility action called on a non-active map overlay.");
+                        alert("This action is only available for maps in the Active View.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    selectedPolygonForContextMenu = null;
+                    break;
+                // --- Cases for 'manager' source ---
                 case 'change-child-map':
-                    isChangingChildMapForPolygon = true;
-                    // selectedPolygonForContextMenu is already set and will be used by uploadedMapsList click handler
-                    alert(`"Change Child Map" selected for polygon linking to "${overlay.linkedMapName}". Please click a new map from the "Manage Maps" list to be its new child.`);
-                    polygonContextMenu.style.display = 'none'; // Hide menu, selection process starts
-                    // No need to clear selectedPolygonForContextMenu here, it's needed for the next step
+                    if (source === 'manager') {
+                        isChangingChildMapForPolygon = true;
+                        alert(`"Change Child Map" selected for polygon linking to "${overlay.linkedMapName}". Please click a new map from the "Manage Maps" list to be its new child.`);
+                        // selectedPolygonForContextMenu remains for the next step
+                    }
+                    polygonContextMenu.style.display = 'none';
                     break;
                 case 'redraw-polygon':
-                    if (parentMapData && parentMapData.overlays && parentMapData.overlays[index]) {
+                    if (source === 'manager' && parentMapData.overlays && parentMapData.overlays[index]) {
                         isRedrawingPolygon = true;
-                        preservedLinkedMapNameForRedraw = overlay.linkedMapName; // Preserve the link
-                        currentPolygonPoints = []; // Reset for new drawing
+                        preservedLinkedMapNameForRedraw = overlay.linkedMapName;
+                        currentPolygonPoints = [];
                         polygonDrawingComplete = false;
-
-                        // Remove the old polygon overlay
                         parentMapData.overlays.splice(index, 1);
-
                         dmCanvas.style.cursor = 'crosshair';
-                        alert(`Redrawing polygon for link to "${preservedLinkedMapNameForRedraw}". Click on the map to start drawing the new polygon. Click the first point to close it.`);
-
-                        // Redraw the map to remove the old polygon before starting to draw the new one
+                        alert(`Redrawing polygon for link to "${preservedLinkedMapNameForRedraw}". Click on the map to start drawing. Click the first point to close it.`);
                         if (selectedMapInManager === parentMapName) {
                             displayMapOnCanvas(parentMapName);
                         }
                         console.log('Redraw Polygon initiated. Old polygon removed. Preserved link:', preservedLinkedMapNameForRedraw);
-                    } else {
+                    } else if (source === 'manager') {
                         console.error("Error initiating redraw: Parent map data or overlay not found.");
                         alert("Error: Could not find the polygon to redraw.");
                     }
                     polygonContextMenu.style.display = 'none';
-                    // selectedPolygonForContextMenu is implicitly cleared by starting redraw or should be nulled if error
                     if (!isRedrawingPolygon) selectedPolygonForContextMenu = null;
                     break;
                 case 'move-polygon':
-                    if (parentMapData && parentMapData.overlays && parentMapData.overlays[index]) {
+                    if (source === 'manager' && parentMapData.overlays && parentMapData.overlays[index]) {
                         isMovingPolygon = true;
                         polygonBeingMoved = {
-                            overlayRef: overlay, // Direct reference to the overlay in detailedMapData
-                            originalPoints: JSON.parse(JSON.stringify(overlay.polygon)), // Deep copy for reference
+                            overlayRef: overlay,
+                            originalPoints: JSON.parse(JSON.stringify(overlay.polygon)),
                             parentMapName: parentMapName,
-                            originalIndex: index // Keep original index if needed, though ref is better
+                            originalIndex: index
                         };
-                        moveStartPoint = null; // Reset, wait for mousedown on polygon
+                        moveStartPoint = null;
                         currentPolygonDragOffsets = {x: 0, y: 0};
                         dmCanvas.style.cursor = 'move';
-                        alert(`Move mode activated for polygon linking to "${overlay.linkedMapName}". Click and drag the polygon to move it. Click again to place, or right-click to cancel.`);
+                        alert(`Move mode activated for polygon linking to "${overlay.linkedMapName}". Click and drag the polygon. Click again to place, or right-click to cancel.`);
                         console.log('Move Polygon initiated for:', polygonBeingMoved);
-                    } else {
+                    } else if (source === 'manager') {
                         console.error("Error initiating move: Parent map data or overlay not found.");
                         alert("Error: Could not find the polygon to move.");
                     }
                     polygonContextMenu.style.display = 'none';
-                    selectedPolygonForContextMenu = null; // Context selection is handled
+                    selectedPolygonForContextMenu = null;
                     break;
                 case 'delete-link':
-                    if (parentMapData && parentMapData.overlays && parentMapData.overlays[index]) {
+                    if (source === 'manager' && parentMapData.overlays && parentMapData.overlays[index]) {
                         if (confirm(`Are you sure you want to delete the link to "${overlay.linkedMapName}"?`)) {
                             parentMapData.overlays.splice(index, 1);
                             console.log(`Link to "${overlay.linkedMapName}" deleted from map "${parentMapName}".`);
                             alert(`Link to "${overlay.linkedMapName}" has been deleted.`);
-
-                            // If the currently displayed map is the one that was modified, refresh its display
                             if (selectedMapInManager === parentMapName) {
                                 displayMapOnCanvas(parentMapName);
                             }
                         }
-                    } else {
+                    } else if (source === 'manager') {
                         console.error("Error deleting link: Parent map data or overlay not found.");
                         alert("Error: Could not find the link to delete.");
                     }
                     polygonContextMenu.style.display = 'none';
-                    selectedPolygonForContextMenu = null; // Clear selection
+                    selectedPolygonForContextMenu = null;
                     break;
             }
         } else if (action) {
-            // Action clicked but no polygon was selected (should not happen if menu is shown correctly)
             console.warn("Context menu action clicked, but no polygon was selected.");
             polygonContextMenu.style.display = 'none';
             selectedPolygonForContextMenu = null;
         }
-        // If click was on UL or non-action LI, it just closes due to the global listener (if not stopped)
-        // or does nothing if propagation is stopped and it's not an action.
     });
 
 
