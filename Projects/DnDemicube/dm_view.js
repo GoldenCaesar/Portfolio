@@ -250,12 +250,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dmCanvas.addEventListener('click', (event) => {
         const rect = dmCanvas.getBoundingClientRect();
-        const canvasClickX = event.clientX - rect.left;
-        const canvasClickY = event.clientY - rect.top;
-        // Adjust for canvas border to get coordinates relative to the drawable area
-        const adjustedCanvasX = canvasClickX - dmCanvas.clientLeft;
-        const adjustedCanvasY = canvasClickY - dmCanvas.clientTop;
-        const imageCoords = getRelativeCoords(adjustedCanvasX, adjustedCanvasY);
+        const canvasX = Math.round(event.clientX - rect.left);
+        const canvasY = Math.round(event.clientY - rect.top);
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
 
         if (!imageCoords) {
             // console.log("Clicked outside map image area.");
@@ -363,12 +360,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentMapDisplayData.img || !hoverLabel) return; // No map or label element
 
         const rect = dmCanvas.getBoundingClientRect();
-        const canvasMouseX = event.clientX - rect.left;
-        const canvasMouseY = event.clientY - rect.top;
-        // Adjust for canvas border to get coordinates relative to the drawable area
-        const adjustedCanvasX = canvasMouseX - dmCanvas.clientLeft;
-        const adjustedCanvasY = canvasMouseY - dmCanvas.clientTop;
-        const imageCoords = getRelativeCoords(adjustedCanvasX, adjustedCanvasY);
+        const canvasX = Math.round(event.clientX - rect.left);
+        const canvasY = Math.round(event.clientY - rect.top);
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
 
         let overlaysToCheck = null;
         let currentMapName = null;
