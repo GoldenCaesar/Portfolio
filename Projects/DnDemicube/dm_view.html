@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DM View - DnDemicube</title>
     <link rel="stylesheet" href="dm_view.css">
+    <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
 </head>
 <body>
     <div id="sidebar">
@@ -63,8 +64,20 @@
         </div>
 
         <div id="tab-notes" class="tab-content">
-            <h3>Notes</h3>
-            <textarea placeholder="Campaign notes..." style="width: 100%; height: 200px;"></textarea>
+            <div class="notes-controls sidebar-section">
+                <h3>Notes <span id="edit-notes-icon" class="edit-icon" style="cursor: pointer;">✏️</span></h3>
+                <button id="create-new-note-button">Create New Note</button>
+            </div>
+            <div id="notes-sidebar" class="sidebar-section">
+                <ul id="notes-list" style="list-style-type: none; padding-left: 0; overflow-y: auto; max-height: 200px;">
+                    <!-- Notes will be listed here -->
+                </ul>
+            </div>
+            <div id="note-editor-area">
+                <input type="text" id="note-title-input" placeholder="Note Title" />
+                <button id="save-note-button">Save Note</button>
+                <textarea id="markdown-editor"></textarea>
+            </div>
         </div>
 
         <div id="tab-characters" class="tab-content">
@@ -78,6 +91,7 @@
     <div id="hover-label" class="hover-label" style="display: none;"></div>
 
     <script src="dm_view.js"></script>
+    <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
 
     <div id="polygon-context-menu" class="context-menu" style="display: none; position: absolute;">
         <ul>

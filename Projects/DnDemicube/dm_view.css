@@ -190,3 +190,149 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     background-color: #3f4c5a; /* Hover effect for menu items */
     color: #b6cae1; /* Highlight text on hover */
 }
+
+/* Notes Tab Styles */
+#tab-notes {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Make notes tab take full height of its container */
+}
+
+.notes-controls {
+    padding-bottom: 10px; /* Add some space below the controls */
+}
+
+#create-new-note-button {
+    width: 100%;
+    margin-top: 5px;
+}
+
+#notes-sidebar {
+    /* border-top: 1px solid #3f4c5a; Already part of .sidebar-section */
+    /* padding-top: 10px; Already part of .sidebar-section */
+    /* max-height is set inline in HTML, can be moved here if preferred */
+    overflow-y: auto;
+}
+
+#notes-list li {
+    padding: 8px 10px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border: 1px solid transparent; /* For consistent sizing with selected */
+    display: flex; /* To align text and icons */
+    justify-content: space-between; /* Pushes icons to the right */
+    align-items: center; /* Vertically aligns text and icons */
+}
+
+#notes-list li:hover {
+    background-color: #2a3138;
+}
+
+#notes-list li.selected-note-item {
+    background-color: #3a4f6a !important;
+    border-left: 3px solid #b6cae1;
+    font-weight: bold;
+    color: #ffffff !important;
+}
+
+#notes-list li.selected-note-item:hover {
+    background-color: #4a5f7a !important;
+}
+
+/* Styles for note actions (rename, move, delete) - similar to map actions */
+.note-actions {
+    margin-left: 10px;
+}
+
+.note-action-icon {
+    cursor: pointer;
+    margin-left: 8px;
+    display: none; /* Hidden by default */
+}
+.note-action-icon:hover {
+    color: #b6cae1;
+}
+
+#notes-list.edit-mode-active .note-action-icon {
+    display: inline-block; /* Show icons in edit mode */
+}
+#notes-list.edit-mode-active .note-list-item-name:hover {
+    /* Optional: style for note names when in edit mode and hovering name part */
+    /* background-color: #313842; */
+}
+
+
+#note-editor-area {
+    flex-grow: 1; /* Takes remaining space in the notes tab */
+    display: flex;
+    flex-direction: column;
+    padding-top: 15px; /* Space above the title input */
+    overflow-y: auto; /* If content overflows */
+}
+
+#note-title-input {
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #2a3138;
+    color: #e0e0e0;
+    border: 1px solid #3f4c5a;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#save-note-button {
+    margin-bottom: 10px;
+    align-self: flex-start; /* Or 'flex-end' or 'center' as preferred */
+}
+
+/* EasyMDE Specific Styles - adjust if necessary */
+#note-editor-area .EasyMDEContainer {
+    flex-grow: 1; /* Allows the editor to fill available vertical space */
+    display: flex; /* Helps manage internal layout of EasyMDE if it needs to fill space */
+    flex-direction: column;
+    min-height: 200px; /* Ensure it has a minimum height */
+}
+
+#note-editor-area .EasyMDEContainer .CodeMirror {
+    flex-grow: 1; /* Make CodeMirror instance fill the EasyMDEContainer */
+    height: auto; /* Override fixed height if any, to allow flex growth */
+    border: 1px solid #3f4c5a;
+    background-color: #2a3138;
+    color: #e0e0e0;
+}
+#note-editor-area .EasyMDEContainer .CodeMirror-focused {
+    border-color: #b6cae1;
+}
+#note-editor-area .editor-toolbar {
+    border-top: 1px solid #3f4c5a;
+    border-left: 1px solid #3f4c5a;
+    border-right: 1px solid #3f4c5a;
+    background-color: #20262d; /* Match sidebar for toolbar */
+}
+#note-editor-area .editor-toolbar button,
+#note-editor-area .editor-toolbar button.active {
+    color: #e0e0e0; /* Light icon color */
+    border-color: #3f4c5a;
+}
+#note-editor-area .editor-toolbar button:hover {
+    background-color: #3f4c5a;
+    border-color: #5f6a7a;
+}
+
+#note-editor-area .editor-preview,
+#note-editor-area .editor-preview-side {
+    background-color: #2a3138; /* Match editor background */
+    border: 1px solid #3f4c5a;
+    color: #e0e0e0;
+}
+/* Ensure links in preview are visible */
+#note-editor-area .editor-preview a,
+#note-editor-area .editor-preview-side a {
+    color: #8ab4f8; /* A common link color, adjust as needed */
+}
+#note-editor-area .editor-preview img,
+#note-editor-area .editor-preview-side img {
+    max-width: 100%; /* Ensure images are responsive within the preview */
+    height: auto;
+}

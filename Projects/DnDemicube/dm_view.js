@@ -10,6 +10,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const polygonContextMenu = document.getElementById('polygon-context-menu'); // Added
     const displayedFileNames = new Set();
 
+    // Notes Tab Elements
+    const createNewNoteButton = document.getElementById('create-new-note-button');
+    const editNotesIcon = document.getElementById('edit-notes-icon');
+    const notesList = document.getElementById('notes-list');
+    const noteTitleInput = document.getElementById('note-title-input');
+    const saveNoteButton = document.getElementById('save-note-button');
+    const markdownEditorTextarea = document.getElementById('markdown-editor');
+    const tabNotes = document.getElementById('tab-notes');
+
+
     // Map Tools Elements
     const mapToolsSection = document.getElementById('map-tools-section');
     // const mapToolButtons = mapToolsSection ? mapToolsSection.querySelectorAll('.map-tools-buttons button') : []; // Will re-evaluate usage of this
@@ -34,6 +44,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedMapInManager = null;
     let selectedMapInActiveView = null;
     let activeMapsData = []; // Stores { fileName: "map.png", overlays: [], ...other unique instance data }
+
+    // Notes State Variables
+    let notesData = []; // Array of note objects: { id: uniqueId, title: "Note 1", content: "# Markdown" }
+    let selectedNoteId = null;
+    let isNotesEditMode = false;
+    let easyMDE = null;
+
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
@@ -1415,6 +1432,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderActiveMapsList(); // Initial render for active maps list (will be empty)
     updateButtonStates(); // Set initial button states
 
+    // Notes Tab Initialisation
+    renderNotesList();
+    // Add other notes event listeners here if needed immediately, or within DOMContentLoaded
+
+
     // --- Campaign Save/Load ---
     const saveCampaignButton = document.getElementById('save-campaign-button');
     const loadCampaignInput = document.getElementById('load-campaign-input');
@@ -1434,7 +1456,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const campaignData = {
             mapDefinitions: serializableDetailedMapData, // Holds map names and their overlay configurations
             activeMaps: activeMapsData, // Holds the state of the active view (filenames and their instance-specific overlays)
-            // Add other campaign elements to save here (notes, characters, etc.)
+            notes: notesData, // Save notes
+            selectedNoteId: selectedNoteId, // Save selected note ID
+            // Add other campaign elements to save here (characters, etc.)
             // currentSelectedMapInManager: selectedMapInManager, // Optional: save UI state
             // currentSelectedMapInActiveView: selectedMapInActiveView // Optional: save UI state
         };
@@ -1503,6 +1527,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Restore activeMapsData
                 activeMapsData = campaignData.activeMaps || [];
                 renderActiveMapsList(); // Update UI for active maps
+
+                // Restore Notes
+                notesData = campaignData.notes || [];
+                selectedNoteId = campaignData.selectedNoteId || null;
+                renderNotesList();
+                if (selectedNoteId) {
+                    const noteToLoad = notesData.find(n => n.id === selectedNoteId);
+                    if (noteToLoad) {
+                        loadNoteIntoEditor(selectedNoteId);
+                    } else {
+                        selectedNoteId = null; // ID from save file doesn't exist in notesData
+                        clearNoteEditor();
+                    }
+                } else {
+                    clearNoteEditor();
+                }
+
 
                 // Optional: Restore UI selections
                 // selectedMapInManager = campaignData.currentSelectedMapInManager || null;
@@ -1846,6 +1887,400 @@ document.addEventListener('DOMContentLoaded', () => {
             polygonContextMenu.style.display = 'none';
             selectedPolygonForContextMenu = null;
         }
+    });
+
+    // --- Notes Tab Functionality ---
+
+    function initEasyMDE() {
+        if (easyMDE) {
+            // console.log("EasyMDE already initialized.");
+            return;
+        }
+        if (!markdownEditorTextarea) {
+            console.error("Markdown textarea element not found for EasyMDE.");
+            return;
+        }
+        try {
+            easyMDE = new EasyMDE({
+                element: markdownEditorTextarea,
+                spellChecker: false,
+                placeholder: "Type your markdown notes here...",
+                minHeight: "150px",
+                autosave: {
+                    enabled: true,
+                    uniqueId: selectedNoteId ? `note_${selectedNoteId}` : "dndemicube_unsaved_note", // Prefix to avoid collision
+                    delay: 3000,
+                },
+                toolbar: [
+                    "bold", "italic", "heading", "|",
+                    "quote", "unordered-list", "ordered-list", "|",
+                    "link", "image", "table", "|",
+                    "preview", "side-by-side", "fullscreen", "|",
+                    "guide"
+                ],
+                // Handle image uploads by pasting or dragging - converts to base64
+                uploadImage: true,
+                imageUploadFunction: function(file, onSuccess, onError) {
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        onSuccess(event.target.result); // Pass base64 data URL
+                    };
+                    reader.onerror = function (error) {
+                        onError("Error reading file: " + error);
+                    };
+                    reader.readAsDataURL(file);
+                },
+            });
+            // console.log("EasyMDE initialized. Autosave ID:", easyMDE.options.autosave.uniqueId);
+
+            if (tabNotes && tabNotes.classList.contains('active') && easyMDE.codemirror) {
+                setTimeout(() => easyMDE.codemirror.refresh(), 10);
+            }
+        } catch (e) {
+            console.error("Error initializing EasyMDE:", e);
+            easyMDE = null; // Ensure it's null if init failed
+        }
+    }
+
+    function destroyEasyMDE() {
+        if (easyMDE) {
+            try {
+                easyMDE.toTextArea();
+            } catch (e) {
+                console.error("Error destroying EasyMDE:", e);
+            }
+            easyMDE = null;
+            // console.log("EasyMDE instance destroyed.");
+        }
+    }
+
+    function clearNoteEditor() {
+        if (noteTitleInput) noteTitleInput.value = "";
+
+        if (easyMDE && typeof easyMDE.value === 'function') {
+            easyMDE.value("");
+        } else if (markdownEditorTextarea) {
+             markdownEditorTextarea.value = "";
+        }
+    }
+
+
+    function renderNotesList() {
+        if (!notesList) return;
+        const currentScrollTop = notesList.scrollTop; // Preserve scroll position
+        notesList.innerHTML = '';
+
+        notesData.forEach(note => {
+            const listItem = document.createElement('li');
+            listItem.dataset.noteId = note.id;
+            listItem.classList.add('note-list-item');
+
+            const nameSpan = document.createElement('span');
+            nameSpan.classList.add('note-list-item-name');
+            nameSpan.textContent = note.title;
+            listItem.appendChild(nameSpan);
+
+
+            if (note.id === selectedNoteId) {
+                listItem.classList.add('selected-note-item');
+            }
+
+            if (isNotesEditMode) {
+                notesList.classList.add('edit-mode-active');
+                const actionsSpan = document.createElement('span');
+                actionsSpan.classList.add('note-actions');
+
+                const renameIconHTML = `<span class="note-action-icon rename-note" title="Rename Note" data-action="rename">✏️</span>`;
+                const upIconHTML = `<span class="note-action-icon move-note-up" title="Move Up" data-action="move-up">↑</span>`;
+                const downIconHTML = `<span class="note-action-icon move-note-down" title="Move Down" data-action="move-down">↓</span>`;
+                const deleteIconHTML = `<span class="note-action-icon delete-note" title="Delete Note" data-action="delete">🗑️</span>`;
+
+                actionsSpan.innerHTML = renameIconHTML + upIconHTML + downIconHTML + deleteIconHTML;
+                listItem.appendChild(actionsSpan);
+            } else {
+                notesList.classList.remove('edit-mode-active');
+            }
+            notesList.appendChild(listItem);
+        });
+        updateNoteMoveIconVisibility();
+        notesList.scrollTop = currentScrollTop; // Restore scroll position
+    }
+
+    function updateNoteMoveIconVisibility() {
+        if (!notesList || !isNotesEditMode) return;
+        const items = notesList.querySelectorAll('li.note-list-item');
+        items.forEach((item, index) => {
+            const upIcon = item.querySelector('.move-note-up');
+            const downIcon = item.querySelector('.move-note-down');
+
+            if (upIcon) upIcon.style.display = (index === 0 || items.length === 1) ? 'none' : 'inline-block';
+            if (downIcon) downIcon.style.display = (index === items.length - 1 || items.length === 1) ? 'none' : 'inline-block';
+        });
+    }
+
+    function handleCreateNewNote() {
+        const newNoteId = Date.now(); // Simple unique ID
+        let noteCounter = 1;
+        let newTitle = `Note ${noteCounter}`;
+        while (notesData.some(note => note.title === newTitle)) {
+            noteCounter++;
+            newTitle = `Note ${noteCounter}`;
+        }
+
+        const newNote = {
+            id: newNoteId,
+            title: newTitle,
+            content: `# ${newTitle}\n\nStart writing your notes here.`
+        };
+        notesData.push(newNote);
+
+        loadNoteIntoEditor(newNoteId); // This will set selectedNoteId and init/update EasyMDE
+        if (noteTitleInput) noteTitleInput.focus();
+    }
+
+    function loadNoteIntoEditor(noteId) {
+        const note = notesData.find(n => n.id === noteId);
+        if (!note) {
+            console.error("Note not found for ID:", noteId);
+            if (selectedNoteId === noteId) { // If the missing note was selected
+                 selectedNoteId = null;
+                 clearNoteEditor();
+                 if (easyMDE && easyMDE.options.autosave) {
+                    easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                 }
+            }
+            renderNotesList();
+            return;
+        }
+
+        selectedNoteId = note.id;
+        if (noteTitleInput) noteTitleInput.value = note.title;
+
+        if (!easyMDE && markdownEditorTextarea) {
+            initEasyMDE(); // Initialize with a generic or no specific ID first
+        }
+
+        if (easyMDE) {
+            if (easyMDE.options.autosave) {
+                // To prevent loading stale data from a previously selected note's autosave slot.
+                if (easyMDE.options.autosave.uniqueId !== `note_${note.id}`) {
+                     // console.log(`Switching autosave ID from ${easyMDE.options.autosave.uniqueId} to note_${note.id}`);
+                     // EasyMDE doesn't have a direct way to clear *another* slot.
+                     // It loads from current uniqueId on value set if content is empty.
+                     // So, set uniqueId, then set value.
+                }
+                easyMDE.options.autosave.uniqueId = `note_${note.id}`;
+            }
+            easyMDE.value(note.content);
+             if (easyMDE.codemirror && tabNotes.classList.contains('active')) {
+                setTimeout(() => easyMDE.codemirror.refresh(), 0);
+            }
+        } else if (markdownEditorTextarea) {
+            markdownEditorTextarea.value = note.content;
+        }
+
+        renderNotesList();
+    }
+
+    function handleSaveNote() {
+        if (!selectedNoteId) {
+            alert("No note selected to save.");
+            return;
+        }
+        const note = notesData.find(n => n.id === selectedNoteId);
+        if (!note) {
+            alert("Error: Selected note not found in data.");
+            return;
+        }
+
+        const newTitle = noteTitleInput ? noteTitleInput.value.trim() : note.title;
+        if (!newTitle) {
+            alert("Note title cannot be empty.");
+            if (noteTitleInput) noteTitleInput.focus();
+            return;
+        }
+
+        note.title = newTitle;
+        if (easyMDE && typeof easyMDE.value === 'function') {
+            note.content = easyMDE.value();
+        } else if (markdownEditorTextarea) {
+            note.content = markdownEditorTextarea.value;
+        }
+
+        renderNotesList();
+        // console.log("Note saved:", note);
+        // Autosave should handle persistence, explicit alert might be too much if autosaving frequently.
+        // Consider a more subtle save indicator if needed.
+    }
+
+    function handleRenameNote(noteId) {
+        const note = notesData.find(n => n.id === noteId);
+        if (!note) return;
+
+        const newTitle = prompt("Enter new name for the note:", note.title);
+        if (newTitle && newTitle.trim() !== "" && newTitle.trim() !== note.title) {
+            note.title = newTitle.trim();
+            renderNotesList();
+            if (note.id === selectedNoteId && noteTitleInput) {
+                noteTitleInput.value = note.title;
+            }
+        }
+    }
+
+    function handleDeleteNote(noteId) {
+        const noteIndex = notesData.findIndex(n => n.id === noteId);
+        if (noteIndex === -1) return;
+
+        const note = notesData[noteIndex];
+        if (confirm(`Are you sure you want to delete "${note.title}"?`)) {
+
+            if (easyMDE && easyMDE.options.autosave.enabled && selectedNoteId === noteId) {
+                // Temporarily change uniqueId to something else, clear, then set back or to generic.
+                const oldUniqueId = easyMDE.options.autosave.uniqueId;
+                easyMDE.options.autosave.uniqueId = `deleting_${noteId}_${Date.now()}`; // Temp unique
+                easyMDE.clearAutosavedValue();
+                // console.log("Cleared autosave for deleted note by changing ID and clearing:", oldUniqueId);
+            }
+
+            notesData.splice(noteIndex, 1);
+
+            if (selectedNoteId === noteId) {
+                selectedNoteId = null;
+                clearNoteEditor();
+                if (easyMDE && easyMDE.options.autosave) {
+                    easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                    // console.log("Reset EasyMDE autosave ID to generic after delete:", easyMDE.options.autosave.uniqueId);
+                }
+            }
+            renderNotesList();
+        }
+    }
+
+    function handleMoveNote(noteId, direction) {
+        const index = notesData.findIndex(n => n.id === noteId);
+        if (index === -1) return;
+
+        if (direction === 'up' && index > 0) {
+            [notesData[index - 1], notesData[index]] = [notesData[index], notesData[index - 1]];
+        } else if (direction === 'down' && index < notesData.length - 1) {
+            [notesData[index], notesData[index + 1]] = [notesData[index + 1], notesData[index]];
+        }
+        renderNotesList();
+    }
+
+
+    if (createNewNoteButton) {
+        createNewNoteButton.addEventListener('click', handleCreateNewNote);
+    }
+
+    if (saveNoteButton) {
+        saveNoteButton.addEventListener('click', handleSaveNote);
+    }
+    // Auto-save title when input blurs or Enter is pressed
+    if (noteTitleInput) {
+        noteTitleInput.addEventListener('blur', handleSaveNote);
+        noteTitleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent form submission if any
+                handleSaveNote();
+                if(easyMDE) easyMDE.codemirror.focus(); // Move focus to editor
+            }
+        });
+    }
+
+
+    if (editNotesIcon) {
+        editNotesIcon.addEventListener('click', () => {
+            isNotesEditMode = !isNotesEditMode;
+            editNotesIcon.textContent = isNotesEditMode ? '✅' : '✏️';
+            renderNotesList();
+        });
+    }
+
+    if (notesList) {
+        notesList.addEventListener('click', (event) => {
+            const listItem = event.target.closest('li.note-list-item');
+            if (!listItem) return;
+
+            const noteId = parseInt(listItem.dataset.noteId, 10);
+            if (isNaN(noteId)) return;
+
+            const actionIcon = event.target.closest('.note-action-icon');
+
+            if (isNotesEditMode && actionIcon) {
+                const action = actionIcon.dataset.action;
+                if (action === 'rename') {
+                    handleRenameNote(noteId);
+                } else if (action === 'delete') {
+                    handleDeleteNote(noteId);
+                } else if (action === 'move-up') {
+                    handleMoveNote(noteId, 'up');
+                } else if (action === 'move-down') {
+                    handleMoveNote(noteId, 'down');
+                }
+            } else if (!actionIcon) {
+                if (selectedNoteId !== noteId) {
+                    // Before loading new note, ensure current one is "saved" by EasyMDE's autosave
+                    // This happens implicitly if content changed and delay passed.
+                    // Or, explicitly trigger save if needed, though our current handleSaveNote is more manual.
+                    // For now, rely on autosave or manual save button.
+                    loadNoteIntoEditor(noteId);
+                }
+            }
+        });
+    }
+
+    // Tab switching logic
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            const targetTab = button.getAttribute('data-tab');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === targetTab) {
+                    content.classList.add('active');
+
+                    // Specific logic for Notes Tab activation
+                    if (targetTab === 'tab-notes') {
+                        if (!easyMDE && markdownEditorTextarea) { // If not initialized, try to init
+                           initEasyMDE();
+                        }
+
+                        if (easyMDE && easyMDE.codemirror) { // If initialized, refresh
+                           setTimeout(() => {
+                                easyMDE.codemirror.refresh();
+                                // console.log("EasyMDE refreshed on tab activation.");
+                            }, 10);
+                        }
+
+                        // If no note is selected, or selected note is no longer valid, try to select one
+                        if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
+                            if (notesData.length > 0) {
+                                loadNoteIntoEditor(notesData[0].id);
+                            } else {
+                                // No notes exist, clear editor, ensure EasyMDE has generic autosave ID
+                                clearNoteEditor();
+                                if (easyMDE && easyMDE.options.autosave) {
+                                    easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                                }
+                            }
+                        } else {
+                            // A valid note is selected, ensure its content is loaded (might be redundant if already loaded)
+                            // loadNoteIntoEditor(selectedNoteId); // This could cause loop if not careful
+                            // Just ensure editor is refreshed
+                             if (easyMDE && easyMDE.codemirror) {
+                                setTimeout(() => easyMDE.codemirror.refresh(), 10);
+                            }
+                        }
+                    }
+                }
+            });
+        });
     });
 
 
