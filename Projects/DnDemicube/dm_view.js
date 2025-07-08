@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadMapsInput = document.getElementById('upload-maps-input');
     const uploadedMapsList = document.getElementById('uploaded-maps-list');
     const activeMapsList = document.getElementById('active-maps-list'); // Added
+    const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
     const mapContainer = document.getElementById('map-container'); // Get the container
@@ -42,6 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
     let preservedLinkedMapNameForRedraw = null; // Added: To store linked map name during redraw
+
+    // Player View window reference
+    let playerWindow = null;
 
     let isMovingPolygon = false; // Added: State for "Move Polygon" action
     let polygonBeingMoved = null; // Added: { overlay: reference, originalPoints: copy, parentMapName: string }
@@ -469,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                             displayMapOnCanvas(childMapName);
                             updateButtonStates();
+                            sendMapToPlayerView(childMapName); // Send to player view
                             console.log(`Switched to child map: ${childMapName}`);
                         } else {
                             alert(`Map "${childMapName}" needs to be added to the Active View list to navigate to it.`);
@@ -1255,6 +1260,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 displayMapOnCanvas(mapData.fileName);
                 updateButtonStates();
+                sendMapToPlayerView(mapData.fileName); // Send to player view
             });
             activeMapsList.appendChild(listItem);
         });
@@ -1454,6 +1460,65 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loadCampaignInput) {
         loadCampaignInput.addEventListener('change', loadCampaign);
     }
+
+    // --- Player View Communication ---
+    function sendMapToPlayerView(mapFileName) {
+        if (playerWindow && !playerWindow.closed && mapFileName) {
+            const mapData = detailedMapData.get(mapFileName);
+            if (mapData && mapData.url) {
+                // Convert Object URL to base64 Data URL before sending
+                fetch(mapData.url)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const base64dataUrl = reader.result;
+                            playerWindow.postMessage({ type: 'loadMap', mapDataUrl: base64dataUrl }, '*');
+                            console.log(`Sent map "${mapFileName}" (as data URL) to player view.`);
+                        };
+                        reader.onerror = () => {
+                            console.error(`Error converting map "${mapFileName}" to data URL for player view.`);
+                        };
+                        reader.readAsDataURL(blob);
+                    })
+                    .catch(error => {
+                        console.error(`Error fetching blob for map "${mapFileName}" to send to player view:`, error);
+                    });
+            } else {
+                console.warn(`Could not send map to player view: Map data or URL not found for "${mapFileName}".`);
+            }
+        } else {
+            if (!mapFileName) {
+                console.warn("sendMapToPlayerView called without a mapFileName.");
+            }
+            // Silently ignore if playerWindow is not available
+        }
+    }
+
+    // --- Player View Button ---
+    if (openPlayerViewButton) {
+        openPlayerViewButton.addEventListener('click', () => {
+            const playerViewUrl = 'player_view.html'; // Corrected path assuming it's relative to dm_view.html
+            if (playerWindow === null || playerWindow.closed) {
+                playerWindow = window.open(playerViewUrl, 'PlayerViewDnDemicube', 'width=800,height=600,resizable=yes,scrollbars=yes');
+                if (playerWindow) {
+                    // Send current map after a short delay to allow the window to load its listeners
+                    setTimeout(() => {
+                        if (selectedMapInActiveView) { // Check selectedMapInActiveView directly
+                            sendMapToPlayerView(selectedMapInActiveView);
+                        }
+                    }, 500);
+                }
+            } else {
+                playerWindow.focus();
+                // If focused and a map is active, ensure it has the latest.
+                if (selectedMapInActiveView) { // Check selectedMapInActiveView directly
+                     sendMapToPlayerView(selectedMapInActiveView);
+                }
+            }
+        });
+    }
+
 
     // --- Context Menu Logic ---
     dmCanvas.addEventListener('contextmenu', (event) => {
