@@ -564,8 +564,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const overlay = overlaysToCheck[i];
                 if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
                     hoverLabel.textContent = overlay.linkedMapName;
-                    hoverLabel.style.left = `${event.clientX + 10}px`; // Position relative to viewport
-                    hoverLabel.style.top = `${event.clientY + 10}px`;
+                    // Use pageX/pageY for positioning relative to the entire document
+                    hoverLabel.style.left = `${event.pageX + 10}px`;
+                    hoverLabel.style.top = `${event.pageY + 10}px`;
                     hoverLabel.style.display = 'block';
                     return; // Found an overlay, show label and exit
                 }
@@ -1658,8 +1659,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
                     }
 
-                    polygonContextMenu.style.left = `${event.clientX}px`;
-                    polygonContextMenu.style.top = `${event.clientY}px`;
+                    // Use pageX/pageY for positioning relative to the entire document
+                    polygonContextMenu.style.left = `${event.pageX}px`;
+                    polygonContextMenu.style.top = `${event.pageY}px`;
                     polygonContextMenu.style.display = 'block';
                     console.log('Right-clicked on polygon:', selectedPolygonForContextMenu);
                     return;
