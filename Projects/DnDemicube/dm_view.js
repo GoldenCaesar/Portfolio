@@ -1059,7 +1059,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial setup calls
-    resizeCanvas(); // Size canvas on load
+    // Delay the initial resizeCanvas call slightly to allow the browser to finalize layout
+    setTimeout(() => {
+        resizeCanvas(); // Size canvas on load
+    }, 10); // A small delay, e.g., 10ms
     window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
     renderActiveMapsList(); // Initial render for active maps list (will be empty)
     updateButtonStates(); // Set initial button states
