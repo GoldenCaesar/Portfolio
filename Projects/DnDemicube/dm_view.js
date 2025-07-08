@@ -858,6 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 renderActiveMapsList(); // Re-render the active maps list
                 updateButtonStates(); // Update button states
+                sendClearMessageToPlayerView(); // Clear the player view
             } else {
                 console.warn("No map selected in Active View to remove.");
             }
@@ -1492,6 +1493,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn("sendMapToPlayerView called without a mapFileName.");
             }
             // Silently ignore if playerWindow is not available
+        }
+    }
+
+    function sendClearMessageToPlayerView() {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'clearMap' }, '*');
+            console.log("Sent clearMap message to player view.");
         }
     }
 
