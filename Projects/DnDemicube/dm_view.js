@@ -185,6 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapInManager === fileName) {
                 drawCurrentPolygon(true); // Pass true to indicate it's a new, temporary polygon
             }
+
+            // Dispatch a resize event to ensure canvas dimensions and scaling are finalized
+            // This helps if the initial layout wasn't fully stable when the first draw occurred.
+            window.dispatchEvent(new Event('resize'));
         };
         img.onerror = () => {
             console.error(`Error loading image for ${fileName} from ${mapData.url}`);
