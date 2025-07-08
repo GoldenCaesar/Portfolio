@@ -703,9 +703,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentPolygonDragOffsets.x = imageCoords.x - moveStartPoint.x;
                 currentPolygonDragOffsets.y = imageCoords.y - moveStartPoint.y;
 
-                // Request redraw of the map to show polygon at new position
-                // displayMapOnCanvas will use currentPolygonDragOffsets via drawOverlays
-                if (selectedMapInManager === polygonBeingMoved.parentMapName) {
+                currentPolygonDragOffsets.x = imageCoords.x - moveStartPoint.x;
+                currentPolygonDragOffsets.y = imageCoords.y - moveStartPoint.y;
+
+                // Optimized redraw for dragging
+                if (selectedMapInManager === polygonBeingMoved.parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
+                    const ctx = dmCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+                    // Redraw base image
+                    ctx.drawImage(
+                        currentMapDisplayData.img, 0, 0,
+                        currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight,
+                        currentMapDisplayData.offsetX, currentMapDisplayData.offsetY,
+                        currentMapDisplayData.scaledWidth, currentMapDisplayData.scaledHeight
+                    );
+                    // Redraw overlays
+                    const managerMapData = detailedMapData.get(selectedMapInManager);
+                    if (managerMapData && managerMapData.overlays) {
+                        drawOverlays(managerMapData.overlays);
+                    }
+                } else if (selectedMapInManager === polygonBeingMoved.parentMapName) {
+                    // Fallback to full displayMapOnCanvas if image somehow not ready (shouldn't happen in normal flow)
                     displayMapOnCanvas(selectedMapInManager);
                 }
             }
