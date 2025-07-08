@@ -5,9 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
-    const mapContainer = document.getElementById('map-container'); // Get the container
+    const mapContainer = document.getElementById('map-container');
+    const noteEditorContainer = document.getElementById('note-editor-container'); // New container for the editor
     const hoverLabel = document.getElementById('hover-label');
-    const polygonContextMenu = document.getElementById('polygon-context-menu'); // Added
+    const polygonContextMenu = document.getElementById('polygon-context-menu');
     const displayedFileNames = new Set();
 
     // Notes Tab Elements
@@ -2243,43 +2244,51 @@ document.addEventListener('DOMContentLoaded', () => {
             tabContents.forEach(content => {
                 content.classList.remove('active');
                 if (content.id === targetTab) {
-                    content.classList.add('active');
-
-                    // Specific logic for Notes Tab activation
-                    if (targetTab === 'tab-notes') {
-                        if (!easyMDE && markdownEditorTextarea) { // If not initialized, try to init
-                           initEasyMDE();
-                        }
-
-                        if (easyMDE && easyMDE.codemirror) { // If initialized, refresh
-                           setTimeout(() => {
-                                easyMDE.codemirror.refresh();
-                                // console.log("EasyMDE refreshed on tab activation.");
-                            }, 10);
-                        }
-
-                        // If no note is selected, or selected note is no longer valid, try to select one
-                        if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
-                            if (notesData.length > 0) {
-                                loadNoteIntoEditor(notesData[0].id);
-                            } else {
-                                // No notes exist, clear editor, ensure EasyMDE has generic autosave ID
-                                clearNoteEditor();
-                                if (easyMDE && easyMDE.options.autosave) {
-                                    easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
-                                }
-                            }
-                        } else {
-                            // A valid note is selected, ensure its content is loaded (might be redundant if already loaded)
-                            // loadNoteIntoEditor(selectedNoteId); // This could cause loop if not careful
-                            // Just ensure editor is refreshed
-                             if (easyMDE && easyMDE.codemirror) {
-                                setTimeout(() => easyMDE.codemirror.refresh(), 10);
-                            }
-                        }
-                    }
+                    content.classList.add('active'); // Activates the tab content in the sidebar
                 }
             });
+
+            // Show/hide main content area (map vs. notes editor)
+            if (targetTab === 'tab-notes') {
+                if (mapContainer) mapContainer.classList.add('hidden');
+                if (noteEditorContainer) noteEditorContainer.classList.add('active');
+
+                // Initialize or refresh EasyMDE
+                if (!easyMDE && markdownEditorTextarea) {
+                    initEasyMDE();
+                }
+                if (easyMDE && easyMDE.codemirror) {
+                    setTimeout(() => {
+                        easyMDE.codemirror.refresh();
+                        // console.log("EasyMDE refreshed on tab activation.");
+                    }, 10); // Delay helps ensure container is visible
+                }
+
+                // Load first note or clear editor if no note selected/available
+                if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
+                    if (notesData.length > 0) {
+                        loadNoteIntoEditor(notesData[0].id); // This will also call renderNotesList
+                    } else {
+                        clearNoteEditor();
+                        if (easyMDE && easyMDE.options.autosave) {
+                            easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                        }
+                        renderNotesList(); // Ensure list is empty if no notes
+                    }
+                } else {
+                    // If a note is already selected, ensure its content is in the editor
+                    // and the editor is refreshed. loadNoteIntoEditor handles this.
+                    // However, to avoid redundant loads if already correct, just refresh.
+                     if (easyMDE && easyMDE.codemirror) {
+                        setTimeout(() => easyMDE.codemirror.refresh(), 10);
+                    }
+                }
+            } else {
+                if (mapContainer) mapContainer.classList.remove('hidden');
+                if (noteEditorContainer) noteEditorContainer.classList.remove('active');
+                // If switching away from notes, EasyMDE doesn't need explicit destruction here
+                // unless it causes issues. Hiding its container should be enough.
+            }
         });
     });
 

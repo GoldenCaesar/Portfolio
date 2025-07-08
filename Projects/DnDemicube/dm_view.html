@@ -69,15 +69,11 @@
                 <button id="create-new-note-button">Create New Note</button>
             </div>
             <div id="notes-sidebar" class="sidebar-section">
-                <ul id="notes-list" style="list-style-type: none; padding-left: 0; overflow-y: auto; max-height: 200px;">
+                <ul id="notes-list" style="list-style-type: none; padding-left: 0; overflow-y: auto; max-height: 400px;"> {/* Adjusted max-height */}
                     <!-- Notes will be listed here -->
                 </ul>
             </div>
-            <div id="note-editor-area">
-                <input type="text" id="note-title-input" placeholder="Note Title" />
-                <button id="save-note-button">Save Note</button>
-                <textarea id="markdown-editor"></textarea>
-            </div>
+            {/* Note editor area will be moved outside the sidebar */}
         </div>
 
         <div id="tab-characters" class="tab-content">
@@ -87,6 +83,13 @@
     </div>
     <div id="map-container">
         <canvas id="dm-canvas"></canvas>
+    </div>
+    <div id="note-editor-container" style="display: none; flex-grow: 1; padding: 10px;"> {/* New container for the note editor */}
+        <div id="note-editor-area" style="display: flex; flex-direction: column; height: 100%;">
+            <input type="text" id="note-title-input" placeholder="Note Title" />
+            <button id="save-note-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Note</button>
+            <textarea id="markdown-editor"></textarea>
+        </div>
     </div>
     <div id="hover-label" class="hover-label" style="display: none;"></div>
 
