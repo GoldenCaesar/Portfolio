@@ -151,3 +151,15 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #e0e0e0;
     border-radius: 3px;
 }
+
+.hover-label {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none; /* Allows mouse events to pass through to the canvas */
+    z-index: 1000; /* Ensure it's on top */
+    /* display: none; is handled by inline style initially and JS */
+}
