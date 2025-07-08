@@ -163,3 +163,30 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     z-index: 1000; /* Ensure it's on top */
     /* display: none; is handled by inline style initially and JS */
 }
+
+/* Context Menu Styling */
+.context-menu {
+    background-color: #2a3138; /* Dark background, similar to canvas */
+    border: 1px solid #3f4c5a; /* Border similar to other elements */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Subtle shadow for depth */
+    z-index: 1001; /* Ensure it's above the hover-label and canvas elements */
+    color: #e0e0e0; /* Light text color */
+    border-radius: 4px; /* Rounded corners */
+}
+
+.context-menu ul {
+    list-style: none;
+    padding: 5px 0;
+    margin: 0;
+}
+
+.context-menu ul li {
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.context-menu ul li:hover {
+    background-color: #3f4c5a; /* Hover effect for menu items */
+    color: #b6cae1; /* Highlight text on hover */
+}

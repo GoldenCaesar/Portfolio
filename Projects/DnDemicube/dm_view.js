@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dmCanvas = document.getElementById('dm-canvas');
     const mapContainer = document.getElementById('map-container'); // Get the container
     const hoverLabel = document.getElementById('hover-label');
+    const polygonContextMenu = document.getElementById('polygon-context-menu'); // Added
     const displayedFileNames = new Set();
 
     // Map Tools Elements
@@ -37,6 +38,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let isLinkingChildMap = false;
     let currentPolygonPoints = [];
     let polygonDrawingComplete = false; // Will be used in Phase 2
+    let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
+    let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
+    let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
+    let preservedLinkedMapNameForRedraw = null; // Added: To store linked map name during redraw
+
+    let isMovingPolygon = false; // Added: State for "Move Polygon" action
+    let polygonBeingMoved = null; // Added: { overlay: reference, originalPoints: copy, parentMapName: string }
+    let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
+    let currentPolygonDragOffsets = {x: 0, y: 0}; // Added: visual offset during drag
+
     let currentMapDisplayData = { // To store details of the currently displayed map for coordinate conversion
         img: null,
         ratio: 1,
@@ -224,9 +235,22 @@ document.addEventListener('DOMContentLoaded', () => {
         overlays.forEach(overlay => {
             if (overlay.type === 'childMapLink' && overlay.polygon) {
                 ctx.beginPath();
-                ctx.strokeStyle = 'rgba(0, 0, 255, 0.7)'; // Blue for existing links
+                let currentPointsToDraw = overlay.polygon;
+                let strokeStyle = 'rgba(0, 0, 255, 0.7)'; // Default: Blue for existing links
+
+                if (isMovingPolygon && polygonBeingMoved && overlay === polygonBeingMoved.overlayRef) {
+                    strokeStyle = 'rgba(0, 255, 0, 0.9)'; // Bright green while moving
+                    // Draw based on original points plus current drag offset
+                    currentPointsToDraw = polygonBeingMoved.originalPoints.map(p => ({
+                        x: p.x + currentPolygonDragOffsets.x,
+                        y: p.y + currentPolygonDragOffsets.y
+                    }));
+                }
+
+                ctx.strokeStyle = strokeStyle;
                 ctx.lineWidth = 2;
-                overlay.polygon.forEach((point, index) => {
+
+                currentPointsToDraw.forEach((point, index) => {
                     const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
                     const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
                     if (index === 0) {
@@ -235,20 +259,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         ctx.lineTo(canvasX, canvasY);
                     }
                 });
-                // No need to close path explicitly if polygon array already has first point at end
-                if (overlay.polygon.length > 2 &&
-                    (overlay.polygon[0].x !== overlay.polygon[overlay.polygon.length-1].x ||
-                     overlay.polygon[0].y !== overlay.polygon[overlay.polygon.length-1].y)) {
-                   // If not explicitly closed in data, draw line to first point (though it should be)
-                    const firstPointCanvasX = (overlay.polygon[0].x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                    const firstPointCanvasY = (overlay.polygon[0].y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
-                    ctx.lineTo(firstPointCanvasX, firstPointCanvasY);
+
+                if (currentPointsToDraw.length > 2) { // Ensure there's a polygon to close
+                    const firstPoint = currentPointsToDraw[0];
+                    const lastPoint = currentPointsToDraw[currentPointsToDraw.length - 1];
+                    // Close path if not already closed by data
+                    if (firstPoint.x !== lastPoint.x || firstPoint.y !== lastPoint.y) {
+                        const firstPointCanvasX = (firstPoint.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+                        const firstPointCanvasY = (firstPoint.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                        ctx.lineTo(firstPointCanvasX, firstPointCanvasY);
+                    }
                 }
                 ctx.stroke();
-                // Optionally, fill or add text label here
             }
         });
     }
+
     // Helper to convert canvas click coords to image-relative coords
     function getRelativeCoords(canvasX, canvasY) {
         // If currentMapDisplayData.img is null, it means we are in a resize/reload cycle.
@@ -328,6 +354,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     dmCanvas.addEventListener('click', (event) => {
+        // If a move operation was just finalized by a mouseup, this click event might fire right after.
+        // resetAllInteractiveStates() should have cleared isMovingPolygon.
+        // If still in move mode (e.g. click-to-place without drag yet), this click should be handled carefully.
+        if (isMovingPolygon) {
+            // If user is in "isMovingPolygon" mode (selected from context menu) but hasn't started dragging (moveStartPoint is null)
+            // A click could be interpreted as "finalize at current (original) position" or "cancel".
+            // The mouseup listener is better for finalization. A simple click here while isMovingPolygon is true
+            // and no drag has started (moveStartPoint is null) should probably do nothing or cancel.
+            // For now, let's assume mouseup handles finalization and mousedown initiates drag.
+            // A plain click here if isMovingPolygon is true and moveStartPoint is null could be a cancel.
+            // However, the "Link to Child Map" button also acts as a global cancel.
+            // Let's make this click do nothing if move mode is active but no drag has started,
+            // to prevent interference with polygon drawing logic below.
+            if (!moveStartPoint) { // In move mode, but not actively dragging (no mousedown on polygon yet)
+                console.log("In move mode, click occurred but not on polygon to start drag. No action.");
+                // Optionally, this could be a way to cancel: resetAllInteractiveStates(); alert("Move cancelled.");
+                return;
+            }
+            // If moveStartPoint IS set, it means a drag was happening, and mouseup should have handled it.
+            // This click listener should ideally not run if mouseup already reset isMovingPolygon.
+            // This is a safeguard.
+            return;
+        }
+
         const canvasX = event.offsetX;
         const canvasY = event.offsetY;
         const imageCoords = getRelativeCoords(canvasX, canvasY);
@@ -337,8 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Priority 1: Polygon Drawing for "Link to Child Map"
-        if (isLinkingChildMap && !polygonDrawingComplete && selectedMapInManager) {
+        // Priority 1: Polygon Drawing (New Link or Redraw)
+        if ((isLinkingChildMap || isRedrawingPolygon) && !polygonDrawingComplete && selectedMapInManager) {
             const clickThreshold = 10 / currentMapDisplayData.ratio; // 10px radius on canvas, converted to image scale
             if (currentPolygonPoints.length > 0) {
                 const firstPoint = currentPolygonPoints[0];
@@ -346,12 +396,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dy = Math.abs(imageCoords.y - firstPoint.y);
 
                 if (currentPolygonPoints.length >= 2 && dx < clickThreshold && dy < clickThreshold) {
-                    currentPolygonPoints.push({ x: firstPoint.x, y: firstPoint.y });
+                    currentPolygonPoints.push({ x: firstPoint.x, y: firstPoint.y }); // Close the polygon
                     polygonDrawingComplete = true;
                     dmCanvas.style.cursor = 'auto';
-                    if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from Manager';
-                    alert('Polygon complete. Now select a map from "Manage Maps" to link as its child.');
-                    console.log("Polygon complete:", currentPolygonPoints);
+
+                    if (isLinkingChildMap) {
+                        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from Manager';
+                        alert('Polygon complete for new link. Now select a map from "Manage Maps" to link as its child.');
+                        console.log("New link polygon complete:", currentPolygonPoints);
+                        // isLinkingChildMap remains true until a child map is selected or action is cancelled.
+                    } else if (isRedrawingPolygon) {
+                        const parentMapData = detailedMapData.get(selectedMapInManager);
+                        if (parentMapData && preservedLinkedMapNameForRedraw) {
+                            const newOverlay = {
+                                type: 'childMapLink',
+                                polygon: [...currentPolygonPoints],
+                                linkedMapName: preservedLinkedMapNameForRedraw
+                            };
+                            parentMapData.overlays.push(newOverlay);
+                            alert(`Polygon redrawn successfully, still linked to "${preservedLinkedMapNameForRedraw}".`);
+                            console.log("Polygon redraw complete. New overlay:", newOverlay);
+
+                            // Refresh the display of the parent map to show the new polygon
+                            if (selectedMapInManager === parentMapData.name) { // Ensure it's the correct map
+                                displayMapOnCanvas(selectedMapInManager);
+                            }
+                        } else {
+                            console.error("Failed to save redrawn polygon: Missing parent map data or preserved link name.");
+                            alert("Error: Could not save the redrawn polygon.");
+                        }
+                        // Reset redraw state
+                        isRedrawingPolygon = false;
+                        preservedLinkedMapNameForRedraw = null;
+                        currentPolygonPoints = []; // Explicitly clear points for next operation
+                        polygonDrawingComplete = false; // Reset completion state
+                        selectedPolygonForContextMenu = null; // Clear context menu selection
+                    }
+                    // polygonDrawingComplete is true here, will be reset if a new drawing starts
+                    // currentPolygonPoints are now final for this polygon.
                 } else {
                     currentPolygonPoints.push(imageCoords);
                 }
@@ -519,21 +601,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function resetLinkingState() {
+    function resetAllInteractiveStates() {
         isLinkingChildMap = false;
+        isRedrawingPolygon = false;
+        isMovingPolygon = false; // Added
+
+        preservedLinkedMapNameForRedraw = null;
         currentPolygonPoints = [];
-        polygonDrawingComplete = false; // Reset this state as well
+        polygonDrawingComplete = false;
+
+        polygonBeingMoved = null; // Added
+        moveStartPoint = null; // Added
+        currentPolygonDragOffsets = {x: 0, y: 0}; // Added
+
         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
-        dmCanvas.style.cursor = 'auto'; // Reset cursor
-        // Redraw current map to clear any temporary polygon lines if needed
-        if (selectedMapInManager) {
-            displayMapOnCanvas(selectedMapInManager);
-        } else if (selectedMapInActiveView) {
-            // This case should ideally not happen if linking is only from manager view
-            displayMapOnCanvas(selectedMapInActiveView);
+        dmCanvas.style.cursor = 'auto';
+        selectedPolygonForContextMenu = null;
+
+        // Redraw current map to clear any temporary states (like a polygon being dragged)
+        let mapToRedraw = selectedMapInManager || selectedMapInActiveView;
+        if (mapToRedraw) {
+            displayMapOnCanvas(mapToRedraw);
         }
-        updateButtonStates(); // Re-evaluates all button states
+        updateButtonStates();
+        console.log("All interactive states reset.");
     }
+
 
     if (btnLinkChildMap) {
         btnLinkChildMap.addEventListener('click', () => {
@@ -542,28 +635,135 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (isLinkingChildMap) {
-                // If already linking, this button click means "Cancel"
-                resetLinkingState();
-                console.log("Child map linking cancelled.");
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon) {
+                // If any interactive mode is active, this button acts as a global cancel.
+                resetAllInteractiveStates();
+                console.log("Interactive operation cancelled via Link/Cancel button.");
             } else {
                 // Start linking process
+                resetAllInteractiveStates(); // Clear other states before starting a new one
                 isLinkingChildMap = true;
-                currentPolygonPoints = [];
-                polygonDrawingComplete = false; // Ensure this is reset when starting a new link
+                // currentPolygonPoints = []; // Handled by resetAllInteractiveStates
+                // polygonDrawingComplete = false; // Handled by resetAllInteractiveStates
                 btnLinkChildMap.textContent = 'Cancel Drawing Link';
-                dmCanvas.style.cursor = 'crosshair'; // Indicate drawing mode
+                dmCanvas.style.cursor = 'crosshair';
                 alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
-                // Disable other tool buttons temporarily, except for "Cancel Drawing Link"
-                // updateButtonStates() will be called by resetLinkingState or when linking is complete.
-                // For now, let's rely on updateButtonStates to correctly set states based on isLinkingChildMap.
-                // We might need a more specific disabling here if updateButtonStates isn't enough.
-                if (btnAddToActive) btnAddToActive.disabled = true;
-                if (btnRemoveFromActive) btnRemoveFromActive.disabled = true;
-                // Other map tool buttons should also be disabled here.
+                updateButtonStates(); // Reflect that linking has started
             }
         });
     }
+
+    // Modify existing dmCanvas click listener to NOT interfere if moving polygon (mouseup will handle finalization)
+    // The dmCanvas click listener is complex; we need to ensure that if isMovingPolygon is true,
+    // its default behavior (like trying to draw a new polygon or navigate) is suppressed
+    // until the move is completed or cancelled.
+
+    // New event listeners for polygon move:
+    dmCanvas.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) return; // Only main (left) click
+
+        if (isMovingPolygon && polygonBeingMoved) {
+            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+            if (imageCoords && isPointInPolygon(imageCoords, polygonBeingMoved.overlayRef.polygon.map(p => ({ // Check against current visual position
+                x: p.x + currentPolygonDragOffsets.x, // This logic is tricky for mousedown, originalPoints is better
+                y: p.y + currentPolygonDragOffsets.y
+            }))) || isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints)) { // Check original points too
+            // A simpler check: if mousedown is on the polygon to be moved (using its original points for start)
+            // For simplicity, let's assume the user clicks on the polygon as it was when "Move" was selected.
+            // A more robust check would be against its *current* visual position if it had already been dragged a bit and mouse released then pressed again (not supported here)
+
+                if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
+                    x: p.x + currentPolygonDragOffsets.x, // If re-clicking after a drag before finalizing
+                    y: p.y + currentPolygonDragOffsets.y
+                })))) {
+                    moveStartPoint = imageCoords; // Start drag
+                    // The currentPolygonDragOffsets are relative to originalPoints.
+                    // When starting a new drag, we want to preserve existing offsets if this is a re-drag.
+                    // For this implementation, first mousedown sets moveStartPoint relative to original points + current offset.
+                    // Subsequent mousemoves adjust from there.
+                    // Let's adjust moveStartPoint to be relative to the true original polygon.
+                    moveStartPoint.x -= currentPolygonDragOffsets.x;
+                    moveStartPoint.y -= currentPolygonDragOffsets.y;
+
+                    console.log("Dragging polygon started at (image coords):", imageCoords, "Effective start for offset calc:", moveStartPoint);
+                    event.preventDefault(); // Prevent text selection or other default drag behaviors
+                }
+            }
+        }
+    });
+
+    dmCanvas.addEventListener('mousemove', (event) => {
+        // This is the general mousemove for hover labels.
+        // We need to add drag logic here too, or ensure handleMouseMoveOnCanvas co-exists.
+        // Let's keep hover logic and add drag logic.
+
+        if (isMovingPolygon && polygonBeingMoved && moveStartPoint) {
+            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+            if (imageCoords) {
+                currentPolygonDragOffsets.x = imageCoords.x - moveStartPoint.x;
+                currentPolygonDragOffsets.y = imageCoords.y - moveStartPoint.y;
+
+                // Request redraw of the map to show polygon at new position
+                // displayMapOnCanvas will use currentPolygonDragOffsets via drawOverlays
+                if (selectedMapInManager === polygonBeingMoved.parentMapName) {
+                    displayMapOnCanvas(selectedMapInManager);
+                }
+            }
+        } else {
+            // Existing hover label logic (if not dragging)
+            handleMouseMoveOnCanvas(event);
+        }
+    });
+
+    dmCanvas.addEventListener('mouseup', (event) => {
+        if (event.button !== 0) return; // Only main (left) click
+
+        if (isMovingPolygon && polygonBeingMoved && moveStartPoint) { // If a drag was in progress
+            // Finalize the move
+            const finalDeltaX = currentPolygonDragOffsets.x;
+            const finalDeltaY = currentPolygonDragOffsets.y;
+
+            polygonBeingMoved.overlayRef.polygon = polygonBeingMoved.originalPoints.map(p => ({
+                x: p.x + finalDeltaX,
+                y: p.y + finalDeltaY
+            }));
+
+            console.log(`Polygon moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}. New points:`, polygonBeingMoved.overlayRef.polygon);
+            alert(`Polygon moved to new position.`);
+
+            resetAllInteractiveStates(); // This will also redraw the map
+        } else if (isMovingPolygon && polygonBeingMoved && !moveStartPoint) {
+            // If in move mode, but not actively dragging (i.e., mousedown didn't occur on polygon),
+            // a click might finalize the position if it was a "click-move-click" paradigm.
+            // For drag-and-drop, this click (if not on polygon) could cancel or do nothing.
+            // Current alert for move says "Click again to place". This implies a click finalizes.
+            // Let's assume any click while isMovingPolygon=true and not dragging (moveStartPoint=null) finalizes at current offset.
+
+            // This case means the user clicked "Move", then clicked somewhere on the map (not dragging).
+            // If they clicked on the polygon itself, mousedown would have set moveStartPoint.
+            // If they clicked elsewhere, we could interpret this as "place here" with current offsets (which would be 0,0 if no drag occurred).
+            // Or, it could be a "cancel". The alert "Click again to place" is a bit ambiguous.
+            // Let's make it so: if you are in move mode, and you click (mouseup) and you weren't dragging the polygon,
+            // it finalizes the move with the current (potentially zero) offset.
+            // This means simply selecting "Move Polygon" and then clicking anywhere will "confirm" it at its current spot.
+
+            // To prevent accidental finalization if user just clicks outside after selecting "Move":
+            // We need a more robust check or change the instruction.
+            // For now, let's stick to: drag must occur (moveStartPoint must have been set).
+            // A simple click without drag having started does nothing to the polygon position.
+            // User would need to right-click or select another tool to cancel "isMovingPolygon" mode.
+            // This part of the logic might need further refinement based on desired UX.
+        }
+    });
+
+    // Modify the main canvas click listener (dmCanvas.addEventListener('click', ...))
+    // to be aware of isMovingPolygon.
+    // Original dmCanvas click listener:
+    // dmCanvas.addEventListener('click', (event) => { ... });
+    // We need to ensure that if isMovingPolygon is true, this listener doesn't execute
+    // things like trying to draw a new polygon or navigate on overlay click.
+    // One way is to add checks at the beginning of that listener.
+    // (This will be done in a subsequent step if needed, the mousedown/move/mouseup should capture most interactions for move)
 
     // Event listener for 'Add to Active List' / 'Update Changes to Active List' button
     if (btnAddToActive) {
@@ -938,8 +1138,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (targetItem && targetItem.tagName === 'LI' && targetItem.classList.contains('map-list-item')) {
             const clickedFileName = targetItem.dataset.fileName;
             if (clickedFileName) {
-                if (isLinkingChildMap && polygonDrawingComplete && selectedMapInManager) {
-                    // Phase 3: Linking the child map
+                if (isChangingChildMapForPolygon && selectedPolygonForContextMenu && selectedMapInManager) {
+                    // Handling "Change Child Map" action
+                    const { overlay, index, parentMapName } = selectedPolygonForContextMenu;
+                    if (parentMapName === clickedFileName) {
+                        alert("Cannot link a map to itself as a child. Please select a different map.");
+                        // Don't reset isChangingChildMapForPolygon yet, let them pick another.
+                        return;
+                    }
+                    const parentMapData = detailedMapData.get(parentMapName);
+                    if (parentMapData && parentMapData.overlays[index] === overlay) {
+                        const oldLinkedMapName = overlay.linkedMapName;
+                        parentMapData.overlays[index].linkedMapName = clickedFileName;
+
+                        alert(`Child map for the selected polygon on "${parentMapName}" changed from "${oldLinkedMapName}" to "${clickedFileName}".`);
+                        console.log(`Child map for polygon on "${parentMapName}" (index ${index}) changed to "${clickedFileName}".`);
+
+                        // If the currently displayed map is the one that was modified, refresh its display
+                        if (selectedMapInManager === parentMapName) {
+                            displayMapOnCanvas(parentMapName);
+                        }
+                    } else {
+                        console.error("Error changing child map: Parent map data or specific overlay not found or mismatched.");
+                        alert("An error occurred while trying to change the child map. Please try again.");
+                    }
+                    isChangingChildMapForPolygon = false;
+                    selectedPolygonForContextMenu = null; // Clear the selection
+                    // No need to hide context menu, it's already hidden.
+                } else if (isLinkingChildMap && polygonDrawingComplete && selectedMapInManager) {
+                    // Phase 3: Linking a NEW child map (original polygon drawing flow)
                     if (selectedMapInManager === clickedFileName) {
                         alert("Cannot link a map to itself. Please select a different map from 'Manage Maps' to be the child.");
                         return;
@@ -954,18 +1181,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         parentMapData.overlays.push(newOverlay);
                         console.log(`Map "${clickedFileName}" linked as child to "${selectedMapInManager}". Overlay data:`, newOverlay);
-                        alert(`Map "${clickedFileName}" successfully linked as a child to "${parentMapData.name}".`);
+                        alert(`Map "${clickedFileName}" successfully linked as a new child to "${parentMapData.name}".`);
 
                         resetLinkingState(); // This will also call updateButtonStates and redraw the parent map
-                        // Ensure the parent map (selectedMapInManager) is displayed to show the new link
-                        displayMapOnCanvas(selectedMapInManager);
+                        displayMapOnCanvas(selectedMapInManager); // Ensure parent map shows new link
                     } else {
-                        console.error("Parent map data not found for:", selectedMapInManager);
+                        console.error("Parent map data not found for new link:", selectedMapInManager);
                         alert("Error: Could not find data for the parent map. Linking failed.");
                         resetLinkingState();
                     }
                 } else {
-                    // Normal selection behavior
+                    // Normal selection behavior (displaying a map from Manage Maps)
+                    if (selectedMapInManager !== null && selectedMapInManager !== clickedFileName) {
+                        // If switching from one selected manager map to another, cancel ongoing interactions
+                        resetAllInteractiveStates();
+                    }
                     selectedMapInManager = clickedFileName;
                     selectedMapInActiveView = null;
 
@@ -1206,5 +1436,159 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loadCampaignInput) {
         loadCampaignInput.addEventListener('change', loadCampaign);
     }
+
+    // --- Context Menu Logic ---
+    dmCanvas.addEventListener('contextmenu', (event) => {
+        event.preventDefault(); // Prevent default browser context menu
+
+        if (isMovingPolygon) {
+            resetAllInteractiveStates(); // Cancel move mode on right-click
+            alert("Polygon move cancelled.");
+            console.log("Polygon move cancelled via right-click.");
+            return;
+        }
+
+        polygonContextMenu.style.display = 'none'; // Hide previous menu first
+        selectedPolygonForContextMenu = null;
+
+        if (!selectedMapInManager) { // Only active if a map is selected in Manage Maps
+            return;
+        }
+
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (!imageCoords) return; // Click was outside the image
+
+        const managerMapData = detailedMapData.get(selectedMapInManager);
+        if (managerMapData && managerMapData.overlays) {
+            // Iterate in reverse to catch topmost polygon if overlapping
+            for (let i = managerMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = managerMapData.overlays[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    selectedPolygonForContextMenu = { overlay: overlay, index: i, parentMapName: selectedMapInManager };
+                    polygonContextMenu.style.left = `${event.clientX}px`; // Use clientX/Y for viewport positioning
+                    polygonContextMenu.style.top = `${event.clientY}px`;
+                    polygonContextMenu.style.display = 'block';
+                    console.log('Right-clicked on polygon:', selectedPolygonForContextMenu);
+                    return; // Found a polygon, show menu and stop
+                }
+            }
+        }
+    });
+
+    // Global click listener to hide context menu
+    document.addEventListener('click', (event) => {
+        if (polygonContextMenu.style.display === 'block') {
+            // Check if the click was outside the context menu
+            if (!polygonContextMenu.contains(event.target)) {
+                polygonContextMenu.style.display = 'none';
+                selectedPolygonForContextMenu = null;
+            }
+        }
+    });
+
+    // Prevent context menu click from propagating to the document listener and closing itself
+    polygonContextMenu.addEventListener('click', (event) => {
+        event.stopPropagation(); // Stop click from closing menu immediately
+        const action = event.target.dataset.action;
+
+        if (action && selectedPolygonForContextMenu) {
+            const { overlay, index, parentMapName } = selectedPolygonForContextMenu;
+            const parentMapData = detailedMapData.get(parentMapName);
+
+            if (!parentMapData) {
+                console.error("Parent map data not found for context menu action:", parentMapName);
+                polygonContextMenu.style.display = 'none';
+                selectedPolygonForContextMenu = null;
+                return;
+            }
+
+            switch (action) {
+                case 'change-child-map':
+                    isChangingChildMapForPolygon = true;
+                    // selectedPolygonForContextMenu is already set and will be used by uploadedMapsList click handler
+                    alert(`"Change Child Map" selected for polygon linking to "${overlay.linkedMapName}". Please click a new map from the "Manage Maps" list to be its new child.`);
+                    polygonContextMenu.style.display = 'none'; // Hide menu, selection process starts
+                    // No need to clear selectedPolygonForContextMenu here, it's needed for the next step
+                    break;
+                case 'redraw-polygon':
+                    if (parentMapData && parentMapData.overlays && parentMapData.overlays[index]) {
+                        isRedrawingPolygon = true;
+                        preservedLinkedMapNameForRedraw = overlay.linkedMapName; // Preserve the link
+                        currentPolygonPoints = []; // Reset for new drawing
+                        polygonDrawingComplete = false;
+
+                        // Remove the old polygon overlay
+                        parentMapData.overlays.splice(index, 1);
+
+                        dmCanvas.style.cursor = 'crosshair';
+                        alert(`Redrawing polygon for link to "${preservedLinkedMapNameForRedraw}". Click on the map to start drawing the new polygon. Click the first point to close it.`);
+
+                        // Redraw the map to remove the old polygon before starting to draw the new one
+                        if (selectedMapInManager === parentMapName) {
+                            displayMapOnCanvas(parentMapName);
+                        }
+                        console.log('Redraw Polygon initiated. Old polygon removed. Preserved link:', preservedLinkedMapNameForRedraw);
+                    } else {
+                        console.error("Error initiating redraw: Parent map data or overlay not found.");
+                        alert("Error: Could not find the polygon to redraw.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    // selectedPolygonForContextMenu is implicitly cleared by starting redraw or should be nulled if error
+                    if (!isRedrawingPolygon) selectedPolygonForContextMenu = null;
+                    break;
+                case 'move-polygon':
+                    if (parentMapData && parentMapData.overlays && parentMapData.overlays[index]) {
+                        isMovingPolygon = true;
+                        polygonBeingMoved = {
+                            overlayRef: overlay, // Direct reference to the overlay in detailedMapData
+                            originalPoints: JSON.parse(JSON.stringify(overlay.polygon)), // Deep copy for reference
+                            parentMapName: parentMapName,
+                            originalIndex: index // Keep original index if needed, though ref is better
+                        };
+                        moveStartPoint = null; // Reset, wait for mousedown on polygon
+                        currentPolygonDragOffsets = {x: 0, y: 0};
+                        dmCanvas.style.cursor = 'move';
+                        alert(`Move mode activated for polygon linking to "${overlay.linkedMapName}". Click and drag the polygon to move it. Click again to place, or right-click to cancel.`);
+                        console.log('Move Polygon initiated for:', polygonBeingMoved);
+                    } else {
+                        console.error("Error initiating move: Parent map data or overlay not found.");
+                        alert("Error: Could not find the polygon to move.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    selectedPolygonForContextMenu = null; // Context selection is handled
+                    break;
+                case 'delete-link':
+                    if (parentMapData && parentMapData.overlays && parentMapData.overlays[index]) {
+                        if (confirm(`Are you sure you want to delete the link to "${overlay.linkedMapName}"?`)) {
+                            parentMapData.overlays.splice(index, 1);
+                            console.log(`Link to "${overlay.linkedMapName}" deleted from map "${parentMapName}".`);
+                            alert(`Link to "${overlay.linkedMapName}" has been deleted.`);
+
+                            // If the currently displayed map is the one that was modified, refresh its display
+                            if (selectedMapInManager === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                            }
+                        }
+                    } else {
+                        console.error("Error deleting link: Parent map data or overlay not found.");
+                        alert("Error: Could not find the link to delete.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    selectedPolygonForContextMenu = null; // Clear selection
+                    break;
+            }
+        } else if (action) {
+            // Action clicked but no polygon was selected (should not happen if menu is shown correctly)
+            console.warn("Context menu action clicked, but no polygon was selected.");
+            polygonContextMenu.style.display = 'none';
+            selectedPolygonForContextMenu = null;
+        }
+        // If click was on UL or non-action LI, it just closes due to the global listener (if not stopped)
+        // or does nothing if propagation is stopped and it's not an action.
+    });
+
 
 });
