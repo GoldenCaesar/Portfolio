@@ -249,9 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     dmCanvas.addEventListener('click', (event) => {
-        const rect = dmCanvas.getBoundingClientRect();
-        const canvasX = event.clientX - rect.left - dmCanvas.clientLeft;
-        const canvasY = event.clientY - rect.top - dmCanvas.clientTop;
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
         const imageCoords = getRelativeCoords(canvasX, canvasY);
 
         if (!imageCoords) {
