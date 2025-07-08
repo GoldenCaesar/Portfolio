@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
     const mapContainer = document.getElementById('map-container'); // Get the container
-    const hoverLabel = document.getElementById('hover-label'); // Added for hover label
     const displayedFileNames = new Set();
 
     // Map Tools Elements
@@ -342,61 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log("Canvas clicked, no specific overlay interaction.", imageCoords);
     });
 
-    dmCanvas.addEventListener('mousemove', (event) => {
-        if (!hoverLabel) return;
-
-        const rect = dmCanvas.getBoundingClientRect();
-        const canvasX = event.clientX - rect.left;
-        const canvasY = event.clientY - rect.top;
-        const imageCoords = getRelativeCoords(canvasX, canvasY);
-
-        if (!imageCoords || (isLinkingChildMap && !polygonDrawingComplete)) { // Don't show label if outside image or actively drawing new polygon points
-            hoverLabel.style.display = 'none';
-            return;
-        }
-
-        let currentOverlays = null;
-        let currentMapName = null;
-
-        if (selectedMapInManager) {
-            currentMapName = selectedMapInManager;
-            const mapData = detailedMapData.get(currentMapName);
-            if (mapData) currentOverlays = mapData.overlays;
-        } else if (selectedMapInActiveView) {
-            currentMapName = selectedMapInActiveView;
-            const activeMapInstance = activeMapsData.find(am => am.fileName === currentMapName);
-            if (activeMapInstance) currentOverlays = activeMapInstance.overlays;
-        }
-
-        if (currentOverlays) {
-            let foundLink = null;
-            for (let i = currentOverlays.length - 1; i >= 0; i--) {
-                const overlay = currentOverlays[i];
-                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                    foundLink = overlay;
-                    break;
-                }
-            }
-
-            if (foundLink && foundLink.linkedMapName) {
-                hoverLabel.textContent = foundLink.linkedMapName;
-                hoverLabel.style.left = `${event.clientX + 15}px`; // Position slightly offset from cursor
-                hoverLabel.style.top = `${event.clientY + 15}px`;
-                hoverLabel.style.display = 'block';
-            } else {
-                hoverLabel.style.display = 'none';
-            }
-        } else {
-            hoverLabel.style.display = 'none';
-        }
-    });
-
-    dmCanvas.addEventListener('mouseout', () => {
-        if (hoverLabel) {
-            hoverLabel.style.display = 'none';
-        }
-    });
-
     // Point-in-polygon helper function (Ray casting algorithm)
     function isPointInPolygon(point, polygon) {
         if (!polygon || polygon.length < 3) return false;
@@ -637,148 +581,61 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
 
                         // Update fileName and linkedMapName in activeMapsData
-                        let activeListNeedsRerender = false;
+                        let activeListNeedsRefresh = false;
                         activeMapsData.forEach(activeMap => {
+                            let activeMapFileNameChanged = false;
                             if (activeMap.fileName === originalName) {
                                 activeMap.fileName = newName;
-                                activeListNeedsRerender = true; // Name in the list itself changed
-                                console.log(`Updated fileName in activeMapsData for: ${originalName} to ${newName}`);
+                                activeListNeedsRefresh = true;
+                                activeMapFileNameChanged = true;
+                                console.log(`Active Map: File name '${originalName}' changed to '${newName}'.`);
                             }
+
                             if (activeMap.overlays && activeMap.overlays.length > 0) {
                                 activeMap.overlays.forEach(overlay => {
                                     if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
                                         overlay.linkedMapName = newName;
-                                        console.log(`Updated linkedMapName in activeMapsData overlays for active map: ${activeMap.fileName}`);
-                                        // If this active map is currently displayed and its overlay changed, it will need a redraw.
-                                        if (selectedMapInActiveView === activeMap.fileName) {
-                                            activeListNeedsRerender = true; // Mark for redraw
+                                        console.log(`Active Overlay: Map '${activeMap.fileName}' link to '${originalName}' changed to '${newName}'.`);
+                                        // If this active map is currently displayed and its overlays changed
+                                        if (activeMap.fileName === currentlyDisplayedMapKey && !activeMapFileNameChanged) {
+                                            displayedMapLinksUpdated = true;
                                         }
+                                        activeListNeedsRefresh = true; // Mark for refresh if an overlay link changes
                                     }
                                 });
                             }
                         });
 
-                        if (activeListNeedsRerender) {
-                            renderActiveMapsList(); // Re-render if any active map fileName or its relevant overlays changed
+                        if (activeListNeedsRefresh) {
+                            renderActiveMapsList();
                         }
 
-                        // If the renamed map was selected (either in manager or active view), update the selection variable
-                        // and redraw the canvas to reflect the name change or updated overlay link names.
-                        let needsRedraw = false;
+                        // Update selection variables if the selected map itself was renamed
+                        let selectionUpdated = false;
                         if (selectedMapInManager === originalName) {
                             selectedMapInManager = newName;
-                            needsRedraw = true;
+                            currentlyDisplayedMapKey = newName; // Update key for redraw logic
+                            selectionUpdated = true;
                         }
-                        // If an active map that was selected had its *own* name changed.
-                        // The selectedMapInActiveView would still be originalName before this block,
-                        // so we check if the originalName matches any of the now-updated activeMap.fileName
                         if (selectedMapInActiveView === originalName) {
-                           selectedMapInActiveView = newName; // Update selection to new name
-                           needsRedraw = true;
+                            selectedMapInActiveView = newName;
+                            currentlyDisplayedMapKey = newName; // Update key for redraw logic
+                            selectionUpdated = true;
                         }
 
-
-                        // If the currently displayed map (manager or active) had its overlays updated
-                        // because it links TO the renamed map, it also needs a redraw.
-                        // This is trickier to check directly without iterating again, but finishRename
-                        // is only called for maps in uploadedMapsList.
-                        // A simpler approach: if the displayed map *is not* the one being renamed,
-                        // but it *might* link to it, we might need to redraw it.
-                        // The most straightforward is to redraw if any detailedMapData overlay was changed and that map is active.
-                        // Or if the selectedMapInManager is displayed, and its overlays were modified.
-
-                        const currentDisplayedMapData = selectedMapInManager ? detailedMapData.get(selectedMapInManager) : (selectedMapInActiveView ? activeMapsData.find(am => am.fileName === selectedMapInActiveView) : null);
-                        if (currentDisplayedMapData && currentDisplayedMapData.overlays) {
-                            currentDisplayedMapData.overlays.forEach(overlay => {
-                                if (overlay.type === 'childMapLink' && overlay.linkedMapName === newName && needsRedraw === false) {
-                                    // This means the *displayed* map links to the *renamed* map.
-                                    // The link text itself might need to update if the hover logic relies on a fresh draw,
-                                    // but the visual polygon won't change. The hover logic reads directly.
-                                    // However, if we want to be absolutely sure, or if other things might change,
-                                    // a redraw here is safe.
-                                    // For now, the primary redraw condition is if the selected map *itself* was renamed.
-                                }
-                            });
-                        }
-
-
-                        if (needsRedraw) {
-                            displayMapOnCanvas(newName); // Display with the new name if it was the one selected
-                        } else {
-                            // If the selected map *wasn't* the one renamed, but it *links* to the renamed map,
-                            // and it's currently displayed, its overlays might have changed.
-                            // We need to redraw it to ensure link integrity if any of its own overlays were updated.
-                            // This is implicitly handled if activeListNeedsRerender was true and the map was active.
-                            // Let's ensure a redraw if the current map's overlays were modified.
-                            let currentlyDisplayedMapRequiresRedrawForOverlayUpdate = false;
-                            if (selectedMapInManager && selectedMapInManager !== newName) { // if a different map is shown in manager
-                                const managerMap = detailedMapData.get(selectedMapInManager);
-                                if (managerMap && managerMap.overlays) {
-                                   if (managerMap.overlays.some(o => o.type === 'childMapLink' && o.linkedMapName === newName && o.originalLinkedMapName === originalName)) {
-                                       // This condition is a bit complex, means we'd have to track originalLinkedMapName temporarily
-                                       // A simpler approach: if any overlay in the currently displayed map now points to newName,
-                                       // and it previously pointed to originalName.
-                                       // The previous loop already updated these. So just check if current map has links to newName.
-                                   }
-                                   // More simply: if the displayed map's overlays were touched by the global update of linkedMapName
-                                   if (detailedMapData.get(selectedMapInManager).overlays.some(ov => ov.linkedMapName === newName && mapDataEntry.overlays.includes(ov))) {
-                                       // This logic is getting complicated. A broader redraw condition might be safer.
-                                       // The change to linkedMapName on *other* maps should trigger their redraw if they are visible.
-                                   }
-                                }
-                            }
-                            // If the current map (manager or active) is on display, and its overlays were updated, redraw it.
-                            // This covers the case where the displayed map links TO the renamed map.
-                            const currentMapKey = selectedMapInManager || selectedMapInActiveView;
-                            if (currentMapKey) {
-                                const mapToPotentiallyRedraw = selectedMapInManager ? detailedMapData.get(currentMapKey) : activeMapsData.find(am => am.fileName === currentMapKey);
-                                if (mapToPotentiallyRedraw && mapToPotentiallyRedraw.overlays) {
-                                    const wasModified = mapToPotentiallyRedraw.overlays.some(o => o.type === 'childMapLink' && o.linkedMapName === newName &&
-                                                                                  mapDataEntry.overlays.some(originalOverlay => originalOverlay.linkedMapName === newName)); // check if any overlay points to the newName
-
-                                    // A simpler check: Did *any* of the currently displayed map's overlays change?
-                                    // The previous loops updated `linkedMapName` globally. If the current map was affected, redraw.
-                                    let currentMapOverlaysAffected = false;
-                                    if (selectedMapInManager) {
-                                        const currentManagerMap = detailedMapData.get(selectedMapInManager);
-                                        if (currentManagerMap.overlays.some(o => o.type === 'childMapLink' && o.linkedMapName === newName && originalName !== newName)) {
-                                           // Check if any overlay *now* points to newName, that previously would have pointed to originalName
-                                           // This is true if originalName was updated to newName.
-                                           // The check `o.linkedMapName === newName` is sufficient if we assume updates happened.
-                                           if (currentManagerMap.overlays.some(o => o.type === 'childMapLink' && o.linkedMapName === newName)) {
-                                                // This map links to the (potentially) renamed map.
-                                                // If originalName was indeed linked, and now it's newName, redraw.
-                                                // This relies on the fact that linkedMapName was updated in previous loops.
-                                                // A robust way: check if any of its overlays *used* to be originalName.
-                                                // This is already done by the loops.
-                                                // So, if displayMapOnCanvas(selectedMapInManager) is called, it will use updated overlays.
-                                                // Let's redraw if the selected map in manager is not the one renamed but its overlays might have changed.
-                                                if (selectedMapInManager !== newName) { // if it's not the map that was just renamed itself
-                                                    // Check if this map had links to the originalName
-                                                    const smData = detailedMapData.get(selectedMapInManager);
-                                                    if (smData.overlays.some(ov => ov.type === 'childMapLink' && ov.linkedMapName === newName /* and it was originalName before */)) {
-                                                         // This check is true if this map links to the one that was renamed.
-                                                         // Its overlays were updated in the loop above. So, it needs a redraw.
-                                                         displayMapOnCanvas(selectedMapInManager);
-                                                    }
-                                                }
-                                           }
-                                        }
-                                    } else if (selectedMapInActiveView) {
-                                        const currentActiveMap = activeMapsData.find(am => am.fileName === selectedMapInActiveView);
-                                        if (currentActiveMap && currentActiveMap.overlays.some(o => o.type === 'childMapLink' && o.linkedMapName === newName)) {
-                                            if (selectedMapInActiveView !== newName) { // if it's not the map that was just renamed itself
-                                                displayMapOnCanvas(selectedMapInActiveView);
-                                            }
-                                        }
-                                    }
-                                }
+                        // Redraw canvas if:
+                        // 1. The selected map itself was renamed.
+                        // 2. The currently displayed map (not renamed itself) had its links updated.
+                        if (selectionUpdated || displayedMapLinksUpdated) {
+                            if (currentlyDisplayedMapKey) {
+                                console.log(`Redrawing canvas for: ${currentlyDisplayedMapKey} (Selection updated: ${selectionUpdated}, Links updated: ${displayedMapLinksUpdated})`);
+                                displayMapOnCanvas(currentlyDisplayedMapKey);
                             }
                         }
+                        updateButtonStates(); // Refresh button states as selection might have changed
                     }
                 }
-
-                listItem.replaceChild(textNode, input);
+                listItem.replaceChild(textNode, input); // This should be inside the else block of displayedFileNames.has(newName)
             }
         } else {
             // If name is empty or unchanged, revert to original
