@@ -818,33 +818,65 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update Mode
                     const activeMapInstance = activeMapsData.find(map => map.fileName === selectedMapInManager);
                     if (activeMapInstance) {
-                        const sourceOverlays = sourceMapData.overlays;
-                        const existingActiveOverlays = activeMapInstance.overlays;
+                        const sourceOverlaysFromManager = JSON.parse(JSON.stringify(sourceMapData.overlays)); // Full list from Manage Maps (for uniqueness checks)
+                        let modifiableExistingActiveOverlays = JSON.parse(JSON.stringify(activeMapInstance.overlays)); // Current active overlays, will be consumed
                         const newActiveOverlays = [];
 
-                        sourceOverlays.forEach(sourceOverlay => {
-                            const sourcePolygonId = JSON.stringify(sourceOverlay.polygon);
-                            const correspondingExistingOverlay = existingActiveOverlays.find(
-                                activeOv => JSON.stringify(activeOv.polygon) === sourcePolygonId
+                        sourceOverlaysFromManager.forEach(sourceOverlay => {
+                            let matched = false;
+                            let visibilityStateToCarryOver = false; // Default to false
+
+                            // Attempt 1: Match by exact polygon geometry
+                            const geomMatchIndex = modifiableExistingActiveOverlays.findIndex(
+                                activeOv => JSON.stringify(activeOv.polygon) === JSON.stringify(sourceOverlay.polygon)
                             );
 
-                            if (correspondingExistingOverlay) {
-                                // Preserve existing visibility, update other properties from source
+                            if (geomMatchIndex > -1) {
+                                const existingMatchByGeom = modifiableExistingActiveOverlays[geomMatchIndex];
+                                visibilityStateToCarryOver = typeof existingMatchByGeom.playerVisible === 'boolean' ? existingMatchByGeom.playerVisible : false;
                                 newActiveOverlays.push({
-                                    ...JSON.parse(JSON.stringify(sourceOverlay)), // Take latest geometry etc. from source
-                                    playerVisible: typeof correspondingExistingOverlay.playerVisible === 'boolean' ? correspondingExistingOverlay.playerVisible : false
+                                    ...sourceOverlay, // Use new geometry/data from source
+                                    playerVisible: visibilityStateToCarryOver
                                 });
-                            } else {
-                                // New overlay from manager, default to not visible
+                                matched = true;
+                                modifiableExistingActiveOverlays.splice(geomMatchIndex, 1); // Remove consumed overlay
+                            } else if (sourceOverlay.linkedMapName) {
+                                // Attempt 2: Match by unique linkedMapName if geometry differs
+                                // Count occurrences of this link name in the original source (Manage Maps)
+                                const countInSource = sourceOverlaysFromManager.filter(
+                                    srcOv => srcOv.linkedMapName === sourceOverlay.linkedMapName
+                                ).length;
+                                // Count occurrences in the *remaining* active overlays
+                                const existingActiveWithSameLinkName = modifiableExistingActiveOverlays.filter(
+                                    activeOv => activeOv.linkedMapName === sourceOverlay.linkedMapName
+                                );
+
+                                if (countInSource === 1 && existingActiveWithSameLinkName.length === 1) {
+                                    // This link name is unique in both current source and remaining active sets for this specific link
+                                    const uniqueExistingMatchByLinkName = existingActiveWithSameLinkName[0];
+                                    visibilityStateToCarryOver = typeof uniqueExistingMatchByLinkName.playerVisible === 'boolean' ? uniqueExistingMatchByLinkName.playerVisible : false;
+                                    newActiveOverlays.push({
+                                        ...sourceOverlay, // Use new geometry/data from source
+                                        playerVisible: visibilityStateToCarryOver
+                                    });
+                                    matched = true;
+                                    // Remove consumed overlay from modifiableExistingActiveOverlays
+                                    const idxToRemove = modifiableExistingActiveOverlays.indexOf(uniqueExistingMatchByLinkName);
+                                    if (idxToRemove > -1) modifiableExistingActiveOverlays.splice(idxToRemove, 1);
+                                }
+                            }
+
+                            if (!matched) {
+                                // No match found by geometry or unique link name, treat as new
                                 newActiveOverlays.push({
-                                    ...JSON.parse(JSON.stringify(sourceOverlay)),
-                                    playerVisible: false
+                                    ...sourceOverlay,
+                                    playerVisible: false // Default for truly new or unmatchable
                                 });
                             }
                         });
 
                         activeMapInstance.overlays = newActiveOverlays;
-                        console.log(`Overlays for "${selectedMapInManager}" updated in Active View. Existing visibilities preserved, new ones defaulted to false.`);
+                        console.log(`Overlays for "${selectedMapInManager}" updated in Active View. Visibility logic applied.`);
 
                         if (selectedMapInActiveView === selectedMapInManager) {
                             displayMapOnCanvas(selectedMapInActiveView);
@@ -852,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         updateButtonStates();
                     } else {
-                        console.error('Error updating map in active list: instance not found in activeMapsData despite check.');
+                        console.error('Error updating map in active list: instance not found for', selectedMapInManager);
                     }
                 } else {
                 // Add Mode: Ensure playerVisible defaults to false for all new overlays
