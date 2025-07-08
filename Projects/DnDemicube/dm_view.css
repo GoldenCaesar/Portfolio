@@ -130,6 +130,19 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     /* Optional: Style for map names when in edit mode, e.g., different background */
     /* background-color: #3a4148; */ /* Example */
 }
+
+/* Styling for selected map items in either list */
+.selected-map-item {
+    background-color: #3a4f6a !important; /* A distinct background color for selection */
+    /* border-left: 3px solid #b6cae1; */ /* Example: a border indicator */
+    font-weight: bold; /* Make text bold */
+    color: #ffffff !important; /* Ensure text is readable */
+}
+/* Ensure hover on a selected item doesn't obscure selection, or is complementary */
+.selected-map-item:hover {
+    background-color: #4a5f7a !important; /* Slightly different hover for selected item */
+}
+
 .rename-input-active {
     /* Basic styling for the rename input field */
     padding: 2px 4px;
