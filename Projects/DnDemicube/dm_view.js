@@ -547,100 +547,93 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newName && newName !== originalName) {
             if (displayedFileNames.has(newName)) {
                 alert(`A map with the name "${newName}" already exists. Please choose a different name.`);
-                textNode.textContent = originalName; // Revert to original
-                listItem.replaceChild(textNode, input);
+                textNode.textContent = originalName; // Revert to original text node content
+                listItem.replaceChild(textNode, input); // Replace input with text node
             } else {
-                textNode.textContent = newName;
+                textNode.textContent = newName; // Update text node content for display
                 listItem.dataset.fileName = newName; // Update data attribute
                 displayedFileNames.delete(originalName);
                 displayedFileNames.add(newName);
 
-                    // Update detailedMapData map
-                    const mapDataEntry = detailedMapData.get(originalName);
-                    if (mapDataEntry) {
-                        mapDataEntry.name = newName; // Update the name within the object
-                        detailedMapData.delete(originalName);
-                        detailedMapData.set(newName, mapDataEntry);
+                const mapDataEntry = detailedMapData.get(originalName);
+                if (mapDataEntry) {
+                    mapDataEntry.name = newName; // Update the name within the object
+                    detailedMapData.delete(originalName);
+                    detailedMapData.set(newName, mapDataEntry);
 
-                        let currentlyDisplayedMapKey = selectedMapInManager || selectedMapInActiveView;
-                        let displayedMapLinksUpdated = false;
+                    let currentlyDisplayedMapKey = selectedMapInManager || selectedMapInActiveView;
+                    let displayedMapLinksUpdated = false;
 
-                        // Update linkedMapName in all map overlays in detailedMapData
-                        detailedMapData.forEach(dmEntry => {
-                            if (dmEntry.overlays && dmEntry.overlays.length > 0) {
-                                dmEntry.overlays.forEach(overlay => {
-                                    if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
-                                        overlay.linkedMapName = newName;
-                                        console.log(`DM Overlay: Map '${dmEntry.name}' link to '${originalName}' changed to '${newName}'.`);
-                                        if (dmEntry.name === currentlyDisplayedMapKey && currentlyDisplayedMapKey !== newName) {
-                                            displayedMapLinksUpdated = true;
-                                        }
+                    // Update linkedMapName in all map overlays in detailedMapData
+                    detailedMapData.forEach(dmEntry => {
+                        if (dmEntry.overlays && dmEntry.overlays.length > 0) {
+                            dmEntry.overlays.forEach(overlay => {
+                                if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
+                                    overlay.linkedMapName = newName;
+                                    console.log(`DM Overlay: Map '${dmEntry.name}' link to '${originalName}' changed to '${newName}'.`);
+                                    if (dmEntry.name === currentlyDisplayedMapKey && currentlyDisplayedMapKey !== newName) {
+                                        displayedMapLinksUpdated = true;
                                     }
-                                });
-                            }
-                        });
+                                }
+                            });
+                        }
+                    });
 
-                        // Update fileName and linkedMapName in activeMapsData
-                        let activeListNeedsRefresh = false;
-                        activeMapsData.forEach(activeMap => {
-                            let activeMapFileNameChanged = false;
-                            if (activeMap.fileName === originalName) {
-                                activeMap.fileName = newName;
-                                activeListNeedsRefresh = true;
-                                activeMapFileNameChanged = true;
-                                console.log(`Active Map: File name '${originalName}' changed to '${newName}'.`);
-                            }
+                    // Update fileName and linkedMapName in activeMapsData
+                    let activeListNeedsRefresh = false;
+                    activeMapsData.forEach(activeMap => {
+                        let activeMapFileNameChanged = false;
+                        if (activeMap.fileName === originalName) {
+                            activeMap.fileName = newName;
+                            activeListNeedsRefresh = true;
+                            activeMapFileNameChanged = true;
+                            console.log(`Active Map: File name '${originalName}' changed to '${newName}'.`);
+                        }
 
-                            if (activeMap.overlays && activeMap.overlays.length > 0) {
-                                activeMap.overlays.forEach(overlay => {
-                                    if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
-                                        overlay.linkedMapName = newName;
-                                        console.log(`Active Overlay: Map '${activeMap.fileName}' link to '${originalName}' changed to '${newName}'.`);
-                                        // If this active map is currently displayed and its overlays changed
-                                        if (activeMap.fileName === currentlyDisplayedMapKey && !activeMapFileNameChanged) {
-                                            displayedMapLinksUpdated = true;
-                                        }
-                                        activeListNeedsRefresh = true; // Mark for refresh if an overlay link changes
+                        if (activeMap.overlays && activeMap.overlays.length > 0) {
+                            activeMap.overlays.forEach(overlay => {
+                                if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
+                                    overlay.linkedMapName = newName;
+                                    console.log(`Active Overlay: Map '${activeMap.fileName}' link to '${originalName}' changed to '${newName}'.`);
+                                    if (activeMap.fileName === currentlyDisplayedMapKey && !activeMapFileNameChanged) {
+                                        displayedMapLinksUpdated = true;
                                     }
-                                });
-                            }
-                        });
+                                    activeListNeedsRefresh = true;
+                                }
+                            });
+                        }
+                    });
 
-                        if (activeListNeedsRefresh) {
-                            renderActiveMapsList();
-                        }
-
-                        // Update selection variables if the selected map itself was renamed
-                        let selectionUpdated = false;
-                        if (selectedMapInManager === originalName) {
-                            selectedMapInManager = newName;
-                            currentlyDisplayedMapKey = newName; // Update key for redraw logic
-                            selectionUpdated = true;
-                        }
-                        if (selectedMapInActiveView === originalName) {
-                            selectedMapInActiveView = newName;
-                            currentlyDisplayedMapKey = newName; // Update key for redraw logic
-                            selectionUpdated = true;
-                        }
-
-                        // Redraw canvas if:
-                        // 1. The selected map itself was renamed.
-                        // 2. The currently displayed map (not renamed itself) had its links updated.
-                        if (selectionUpdated || displayedMapLinksUpdated) {
-                            if (currentlyDisplayedMapKey) {
-                                console.log(`Redrawing canvas for: ${currentlyDisplayedMapKey} (Selection updated: ${selectionUpdated}, Links updated: ${displayedMapLinksUpdated})`);
-                                displayMapOnCanvas(currentlyDisplayedMapKey);
-                            }
-                        }
-                        updateButtonStates(); // Refresh button states as selection might have changed
+                    if (activeListNeedsRefresh) {
+                        renderActiveMapsList();
                     }
+
+                    let selectionUpdated = false;
+                    if (selectedMapInManager === originalName) {
+                        selectedMapInManager = newName;
+                        currentlyDisplayedMapKey = newName;
+                        selectionUpdated = true;
+                    }
+                    if (selectedMapInActiveView === originalName) {
+                        selectedMapInActiveView = newName;
+                        currentlyDisplayedMapKey = newName;
+                        selectionUpdated = true;
+                    }
+
+                    if (selectionUpdated || displayedMapLinksUpdated) {
+                        if (currentlyDisplayedMapKey) {
+                            console.log(`Redrawing canvas for: ${currentlyDisplayedMapKey} (Selection updated: ${selectionUpdated}, Links updated: ${displayedMapLinksUpdated})`);
+                            displayMapOnCanvas(currentlyDisplayedMapKey);
+                        }
+                    }
+                    updateButtonStates();
                 }
-                listItem.replaceChild(textNode, input); // This should be inside the else block of displayedFileNames.has(newName)
+                listItem.replaceChild(textNode, input); // Replace input with text node after successful rename
             }
         } else {
             // If name is empty or unchanged, revert to original
-            textNode.textContent = originalName;
-            listItem.replaceChild(textNode, input);
+            textNode.textContent = originalName; // Ensure text node has original name
+            listItem.replaceChild(textNode, input); // Replace input with text node
         }
     }
 
