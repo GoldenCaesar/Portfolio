@@ -444,34 +444,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Event listener for 'Add to Active List' button
+    // Event listener for 'Add to Active List' / 'Update Changes to Active List' button
     if (btnAddToActive) {
         btnAddToActive.addEventListener('click', () => {
             if (selectedMapInManager) {
-                const isAlreadyActive = activeMapsData.some(map => map.fileName === selectedMapInManager);
-                if (!isAlreadyActive) {
-                    const sourceMapData = detailedMapData.get(selectedMapInManager);
-                    if (sourceMapData) {
-                        // Deep copy the source map data, including its overlays, for the active instance
-                        const activeMapInstance = JSON.parse(JSON.stringify(sourceMapData));
-                        // Ensure the URL is not part of the JSON stringify/parse if it's an ObjectURL,
-                        // or handle its re-creation if necessary. For now, we assume fileName is key.
-                        // Overlays are geometry and linked names, which are serializable.
-                        // We only need fileName and overlays for the active instance's unique behavior.
-                        activeMapsData.push({
-                            fileName: activeMapInstance.name, // or sourceMapData.name
-                            overlays: activeMapInstance.overlays // Copied overlays
-                        });
-                        renderActiveMapsList();
-                        updateButtonStates();
+                const isAlreadyInActiveList = activeMapsData.some(map => map.fileName === selectedMapInManager);
+                const sourceMapData = detailedMapData.get(selectedMapInManager);
+
+                if (!sourceMapData) {
+                    console.error('Error: Source map data not found in detailedMapData for:', selectedMapInManager);
+                    return;
+                }
+
+                if (isAlreadyInActiveList) {
+                    // Update Mode
+                    const activeMapInstance = activeMapsData.find(map => map.fileName === selectedMapInManager);
+                    if (activeMapInstance) {
+                        activeMapInstance.overlays = JSON.parse(JSON.stringify(sourceMapData.overlays));
+                        console.log(`Overlays for "${selectedMapInManager}" updated in Active View.`);
+
+                        // If this specific active map instance is currently displayed, refresh its view
+                        if (selectedMapInActiveView === selectedMapInManager) {
+                            displayMapOnCanvas(selectedMapInActiveView);
+                        }
+                        // No need to call renderActiveMapsList() as the list item text doesn't change.
+                        updateButtonStates(); // To ensure button text/state is correct if something else changed
                     } else {
-                        console.error("Source map data not found for:", selectedMapInManager);
+                        // Should not happen if isAlreadyInActiveList is true, but good to guard.
+                        console.error('Error updating map in active list: instance not found in activeMapsData despite check.');
                     }
                 } else {
-                    console.warn(`Map "${selectedMapInManager}" is already in the Active View.`);
+                    // Add Mode
+                    activeMapsData.push({
+                        fileName: sourceMapData.name,
+                        overlays: JSON.parse(JSON.stringify(sourceMapData.overlays))
+                    });
+                    renderActiveMapsList();
+                    updateButtonStates();
                 }
             } else {
-                console.warn("No map selected in Manage Maps to add to Active View.");
+                console.warn('Add/Update button clicked without a map selected in manager.');
             }
         });
     }
@@ -829,9 +841,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateButtonStates() {
         const inLinkingProcess = isLinkingChildMap || polygonDrawingComplete;
 
-        // Add to Active List button
-        const isAlreadyInActiveList = activeMapsData.some(map => map.fileName === selectedMapInManager);
-        if (btnAddToActive) btnAddToActive.disabled = inLinkingProcess || !selectedMapInManager || isAlreadyInActiveList;
+        // Add to Active List / Update Changes to Active List button
+        if (btnAddToActive) {
+            if (selectedMapInManager) {
+                const isAlreadyInActiveList = activeMapsData.some(map => map.fileName === selectedMapInManager);
+                if (isAlreadyInActiveList) {
+                    btnAddToActive.textContent = 'Update Changes to Active List';
+                    btnAddToActive.disabled = inLinkingProcess; // Can update unless linking
+                } else {
+                    btnAddToActive.textContent = 'Add to Active List';
+                    btnAddToActive.disabled = inLinkingProcess; // Can add unless linking
+                }
+            } else {
+                btnAddToActive.textContent = 'Add to Active List';
+                btnAddToActive.disabled = true; // No manager map selected
+            }
+        }
 
         // Remove from Active List button
         if (btnRemoveFromActive) btnRemoveFromActive.disabled = inLinkingProcess || !selectedMapInActiveView;
