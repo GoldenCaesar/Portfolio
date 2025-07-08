@@ -711,7 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteIcon.classList.add('file-action-icon', 'delete-map');
                     deleteIcon.title = 'Delete map';
                     deleteIcon.style.cursor = 'pointer';
-                    // deleteIcon.onclick = () => handleDelete(item); // Placeholder for delete
+                    deleteIcon.onclick = () => handleDelete(item); // Placeholder for delete
 
                     const upIcon = document.createElement('span');
                     upIcon.textContent = '↑';
