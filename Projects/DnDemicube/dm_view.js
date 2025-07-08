@@ -50,16 +50,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
         if (dmCanvas && mapContainer) {
-            dmCanvas.width = mapContainer.clientWidth;
-            dmCanvas.height = mapContainer.clientHeight;
-            console.log(`Canvas resized to: ${dmCanvas.width}x${dmCanvas.height}`);
+            const style = window.getComputedStyle(mapContainer);
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            const paddingRight = parseFloat(style.paddingRight) || 0;
+            const paddingTop = parseFloat(style.paddingTop) || 0;
+            const paddingBottom = parseFloat(style.paddingBottom) || 0;
+
+            // Usable width/height for canvas is clientWidth/Height of the container minus the container's padding
+            const canvasWidth = mapContainer.clientWidth - paddingLeft - paddingRight;
+            const canvasHeight = mapContainer.clientHeight - paddingTop - paddingBottom;
+
+            dmCanvas.width = canvasWidth;
+            dmCanvas.height = canvasHeight;
+            
+            console.log(`Canvas resized to: ${dmCanvas.width}x${dmCanvas.height} (Container clientW/H: ${mapContainer.clientWidth}x${mapContainer.clientHeight}, Padding L/R/T/B: ${paddingLeft}/${paddingRight}/${paddingTop}/${paddingBottom})`);
+
             // If a map is currently displayed, redraw it
             if (currentMapDisplayData.img && currentMapDisplayData.img.complete) { // Check if an image was loaded
                  // Find the filename of the map that was displayed.
-                 // This logic assumes either selectedMapInManager or selectedMapInActiveView holds the current map.
                  let currentFileName = null;
                  if (selectedMapInManager) currentFileName = selectedMapInManager;
                  else if (selectedMapInActiveView) currentFileName = selectedMapInActiveView;
+                 // If linking a child map, the base map is selectedMapInManager
+                 else if (isLinkingChildMap && selectedMapInManager) currentFileName = selectedMapInManager;
+
 
                  if (currentFileName) {
                     displayMapOnCanvas(currentFileName); // Redraw the map
