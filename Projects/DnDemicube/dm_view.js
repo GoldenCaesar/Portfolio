@@ -47,6 +47,17 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
+    // Debounce utility function
+    function debounce(func, delay) {
+        let timeoutId;
+        return function(...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                func.apply(this, args);
+            }, delay);
+        };
+    }
+
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
         if (dmCanvas && mapContainer) {
@@ -56,28 +67,48 @@ document.addEventListener('DOMContentLoaded', () => {
             const paddingTop = parseFloat(style.paddingTop) || 0;
             const paddingBottom = parseFloat(style.paddingBottom) || 0;
 
-            // Usable width/height for canvas is clientWidth/Height of the container minus the container's padding
             const canvasWidth = mapContainer.clientWidth - paddingLeft - paddingRight;
             const canvasHeight = mapContainer.clientHeight - paddingTop - paddingBottom;
 
+            let mapWasDisplayed = currentMapDisplayData.img && currentMapDisplayData.img.complete;
+            let currentFileNameToRedraw = null;
+
+            if (mapWasDisplayed) {
+                if (selectedMapInManager) currentFileNameToRedraw = selectedMapInManager;
+                else if (selectedMapInActiveView) currentFileNameToRedraw = selectedMapInActiveView;
+                // Note: isLinkingChildMap implies selectedMapInManager is the map being drawn on.
+                
+                // Invalidate current display data BEFORE canvas dimensions change and before displayMapOnCanvas.
+                currentMapDisplayData.img = null; 
+                console.log("Invalidated currentMapDisplayData.img due to resize preparation.");
+            }
+            
+            // Apply new dimensions to the canvas
             dmCanvas.width = canvasWidth;
             dmCanvas.height = canvasHeight;
-            
             console.log(`Canvas resized to: ${dmCanvas.width}x${dmCanvas.height} (Container clientW/H: ${mapContainer.clientWidth}x${mapContainer.clientHeight}, Padding L/R/T/B: ${paddingLeft}/${paddingRight}/${paddingTop}/${paddingBottom})`);
 
-            // If a map is currently displayed, redraw it
-            if (currentMapDisplayData.img && currentMapDisplayData.img.complete) { // Check if an image was loaded
-                 // Find the filename of the map that was displayed.
-                 let currentFileName = null;
-                 if (selectedMapInManager) currentFileName = selectedMapInManager;
-                 else if (selectedMapInActiveView) currentFileName = selectedMapInActiveView;
-                 // If linking a child map, the base map is selectedMapInManager
-                 else if (isLinkingChildMap && selectedMapInManager) currentFileName = selectedMapInManager;
+            if (mapWasDisplayed && currentFileNameToRedraw) {
+                displayMapOnCanvas(currentFileNameToRedraw);
+            } else if (!mapWasDisplayed) {
+                // If no map was displayed but one is selected (e.g. initial load scenario or after clearing canvas)
+                let fileToDisplay = null;
+                if (selectedMapInManager) fileToDisplay = selectedMapInManager;
+                else if (selectedMapInActiveView) fileToDisplay = selectedMapInActiveView;
 
-
-                 if (currentFileName) {
-                    displayMapOnCanvas(currentFileName); // Redraw the map
-                 }
+                if (fileToDisplay) {
+                    displayMapOnCanvas(fileToDisplay);
+                } else {
+                    // No map was displayed and no map is selected, ensure canvas is clear.
+                    const ctx = dmCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+                }
+            } else {
+                 // mapWasDisplayed was true, but currentFileNameToRedraw is null (should not happen if logic is correct)
+                 // or mapWasDisplayed was false, and some other condition.
+                 // Ensure canvas is clear if no specific map is being redrawn.
+                const ctx = dmCanvas.getContext('2d');
+                ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
             }
         }
     }
@@ -198,11 +229,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Helper to convert canvas click coords to image-relative coords
     function getRelativeCoords(canvasX, canvasY) {
-        if (!currentMapDisplayData.img) return null; // No image loaded
+        // If currentMapDisplayData.img is null, it means we are in a resize/reload cycle.
+        // If currentMapDisplayData.img.complete is false, the image is still loading.
+        if (!currentMapDisplayData.img || !currentMapDisplayData.img.complete) {
+            console.warn("getRelativeCoords: currentMapDisplayData.img is null or image not complete. Map not ready for coordinate conversion.");
+            return null;
+        }
 
         // Check if click is within the bounds of the displayed image
+        // Ensure scaledWidth and scaledHeight are valid before using them
+        if (typeof currentMapDisplayData.scaledWidth === 'undefined' || typeof currentMapDisplayData.scaledHeight === 'undefined') {
+            console.warn("getRelativeCoords: scaledWidth or scaledHeight is undefined in currentMapDisplayData.");
+            return null;
+        }
+        
         if (canvasX < currentMapDisplayData.offsetX || canvasX > currentMapDisplayData.offsetX + currentMapDisplayData.scaledWidth ||
             canvasY < currentMapDisplayData.offsetY || canvasY > currentMapDisplayData.offsetY + currentMapDisplayData.scaledHeight) {
+            // console.log("Clicked outside map image area."); // This can be noisy, enable if needed for debugging
             return null; // Click was outside the image
         }
 
@@ -950,10 +993,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial canvas setup
     if (dmCanvas && mapContainer) {
-        resizeCanvas(); // Size canvas on load
-        window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
-        dmCanvas.addEventListener('mousemove', handleMouseMoveOnCanvas); // Added mousemove listener
-        dmCanvas.addEventListener('mouseout', () => { // Added mouseout listener
+        // Call resizeCanvas directly on initial load. The debounced version is for subsequent resize events.
+        // resizeCanvas(); // This will be called as part of Initial setup calls below
+
+        // Listen to resize events using the debounced version of resizeCanvas
+        window.addEventListener('resize', debounce(resizeCanvas, 250)); 
+        
+        dmCanvas.addEventListener('mousemove', handleMouseMoveOnCanvas);
+        dmCanvas.addEventListener('mouseout', () => {
             if (hoverLabel) {
                 hoverLabel.style.display = 'none';
             }
