@@ -1183,12 +1183,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log(`Map "${clickedFileName}" linked as child to "${selectedMapInManager}". Overlay data:`, newOverlay);
                         alert(`Map "${clickedFileName}" successfully linked as a new child to "${parentMapData.name}".`);
 
-                        resetLinkingState(); // This will also call updateButtonStates and redraw the parent map
+                        resetAllInteractiveStates(); // This will also call updateButtonStates and redraw the parent map
                         displayMapOnCanvas(selectedMapInManager); // Ensure parent map shows new link
                     } else {
                         console.error("Parent map data not found for new link:", selectedMapInManager);
                         alert("Error: Could not find data for the parent map. Linking failed.");
-                        resetLinkingState();
+                        resetAllInteractiveStates();
                     }
                 } else {
                     // Normal selection behavior (displaying a map from Manage Maps)
