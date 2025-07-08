@@ -130,10 +130,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // }
 
     function displayMapOnCanvas(fileName) {
-        if (!dmCanvas) {
-            console.error("DM Canvas not found!");
+        if (!dmCanvas || !mapContainer) {
+            console.error("DM Canvas or Map Container not found!");
             return;
         }
+
+        // --- Start: Added logic to update canvas dimensions ---
+        // Ensure canvas dimensions are up-to-date based on container size each time a map is displayed.
+        // This is similar to the dimension calculation in resizeCanvas.
+        const style = window.getComputedStyle(mapContainer);
+        const paddingLeft = parseFloat(style.paddingLeft) || 0;
+        const paddingRight = parseFloat(style.paddingRight) || 0;
+        const paddingTop = parseFloat(style.paddingTop) || 0;
+        const paddingBottom = parseFloat(style.paddingBottom) || 0;
+
+        const newCanvasWidth = mapContainer.clientWidth - paddingLeft - paddingRight;
+        const newCanvasHeight = mapContainer.clientHeight - paddingTop - paddingBottom;
+
+        // Only resize if dimensions actually changed, to avoid unnecessary redraws if called repeatedly.
+        // However, for this specific problem, we want to ensure it *always* sets it before image load.
+        // Let's consider if this check is needed or if we should always set it.
+        // For now, let's always set it to ensure it's fresh.
+        dmCanvas.width = newCanvasWidth;
+        dmCanvas.height = newCanvasHeight;
+        // console.log(`displayMapOnCanvas: Canvas dimensions set to ${dmCanvas.width}x${dmCanvas.height}`);
+        // --- End: Added logic ---
+
         const mapData = detailedMapData.get(fileName);
         if (!mapData || !mapData.url) {
             console.error(`Map data or URL not found for ${fileName}`);
