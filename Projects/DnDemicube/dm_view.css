@@ -7,7 +7,31 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
 .tab-button.active { border-bottom-color: #b6cae1; color: #b6cae1; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-#map-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 10px; }
+
+/* Main content area containers: #map-container and #note-editor-container */
+#map-container {
+    flex-grow: 1;
+    display: flex; /* Default visible, unless .hidden is applied by JS */
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    padding: 10px;
+}
+#map-container.hidden {
+    display: none !important;
+}
+
+/* #note-editor-container has initial inline styles: display: none; flex-grow: 1; padding: 10px; */
+/* JS will toggle this class to show it and ensure flex properties */
+#note-editor-container.active {
+    display: flex !important; /* Override inline display: none */
+    flex-direction: column; /* To make #note-editor-area inside it grow */
+    /* flex-grow: 1; and padding: 10px; are already set inline */
+    /* Optional: Add border/background if it should differ from map-container or body */
+    /* border: 1px solid #3f4c5a; */
+    /* background-color: #2a3138; */
+}
+
 #dm-canvas { max-width: 100%; max-height: 100%; border: 1px solid #3f4c5a; background-color: #2a3138; }
 button, input[type="file"] {
     padding: 8px 12px;
@@ -192,10 +216,14 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 }
 
 /* Notes Tab Styles */
+/* #tab-notes no longer needs to be a flex column for the editor,
+   but keeping it block or flex for its children (controls, list) is fine.
+   Height 100% might also not be necessary if it's just for the list area,
+   which will have its own scroll. */
 #tab-notes {
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Make notes tab take full height of its container */
+    /* display: flex; */ /* Not strictly necessary anymore for editor */
+    /* flex-direction: column; */
+    /* height: 100%; */ /* Let content define its height within sidebar constraints */
 }
 
 .notes-controls {
@@ -264,11 +292,11 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 
 
 #note-editor-area {
-    flex-grow: 1; /* Takes remaining space in the notes tab */
+    flex-grow: 1; /* Takes remaining space in its container (#note-editor-container) */
     display: flex;
     flex-direction: column;
-    padding-top: 15px; /* Space above the title input */
-    overflow-y: auto; /* If content overflows */
+    /* padding-top: 15px; /* Padding is now on #note-editor-container */
+    overflow-y: hidden; /* EasyMDE handles its own scrolling */
 }
 
 #note-title-input {
