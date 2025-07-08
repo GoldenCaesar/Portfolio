@@ -74,8 +74,12 @@
                 } else {
                     console.log("Player view received unhandled message type:", event.data.type);
                 }
+            } else if (event.data && event.data.type === 'clearMap') {
+                console.log("Player view received clearMap message.");
+                currentMapImage = null; // Clear the current image reference
+                drawPlaceholder(); // Redraw the placeholder (clears canvas and shows message)
             } else {
-                console.log("Player view received message with no mapDataUrl or type:", event.data);
+                console.log("Player view received message with no mapDataUrl or type, or unhandled structure:", event.data);
             }
         });
 
