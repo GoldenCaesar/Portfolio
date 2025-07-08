@@ -250,8 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dmCanvas.addEventListener('click', (event) => {
         const rect = dmCanvas.getBoundingClientRect();
-        const canvasX = Math.round(event.clientX - rect.left);
-        const canvasY = Math.round(event.clientY - rect.top);
+        const canvasX = Math.round(event.clientX - rect.left - dmCanvas.clientLeft);
+        const canvasY = Math.round(event.clientY - rect.top - dmCanvas.clientTop);
         const imageCoords = getRelativeCoords(canvasX, canvasY);
 
         if (!imageCoords) {
