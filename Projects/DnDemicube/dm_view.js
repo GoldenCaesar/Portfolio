@@ -817,35 +817,53 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update Mode
                     const activeMapInstance = activeMapsData.find(map => map.fileName === selectedMapInManager);
                     if (activeMapInstance) {
-                    activeMapInstance.overlays = JSON.parse(JSON.stringify(sourceMapData.overlays)).map(overlay => ({
-                        ...overlay,
-                        playerVisible: typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true // Ensure default
-                    }));
-                    console.log(`Overlays for "${selectedMapInManager}" updated in Active View. Player visibility defaults applied/preserved.`);
+                        const sourceOverlays = sourceMapData.overlays;
+                        const existingActiveOverlays = activeMapInstance.overlays;
+                        const newActiveOverlays = [];
 
-                        // If this specific active map instance is currently displayed, refresh its view
+                        sourceOverlays.forEach(sourceOverlay => {
+                            const sourcePolygonId = JSON.stringify(sourceOverlay.polygon);
+                            const correspondingExistingOverlay = existingActiveOverlays.find(
+                                activeOv => JSON.stringify(activeOv.polygon) === sourcePolygonId
+                            );
+
+                            if (correspondingExistingOverlay) {
+                                // Preserve existing visibility, update other properties from source
+                                newActiveOverlays.push({
+                                    ...JSON.parse(JSON.stringify(sourceOverlay)), // Take latest geometry etc. from source
+                                    playerVisible: typeof correspondingExistingOverlay.playerVisible === 'boolean' ? correspondingExistingOverlay.playerVisible : false
+                                });
+                            } else {
+                                // New overlay from manager, default to not visible
+                                newActiveOverlays.push({
+                                    ...JSON.parse(JSON.stringify(sourceOverlay)),
+                                    playerVisible: false
+                                });
+                            }
+                        });
+
+                        activeMapInstance.overlays = newActiveOverlays;
+                        console.log(`Overlays for "${selectedMapInManager}" updated in Active View. Existing visibilities preserved, new ones defaulted to false.`);
+
                         if (selectedMapInActiveView === selectedMapInManager) {
                             displayMapOnCanvas(selectedMapInActiveView);
-                        // Also, resend to player view if it's the active one being updated
-                        sendMapToPlayerView(selectedMapInActiveView);
+                            sendMapToPlayerView(selectedMapInManager);
                         }
-                        // No need to call renderActiveMapsList() as the list item text doesn't change.
-                        updateButtonStates(); // To ensure button text/state is correct if something else changed
+                        updateButtonStates();
                     } else {
-                        // Should not happen if isAlreadyInActiveList is true, but good to guard.
                         console.error('Error updating map in active list: instance not found in activeMapsData despite check.');
                     }
                 } else {
-                // Add Mode: Ensure playerVisible defaults to true for all new overlays
+                // Add Mode: Ensure playerVisible defaults to false for all new overlays
                 const newOverlays = JSON.parse(JSON.stringify(sourceMapData.overlays)).map(overlay => ({
                     ...overlay,
-                    playerVisible: true // Default to visible for new additions
+                    playerVisible: false // Default to hidden for new additions
                 }));
                     activeMapsData.push({
                         fileName: sourceMapData.name,
                     overlays: newOverlays
                     });
-                console.log(`Map "${sourceMapData.name}" added to Active View. Player visibility defaulted to true for overlays.`);
+                console.log(`Map "${sourceMapData.name}" added to Active View. Player visibility defaulted to false for overlays.`);
                     renderActiveMapsList();
                     updateButtonStates();
                 }
