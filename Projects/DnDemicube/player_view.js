@@ -83,11 +83,9 @@ function drawOverlays_PlayerView(overlays) {
 
     overlays.forEach(overlay => {
         if (overlay.type === 'childMapLink' && overlay.polygon) {
-            // Player view receives already filtered overlays (playerVisible = true by DM)
             pCtx.beginPath();
-            pCtx.strokeStyle = 'rgba(100, 100, 255, 0.4)'; // Slightly more visible blue for player links
+            pCtx.strokeStyle = 'rgba(100, 100, 255, 0.4)';
             pCtx.lineWidth = 2;
-
             overlay.polygon.forEach((point, index) => {
                 const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
                 const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
@@ -97,7 +95,6 @@ function drawOverlays_PlayerView(overlays) {
                     pCtx.lineTo(canvasX, canvasY);
                 }
             });
-
             if (overlay.polygon.length > 2) {
                 const firstPoint = overlay.polygon[0];
                 const firstPointCanvasX = (firstPoint.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
@@ -105,6 +102,19 @@ function drawOverlays_PlayerView(overlays) {
                 pCtx.lineTo(firstPointCanvasX, firstPointCanvasY);
             }
             pCtx.stroke();
+        } else if (overlay.type === 'noteLink' && overlay.position) {
+            const iconSize = 20;
+            const canvasX = (overlay.position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+            const canvasY = (overlay.position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+            pCtx.fillStyle = 'rgba(102, 255, 102, 0.9)';
+            pCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+            pCtx.strokeStyle = 'black';
+            pCtx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+            pCtx.fillStyle = 'black';
+            pCtx.font = `${iconSize * 0.8}px sans-serif`;
+            pCtx.textAlign = 'center';
+            pCtx.textBaseline = 'middle';
+            pCtx.fillText('📝', canvasX, canvasY);
         }
     });
 }
@@ -175,6 +185,20 @@ window.addEventListener('message', (event) => {
                 currentMapImage = null;
                 currentOverlays = [];
                 drawPlaceholder("Map cleared by DM.");
+                break;
+            case 'showNotePreview':
+                const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                const notePreviewBody = document.getElementById('note-preview-body');
+                if (notePreviewOverlay && notePreviewBody && data.content) {
+                    notePreviewBody.innerHTML = data.content;
+                    notePreviewOverlay.style.display = 'flex';
+                }
+                break;
+            case 'hideNotePreview':
+                const notePreviewOverlayToHide = document.getElementById('note-preview-overlay');
+                if (notePreviewOverlayToHide) {
+                    notePreviewOverlayToHide.style.display = 'none';
+                }
                 break;
             default:
                 console.log("Player view received unhandled message type:", data.type);
