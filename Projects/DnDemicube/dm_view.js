@@ -572,8 +572,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const notePreviewOverlay = document.getElementById('note-preview-overlay');
                                 const notePreviewBody = document.getElementById('note-preview-body');
                                 if (notePreviewOverlay && notePreviewBody) {
-                                    notePreviewBody.innerHTML = easyMDE.options.previewRender(note.content);
+                                    const renderedHTML = easyMDE.options.previewRender(note.content);
+                                    notePreviewBody.innerHTML = renderedHTML;
                                     notePreviewOverlay.style.display = 'flex';
+                                    if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                        playerWindow.postMessage({
+                                            type: 'showNotePreview',
+                                            content: renderedHTML
+                                        }, '*');
+                                    }
                                 }
                             }
                         }
@@ -2487,6 +2494,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const notePreviewOverlay = document.getElementById('note-preview-overlay');
             if (notePreviewOverlay) {
                 notePreviewOverlay.style.display = 'none';
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'hideNotePreview' }, '*');
+                }
             }
         });
     }
