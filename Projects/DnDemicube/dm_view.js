@@ -664,11 +664,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const overlay = overlaysToCheck[i];
                 if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
                     hoverLabel.textContent = overlay.linkedMapName;
-                    // Use pageX/pageY for positioning relative to the entire document
                     hoverLabel.style.left = `${event.pageX + 10}px`;
                     hoverLabel.style.top = `${event.pageY + 10}px`;
                     hoverLabel.style.display = 'block';
-                    return; // Found an overlay, show label and exit
+                    return;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay) && overlay.linkedNoteId) {
+                    const note = notesData.find(n => n.id === overlay.linkedNoteId);
+                    if (note) {
+                        hoverLabel.textContent = note.title;
+                        hoverLabel.style.left = `${event.pageX + 10}px`;
+                        hoverLabel.style.top = `${event.pageY + 10}px`;
+                        hoverLabel.style.display = 'block';
+                        return;
+                    }
                 }
             }
         }
