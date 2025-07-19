@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const noteEditorContainer = document.getElementById('note-editor-container'); // New container for the editor
     const hoverLabel = document.getElementById('hover-label');
     const polygonContextMenu = document.getElementById('polygon-context-menu');
+    const noteContextMenu = document.getElementById('note-context-menu');
     const displayedFileNames = new Set();
 
     // Notes Tab Elements
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRemoveFromActive = document.getElementById('btn-remove-from-active');
     const btnLinkChildMap = document.getElementById('btn-link-child-map');
     // Add other tool buttons here as needed, e.g.:
-    // const btnLinkNote = document.getElementById('btn-link-note');
+    const btnLinkNote = document.getElementById('btn-link-note');
     // const btnLinkCharacter = document.getElementById('btn-link-character');
     // const btnLinkTrigger = document.getElementById('btn-link-trigger');
     // const btnRemoveLinks = document.getElementById('btn-remove-links');
@@ -55,9 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
+    let isLinkingNote = false;
     let currentPolygonPoints = [];
     let polygonDrawingComplete = false; // Will be used in Phase 2
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
+    let selectedNoteForContextMenu = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
     let preservedLinkedMapNameForRedraw = null; // Added: To store linked map name during redraw
@@ -67,8 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isMovingPolygon = false; // Added: State for "Move Polygon" action
     let polygonBeingMoved = null; // Added: { overlay: reference, originalPoints: copy, parentMapName: string }
+    let isMovingNote = false;
+    let noteBeingMoved = null;
     let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
-    let currentPolygonDragOffsets = {x: 0, y: 0}; // Added: visual offset during drag
+    let currentDragOffsets = {x: 0, y: 0};
 
     let currentMapDisplayData = { // To store details of the currently displayed map for coordinate conversion
         img: null,
@@ -277,8 +282,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isMovingPolygon && polygonBeingMoved && overlay === polygonBeingMoved.overlayRef) {
                     strokeStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow while moving (changed from green for better contrast)
                     currentPointsToDraw = polygonBeingMoved.originalPoints.map(p => ({
-                        x: p.x + currentPolygonDragOffsets.x,
-                        y: p.y + currentPolygonDragOffsets.y
+                        x: p.x + currentDragOffsets.x,
+                        y: p.y + currentDragOffsets.y
                     }));
                 }
 
@@ -306,6 +311,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 ctx.stroke();
+            } else if (overlay.type === 'noteLink' && overlay.position) {
+                const iconSize = 20; // The size of the icon on the canvas
+                let position = overlay.position;
+                if (isMovingNote && noteBeingMoved && overlay === noteBeingMoved.overlayRef) {
+                    position = {
+                        x: noteBeingMoved.originalPosition.x + currentDragOffsets.x,
+                        y: noteBeingMoved.originalPosition.y + currentDragOffsets.y
+                    };
+                }
+
+                const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+                const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+
+                let fillStyle = 'rgba(255, 255, 102, 0.9)'; // Default yellow
+                if (selectedMapInActiveView) {
+                    if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
+                        fillStyle = 'rgba(255, 102, 102, 0.7)'; // Reddish if hidden from player
+                    } else {
+                        fillStyle = 'rgba(102, 255, 102, 0.9)'; // Greenish if visible to player
+                    }
+                }
+                if (isMovingNote && noteBeingMoved && overlay === noteBeingMoved.overlayRef) {
+                    fillStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow when moving
+                }
+
+                ctx.fillStyle = fillStyle;
+                ctx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                ctx.strokeStyle = 'black';
+                ctx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                ctx.fillStyle = 'black';
+                ctx.font = `${iconSize * 0.8}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('📝', canvasX, canvasY);
             }
         });
     }
@@ -479,6 +519,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // Prevent other interactions if drawing
         }
 
+        if (isLinkingNote && selectedMapInManager) {
+            const parentMapData = detailedMapData.get(selectedMapInManager);
+            if (parentMapData) {
+                const newOverlay = {
+                    type: 'noteLink',
+                    position: imageCoords,
+                    linkedNoteId: null // Initially unlinked
+                };
+                parentMapData.overlays.push(newOverlay);
+                console.log('Note icon placed. Overlay:', newOverlay);
+                resetAllInteractiveStates(); // This will redraw the map with the new icon
+            }
+            return; // Interaction handled
+        }
+
         // Priority 2: Interaction with Overlays in "Active View"
         if (selectedMapInActiveView) {
             const activeMapInstance = activeMapsData.find(am => am.fileName === selectedMapInActiveView);
@@ -508,6 +563,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             console.log(`Switched to child map: ${childMapName}`);
                         } else {
                             alert(`Map "${childMapName}" needs to be added to the Active View list to navigate to it.`);
+                        }
+                        return; // Interaction handled
+                    } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
+                        if (overlay.linkedNoteId) {
+                            const note = notesData.find(n => n.id === overlay.linkedNoteId);
+                            if (note) {
+                                const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                                const notePreviewBody = document.getElementById('note-preview-body');
+                                if (notePreviewOverlay && notePreviewBody) {
+                                    notePreviewBody.innerHTML = easyMDE.options.previewRender(note.content);
+                                    notePreviewOverlay.style.display = 'flex';
+                                }
+                            }
                         }
                         return; // Interaction handled
                     }
@@ -550,6 +618,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (intersect) inside = !inside;
         }
         return inside;
+    }
+
+    function isPointInNoteIcon(point, noteOverlay) {
+        const iconSize = 20 / currentMapDisplayData.ratio; // icon size in image coordinates
+        const notePos = noteOverlay.position;
+        return point.x >= notePos.x - iconSize / 2 && point.x <= notePos.x + iconSize / 2 &&
+               point.y >= notePos.y - iconSize / 2 && point.y <= notePos.y + iconSize / 2;
     }
 
     function handleMouseMoveOnCanvas(event) {
@@ -640,20 +715,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetAllInteractiveStates() {
         isLinkingChildMap = false;
+        isLinkingNote = false;
         isRedrawingPolygon = false;
         isMovingPolygon = false; // Added
+        isMovingNote = false;
 
         preservedLinkedMapNameForRedraw = null;
         currentPolygonPoints = [];
         polygonDrawingComplete = false;
 
         polygonBeingMoved = null; // Added
+        noteBeingMoved = null;
         moveStartPoint = null; // Added
-        currentPolygonDragOffsets = {x: 0, y: 0}; // Added
+        currentDragOffsets = {x: 0, y: 0}; // Added
 
         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
+        if (btnLinkNote) btnLinkNote.textContent = 'Link Note';
         dmCanvas.style.cursor = 'auto';
         selectedPolygonForContextMenu = null;
+        selectedNoteForContextMenu = null;
 
         // Redraw current map to clear any temporary states (like a polygon being dragged)
         let mapToRedraw = selectedMapInManager || selectedMapInActiveView;
@@ -672,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon) {
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote) {
                 // If any interactive mode is active, this button acts as a global cancel.
                 resetAllInteractiveStates();
                 console.log("Interactive operation cancelled via Link/Cancel button.");
@@ -690,6 +770,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (btnLinkNote) {
+        btnLinkNote.addEventListener('click', () => {
+            if (!selectedMapInManager) {
+                alert("Please select a map from 'Manage Maps' first to add a note to it.");
+                return;
+            }
+
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote) {
+                resetAllInteractiveStates();
+                console.log("Interactive operation cancelled via Link Note/Cancel button.");
+            } else {
+                resetAllInteractiveStates();
+                isLinkingNote = true;
+                btnLinkNote.textContent = 'Cancel Linking Note';
+                dmCanvas.style.cursor = 'crosshair';
+                alert("Click on the map to place a note icon.");
+                updateButtonStates();
+            }
+        });
+    }
+
     // Modify existing dmCanvas click listener to NOT interfere if moving polygon (mouseup will handle finalization)
     // The dmCanvas click listener is complex; we need to ensure that if isMovingPolygon is true,
     // its default behavior (like trying to draw a new polygon or navigate) is suppressed
@@ -699,32 +800,27 @@ document.addEventListener('DOMContentLoaded', () => {
     dmCanvas.addEventListener('mousedown', (event) => {
         if (event.button !== 0) return; // Only main (left) click
 
+        const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+        if (!imageCoords) return;
+
         if (isMovingPolygon && polygonBeingMoved) {
-            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
-            if (imageCoords && isPointInPolygon(imageCoords, polygonBeingMoved.overlayRef.polygon.map(p => ({ // Check against current visual position
-                x: p.x + currentPolygonDragOffsets.x, // This logic is tricky for mousedown, originalPoints is better
-                y: p.y + currentPolygonDragOffsets.y
-            }))) || isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints)) { // Check original points too
-            // A simpler check: if mousedown is on the polygon to be moved (using its original points for start)
-            // For simplicity, let's assume the user clicks on the polygon as it was when "Move" was selected.
-            // A more robust check would be against its *current* visual position if it had already been dragged a bit and mouse released then pressed again (not supported here)
-
-                if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
-                    x: p.x + currentPolygonDragOffsets.x, // If re-clicking after a drag before finalizing
-                    y: p.y + currentPolygonDragOffsets.y
-                })))) {
-                    moveStartPoint = imageCoords; // Start drag
-                    // The currentPolygonDragOffsets are relative to originalPoints.
-                    // When starting a new drag, we want to preserve existing offsets if this is a re-drag.
-                    // For this implementation, first mousedown sets moveStartPoint relative to original points + current offset.
-                    // Subsequent mousemoves adjust from there.
-                    // Let's adjust moveStartPoint to be relative to the true original polygon.
-                    moveStartPoint.x -= currentPolygonDragOffsets.x;
-                    moveStartPoint.y -= currentPolygonDragOffsets.y;
-
-                    console.log("Dragging polygon started at (image coords):", imageCoords, "Effective start for offset calc:", moveStartPoint);
-                    event.preventDefault(); // Prevent text selection or other default drag behaviors
-                }
+            if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
+                x: p.x + currentDragOffsets.x,
+                y: p.y + currentDragOffsets.y
+            })))) {
+                moveStartPoint = imageCoords;
+                moveStartPoint.x -= currentDragOffsets.x;
+                moveStartPoint.y -= currentDragOffsets.y;
+                console.log("Dragging polygon started at:", imageCoords);
+                event.preventDefault();
+            }
+        } else if (isMovingNote && noteBeingMoved) {
+            if (isPointInNoteIcon(imageCoords, noteBeingMoved.overlayRef)) {
+                moveStartPoint = imageCoords;
+                moveStartPoint.x -= currentDragOffsets.x;
+                moveStartPoint.y -= currentDragOffsets.y;
+                console.log("Dragging note started at:", imageCoords);
+                event.preventDefault();
             }
         }
     });
@@ -734,80 +830,59 @@ document.addEventListener('DOMContentLoaded', () => {
         // We need to add drag logic here too, or ensure handleMouseMoveOnCanvas co-exists.
         // Let's keep hover logic and add drag logic.
 
-        if (isMovingPolygon && polygonBeingMoved && moveStartPoint) {
+        if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint)) {
             const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
             if (imageCoords) {
-                currentPolygonDragOffsets.x = imageCoords.x - moveStartPoint.x;
-                currentPolygonDragOffsets.y = imageCoords.y - moveStartPoint.y;
+                currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
+                currentDragOffsets.y = imageCoords.y - moveStartPoint.y;
 
-                currentPolygonDragOffsets.x = imageCoords.x - moveStartPoint.x;
-                currentPolygonDragOffsets.y = imageCoords.y - moveStartPoint.y;
+                const parentMapName = isMovingPolygon ? polygonBeingMoved.parentMapName : noteBeingMoved.parentMapName;
 
-                // Optimized redraw for dragging
-                if (selectedMapInManager === polygonBeingMoved.parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
+                if (selectedMapInManager === parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
                     const ctx = dmCanvas.getContext('2d');
                     ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-                    // Redraw base image
                     ctx.drawImage(
                         currentMapDisplayData.img, 0, 0,
                         currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight,
                         currentMapDisplayData.offsetX, currentMapDisplayData.offsetY,
                         currentMapDisplayData.scaledWidth, currentMapDisplayData.scaledHeight
                     );
-                    // Redraw overlays
                     const managerMapData = detailedMapData.get(selectedMapInManager);
                     if (managerMapData && managerMapData.overlays) {
                         drawOverlays(managerMapData.overlays);
                     }
-                } else if (selectedMapInManager === polygonBeingMoved.parentMapName) {
-                    // Fallback to full displayMapOnCanvas if image somehow not ready (shouldn't happen in normal flow)
+                } else if (selectedMapInManager === parentMapName) {
                     displayMapOnCanvas(selectedMapInManager);
                 }
             }
         } else {
-            // Existing hover label logic (if not dragging)
             handleMouseMoveOnCanvas(event);
         }
     });
 
     dmCanvas.addEventListener('mouseup', (event) => {
-        if (event.button !== 0) return; // Only main (left) click
+        if (event.button !== 0) return;
 
-        if (isMovingPolygon && polygonBeingMoved && moveStartPoint) { // If a drag was in progress
-            // Finalize the move
-            const finalDeltaX = currentPolygonDragOffsets.x;
-            const finalDeltaY = currentPolygonDragOffsets.y;
-
+        if (isMovingPolygon && polygonBeingMoved && moveStartPoint) {
+            const finalDeltaX = currentDragOffsets.x;
+            const finalDeltaY = currentDragOffsets.y;
             polygonBeingMoved.overlayRef.polygon = polygonBeingMoved.originalPoints.map(p => ({
                 x: p.x + finalDeltaX,
                 y: p.y + finalDeltaY
             }));
-
-            console.log(`Polygon moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}. New points:`, polygonBeingMoved.overlayRef.polygon);
+            console.log(`Polygon moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
             alert(`Polygon moved to new position.`);
-
-            resetAllInteractiveStates(); // This will also redraw the map
-        } else if (isMovingPolygon && polygonBeingMoved && !moveStartPoint) {
-            // If in move mode, but not actively dragging (i.e., mousedown didn't occur on polygon),
-            // a click might finalize the position if it was a "click-move-click" paradigm.
-            // For drag-and-drop, this click (if not on polygon) could cancel or do nothing.
-            // Current alert for move says "Click again to place". This implies a click finalizes.
-            // Let's assume any click while isMovingPolygon=true and not dragging (moveStartPoint=null) finalizes at current offset.
-
-            // This case means the user clicked "Move", then clicked somewhere on the map (not dragging).
-            // If they clicked on the polygon itself, mousedown would have set moveStartPoint.
-            // If they clicked elsewhere, we could interpret this as "place here" with current offsets (which would be 0,0 if no drag occurred).
-            // Or, it could be a "cancel". The alert "Click again to place" is a bit ambiguous.
-            // Let's make it so: if you are in move mode, and you click (mouseup) and you weren't dragging the polygon,
-            // it finalizes the move with the current (potentially zero) offset.
-            // This means simply selecting "Move Polygon" and then clicking anywhere will "confirm" it at its current spot.
-
-            // To prevent accidental finalization if user just clicks outside after selecting "Move":
-            // We need a more robust check or change the instruction.
-            // For now, let's stick to: drag must occur (moveStartPoint must have been set).
-            // A simple click without drag having started does nothing to the polygon position.
-            // User would need to right-click or select another tool to cancel "isMovingPolygon" mode.
-            // This part of the logic might need further refinement based on desired UX.
+            resetAllInteractiveStates();
+        } else if (isMovingNote && noteBeingMoved && moveStartPoint) {
+            const finalDeltaX = currentDragOffsets.x;
+            const finalDeltaY = currentDragOffsets.y;
+            noteBeingMoved.overlayRef.position = {
+                x: noteBeingMoved.originalPosition.x + finalDeltaX,
+                y: noteBeingMoved.originalPosition.y + finalDeltaY
+            };
+            console.log(`Note moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
+            alert(`Note moved to new position.`);
+            resetAllInteractiveStates();
         }
     });
 
@@ -1420,7 +1495,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         // Future buttons: Consider disabling them during the linking process as well.
-        // e.g. if (btnLinkNote) btnLinkNote.disabled = inLinkingProcess || !selectedMapInManager;
+        const btnLinkNote = document.getElementById('btn-link-note');
+        if (btnLinkNote) btnLinkNote.disabled = inLinkingProcess || !selectedMapInManager;
         // if (btnLinkNote) btnLinkNote.disabled = !selectedMapInManager; // Example
         // if (btnLinkCharacter) btnLinkCharacter.disabled = !selectedMapInManager; // Example
         // if (btnLinkTrigger) btnLinkTrigger.disabled = !selectedMapInManager; // Example
@@ -1677,7 +1753,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         polygonContextMenu.style.display = 'none'; // Hide previous menu first
+        noteContextMenu.style.display = 'none';
         selectedPolygonForContextMenu = null;
+        selectedNoteForContextMenu = null;
 
         // Context menu is available if a map is selected in EITHER Manage Maps OR Active View
         if (!selectedMapInManager && !selectedMapInActiveView) {
@@ -1739,6 +1817,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     polygonContextMenu.style.display = 'block';
                     console.log('Right-clicked on polygon:', selectedPolygonForContextMenu);
                     return;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
+                    selectedNoteForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: mapToSearchForOverlays.name || mapToSearchForOverlays.fileName,
+                        source: overlaySource
+                    };
+
+                    const toggleVisibilityItem = noteContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const linkToNewNoteItem = noteContextMenu.querySelector('[data-action="link-to-new-note"]');
+                    const moveNoteItem = noteContextMenu.querySelector('[data-action="move-note"]');
+                    const deleteLinkItem = noteContextMenu.querySelector('[data-action="delete-link"]');
+
+                    if (overlaySource === 'active') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'none';
+                        if (moveNoteItem) moveNoteItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // manager source
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'list-item';
+                        if (moveNoteItem) moveNoteItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
+
+                    noteContextMenu.style.left = `${event.pageX}px`;
+                    noteContextMenu.style.top = `${event.pageY}px`;
+                    noteContextMenu.style.display = 'block';
+                    console.log('Right-clicked on note icon:', selectedNoteForContextMenu);
+                    return;
                 }
             }
         }
@@ -1751,6 +1859,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!polygonContextMenu.contains(event.target)) {
                 polygonContextMenu.style.display = 'none';
                 selectedPolygonForContextMenu = null;
+            }
+        }
+        if (noteContextMenu.style.display === 'block') {
+            if (!noteContextMenu.contains(event.target)) {
+                noteContextMenu.style.display = 'none';
+                selectedNoteForContextMenu = null;
             }
         }
     });
@@ -2220,12 +2334,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     handleMoveNote(noteId, 'down');
                 }
             } else if (!actionIcon) {
-                if (selectedNoteId !== noteId) {
-                    // Before loading new note, ensure current one is "saved" by EasyMDE's autosave
-                    // This happens implicitly if content changed and delay passed.
-                    // Or, explicitly trigger save if needed, though our current handleSaveNote is more manual.
-                    // For now, rely on autosave or manual save button.
-                    loadNoteIntoEditor(noteId);
+                if (selectedNoteForContextMenu) {
+                    const { overlay, parentMapName, source } = selectedNoteForContextMenu;
+                    overlay.linkedNoteId = noteId;
+                    alert(`Note linked successfully.`);
+                    selectedNoteForContextMenu = null;
+                    switchTab('tab-dm-controls');
+                    displayMapOnCanvas(parentMapName);
+                } else {
+                    if (selectedNoteId !== noteId) {
+                        loadNoteIntoEditor(noteId);
+                    }
                 }
             }
         });
@@ -2235,62 +2354,142 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
+    function switchTab(tabId) {
+        tabButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+        });
+        tabContents.forEach(content => {
+            content.classList.toggle('active', content.id === tabId);
+        });
 
-            const targetTab = button.getAttribute('data-tab');
-            tabContents.forEach(content => {
-                content.classList.remove('active');
-                if (content.id === targetTab) {
-                    content.classList.add('active'); // Activates the tab content in the sidebar
-                }
-            });
+        if (tabId === 'tab-notes') {
+            if (mapContainer) mapContainer.classList.add('hidden');
+            if (noteEditorContainer) noteEditorContainer.classList.add('active');
 
-            // Show/hide main content area (map vs. notes editor)
-            if (targetTab === 'tab-notes') {
-                if (mapContainer) mapContainer.classList.add('hidden');
-                if (noteEditorContainer) noteEditorContainer.classList.add('active');
+            if (!easyMDE && markdownEditorTextarea) {
+                initEasyMDE();
+            }
+            if (easyMDE && easyMDE.codemirror) {
+                setTimeout(() => {
+                    easyMDE.codemirror.refresh();
+                }, 10);
+            }
 
-                // Initialize or refresh EasyMDE
-                if (!easyMDE && markdownEditorTextarea) {
-                    initEasyMDE();
-                }
-                if (easyMDE && easyMDE.codemirror) {
-                    setTimeout(() => {
-                        easyMDE.codemirror.refresh();
-                        // console.log("EasyMDE refreshed on tab activation.");
-                    }, 10); // Delay helps ensure container is visible
-                }
-
-                // Load first note or clear editor if no note selected/available
-                if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
-                    if (notesData.length > 0) {
-                        loadNoteIntoEditor(notesData[0].id); // This will also call renderNotesList
-                    } else {
-                        clearNoteEditor();
-                        if (easyMDE && easyMDE.options.autosave) {
-                            easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
-                        }
-                        renderNotesList(); // Ensure list is empty if no notes
-                    }
+            if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
+                if (notesData.length > 0) {
+                    loadNoteIntoEditor(notesData[0].id);
                 } else {
-                    // If a note is already selected, ensure its content is in the editor
-                    // and the editor is refreshed. loadNoteIntoEditor handles this.
-                    // However, to avoid redundant loads if already correct, just refresh.
-                     if (easyMDE && easyMDE.codemirror) {
-                        setTimeout(() => easyMDE.codemirror.refresh(), 10);
+                    clearNoteEditor();
+                    if (easyMDE && easyMDE.options.autosave) {
+                        easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
                     }
+                    renderNotesList();
                 }
             } else {
-                if (mapContainer) mapContainer.classList.remove('hidden');
-                if (noteEditorContainer) noteEditorContainer.classList.remove('active');
-                // If switching away from notes, EasyMDE doesn't need explicit destruction here
-                // unless it causes issues. Hiding its container should be enough.
+                 if (easyMDE && easyMDE.codemirror) {
+                    setTimeout(() => easyMDE.codemirror.refresh(), 10);
+                }
             }
+        } else {
+            if (mapContainer) mapContainer.classList.remove('hidden');
+            if (noteEditorContainer) noteEditorContainer.classList.remove('active');
+        }
+    }
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            switchTab(targetTab);
         });
     });
+
+    if (noteContextMenu) {
+        noteContextMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const action = event.target.dataset.action;
+
+            if (action && selectedNoteForContextMenu) {
+                const { overlay, index, parentMapName, source } = selectedNoteForContextMenu;
+
+                let parentMapData;
+                if (source === 'manager') {
+                    parentMapData = detailedMapData.get(parentMapName);
+                } else if (source === 'active') {
+                    parentMapData = activeMapsData.find(am => am.fileName === parentMapName);
+                }
+
+                if (!parentMapData) {
+                    console.error(`Parent map data not found for note context menu action. Name: ${parentMapName}, Source: ${source}`);
+                    noteContextMenu.style.display = 'none';
+                    selectedNoteForContextMenu = null;
+                    return;
+                }
+
+                switch (action) {
+                    case 'link-to-new-note':
+                        if (notesData.length === 0) {
+                            alert("No notes available. Please create a new note first in the Notes tab.");
+                            noteContextMenu.style.display = 'none';
+                            selectedNoteForContextMenu = null;
+                            return;
+                        }
+                        alert("Please select a note from the list in the Notes tab to link it.");
+                        switchTab('tab-notes');
+                        // The actual linking will be handled by the notesList click listener
+                        break;
+                    case 'move-note':
+                        isMovingNote = true;
+                        noteBeingMoved = {
+                            overlayRef: overlay,
+                            originalPosition: { ...overlay.position },
+                            parentMapName: parentMapName,
+                            originalIndex: index
+                        };
+                        moveStartPoint = null;
+                        currentDragOffsets = { x: 0, y: 0 };
+                        dmCanvas.style.cursor = 'move';
+                        alert(`Move mode activated for note. Click and drag the note icon. Click again to place, or right-click to cancel.`);
+                        console.log('Move Note initiated for:', noteBeingMoved);
+                        break;
+                    case 'delete-link':
+                        if (confirm(`Are you sure you want to delete this note link?`)) {
+                            parentMapData.overlays.splice(index, 1);
+                            console.log(`Note link deleted from map "${parentMapName}".`);
+                            alert(`Note link has been deleted.`);
+                            if (selectedMapInManager === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                            }
+                        }
+                        break;
+                    case 'toggle-player-visibility':
+                        if (source === 'active') {
+                            if (typeof overlay.playerVisible !== 'boolean') {
+                                overlay.playerVisible = true;
+                            }
+                            overlay.playerVisible = !overlay.playerVisible;
+                            console.log(`Note visibility for note link on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
+                            alert(`Player visibility for this note is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
+                            if (selectedMapInActiveView === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                                sendMapToPlayerView(parentMapName);
+                            }
+                        }
+                        break;
+                }
+            }
+            noteContextMenu.style.display = 'none';
+        });
+    }
+
+    const notePreviewClose = document.getElementById('note-preview-close');
+    if (notePreviewClose) {
+        notePreviewClose.addEventListener('click', () => {
+            const notePreviewOverlay = document.getElementById('note-preview-overlay');
+            if (notePreviewOverlay) {
+                notePreviewOverlay.style.display = 'none';
+            }
+        });
+    }
 
 
 });

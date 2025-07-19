@@ -103,5 +103,21 @@
             <li data-action="toggle-player-visibility">Toggle Player Visibility</li>
         </ul>
     </div>
+
+    <div id="note-context-menu" class="context-menu" style="display: none; position: absolute;">
+        <ul>
+            <li data-action="link-to-new-note">Link to New Note</li>
+            <li data-action="move-note">Move Note</li>
+            <li data-action="delete-link">Delete Link</li>
+            <li data-action="toggle-player-visibility">Toggle Player Visibility</li>
+        </ul>
+    </div>
+
+    <div id="note-preview-overlay" class="note-preview-overlay" style="display: none;">
+        <div class="note-preview-content">
+            <button id="note-preview-close" class="note-preview-close">&times;</button>
+            <div id="note-preview-body"></div>
+        </div>
+    </div>
 </body>
 </html>
