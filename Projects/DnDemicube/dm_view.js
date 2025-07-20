@@ -21,6 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const markdownEditorTextarea = document.getElementById('markdown-editor');
     const tabNotes = document.getElementById('tab-notes');
 
+    // Characters Tab Elements
+    const addCharacterButton = document.getElementById('add-character-button');
+    const editCharactersIcon = document.getElementById('edit-characters-icon');
+    const charactersList = document.getElementById('characters-list');
+    const characterNameInput = document.getElementById('character-name-input');
+    const saveCharacterButton = document.getElementById('save-character-button');
+    const characterSheetContainer = document.getElementById('character-sheet-container');
+    const characterSheetIframe = document.getElementById('character-sheet-iframe');
+    const tabCharacters = document.getElementById('tab-characters');
+
 
     // Map Tools Elements
     const mapToolsSection = document.getElementById('map-tools-section');
@@ -52,6 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedNoteId = null;
     let isNotesEditMode = false;
     let easyMDE = null;
+
+    // Characters State Variables
+    let charactersData = []; // Array of character objects: { id: uniqueId, name: "Character 1", sheetData: "..." }
+    let selectedCharacterId = null;
+    let isCharactersEditMode = false;
 
 
     // State for 'Link to Child Map' tool
@@ -1526,6 +1541,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Notes Tab Initialisation
     renderNotesList();
+    renderCharactersList();
     // Add other notes event listeners here if needed immediately, or within DOMContentLoaded
 
 
@@ -1550,6 +1566,8 @@ document.addEventListener('DOMContentLoaded', () => {
             activeMaps: activeMapsData, // Holds the state of the active view (filenames and their instance-specific overlays)
             notes: notesData, // Save notes
             selectedNoteId: selectedNoteId, // Save selected note ID
+            characters: charactersData,
+            selectedCharacterId: selectedCharacterId,
             // Add other campaign elements to save here (characters, etc.)
             // currentSelectedMapInManager: selectedMapInManager, // Optional: save UI state
             // currentSelectedMapInActiveView: selectedMapInActiveView // Optional: save UI state
@@ -1634,6 +1652,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } else {
                     clearNoteEditor();
+                }
+
+                // Restore Characters
+                charactersData = campaignData.characters || [];
+                selectedCharacterId = campaignData.selectedCharacterId || null;
+                renderCharactersList();
+                if (selectedCharacterId) {
+                    const characterToLoad = charactersData.find(c => c.id === selectedCharacterId);
+                    if (characterToLoad) {
+                        loadCharacterIntoEditor(selectedCharacterId);
+                    } else {
+                        selectedCharacterId = null;
+                        clearCharacterEditor();
+                    }
+                } else {
+                    clearCharacterEditor();
                 }
 
 
@@ -2379,6 +2413,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tabId === 'tab-notes') {
             if (mapContainer) mapContainer.classList.add('hidden');
+            if (characterSheetContainer) characterSheetContainer.classList.remove('active');
             if (noteEditorContainer) noteEditorContainer.classList.add('active');
 
             if (!easyMDE && markdownEditorTextarea) {
@@ -2405,9 +2440,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTimeout(() => easyMDE.codemirror.refresh(), 10);
                 }
             }
+        } else if (tabId === 'tab-characters') {
+            if (mapContainer) mapContainer.classList.add('hidden');
+            if (noteEditorContainer) noteEditorContainer.classList.remove('active');
+            if (characterSheetContainer) characterSheetContainer.classList.add('active');
+
+            if (!selectedCharacterId || !charactersData.some(c => c.id === selectedCharacterId)) {
+                if (charactersData.length > 0) {
+                    loadCharacterIntoEditor(charactersData[0].id);
+                } else {
+                    clearCharacterEditor();
+                    renderCharactersList();
+                }
+            }
         } else {
             if (mapContainer) mapContainer.classList.remove('hidden');
             if (noteEditorContainer) noteEditorContainer.classList.remove('active');
+            if (characterSheetContainer) characterSheetContainer.classList.remove('active');
         }
     }
 
@@ -2504,6 +2553,229 @@ document.addEventListener('DOMContentLoaded', () => {
                 notePreviewOverlay.style.display = 'none';
                 if (playerWindow && !playerWindow.closed) {
                     playerWindow.postMessage({ type: 'hideNotePreview' }, '*');
+                }
+            }
+        });
+    }
+
+    // --- Characters Tab Functionality ---
+
+    function renderCharactersList() {
+        if (!charactersList) return;
+        const currentScrollTop = charactersList.scrollTop; // Preserve scroll position
+        charactersList.innerHTML = '';
+
+        charactersData.forEach(character => {
+            const listItem = document.createElement('li');
+            listItem.dataset.characterId = character.id;
+            listItem.classList.add('character-list-item');
+
+            const nameSpan = document.createElement('span');
+            nameSpan.classList.add('character-list-item-name');
+            nameSpan.textContent = character.name;
+            listItem.appendChild(nameSpan);
+
+
+            if (character.id === selectedCharacterId) {
+                listItem.classList.add('selected-character-item');
+            }
+
+            if (isCharactersEditMode) {
+                charactersList.classList.add('edit-mode-active');
+                const actionsSpan = document.createElement('span');
+                actionsSpan.classList.add('character-actions');
+
+                const renameIconHTML = `<span class="character-action-icon rename-character" title="Rename Character" data-action="rename">✏️</span>`;
+                const upIconHTML = `<span class="character-action-icon move-character-up" title="Move Up" data-action="move-up">↑</span>`;
+                const downIconHTML = `<span class="character-action-icon move-character-down" title="Move Down" data-action="move-down">↓</span>`;
+                const deleteIconHTML = `<span class="character-action-icon delete-character" title="Delete Character" data-action="delete">🗑️</span>`;
+
+                actionsSpan.innerHTML = renameIconHTML + upIconHTML + downIconHTML + deleteIconHTML;
+                listItem.appendChild(actionsSpan);
+            } else {
+                charactersList.classList.remove('edit-mode-active');
+            }
+            charactersList.appendChild(listItem);
+        });
+        updateCharacterMoveIconVisibility();
+        charactersList.scrollTop = currentScrollTop; // Restore scroll position
+    }
+
+    function updateCharacterMoveIconVisibility() {
+        if (!charactersList || !isCharactersEditMode) return;
+        const items = charactersList.querySelectorAll('li.character-list-item');
+        items.forEach((item, index) => {
+            const upIcon = item.querySelector('.move-character-up');
+            const downIcon = item.querySelector('.move-character-down');
+
+            if (upIcon) upIcon.style.display = (index === 0 || items.length === 1) ? 'none' : 'inline-block';
+            if (downIcon) downIcon.style.display = (index === items.length - 1 || items.length === 1) ? 'none' : 'inline-block';
+        });
+    }
+
+    function handleCreateCharacter() {
+        const newCharacterId = Date.now(); // Simple unique ID
+        let characterCounter = 1;
+        let newName = `Character ${characterCounter}`;
+        while (charactersData.some(character => character.name === newName)) {
+            characterCounter++;
+            newName = `Character ${characterCounter}`;
+        }
+
+        const newCharacter = {
+            id: newCharacterId,
+            name: newName,
+            sheetData: "" // Initially empty
+        };
+        charactersData.push(newCharacter);
+
+        loadCharacterIntoEditor(newCharacterId);
+        if (characterNameInput) characterNameInput.focus();
+    }
+
+    function loadCharacterIntoEditor(characterId) {
+        const character = charactersData.find(c => c.id === characterId);
+        if (!character) {
+            console.error("Character not found for ID:", characterId);
+            if (selectedCharacterId === characterId) {
+                selectedCharacterId = null;
+                clearCharacterEditor();
+            }
+            renderCharactersList();
+            return;
+        }
+
+        selectedCharacterId = character.id;
+        if (characterNameInput) characterNameInput.value = character.name;
+
+        // For now, we just select the character. The iframe is already pointing to the character sheet.
+        // In the future, we might save and load character-specific data into the iframe.
+        // For now, we just make sure the name is updated.
+
+        renderCharactersList();
+    }
+
+    function handleSaveCharacter() {
+        if (!selectedCharacterId) {
+            alert("No character selected to save.");
+            return;
+        }
+        const character = charactersData.find(c => c.id === selectedCharacterId);
+        if (!character) {
+            alert("Error: Selected character not found in data.");
+            return;
+        }
+
+        const newName = characterNameInput ? characterNameInput.value.trim() : character.name;
+        if (!newName) {
+            alert("Character name cannot be empty.");
+            if (characterNameInput) characterNameInput.focus();
+            return;
+        }
+
+        character.name = newName;
+        // In the future, we would save the character sheet data here.
+        // For now, we just save the name.
+
+        renderCharactersList();
+    }
+
+    function handleRenameCharacter(characterId) {
+        const character = charactersData.find(c => c.id === characterId);
+        if (!character) return;
+
+        const newName = prompt("Enter new name for the character:", character.name);
+        if (newName && newName.trim() !== "" && newName.trim() !== character.name) {
+            character.name = newName.trim();
+            renderCharactersList();
+            if (character.id === selectedCharacterId && characterNameInput) {
+                characterNameInput.value = character.name;
+            }
+        }
+    }
+
+    function handleDeleteCharacter(characterId) {
+        const characterIndex = charactersData.findIndex(c => c.id === characterId);
+        if (characterIndex === -1) return;
+
+        const character = charactersData[characterIndex];
+        if (confirm(`Are you sure you want to delete "${character.name}"?`)) {
+            charactersData.splice(characterIndex, 1);
+
+            if (selectedCharacterId === characterId) {
+                selectedCharacterId = null;
+                clearCharacterEditor();
+            }
+            renderCharactersList();
+        }
+    }
+
+    function handleMoveCharacter(characterId, direction) {
+        const index = charactersData.findIndex(c => c.id === characterId);
+        if (index === -1) return;
+
+        if (direction === 'up' && index > 0) {
+            [charactersData[index - 1], charactersData[index]] = [charactersData[index], charactersData[index - 1]];
+        } else if (direction === 'down' && index < charactersData.length - 1) {
+            [charactersData[index], charactersData[index + 1]] = [charactersData[index + 1], charactersData[index]];
+        }
+        renderCharactersList();
+    }
+
+    function clearCharacterEditor() {
+        if (characterNameInput) characterNameInput.value = "";
+    }
+
+    if (addCharacterButton) {
+        addCharacterButton.addEventListener('click', handleCreateCharacter);
+    }
+
+    if (saveCharacterButton) {
+        saveCharacterButton.addEventListener('click', handleSaveCharacter);
+    }
+
+    if (characterNameInput) {
+        characterNameInput.addEventListener('blur', handleSaveCharacter);
+        characterNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveCharacter();
+            }
+        });
+    }
+
+    if (editCharactersIcon) {
+        editCharactersIcon.addEventListener('click', () => {
+            isCharactersEditMode = !isCharactersEditMode;
+            editCharactersIcon.textContent = isCharactersEditMode ? '✅' : '✏️';
+            renderCharactersList();
+        });
+    }
+
+    if (charactersList) {
+        charactersList.addEventListener('click', (event) => {
+            const listItem = event.target.closest('li.character-list-item');
+            if (!listItem) return;
+
+            const characterId = parseInt(listItem.dataset.characterId, 10);
+            if (isNaN(characterId)) return;
+
+            const actionIcon = event.target.closest('.character-action-icon');
+
+            if (isCharactersEditMode && actionIcon) {
+                const action = actionIcon.dataset.action;
+                if (action === 'rename') {
+                    handleRenameCharacter(characterId);
+                } else if (action === 'delete') {
+                    handleDeleteCharacter(characterId);
+                } else if (action === 'move-up') {
+                    handleMoveCharacter(characterId, 'up');
+                } else if (action === 'move-down') {
+                    handleMoveCharacter(characterId, 'down');
+                }
+            } else if (!actionIcon) {
+                if (selectedCharacterId !== characterId) {
+                    loadCharacterIntoEditor(characterId);
                 }
             }
         });
