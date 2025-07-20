@@ -154,6 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('message', (event) => {
         if (event.data.type === 'loadCharacterSheet') {
             loadData(event.data.data);
+        } else if (event.data.type === 'clearCharacterSheet') {
+            loadData({});
         }
     });
 

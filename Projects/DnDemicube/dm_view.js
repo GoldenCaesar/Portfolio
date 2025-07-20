@@ -32,6 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterSheetContainer = document.getElementById('character-sheet-container');
     const characterSheetIframe = document.getElementById('character-sheet-iframe');
     const tabCharacters = document.getElementById('tab-characters');
+    const viewPdfButton = document.getElementById('view-pdf-button');
+    const deletePdfButton = document.getElementById('delete-pdf-button');
+    const characterSheetContent = document.getElementById('character-sheet-content');
+    const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+    const pdfViewerIframe = document.getElementById('pdf-viewer-iframe');
 
 
     // Map Tools Elements
@@ -2746,6 +2751,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let currentCharacterPdf = null;
+
     if (pdfUploadInput) {
         pdfUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
@@ -2753,6 +2760,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     const pdfData = new Uint8Array(e.target.result);
+                    currentCharacterPdf = pdfData;
                     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
                     const numPages = pdf.numPages;
                     let textContent = '';
@@ -2767,58 +2775,131 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log(textContent); // For debugging
                     const sheetData = parsePdfText(textContent);
                     characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
+                    viewPdfButton.style.display = 'inline-block';
                 };
                 reader.readAsArrayBuffer(file);
             }
         });
     }
 
+    if (viewPdfButton) {
+        viewPdfButton.addEventListener('click', () => {
+            if (pdfViewerContainer.style.display === 'none') {
+                const pdfUrl = URL.createObjectURL(new Blob([currentCharacterPdf], { type: 'application/pdf' }));
+                pdfViewerIframe.src = pdfUrl;
+                characterSheetContent.style.display = 'none';
+                pdfViewerContainer.style.display = 'block';
+                viewPdfButton.textContent = 'Local Character Editor';
+                deletePdfButton.style.display = 'inline-block';
+            } else {
+                pdfViewerIframe.src = '';
+                characterSheetContent.style.display = 'block';
+                pdfViewerContainer.style.display = 'none';
+                viewPdfButton.textContent = 'View PDF';
+                deletePdfButton.style.display = 'none';
+            }
+        });
+    }
+
+    if (deletePdfButton) {
+        deletePdfButton.addEventListener('click', () => {
+            currentCharacterPdf = null;
+            pdfViewerIframe.src = '';
+            characterSheetContent.style.display = 'block';
+            pdfViewerContainer.style.display = 'none';
+            viewPdfButton.textContent = 'View PDF';
+            viewPdfButton.style.display = 'none';
+            deletePdfButton.style.display = 'none';
+            characterSheetIframe.contentWindow.postMessage({ type: 'clearCharacterSheet' }, '*');
+        });
+    }
+
     function parsePdfText(text) {
         const sheetData = {};
+        const lines = text.split('\n');
 
-        // Helper function to extract a value based on a regular expression
-        const extract = (regex) => {
-            const match = text.match(regex);
-            return match ? match[1].trim() : '';
+        const mappings = {
+            'char_name': /character name/i,
+            'class_level': /class & level/i,
+            'background': /background/i,
+            'player_name': /player name/i,
+            'race': /race/i,
+            'alignment': /alignment/i,
+            'xp': /experience points/i,
+            'strength_score': /strength/i,
+            'dexterity_score': /dexterity/i,
+            'constitution_score': /constitution/i,
+            'intelligence_score': /intelligence/i,
+            'wisdom_score': /wisdom/i,
+            'charisma_score': /charisma/i,
+            'inspiration': /inspiration/i,
+            'proficiency_bonus': /proficiency bonus/i,
+            'ac': /armor class/i,
+            'initiative': /initiative/i,
+            'speed': /speed/i,
+            'hp_max': /hit point maximum/i,
+            'hp_current': /current hit points/i,
+            'hp_temp': /temporary hit points/i,
+            'hit_dice_total': /total/i,
+            'hit_dice_current': /hit dice/i,
+            'attacks_spellcasting': /attacks & spellcasting/i,
+            'equipment': /equipment/i,
+            'features_traits': /features & traits/i,
+            'personality_traits': /personality traits/i,
+            'ideals': /ideals/i,
+            'bonds': /bonds/i,
+            'flaws': /flaws/i,
         };
 
-        sheetData.char_name = extract(/Character Name: (.*?)\s/);
-        sheetData.class_level = extract(/Class & Level: (.*?)\s/);
-        sheetData.background = extract(/Background: (.*?)\s/);
-        sheetData.player_name = extract(/Player Name: (.*?)\s/);
-        sheetData.race = extract(/Race: (.*?)\s/);
-        sheetData.alignment = extract(/Alignment: (.*?)\s/);
-        sheetData.xp = extract(/Experience Points: (.*?)\s/);
+        // More complex fields that need special handling
+        const valueAfterLabel = (label, text) => {
+            const regex = new RegExp(`${label}\\s*(\\S+)`, 'i');
+            const match = text.match(regex);
+            return match ? match[1] : '';
+        };
 
-        sheetData.strength_score = extract(/Strength\s+(\d+)/) || '';
-        sheetData.dexterity_score = extract(/Dexterity\s+(\d+)/) || '';
-        sheetData.constitution_score = extract(/Constitution\s+(\d+)/) || '';
-        sheetData.intelligence_score = extract(/Intelligence\s+(\d+)/) || '';
-        sheetData.wisdom_score = extract(/Wisdom\s+(\d+)/) || '';
-        sheetData.charisma_score = extract(/Charisma\s+(\d+)/) || '';
+        for (const key in mappings) {
+            for (const line of lines) {
+                if (mappings[key].test(line)) {
+                    let value = line.replace(mappings[key], '').trim();
+                    if (value.startsWith(':')) {
+                        value = value.substring(1).trim();
+                    }
+                    if (value) {
+                        sheetData[key] = value;
+                        break;
+                    }
+                }
+            }
+        }
 
-        sheetData.inspiration = extract(/Inspiration\s+(.*?)\s/) || '';
-        sheetData.proficiency_bonus = extract(/Proficiency Bonus\s+(.*?)\s/) || '';
-        sheetData.ac = extract(/Armor Class\s+(\d+)/) || '';
-        sheetData.initiative = extract(/Initiative\s+([+-]?\d+)/) || '';
-        sheetData.speed = extract(/Speed\s+(.*?)\s/) || '';
-        sheetData.hp_max = extract(/Hit Point Maximum\s+(\d+)/) || '';
-        sheetData.hp_current = extract(/Current Hit Points\s+(\d*)/) || '';
-        sheetData.hp_temp = extract(/Temporary Hit Points\s+(\d*)/) || '';
+        // Handle ability scores
+        sheetData.strength_score = valueAfterLabel('Strength', text);
+        sheetData.dexterity_score = valueAfterLabel('Dexterity', text);
+        sheetData.constitution_score = valueAfterLabel('Constitution', text);
+        sheetData.intelligence_score = valueAfterLabel('Intelligence', text);
+        sheetData.wisdom_score = valueAfterLabel('Wisdom', text);
+        sheetData.charisma_score = valueAfterLabel('Charisma', text);
 
-        sheetData.hit_dice_total = extract(/Total\s+(.*?)\s/);
-        sheetData.hit_dice_current = extract(/Hit Dice\s+(.*?)\s/);
+        // Handle text areas
+        const extractTextArea = (startLabel, endLabel, text) => {
+            const startRegex = new RegExp(startLabel, 'i');
+            const endRegex = new RegExp(endLabel, 'i');
+            const startIndex = text.search(startRegex);
+            if (startIndex === -1) return '';
+            const textAfterStart = text.substring(startIndex);
+            const endIndex = textAfterStart.search(endRegex);
+            if (endIndex === -1) return textAfterStart.replace(startLabel, '').trim();
+            return textAfterStart.substring(0, endIndex).replace(startLabel, '').trim();
+        };
 
-        // Checkboxes are harder, so I'll leave them for now.
-
-        sheetData.attacks_spellcasting = extract(/Attacks & Spellcasting\s+([\s\S]*?)\s+Equipment/);
-        sheetData.equipment = extract(/Equipment\s+([\s\S]*?)\s+Features & Traits/);
-        sheetData.features_traits = extract(/Features & Traits\s+([\s\S]*?)\s+Personality Traits/);
-        sheetData.personality_traits = extract(/Personality Traits\s+([\s\S]*?)\s+Ideals/);
-        sheetData.ideals = extract(/Ideals\s+([\s\S]*?)\s+Bonds/);
-        sheetData.bonds = extract(/Bonds\s+([\s\S]*?)\s+Flaws/);
-        sheetData.flaws = extract(/Flaws\s+([\s\S]*?)$/);
-
+        sheetData.attacks_spellcasting = extractTextArea('Attacks & Spellcasting', 'Equipment', text);
+        sheetData.equipment = extractTextArea('Equipment', 'Features & Traits', text);
+        sheetData.features_traits = extractTextArea('Features & Traits', 'Personality Traits', text);
+        sheetData.personality_traits = extractTextArea('Personality Traits', 'Ideals', text);
+        sheetData.ideals = extractTextArea('Ideals', 'Bonds', text);
+        sheetData.bonds = extractTextArea('Bonds', 'Flaws', text);
+        sheetData.flaws = extractTextArea('Flaws', '$', text);
 
         return sheetData;
     }
