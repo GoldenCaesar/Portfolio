@@ -2625,7 +2625,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newCharacter = {
             id: newCharacterId,
             name: newName,
-            sheetData: "" // Initially empty
+            sheetData: {} // Initially empty
         };
         charactersData.push(newCharacter);
 
@@ -2650,6 +2650,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (characterSheetIframe && characterSheetIframe.contentWindow) {
             characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: character.sheetData || {} }, '*');
+        } else {
+            // This case should not happen if the iframe is loaded, but as a fallback:
+            console.warn("Character sheet iframe not ready to receive data.");
         }
 
         renderCharactersList();
