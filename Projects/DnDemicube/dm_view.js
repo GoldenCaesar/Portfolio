@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const charactersList = document.getElementById('characters-list');
     const characterNameInput = document.getElementById('character-name-input');
     const saveCharacterButton = document.getElementById('save-character-button');
+    const fillFromPdfButton = document.getElementById('fill-from-pdf-button');
+    const pdfUploadInput = document.getElementById('pdf-upload-input');
     const characterSheetContainer = document.getElementById('character-sheet-container');
     const characterSheetIframe = document.getElementById('character-sheet-iframe');
     const tabCharacters = document.getElementById('tab-characters');
@@ -2736,6 +2738,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (saveCharacterButton) {
         saveCharacterButton.addEventListener('click', handleSaveCharacter);
+    }
+
+    if (fillFromPdfButton) {
+        fillFromPdfButton.addEventListener('click', () => {
+            pdfUploadInput.click();
+        });
+    }
+
+    if (pdfUploadInput) {
+        pdfUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const pdfData = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                    const numPages = pdf.numPages;
+                    let textContent = '';
+
+                    for (let i = 1; i <= numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        const strings = content.items.map(item => item.str);
+                        textContent += strings.join(' ');
+                    }
+
+                    console.log(textContent); // For debugging
+                    const sheetData = parsePdfText(textContent);
+                    characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+    }
+
+    function parsePdfText(text) {
+        const sheetData = {};
+
+        // Helper function to extract a value based on a regular expression
+        const extract = (regex) => {
+            const match = text.match(regex);
+            return match ? match[1].trim() : '';
+        };
+
+        sheetData.char_name = extract(/Character Name: (.*?)\s/);
+        sheetData.class_level = extract(/Class & Level: (.*?)\s/);
+        sheetData.background = extract(/Background: (.*?)\s/);
+        sheetData.player_name = extract(/Player Name: (.*?)\s/);
+        sheetData.race = extract(/Race: (.*?)\s/);
+        sheetData.alignment = extract(/Alignment: (.*?)\s/);
+        sheetData.xp = extract(/Experience Points: (.*?)\s/);
+
+        sheetData.strength_score = extract(/Strength\s+(\d+)/) || '';
+        sheetData.dexterity_score = extract(/Dexterity\s+(\d+)/) || '';
+        sheetData.constitution_score = extract(/Constitution\s+(\d+)/) || '';
+        sheetData.intelligence_score = extract(/Intelligence\s+(\d+)/) || '';
+        sheetData.wisdom_score = extract(/Wisdom\s+(\d+)/) || '';
+        sheetData.charisma_score = extract(/Charisma\s+(\d+)/) || '';
+
+        sheetData.inspiration = extract(/Inspiration\s+(.*?)\s/) || '';
+        sheetData.proficiency_bonus = extract(/Proficiency Bonus\s+(.*?)\s/) || '';
+        sheetData.ac = extract(/Armor Class\s+(\d+)/) || '';
+        sheetData.initiative = extract(/Initiative\s+([+-]?\d+)/) || '';
+        sheetData.speed = extract(/Speed\s+(.*?)\s/) || '';
+        sheetData.hp_max = extract(/Hit Point Maximum\s+(\d+)/) || '';
+        sheetData.hp_current = extract(/Current Hit Points\s+(\d*)/) || '';
+        sheetData.hp_temp = extract(/Temporary Hit Points\s+(\d*)/) || '';
+
+        sheetData.hit_dice_total = extract(/Total\s+(.*?)\s/);
+        sheetData.hit_dice_current = extract(/Hit Dice\s+(.*?)\s/);
+
+        // Checkboxes are harder, so I'll leave them for now.
+
+        sheetData.attacks_spellcasting = extract(/Attacks & Spellcasting\s+([\s\S]*?)\s+Equipment/);
+        sheetData.equipment = extract(/Equipment\s+([\s\S]*?)\s+Features & Traits/);
+        sheetData.features_traits = extract(/Features & Traits\s+([\s\S]*?)\s+Personality Traits/);
+        sheetData.personality_traits = extract(/Personality Traits\s+([\s\S]*?)\s+Ideals/);
+        sheetData.ideals = extract(/Ideals\s+([\s\S]*?)\s+Bonds/);
+        sheetData.bonds = extract(/Bonds\s+([\s\S]*?)\s+Flaws/);
+        sheetData.flaws = extract(/Flaws\s+([\s\S]*?)$/);
+
+
+        return sheetData;
     }
 
     if (characterNameInput) {

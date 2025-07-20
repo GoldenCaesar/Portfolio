@@ -99,12 +99,17 @@
     <div id="character-sheet-container" style="display: none; flex-grow: 1; padding: 10px;">
         <div id="character-sheet-area" style="display: flex; flex-direction: column; height: 100%;">
             <input type="text" id="character-name-input" placeholder="Character Name" />
-            <button id="save-character-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Character</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="save-character-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Character</button>
+                <button id="fill-from-pdf-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Fill from PDF</button>
+                <input type="file" id="pdf-upload-input" accept=".pdf" style="display: none;">
+            </div>
             <iframe id="character-sheet-iframe" src="character_sheet.html" style="flex-grow: 1; border: none;"></iframe>
         </div>
     </div>
     <div id="hover-label" class="hover-label" style="display: none;"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <script src="dm_view.js"></script>
     <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
 
