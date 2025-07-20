@@ -398,3 +398,68 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #e0e0e0;
     cursor: pointer;
 }
+
+/* Character Tab Styles */
+#character-sheet-container.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+#character-sheet-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#character-name-input {
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #2a3138;
+    color: #e0e0e0;
+    border: 1px solid #3f4c5a;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#characters-list li {
+    padding: 8px 10px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border: 1px solid transparent; /* For consistent sizing with selected */
+    display: flex; /* To align text and icons */
+    justify-content: space-between; /* Pushes icons to the right */
+    align-items: center; /* Vertically aligns text and icons */
+}
+
+#characters-list li:hover {
+    background-color: #2a3138;
+}
+
+#characters-list li.selected-character-item {
+    background-color: #3a4f6a !important;
+    border-left: 3px solid #b6cae1;
+    font-weight: bold;
+    color: #ffffff !important;
+}
+
+#characters-list li.selected-character-item:hover {
+    background-color: #4a5f7a !important;
+}
+
+.character-actions {
+    margin-left: 10px;
+}
+
+.character-action-icon {
+    cursor: pointer;
+    margin-left: 8px;
+    display: none; /* Hidden by default */
+}
+.character-action-icon:hover {
+    color: #b6cae1;
+}
+
+#characters-list.edit-mode-active .character-action-icon {
+    display: inline-block; /* Show icons in edit mode */
+}

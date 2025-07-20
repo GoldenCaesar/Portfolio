@@ -76,8 +76,15 @@
         </div>
 
         <div id="tab-characters" class="tab-content">
-            <h3>Characters</h3>
-            <p>Character management will go here.</p>
+            <div class="characters-controls sidebar-section">
+                <h3>Characters <span id="edit-characters-icon" class="edit-icon" style="cursor: pointer;">✏️</span></h3>
+                <button id="add-character-button">Add Character</button>
+            </div>
+            <div id="characters-sidebar" class="sidebar-section">
+                <ul id="characters-list" style="list-style-type: none; padding-left: 0; overflow-y: auto; max-height: 400px;">
+                    <!-- Characters will be listed here -->
+                </ul>
+            </div>
         </div>
     </div>
     <div id="map-container">
@@ -87,6 +94,13 @@
             <input type="text" id="note-title-input" placeholder="Note Title" />
             <button id="save-note-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Note</button>
             <textarea id="markdown-editor"></textarea>
+        </div>
+    </div>
+    <div id="character-sheet-container" style="display: none; flex-grow: 1; padding: 10px;">
+        <div id="character-sheet-area" style="display: flex; flex-direction: column; height: 100%;">
+            <input type="text" id="character-name-input" placeholder="Character Name" />
+            <button id="save-character-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Character</button>
+            <iframe id="character-sheet-iframe" src="https://www.dnd-compendium.com/characters/sheets/5e" style="flex-grow: 1; border: none;"></iframe>
         </div>
     </div>
     <div id="hover-label" class="hover-label" style="display: none;"></div>
