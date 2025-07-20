@@ -2648,9 +2648,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterId = character.id;
         if (characterNameInput) characterNameInput.value = character.name;
 
-        // For now, we just select the character. The iframe is already pointing to the character sheet.
-        // In the future, we might save and load character-specific data into the iframe.
-        // For now, we just make sure the name is updated.
+        if (characterSheetIframe && characterSheetIframe.contentWindow) {
+            characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: character.sheetData || {} }, '*');
+        }
 
         renderCharactersList();
     }
@@ -2674,8 +2674,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         character.name = newName;
-        // In the future, we would save the character sheet data here.
-        // For now, we just save the name.
+        if (characterSheetIframe && characterSheetIframe.contentWindow) {
+            characterSheetIframe.contentWindow.postMessage({ type: 'requestSheetData' }, '*');
+        }
 
         renderCharactersList();
     }
@@ -2780,6 +2781,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    window.addEventListener('message', (event) => {
+        if (event.source !== characterSheetIframe.contentWindow) {
+            return;
+        }
+
+        if (event.data.type === 'saveCharacterSheet') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.sheetData = event.data.data;
+                }
+            }
+        } else if (event.data.type === 'characterSheetReady') {
+            if (selectedCharacterId) {
+                loadCharacterIntoEditor(selectedCharacterId);
+            }
+        }
+    });
 
 
 });

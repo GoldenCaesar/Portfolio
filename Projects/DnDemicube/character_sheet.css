@@ -1,0 +1,102 @@
+body {
+    font-family: sans-serif;
+    background-color: #f0f0f0;
+}
+
+.character-sheet {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    border: 2px solid #000;
+    border-radius: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+section {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.header {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+}
+
+.char-name {
+    flex-grow: 1;
+}
+
+.char-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.main-stats {
+    grid-column: 1 / 2;
+}
+
+.attributes {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.attr-box {
+    text-align: center;
+}
+
+.attr-score {
+    width: 50px;
+    font-size: 24px;
+    text-align: center;
+}
+
+.attr-modifier {
+    font-size: 18px;
+    border: 1px solid #000;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    margin: 5px auto;
+}
+
+.inspiration-proficiency,
+.saving-throws,
+.skills {
+    margin-top: 20px;
+}
+
+.combat-info {
+    grid-column: 2 / 3;
+}
+
+.attacks-spellcasting,
+.equipment,
+.features-traits,
+.personality {
+    grid-column: 1 / -1;
+}
+
+textarea {
+    width: 100%;
+    min-height: 100px;
+    resize: vertical;
+}
+
+input[type="text"],
+input[type="checkbox"] {
+    margin-top: 5px;
+}
+
+h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
