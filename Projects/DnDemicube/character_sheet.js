@@ -129,6 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     input.value = data[input.name];
                 }
+            } else {
+                if (input.type === 'checkbox') {
+                    input.checked = false;
+                } else {
+                    input.value = '';
+                }
             }
         });
         updateAllModifiers();
