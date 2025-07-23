@@ -2678,24 +2678,32 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
+                console.log("PDF file selected:", file.name);
                 const reader = new FileReader();
                 reader.onload = async (e) => {
+                    console.log("PDF file loaded.");
                     const pdfData = new Uint8Array(e.target.result);
                     currentCharacterPdf = pdfData;
-                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                    const numPages = pdf.numPages;
-                    let textContent = '';
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                        console.log("PDF document loaded.");
+                        const numPages = pdf.numPages;
+                        let textContent = '';
 
-                    for (let i = 1; i <= numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        const strings = content.items.map(item => item.str);
-                        textContent += strings.join(' ');
+                        for (let i = 1; i <= numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            const strings = content.items.map(item => item.str);
+                            textContent += strings.join(' ');
+                        }
+
+                        console.log("PDF text content extracted:", textContent);
+                        const sheetData = parsePdfText(textContent);
+                        characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
+                        viewPdfButton.style.display = 'inline-block';
+                    } catch (error) {
+                        console.error("Error processing PDF:", error);
                     }
-
-                    const sheetData = parsePdfText(textContent);
-                    characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
-                    viewPdfButton.style.display = 'inline-block';
                 };
                 reader.readAsArrayBuffer(file);
             }
