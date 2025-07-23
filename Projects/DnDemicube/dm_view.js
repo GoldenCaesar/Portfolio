@@ -2816,15 +2816,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function parsePdfText(text) {
         const sheetData = {};
+        const upperText = text.toUpperCase();
 
         // Helper function to extract a value based on a regex pattern
         const extract = (regex) => {
-            const match = text.match(regex);
+            const match = upperText.match(regex);
             return match ? match[1].trim() : null;
         };
 
         // Character Info
-        sheetData.char_name = extract(/CHARACTER NAME\s*([^\s]+)/);
+        sheetData.char_name = extract(/CHARACTER NAME\s*([A-Z\s]+)\s*EXPERIENCE POINTS/);
         console.log("Extracted char_name:", sheetData.char_name);
         sheetData.class_level = extract(/CLASS & LEVEL\s*([^\n]+)/);
         sheetData.background = extract(/BACKGROUND\s*([^\n]+)/);
@@ -2858,7 +2859,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Text Areas
         const extractTextArea = (start, end) => {
             const regex = new RegExp(`${start}\\s*([\\s\\S]*?)\\s*${end}`);
-            const match = text.match(regex);
+            const match = upperText.match(regex);
             return match ? match[1].trim() : null;
         };
         
