@@ -2687,18 +2687,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
                         console.log("PDF document loaded.");
-                        const numPages = pdf.numPages;
-                        let textContent = '';
 
-                        for (let i = 1; i <= numPages; i++) {
-                            const page = await pdf.getPage(i);
-                            const content = await page.getTextContent();
-                            const strings = content.items.map(item => item.str);
-                            textContent += strings.join(' ');
+                        const formInfo = await pdf.getFormInfo();
+                        const sheetData = {};
+                        for (const field of formInfo) {
+                            sheetData[field.fieldName] = field.fieldValue;
                         }
 
-                        console.log("PDF text content extracted:", textContent);
-                        const sheetData = parsePdfText(textContent);
+                        console.log("PDF form data extracted:", sheetData);
                         characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
                         viewPdfButton.style.display = 'inline-block';
                     } catch (error) {
