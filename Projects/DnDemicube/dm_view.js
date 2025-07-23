@@ -2816,90 +2816,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function parsePdfText(text) {
         const sheetData = {};
-        const lines = text.split('\n');
 
-        const mappings = {
-            'char_name': /character name/i,
-            'class_level': /class & level/i,
-            'background': /background/i,
-            'player_name': /player name/i,
-            'race': /race/i,
-            'alignment': /alignment/i,
-            'xp': /experience points/i,
-            'strength_score': /strength/i,
-            'dexterity_score': /dexterity/i,
-            'constitution_score': /constitution/i,
-            'intelligence_score': /intelligence/i,
-            'wisdom_score': /wisdom/i,
-            'charisma_score': /charisma/i,
-            'inspiration': /inspiration/i,
-            'proficiency_bonus': /proficiency bonus/i,
-            'ac': /armor class/i,
-            'initiative': /initiative/i,
-            'speed': /speed/i,
-            'hp_max': /hit point maximum/i,
-            'hp_current': /current hit points/i,
-            'hp_temp': /temporary hit points/i,
-            'hit_dice_total': /total/i,
-            'hit_dice_current': /hit dice/i,
-            'attacks_spellcasting': /attacks & spellcasting/i,
-            'equipment': /equipment/i,
-            'features_traits': /features & traits/i,
-            'personality_traits': /personality traits/i,
-            'ideals': /ideals/i,
-            'bonds': /bonds/i,
-            'flaws': /flaws/i,
-        };
-
-        // More complex fields that need special handling
-        const valueAfterLabel = (label, text) => {
-            const regex = new RegExp(`${label}\\s*(\\S+)`, 'i');
+        // Helper function to extract a value based on a regex pattern
+        const extract = (regex) => {
             const match = text.match(regex);
-            return match ? match[1] : '';
+            return match ? match[1].trim() : null;
         };
 
-        for (const key in mappings) {
-            for (const line of lines) {
-                if (mappings[key].test(line)) {
-                    let value = line.replace(mappings[key], '').trim();
-                    if (value.startsWith(':')) {
-                        value = value.substring(1).trim();
-                    }
-                    if (value) {
-                        sheetData[key] = value;
-                        break;
-                    }
-                }
-            }
-        }
+        // Character Info
+        sheetData.char_name = extract(/Character Name\s*([^\n]+)/);
+        sheetData.class_level = extract(/Class & Level\s*([^\n]+)/);
+        sheetData.background = extract(/Background\s*([^\n]+)/);
+        sheetData.player_name = extract(/Player Name\s*([^\n]+)/);
+        sheetData.race = extract(/Race\/Species\s*([^\n]+)/) || extract(/Race\s*([^\n]+)/);
+        sheetData.alignment = extract(/Alignment\s*([^\n]+)/);
+        sheetData.xp = extract(/Experience Points\s*([^\n]+)/);
 
-        // Handle ability scores
-        sheetData.strength_score = valueAfterLabel('Strength', text);
-        sheetData.dexterity_score = valueAfterLabel('Dexterity', text);
-        sheetData.constitution_score = valueAfterLabel('Constitution', text);
-        sheetData.intelligence_score = valueAfterLabel('Intelligence', text);
-        sheetData.wisdom_score = valueAfterLabel('Wisdom', text);
-        sheetData.charisma_score = valueAfterLabel('Charisma', text);
+        // Ability Scores
+        sheetData.strength_score = extract(/Strength\s*(\d+)/);
+        sheetData.dexterity_score = extract(/Dexterity\s*(\d+)/);
+        sheetData.constitution_score = extract(/Constitution\s*(\d+)/);
+        sheetData.intelligence_score = extract(/Intelligence\s*(\d+)/);
+        sheetData.wisdom_score = extract(/Wisdom\s*(\d+)/);
+        sheetData.charisma_score = extract(/Charisma\s*(\d+)/);
 
-        // Handle text areas
-        const extractTextArea = (startLabel, endLabel, text) => {
-            const startRegex = new RegExp(startLabel, 'i');
-            const endRegex = new RegExp(endLabel, 'i');
-            const startIndex = text.search(startRegex);
-            if (startIndex === -1) return '';
-            const textAfterStart = text.substring(startIndex);
-            const endIndex = textAfterStart.search(endRegex);
-            if (endIndex === -1) return textAfterStart.replace(startLabel, '').trim();
-            return textAfterStart.substring(0, endIndex).replace(startLabel, '').trim();
+        // Combat Stats
+        sheetData.ac = extract(/Armor Class\s*(\d+)/);
+        sheetData.initiative = extract(/Initiative\s*([+-]?\d+)/);
+        sheetData.speed = extract(/Speed\s*([^\n]+)/);
+        sheetData.hp_max = extract(/Hit Point Maximum\s*(\d+)/);
+        sheetData.hp_current = extract(/Current Hit Points\s*(\d*)/);
+        sheetData.hp_temp = extract(/Temporary Hit Points\s*(\d*)/);
+        sheetData.hit_dice_total = extract(/Total\s*([^\n]+)\s*Hit Dice/);
+        sheetData.hit_dice_current = extract(/Hit Dice\s*([^\n]+)/);
+        sheetData.proficiency_bonus = extract(/Proficiency Bonus\s*([+-]?\d+)/);
+        sheetData.passive_perception = extract(/Passive Perception\s*(\d+)/);
+        sheetData.passive_insight = extract(/Passive Insight\s*(\d+)/);
+        sheetData.passive_investigation = extract(/Passive Investigation\s*(\d+)/);
+
+        // Text Areas
+        const extractTextArea = (start, end) => {
+            const regex = new RegExp(`${start}\\s*([\\s\\S]*?)\\s*${end}`);
+            const match = text.match(regex);
+            return match ? match[1].trim() : null;
         };
-
-        sheetData.attacks_spellcasting = extractTextArea('Attacks & Spellcasting', 'Equipment', text);
-        sheetData.equipment = extractTextArea('Equipment', 'Features & Traits', text);
-        sheetData.features_traits = extractTextArea('Features & Traits', 'Personality Traits', text);
-        sheetData.personality_traits = extractTextArea('Personality Traits', 'Ideals', text);
-        sheetData.ideals = extractTextArea('Ideals', 'Bonds', text);
-        sheetData.bonds = extractTextArea('Bonds', 'Flaws', text);
-        sheetData.flaws = extractTextArea('Flaws', '$', text);
+        
+        sheetData.attacks_spellcasting = extractTextArea('Attacks & Spellcasting', 'Equipment');
+        sheetData.equipment = extractTextArea('Equipment', 'Features & Traits');
+        sheetData.features_traits = extractTextArea('Features & Traits', 'Personality Traits');
+        sheetData.personality_traits = extractTextArea('Personality Traits', 'Ideals');
+        sheetData.ideals = extractTextArea('Ideals', 'Bonds');
+        sheetData.bonds = extractTextArea('Bonds', 'Flaws');
+        sheetData.flaws = extractTextArea('Flaws', 'Character Appearance');
 
         return sheetData;
     }
