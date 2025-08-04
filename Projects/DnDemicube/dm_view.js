@@ -3573,137 +3573,128 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function generateCharacterMarkdown(sheetData, notes) {
-        let md = '';
+    let md = `
+${notes || ''}
 
-        if (notes) {
-            md += `${notes}\\n\\n`;
-        }
+## **Character Information**
+| Field | Value |
+| :--- | :--- |
+| **Character Name** | ${sheetData.char_name || ''} |
+| **Class & Level** | ${sheetData.class_level || ''} |
+| **Background** | ${sheetData.background || ''} |
+| **Player Name** | ${sheetData.player_name || ''} |
+| **Race or Species** | ${sheetData.race || ''} |
+| **Alignment** | ${sheetData.alignment || ''} |
+| **Experience Points** | ${sheetData.xp || ''} |
 
-        md += `## **Character Information**\\n`;
-        md += `| Field | Value |\\n`;
-        md += `| :--- | :--- |\\n`;
-        md += `| **Character Name** | ${sheetData.char_name || ''} |\\n`;
-        md += `| **Class & Level** | ${sheetData.class_level || ''} |\\n`;
-        md += `| **Background** | ${sheetData.background || ''} |\\n`;
-        md += `| **Player Name** | ${sheetData.player_name || ''} |\\n`;
-        md += `| **Race or Species** | ${sheetData.race || ''} |\\n`;
-        md += `| **Alignment** | ${sheetData.alignment || ''} |\\n`;
-        md += `| **Experience Points** | ${sheetData.xp || ''} |\\n\\n`;
+***
 
-        md += `***\\n\\n`;
+## **Attributes**
+| Ability | Score | Modifier |
+| :--- | :---: | :---: |
+| **Strength** | ${sheetData['strength-score'] || ''} | ${sheetData['strength-modifier'] || '+0'} |
+| **Dexterity** | ${sheetData['dexterity-score'] || ''} | ${sheetData['dexterity-modifier'] || '+0'} |
+| **Constitution** | ${sheetData['constitution-score'] || ''} | ${sheetData['constitution-modifier'] || '+0'} |
+| **Intelligence**| ${sheetData['intelligence-score'] || ''} | ${sheetData['intelligence-modifier'] || '+0'} |
+| **Wisdom** | ${sheetData['wisdom-score'] || ''} | ${sheetData['wisdom-modifier'] || '+0'} |
+| **Charisma** | ${sheetData['charisma-score'] || ''} | ${sheetData['charisma-modifier'] || '+0'} |
 
-        md += `## **Attributes**\\n`;
-        md += `| Ability | Score | Modifier |\\n`;
-        md += `| :--- | :---: | :---: |\\n`;
-        md += `| **Strength** | ${sheetData['strength-score'] || ''} | ${sheetData['strength-modifier'] || '+0'} |\\n`;
-        md += `| **Dexterity** | ${sheetData['dexterity-score'] || ''} | ${sheetData['dexterity-modifier'] || '+0'} |\\n`;
-        md += `| **Constitution** | ${sheetData['constitution-score'] || ''} | ${sheetData['constitution-modifier'] || '+0'} |\\n`;
-        md += `| **Intelligence**| ${sheetData['intelligence-score'] || ''} | ${sheetData['intelligence-modifier'] || '+0'} |\\n`;
-        md += `| **Wisdom** | ${sheetData['wisdom-score'] || ''} | ${sheetData['wisdom-modifier'] || '+0'} |\\n`;
-        md += `| **Charisma** | ${sheetData['charisma-score'] || ''} | ${sheetData['charisma-modifier'] || '+0'} |\\n\\n`;
+---
 
-        md += `---
-\\n\\n`;
+## **Combat**
+| Field | Value |
+| :--- | :---: |
+| **Armor Class** | ${sheetData.ac || ''} |
+| **Initiative** | ${sheetData.initiative || ''} |
+| **Speed** | ${sheetData.speed || ''} |
 
-        md += `## **Combat**\\n`;
-        md += `| Field | Value |\\n`;
-        md += `| :--- | :---: |\\n`;
-        md += `| **Armor Class** | ${sheetData.ac || ''} |\\n`;
-        md += `| **Initiative** | ${sheetData.initiative || ''} |\\n`;
-        md += `| **Speed** | ${sheetData.speed || ''} |\\n\\n`;
+### **Hit Points**
+| Type | Value |
+| :--- | :---: |
+| **Maximum** | ${sheetData.hp_max || ''} |
+| **Current** | ${sheetData.hp_current || ''} |
+| **Temporary** | ${sheetData.hp_temp || ''} |
 
-        md += `### **Hit Points**\\n`;
-        md += `| Type | Value |\\n`;
-        md += `| :--- | :---: |\\n`;
-        md += `| **Maximum** | ${sheetData.hp_max || ''} |\\n`;
-        md += `| **Current** | ${sheetData.hp_current || ''} |\\n`;
-        md += `| **Temporary** | ${sheetData.hp_temp || ''} |\\n\\n`;
+### **Hit Dice**
+| Type | Value |
+| :--- | :---: |
+| **Hit Dice** | ${sheetData.hit_dice_total || ''} |
+| **Death Saves (Successes)** | ${sheetData.death_saves_successes || ''} |
+| **Death Saves (Failures)** | ${sheetData.death_saves_failures || ''} |
 
-        md += `### **Hit Dice**\\n`;
-        md += `| Type | Value |\\n`;
-        md += `| :--- | :---: |\\n`;
-        md += `| **Hit Dice** | ${sheetData.hit_dice_total || ''} |\\n`;
-        md += `| **Death Saves (Successes)** | ${sheetData.death_saves_successes || ''} |\\n`;
-        md += `| **Death Saves (Failures)** | ${sheetData.death_saves_failures || ''} |\\n\\n`;
+---
 
-        md += `---
-\\n\\n`;
+## **Saving Throws**
+| Saving Throw | Value |
+| :--- | :---: |
+| **Strength** | ${sheetData.save_strength_mod || ''} |
+| **Dexterity** | ${sheetData.save_dexterity_mod || ''} |
+| **Constitution** | ${sheetData.save_constitution_mod || ''} |
+| **Intelligence** | ${sheetData.save_intelligence_mod || ''} |
+| **Wisdom** | ${sheetData.save_wisdom_mod || ''} |
+| **Charisma** | ${sheetData.save_charisma_mod || ''} |
 
-        md += `## **Saving Throws**\\n`;
-        md += `| Saving Throw | Value |\\n`;
-        md += `| :--- | :---: |\\n`;
-        md += `| **Strength** | ${sheetData.save_strength_mod || ''} |\\n`;
-        md += `| **Dexterity** | ${sheetData.save_dexterity_mod || ''} |\\n`;
-        md += `| **Constitution** | ${sheetData.save_constitution_mod || ''} |\\n`;
-        md += `| **Intelligence** | ${sheetData.save_intelligence_mod || ''} |\\n`;
-        md += `| **Wisdom** | ${sheetData.save_wisdom_mod || ''} |\\n`;
-        md += `| **Charisma** | ${sheetData.save_charisma_mod || ''} |\\n\\n`;
+---
 
-        md += `---
-\\n\\n`;
+## **Skills**
+| Skill | Value |
+| :--- | :---: |
+| Acrobatics (Dex) | ${sheetData.skill_acrobatics_mod || ''} |
+| Animal Handling (Wis) | ${sheetData.skill_animal_handling_mod || ''} |
+| Arcana (Int) | ${sheetData.skill_arcana_mod || ''} |
+| Athletics (Str) | ${sheetData.skill_athletics_mod || ''} |
+| Deception (Cha) | ${sheetData.skill_deception_mod || ''} |
+| History (Int) | ${sheetData.skill_history_mod || ''} |
+| Insight (Wis) | ${sheetData.skill_insight_mod || ''} |
+| Intimidation (Cha) | ${sheetData.skill_intimidation_mod || ''} |
+| Investigation (Int) | ${sheetData.skill_investigation_mod || ''} |
+| Medicine (Wis) | ${sheetData.skill_medicine_mod || ''} |
+| Nature (Int) | ${sheetData.skill_nature_mod || ''} |
+| Perception (Wis) | ${sheetData.skill_perception_mod || ''} |
+| Performance (Cha) | ${sheetData.skill_performance_mod || ''} |
+| Persuasion (Cha) | ${sheetData.skill_persuasion_mod || ''} |
+| Religion (Int) | ${sheetData.skill_religion_mod || ''} |
+| Sleight of Hand (Dex) | ${sheetData.skill_sleight_of_hand_mod || ''} |
+| Stealth (Dex) | ${sheetData.skill_stealth_mod || ''} |
+| Survival (Wis) | ${sheetData.skill_survival_mod || ''} |
 
-        md += `## **Skills**\\n`;
-        md += `| Skill | Value |\\n`;
-        md += `| :--- | :---: |\\n`;
-        md += `| Acrobatics (Dex) | ${sheetData.skill_acrobatics_mod || ''} |\\n`;
-        md += `| Animal Handling (Wis) | ${sheetData.skill_animal_handling_mod || ''} |\\n`;
-        md += `| Arcana (Int) | ${sheetData.skill_arcana_mod || ''} |\\n`;
-        md += `| Athletics (Str) | ${sheetData.skill_athletics_mod || ''} |\\n`;
-        md += `| Deception (Cha) | ${sheetData.skill_deception_mod || ''} |\\n`;
-        md += `| History (Int) | ${sheetData.skill_history_mod || ''} |\\n`;
-        md += `| Insight (Wis) | ${sheetData.skill_insight_mod || ''} |\\n`;
-        md += `| Intimidation (Cha) | ${sheetData.skill_intimidation_mod || ''} |\\n`;
-        md += `| Investigation (Int) | ${sheetData.skill_investigation_mod || ''} |\\n`;
-        md += `| Medicine (Wis) | ${sheetData.skill_medicine_mod || ''} |\\n`;
-        md += `| Nature (Int) | ${sheetData.skill_nature_mod || ''} |\\n`;
-        md += `| Perception (Wis) | ${sheetData.skill_perception_mod || ''} |\\n`;
-        md += `| Performance (Cha) | ${sheetData.skill_performance_mod || ''} |\\n`;
-        md += `| Persuasion (Cha) | ${sheetData.skill_persuasion_mod || ''} |\\n`;
-        md += `| Religion (Int) | ${sheetData.skill_religion_mod || ''} |\\n`;
-        md += `| Sleight of Hand (Dex) | ${sheetData.skill_sleight_of_hand_mod || ''} |\\n`;
-        md += `| Stealth (Dex) | ${sheetData.skill_stealth_mod || ''} |\\n`;
-        md += `| Survival (Wis) | ${sheetData.skill_survival_mod || ''} |\\n\\n`;
+---
 
-        md += `---
-\\n\\n`;
+## **Character Proficiencies**
+| Field | Value |
+| :--- | :---: |
+| **Proficiency Bonus** | ${sheetData.proficiency_bonus || ''} |
+| **Passive Perception** | ${sheetData.passive_perception || ''} |
+| **Passive Insight** | ${sheetData.passive_insight || ''} |
+| **Passive Investigation** | ${sheetData.passive_investigation || ''} |
+| **Armor Proficiencies** | ${sheetData.armor_proficiencies || ''} |
+| **Weapon Proficiencies**| ${sheetData.weapon_proficiencies || ''} |
+| **Tool Proficiencies** | ${sheetData.tool_proficiencies || ''} |
+| **Languages** | ${sheetData.languages || ''} |
 
-        md += `## **Character Proficiencies**\\n`;
-        md += `| Field | Value |\\n`;
-        md += `| :--- | :---: |\\n`;
-        md += `| **Proficiency Bonus** | ${sheetData.proficiency_bonus || ''} |\\n`;
-        md += `| **Passive Perception** | ${sheetData.passive_perception || ''} |\\n`;
-        md += `| **Passive Insight** | ${sheetData.passive_insight || ''} |\\n`;
-        md += `| **Passive Investigation** | ${sheetData.passive_investigation || ''} |\\n`;
-        md += `| **Armor Proficiencies** | ${sheetData.armor_proficiencies || ''} |\\n`;
-        md += `| **Weapon Proficiencies**| ${sheetData.weapon_proficiencies || ''} |\\n`;
-        md += `| **Tool Proficiencies** | ${sheetData.tool_proficiencies || ''} |\\n`;
-        md += `| **Languages** | ${sheetData.languages || ''} |\\n\\n`;
+---
 
-        md += `---
-\\n\\n`;
+## **Equipment & Features**
+| Field | Value |
+| :--- | :--- |
+| **Attacks & Spellcasting** | ${sheetData.attacks_spellcasting || ''} |
+| **Features & Traits** | ${sheetData.features_traits || ''} |
+| **Equipment** | ${sheetData.equipment || ''} |
 
-        md += `## **Equipment & Features**\\n`;
-        md += `| Field | Value |\\n`;
-        md += `| :--- | :--- |\\n`;
-        md += `| **Attacks & Spellcasting** | ${sheetData.attacks_spellcasting || ''} |\\n`;
-        md += `| **Features & Traits** | ${sheetData.features_traits || ''} |\\n`;
-        md += `| **Equipment** | ${sheetData.equipment || ''} |\\n\\n`;
+---
 
-        md += `---
-\\n\\n`;
-
-        md += `## **Character Background**\\n`;
-        md += `| Field | Value |\\n`;
-        md += `| :--- | :--- |\\n`;
-        md += `| **Character Appearance** | ${sheetData.char_appearance || ''} |\\n`;
-        md += `| **Character Backstory** | ${sheetData.backstory || ''} |\\n`;
-        md += `| **Personality Traits** | ${sheetData.personality_traits || ''} |\\n`;
-        md += `| **Ideals** | ${sheetData.ideals || ''} |\\n`;
-        md += `| **Bonds** | ${sheetData.bonds || ''} |\\n`;
-        md += `| **Flaws** | ${sheetData.flaws || ''} |\\n`;
-
-        return easyMDE.options.previewRender(md);
-    }
+## **Character Background**
+| Field | Value |
+| :--- | :--- |
+| **Character Appearance** | ${sheetData.char_appearance || ''} |
+| **Character Backstory** | ${sheetData.backstory || ''} |
+| **Personality Traits** | ${sheetData.personality_traits || ''} |
+| **Ideals** | ${sheetData.ideals || ''} |
+| **Bonds** | ${sheetData.bonds || ''} |
+| **Flaws** | ${sheetData.flaws || ''} |
+`;
+    return easyMDE.options.previewRender(md);
+}
 
 
 });
