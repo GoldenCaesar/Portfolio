@@ -22,16 +22,25 @@
                     <label for="upload-maps-input">Upload Map Files:</label>
                     <input type="file" id="upload-maps-input" accept="image/*" multiple>
                 </div>
-                <ul id="uploaded-maps-list" style="list-style-type: none; padding-left: 0; margin-top: 10px; overflow-y: auto; max-height: 150px;">
-                    <!-- Uploaded map files will be listed here -->
+                <ul id="maps-list" style="list-style-type: none; padding-left: 0; margin-top: 10px; overflow-y: auto; max-height: 150px;">
+                    <!-- Map files will be listed here -->
                 </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="mode-toggle-container" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <span class="mode-label">Edit</span>
+                    <label class="switch">
+                        <input type="checkbox" id="mode-toggle-switch" disabled>
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="mode-label">View</span>
+                </div>
             </div>
 
             <div class="sidebar-section" id="map-tools-section">
                 <h3>Map Tools</h3>
                 <div class="map-tools-buttons">
-                    <button id="btn-add-to-active" disabled>Add to Active List</button>
-                    <button id="btn-remove-from-active" disabled>Remove from Active List</button>
                     <button id="btn-link-child-map" disabled>Link to Child Map</button>
                     <button id="btn-link-note" disabled>Link Note</button>
                     <button id="btn-link-character" disabled>Link Character</button>
@@ -40,12 +49,6 @@
                 </div>
             </div>
 
-            <div class="sidebar-section" id="active-maps-section" style="overflow-y: auto; overflow-x: auto; max-height: 200px;">
-                <h3>Active View</h3>
-                <ul id="active-maps-list" style="white-space: nowrap;">
-                    <!-- Active map and its layers/sub-maps will be listed here -->
-                </ul>
-            </div>
 
             <div class="sidebar-section">
                 <h3>Campaign</h3>

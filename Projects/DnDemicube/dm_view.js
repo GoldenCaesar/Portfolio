@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const uploadMapsInput = document.getElementById('upload-maps-input');
-    const uploadedMapsList = document.getElementById('uploaded-maps-list');
-    const activeMapsList = document.getElementById('active-maps-list'); // Added
+    const mapsList = document.getElementById('maps-list');
     const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
@@ -46,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewCharacterButton = document.getElementById('view-character-button');
     const characterNotesEditorContainer = document.getElementById('character-notes-editor-container');
     const characterMarkdownEditor = document.getElementById('character-markdown-editor');
+    const modeToggleSwitch = document.getElementById('mode-toggle-switch');
     const viewPdfButton = document.getElementById('view-pdf-button');
     const deletePdfButton = document.getElementById('delete-pdf-button');
     const characterSheetContent = document.getElementById('character-sheet-content');
@@ -58,8 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // const mapToolButtons = mapToolsSection ? mapToolsSection.querySelectorAll('.map-tools-buttons button') : []; // Will re-evaluate usage of this
 
     // Button References for Map Tools
-    const btnAddToActive = document.getElementById('btn-add-to-active');
-    const btnRemoveFromActive = document.getElementById('btn-remove-from-active');
     const btnLinkChildMap = document.getElementById('btn-link-child-map');
     // Add other tool buttons here as needed, e.g.:
     const btnLinkNote = document.getElementById('btn-link-note');
@@ -74,9 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isEditMode = false;
 
     // Core state variables
-    let selectedMapInManager = null;
-    let selectedMapInActiveView = null;
-    let activeMapsData = []; // Stores { fileName: "map.png", overlays: [], ...other unique instance data }
+    let selectedMapFileName = null;
 
     // Notes State Variables
     let notesData = []; // Array of note objects: { id: uniqueId, title: "Note 1", content: "# Markdown" }
@@ -150,12 +146,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const canvasHeight = mapContainer.clientHeight - paddingTop - paddingBottom;
 
             let mapWasDisplayed = currentMapDisplayData.img && currentMapDisplayData.img.complete;
-            let currentFileNameToRedraw = null;
+            let currentFileNameToRedraw = selectedMapFileName;
 
             if (mapWasDisplayed) {
-                if (selectedMapInManager) currentFileNameToRedraw = selectedMapInManager;
-                else if (selectedMapInActiveView) currentFileNameToRedraw = selectedMapInActiveView;
-                // Note: isLinkingChildMap implies selectedMapInManager is the map being drawn on.
+                // Note: isLinkingChildMap implies selectedMapFileName is the map being drawn on.
                 
                 // Invalidate current display data BEFORE canvas dimensions change and before displayMapOnCanvas.
                 currentMapDisplayData.img = null; 
@@ -171,12 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayMapOnCanvas(currentFileNameToRedraw);
             } else if (!mapWasDisplayed) {
                 // If no map was displayed but one is selected (e.g. initial load scenario or after clearing canvas)
-                let fileToDisplay = null;
-                if (selectedMapInManager) fileToDisplay = selectedMapInManager;
-                else if (selectedMapInActiveView) fileToDisplay = selectedMapInActiveView;
-
-                if (fileToDisplay) {
-                    displayMapOnCanvas(fileToDisplay);
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
                 } else {
                     // No map was displayed and no map is selected, ensure canvas is clear.
                     const ctx = dmCanvas.getContext('2d');
@@ -272,19 +262,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateButtonStates();
 
-            // Draw existing overlays for this map (manager view) or active map instance
-            if (selectedMapInManager === fileName && mapData.overlays) {
+            // Draw existing overlays for this map
+            if (mapData.overlays) {
                 drawOverlays(mapData.overlays);
-            } else if (selectedMapInActiveView === fileName) {
-                const activeMapInstance = activeMapsData.find(am => am.fileName === fileName);
-                if (activeMapInstance && activeMapInstance.overlays) {
-                    drawOverlays(activeMapInstance.overlays);
-                }
             }
 
             // If actively drawing a new polygon, draw it on top
-            if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapInManager === fileName) {
-                drawCurrentPolygon(true); // Pass true to indicate it's a new, temporary polygon
+            if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapFileName === fileName) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'edit') {
+                    drawCurrentPolygon(true); // Pass true to indicate it's a new, temporary polygon
+                }
             }
         };
         img.onerror = () => {
@@ -310,13 +298,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 ctx.beginPath();
                 let currentPointsToDraw = overlay.polygon;
-                let strokeStyle = 'rgba(0, 0, 255, 0.7)'; // Default: Blue for existing links
-
-                if (selectedMapInActiveView) { // Special styling for Active View context on DM screen
+                let strokeStyle = 'rgba(0, 0, 255, 0.7)'; // Default: Blue for 'edit' mode
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'view') { // Special styling for 'view' mode
                     if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
                         strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Red and more transparent if hidden from player
                     } else {
-                        strokeStyle = 'rgba(0, 255, 0, 0.7)'; // Green if visible to player in Active View
+                        strokeStyle = 'rgba(0, 255, 0, 0.7)'; // Green if visible to player in 'view' mode
                     }
                 }
                 // Moving polygon overrides visibility-based styling for immediate feedback
@@ -366,7 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
 
                 let fillStyle = 'rgba(255, 255, 102, 0.9)'; // Default yellow
-                if (selectedMapInActiveView) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'view') {
                     if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
                         fillStyle = 'rgba(255, 102, 102, 0.7)'; // Reddish if hidden from player
                     } else {
@@ -401,7 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
 
                 let fillStyle = 'rgba(135, 206, 250, 0.9)'; // Default light blue
-                if (selectedMapInActiveView) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'view') {
                     if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
                         fillStyle = 'rgba(255, 102, 102, 0.7)'; // Reddish if hidden from player
                     } else {
@@ -556,8 +546,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Priority 1: Polygon Drawing (New Link or Redraw)
-        if ((isLinkingChildMap || isRedrawingPolygon) && !polygonDrawingComplete && selectedMapInManager) {
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+
+        // Priority 1: Polygon Drawing (New Link or Redraw) - Only in 'edit' mode
+        if (selectedMapData.mode === 'edit' && (isLinkingChildMap || isRedrawingPolygon) && !polygonDrawingComplete) {
             const clickThreshold = 10 / currentMapDisplayData.ratio; // 10px radius on canvas, converted to image scale
             if (currentPolygonPoints.length > 0) {
                 const firstPoint = currentPolygonPoints[0];
@@ -570,171 +563,130 @@ document.addEventListener('DOMContentLoaded', () => {
                     dmCanvas.style.cursor = 'auto';
 
                     if (isLinkingChildMap) {
-                        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from Manager';
-                        alert('Polygon complete for new link. Now select a map from "Manage Maps" to link as its child.');
+                        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from List';
+                        alert('Polygon complete for new link. Now select a map from the list to link as its child.');
                         console.log("New link polygon complete:", currentPolygonPoints);
-                        // isLinkingChildMap remains true until a child map is selected or action is cancelled.
                     } else if (isRedrawingPolygon) {
-                        const parentMapData = detailedMapData.get(selectedMapInManager);
-                        if (parentMapData && preservedLinkedMapNameForRedraw) {
+                        if (preservedLinkedMapNameForRedraw) {
                             const newOverlay = {
                                 type: 'childMapLink',
                                 polygon: [...currentPolygonPoints],
                                 linkedMapName: preservedLinkedMapNameForRedraw
                             };
-                            parentMapData.overlays.push(newOverlay);
+                            selectedMapData.overlays.push(newOverlay);
                             alert(`Polygon redrawn successfully, still linked to "${preservedLinkedMapNameForRedraw}".`);
                             console.log("Polygon redraw complete. New overlay:", newOverlay);
-
-                            // Refresh the display of the parent map to show the new polygon
-                            if (selectedMapInManager === parentMapData.name) { // Ensure it's the correct map
-                                displayMapOnCanvas(selectedMapInManager);
-                            }
+                            displayMapOnCanvas(selectedMapFileName);
                         } else {
-                            console.error("Failed to save redrawn polygon: Missing parent map data or preserved link name.");
+                            console.error("Failed to save redrawn polygon: Missing preserved link name.");
                             alert("Error: Could not save the redrawn polygon.");
                         }
-                        // Reset redraw state
                         isRedrawingPolygon = false;
                         preservedLinkedMapNameForRedraw = null;
-                        currentPolygonPoints = []; // Explicitly clear points for next operation
-                        polygonDrawingComplete = false; // Reset completion state
-                        selectedPolygonForContextMenu = null; // Clear context menu selection
+                        currentPolygonPoints = [];
+                        polygonDrawingComplete = false;
+                        selectedPolygonForContextMenu = null;
                     }
-                    // polygonDrawingComplete is true here, will be reset if a new drawing starts
-                    // currentPolygonPoints are now final for this polygon.
                 } else {
                     currentPolygonPoints.push(imageCoords);
                 }
             } else {
                 currentPolygonPoints.push(imageCoords);
             }
-            drawCurrentPolygon(false); // Redraw map, existing overlays, and current new polygon
-            return; // Prevent other interactions if drawing
+            drawCurrentPolygon(false);
+            return;
         }
 
-        if (isLinkingNote && selectedMapInManager) {
-            const parentMapData = detailedMapData.get(selectedMapInManager);
-            if (parentMapData) {
-                const newOverlay = {
-                    type: 'noteLink',
-                    position: imageCoords,
-                    linkedNoteId: null // Initially unlinked
-                };
-                parentMapData.overlays.push(newOverlay);
-                console.log('Note icon placed. Overlay:', newOverlay);
-                resetAllInteractiveStates(); // This will redraw the map with the new icon
-            }
-            return; // Interaction handled
+        if (selectedMapData.mode === 'edit' && isLinkingNote) {
+            const newOverlay = {
+                type: 'noteLink',
+                position: imageCoords,
+                linkedNoteId: null
+            };
+            selectedMapData.overlays.push(newOverlay);
+            console.log('Note icon placed. Overlay:', newOverlay);
+            resetAllInteractiveStates();
+            return;
         }
 
-        if (isLinkingCharacter && selectedMapInManager) {
-            const parentMapData = detailedMapData.get(selectedMapInManager);
-            if (parentMapData) {
-                const newOverlay = {
-                    type: 'characterLink',
-                    position: imageCoords,
-                    linkedCharacterId: null // Initially unlinked
-                };
-                parentMapData.overlays.push(newOverlay);
-                console.log('Character icon placed. Overlay:', newOverlay);
-                resetAllInteractiveStates(); // This will redraw the map with the new icon
-            }
-            return; // Interaction handled
+        if (selectedMapData.mode === 'edit' && isLinkingCharacter) {
+            const newOverlay = {
+                type: 'characterLink',
+                position: imageCoords,
+                linkedCharacterId: null
+            };
+            selectedMapData.overlays.push(newOverlay);
+            console.log('Character icon placed. Overlay:', newOverlay);
+            resetAllInteractiveStates();
+            return;
         }
 
-        // Priority 2: Interaction with Overlays in "Active View"
-        if (selectedMapInActiveView) {
-            const activeMapInstance = activeMapsData.find(am => am.fileName === selectedMapInActiveView);
-            if (activeMapInstance && activeMapInstance.overlays) {
-                // Iterate overlays in reverse order so top ones are checked first if overlapping
-                for (let i = activeMapInstance.overlays.length - 1; i >= 0; i--) {
-                    const overlay = activeMapInstance.overlays[i];
-                    if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                        console.log("Clicked on child map link:", overlay);
-                        const childMapName = overlay.linkedMapName;
-                        const childMapInActiveList = activeMapsData.some(am => am.fileName === childMapName);
-                        if (childMapInActiveList) {
-                            // Select and display the child map
-                            selectedMapInActiveView = childMapName; // Update selection
-                            selectedMapInManager = null;
-                            clearAllSelections();
-                            // Find and highlight the corresponding LI in active-maps-list
-                            const activeMapItems = activeMapsList.querySelectorAll('li');
-                            activeMapItems.forEach(li => {
-                                if (li.dataset.fileName === childMapName) {
-                                    li.classList.add('selected-map-item');
-                                }
-                            });
-                            displayMapOnCanvas(childMapName);
-                            updateButtonStates();
-                            sendMapToPlayerView(childMapName); // Send to player view
-                            console.log(`Switched to child map: ${childMapName}`);
-                        } else {
-                            alert(`Map "${childMapName}" needs to be added to the Active View list to navigate to it.`);
-                        }
-                        return; // Interaction handled
-                    } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
-                        if (overlay.linkedNoteId) {
-                            const note = notesData.find(n => n.id === overlay.linkedNoteId);
-                            if (note) {
-                                const notePreviewOverlay = document.getElementById('note-preview-overlay');
-                                const notePreviewBody = document.getElementById('note-preview-body');
-                                if (notePreviewOverlay && notePreviewBody) {
-                                    const renderedHTML = easyMDE.options.previewRender(note.content);
-                                    notePreviewBody.innerHTML = renderedHTML;
-                                    notePreviewOverlay.style.display = 'flex';
-                                    if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
-                                        playerWindow.postMessage({
-                                            type: 'showNotePreview',
-                                            content: renderedHTML
-                                        }, '*');
-                                    }
-                                }
+        // Priority 2: Interaction with Overlays in "View" mode
+        if (selectedMapData.mode === 'view' && selectedMapData.overlays) {
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    console.log("Clicked on child map link:", overlay);
+                    const childMapName = overlay.linkedMapName;
+                    const childMapData = detailedMapData.get(childMapName);
+                    if (childMapData) {
+                        selectedMapFileName = childMapName;
+                        clearAllSelections();
+                        const mapItems = mapsList.querySelectorAll('li');
+                        mapItems.forEach(li => {
+                            if (li.dataset.fileName === childMapName) {
+                                li.classList.add('selected-map-item');
                             }
-                        }
-                        return; // Interaction handled
-                    } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
-                        if (overlay.linkedCharacterId) {
-                            const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
-                            if (character) {
-                                const markdown = generateCharacterMarkdown(character.sheetData, character.notes);
-                                const characterPreviewOverlay = document.getElementById('character-preview-overlay');
-                                const characterPreviewBody = document.getElementById('character-preview-body');
-                                if (characterPreviewOverlay && characterPreviewBody) {
-                                    characterPreviewBody.innerHTML = markdown;
-                                    characterPreviewOverlay.style.display = 'flex';
-                                }
-
+                        });
+                        displayMapOnCanvas(childMapName);
+                        updateButtonStates();
+                        sendMapToPlayerView(childMapName);
+                        console.log(`Switched to child map: ${childMapName}`);
+                    } else {
+                        alert(`Map "${childMapName}" not found.`);
+                    }
+                    return;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
+                    if (overlay.linkedNoteId) {
+                        const note = notesData.find(n => n.id === overlay.linkedNoteId);
+                        if (note) {
+                            const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                            const notePreviewBody = document.getElementById('note-preview-body');
+                            if (notePreviewOverlay && notePreviewBody) {
+                                const renderedHTML = easyMDE.options.previewRender(note.content);
+                                notePreviewBody.innerHTML = renderedHTML;
+                                notePreviewOverlay.style.display = 'flex';
                                 if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
                                     playerWindow.postMessage({
-                                        type: 'showCharacterPreview',
-                                        content: markdown
+                                        type: 'showNotePreview',
+                                        content: renderedHTML
                                     }, '*');
                                 }
                             }
                         }
-                        return; // Interaction handled
                     }
-                    // Add other overlay type interactions here (e.g., notes, characters)
-                }
-            }
-        }
+                    return;
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
+                    if (overlay.linkedCharacterId) {
+                        const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                        if (character) {
+                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes);
+                            const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                            const characterPreviewBody = document.getElementById('character-preview-body');
+                            if (characterPreviewOverlay && characterPreviewBody) {
+                                characterPreviewBody.innerHTML = markdown;
+                                characterPreviewOverlay.style.display = 'flex';
+                            }
 
-        // Priority 3: Interaction with Overlays in "Manage Maps" view (e.g., for selection, deletion)
-        // This part is for future development (e.g., selecting an overlay to delete it)
-        if (selectedMapInManager) {
-            const managerMapData = detailedMapData.get(selectedMapInManager);
-            if (managerMapData && managerMapData.overlays) {
-                for (let i = managerMapData.overlays.length - 1; i >= 0; i--) {
-                    const overlay = managerMapData.overlays[i];
-                    if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                        // TODO: Implement selection of overlay for editing/deletion
-                        console.log("Clicked on an overlay in Manage Maps view (for future editing):", overlay);
-                        // Example: highlight a "Remove Links" button if it's for selected overlays
-                        // Or set a `selectedOverlayForEditing = overlay;`
-                        return; // Interaction (even if just logging) handled
+                            if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                playerWindow.postMessage({
+                                    type: 'showCharacterPreview',
+                                    content: markdown
+                                }, '*');
+                            }
+                        }
                     }
+                    return;
                 }
             }
         }
@@ -779,22 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const canvasY = Math.round(event.clientY - rect.top);
         const imageCoords = getRelativeCoords(canvasX, canvasY);
 
-        let overlaysToCheck = null;
-        let currentMapName = null;
-
-        if (selectedMapInActiveView) {
-            currentMapName = selectedMapInActiveView;
-            const activeMapInstance = activeMapsData.find(am => am.fileName === currentMapName);
-            if (activeMapInstance) {
-                overlaysToCheck = activeMapInstance.overlays;
-            }
-        } else if (selectedMapInManager) {
-            currentMapName = selectedMapInManager;
-            const managerMapData = detailedMapData.get(currentMapName);
-            if (managerMapData) {
-                overlaysToCheck = managerMapData.overlays;
-            }
-        }
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        let overlaysToCheck = selectedMapData ? selectedMapData.overlays : null;
 
         if (imageCoords && overlaysToCheck && overlaysToCheck.length > 0) {
             for (let i = overlaysToCheck.length - 1; i >= 0; i--) { // Iterate in reverse for top-most
@@ -843,6 +781,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mapDataEntry && mapDataEntry.url) {
                 URL.revokeObjectURL(mapDataEntry.url);
                 detailedMapData.delete(fileName);
+            }
+
+            if (selectedMapFileName === fileName) {
+                selectedMapFileName = null;
+                if (modeToggleSwitch) modeToggleSwitch.disabled = true;
+                const ctx = dmCanvas.getContext('2d');
+                ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+                updateButtonStates();
             }
 
             updateMoveIconVisibility(list); // Update move icons in case first/last item changed
@@ -902,9 +848,8 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterForContextMenu = null;
 
         // Redraw current map to clear any temporary states (like a polygon being dragged)
-        let mapToRedraw = selectedMapInManager || selectedMapInActiveView;
-        if (mapToRedraw) {
-            displayMapOnCanvas(mapToRedraw);
+        if (selectedMapFileName) {
+            displayMapOnCanvas(selectedMapFileName);
         }
         updateButtonStates();
         console.log("All interactive states reset.");
@@ -913,8 +858,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnLinkChildMap) {
         btnLinkChildMap.addEventListener('click', () => {
-            if (!selectedMapInManager) {
-                alert("Please select a map from 'Manage Maps' first to add a link to it.");
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                alert("Please select a map and ensure it is in 'Edit' mode to add a link to it.");
                 return;
             }
 
@@ -938,8 +884,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnLinkNote) {
         btnLinkNote.addEventListener('click', () => {
-            if (!selectedMapInManager) {
-                alert("Please select a map from 'Manage Maps' first to add a note to it.");
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                alert("Please select a map and ensure it is in 'Edit' mode to add a note to it.");
                 return;
             }
 
@@ -959,8 +906,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnLinkCharacter) {
         btnLinkCharacter.addEventListener('click', () => {
-            if (!selectedMapInManager) {
-                alert("Please select a map from 'Manage Maps' first to add a character to it.");
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                alert("Please select a map and ensure it is in 'Edit' mode to add a character to it.");
                 return;
             }
 
@@ -1033,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const parentMapName = isMovingPolygon ? polygonBeingMoved.parentMapName : (isMovingNote ? noteBeingMoved.parentMapName : characterBeingMoved.parentMapName);
 
-                if (selectedMapInManager === parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
+                if (selectedMapFileName === parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
                     const ctx = dmCanvas.getContext('2d');
                     ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
                     ctx.drawImage(
@@ -1042,12 +990,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMapDisplayData.offsetX, currentMapDisplayData.offsetY,
                         currentMapDisplayData.scaledWidth, currentMapDisplayData.scaledHeight
                     );
-                    const managerMapData = detailedMapData.get(selectedMapInManager);
-                    if (managerMapData && managerMapData.overlays) {
-                        drawOverlays(managerMapData.overlays);
+                    const mapData = detailedMapData.get(selectedMapFileName);
+                    if (mapData && mapData.overlays) {
+                        drawOverlays(mapData.overlays);
                     }
-                } else if (selectedMapInManager === parentMapName) {
-                    displayMapOnCanvas(selectedMapInManager);
+                } else if (selectedMapFileName === parentMapName) {
+                    displayMapOnCanvas(selectedMapFileName);
                 }
             }
         } else {
@@ -1100,142 +1048,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // One way is to add checks at the beginning of that listener.
     // (This will be done in a subsequent step if needed, the mousedown/move/mouseup should capture most interactions for move)
 
-    // Event listener for 'Add to Active List' / 'Update Changes to Active List' button
-    if (btnAddToActive) {
-        btnAddToActive.addEventListener('click', () => {
-            if (selectedMapInManager) {
-                const isAlreadyInActiveList = activeMapsData.some(map => map.fileName === selectedMapInManager);
-                const sourceMapData = detailedMapData.get(selectedMapInManager);
-
-                if (!sourceMapData) {
-                    console.error('Error: Source map data not found in detailedMapData for:', selectedMapInManager);
-                    return;
-                }
-
-                if (isAlreadyInActiveList) {
-                    // Update Mode
-                    const activeMapInstance = activeMapsData.find(map => map.fileName === selectedMapInManager);
-                    if (activeMapInstance) {
-                        const sourceOverlaysFromManager = JSON.parse(JSON.stringify(sourceMapData.overlays)); // Full list from Manage Maps (for uniqueness checks)
-                        let modifiableExistingActiveOverlays = JSON.parse(JSON.stringify(activeMapInstance.overlays)); // Current active overlays, will be consumed
-                        const newActiveOverlays = [];
-
-                        sourceOverlaysFromManager.forEach(sourceOverlay => {
-                            let matched = false;
-                            let visibilityStateToCarryOver = false; // Default to false
-
-                            // Attempt 1: Match by exact polygon geometry
-                            const geomMatchIndex = modifiableExistingActiveOverlays.findIndex(
-                                activeOv => JSON.stringify(activeOv.polygon) === JSON.stringify(sourceOverlay.polygon)
-                            );
-
-                            if (geomMatchIndex > -1) {
-                                const existingMatchByGeom = modifiableExistingActiveOverlays[geomMatchIndex];
-                                visibilityStateToCarryOver = typeof existingMatchByGeom.playerVisible === 'boolean' ? existingMatchByGeom.playerVisible : false;
-                                newActiveOverlays.push({
-                                    ...sourceOverlay, // Use new geometry/data from source
-                                    playerVisible: visibilityStateToCarryOver
-                                });
-                                matched = true;
-                                modifiableExistingActiveOverlays.splice(geomMatchIndex, 1); // Remove consumed overlay
-                            } else if (sourceOverlay.linkedMapName) {
-                                // Attempt 2: Match by unique linkedMapName if geometry differs
-                                // Count occurrences of this link name in the original source (Manage Maps)
-                                const countInSource = sourceOverlaysFromManager.filter(
-                                    srcOv => srcOv.linkedMapName === sourceOverlay.linkedMapName
-                                ).length;
-                                // Count occurrences in the *remaining* active overlays
-                                const existingActiveWithSameLinkName = modifiableExistingActiveOverlays.filter(
-                                    activeOv => activeOv.linkedMapName === sourceOverlay.linkedMapName
-                                );
-
-                                if (countInSource === 1 && existingActiveWithSameLinkName.length === 1) {
-                                    // This link name is unique in both current source and remaining active sets for this specific link
-                                    const uniqueExistingMatchByLinkName = existingActiveWithSameLinkName[0];
-                                    visibilityStateToCarryOver = typeof uniqueExistingMatchByLinkName.playerVisible === 'boolean' ? uniqueExistingMatchByLinkName.playerVisible : false;
-                                    newActiveOverlays.push({
-                                        ...sourceOverlay, // Use new geometry/data from source
-                                        playerVisible: visibilityStateToCarryOver
-                                    });
-                                    matched = true;
-                                    // Remove consumed overlay from modifiableExistingActiveOverlays
-                                    const idxToRemove = modifiableExistingActiveOverlays.indexOf(uniqueExistingMatchByLinkName);
-                                    if (idxToRemove > -1) modifiableExistingActiveOverlays.splice(idxToRemove, 1);
-                                }
-                            }
-
-                            if (!matched) {
-                                // No match found by geometry or unique link name, treat as new
-                                newActiveOverlays.push({
-                                    ...sourceOverlay,
-                                    playerVisible: false // Default for truly new or unmatchable
-                                });
-                            }
-                        });
-
-                        activeMapInstance.overlays = newActiveOverlays;
-                        console.log(`Overlays for "${selectedMapInManager}" updated in Active View. Visibility logic applied.`);
-
-                        if (selectedMapInActiveView === selectedMapInManager) {
-                            displayMapOnCanvas(selectedMapInActiveView);
-                            sendMapToPlayerView(selectedMapInManager);
-                        }
-                        updateButtonStates();
-                    } else {
-                        console.error('Error updating map in active list: instance not found for', selectedMapInManager);
-                    }
-                } else {
-                // Add Mode: Ensure playerVisible defaults to false for all new overlays
-                const newOverlays = JSON.parse(JSON.stringify(sourceMapData.overlays)).map(overlay => ({
-                    ...overlay,
-                    playerVisible: false // Default to hidden for new additions
-                }));
-                    activeMapsData.push({
-                        fileName: sourceMapData.name,
-                    overlays: newOverlays
-                    });
-                console.log(`Map "${sourceMapData.name}" added to Active View. Player visibility defaulted to false for overlays.`);
-                    renderActiveMapsList();
-                    updateButtonStates();
-                }
-            } else {
-                console.warn('Add/Update button clicked without a map selected in manager.');
-            }
-        });
-    }
-
-    // Event listener for 'Remove from Active List' button
-    if (btnRemoveFromActive) {
-        btnRemoveFromActive.addEventListener('click', () => {
-            if (selectedMapInActiveView) {
-                const mapToRemoveName = selectedMapInActiveView;
-                activeMapsData = activeMapsData.filter(map => map.fileName !== selectedMapInActiveView);
-                selectedMapInActiveView = null; // Clear selection
-
-                // If the removed map was displayed on canvas, clear it
-                // This check assumes displayMapOnCanvas updates some global state or canvas content directly related to the map name
-                // A more robust way might be to track `currentMapOnCanvasName`
-                const ctx = dmCanvas.getContext('2d');
-                // Simple check: if canvas has content and the removed map *might* be it.
-                // For now, let's assume if a map was selected in active view and then removed,
-                // and it was the one on canvas, we should clear.
-                // A potentially better way is to check if the current displayed map's name matches mapToRemoveName.
-                // This needs `currentMapOnCanvasName` to be set by `displayMapOnCanvas`.
-                // Let's assume for now, if we remove a selected active map, we clear the canvas.
-                ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-                // Consider if disableMapTools() or a similar function to reset canvas-related tools is needed here.
-                // For now, updateButtonStates will handle general tool states. If specific tools depend on a map being on canvas,
-                // they might need individual attention or a refined disableMapTools().
-                // The original disableMapTools() disables all buttons; updateButtonStates() is more nuanced.
-
-                renderActiveMapsList(); // Re-render the active maps list
-                updateButtonStates(); // Update button states
-                sendClearMessageToPlayerView(); // Clear the player view
-            } else {
-                console.warn("No map selected in Active View to remove.");
-            }
-        });
-    }
 
     function enableRename(listItem, textNode) {
         const currentName = textNode.textContent;
@@ -1278,7 +1090,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailedMapData.delete(originalName);
                     detailedMapData.set(newName, mapDataEntry);
 
-                    let currentlyDisplayedMapKey = selectedMapInManager || selectedMapInActiveView;
                     let displayedMapLinksUpdated = false;
 
                     // Update linkedMapName in all map overlays in detailedMapData
@@ -1288,59 +1099,24 @@ document.addEventListener('DOMContentLoaded', () => {
                                 if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
                                     overlay.linkedMapName = newName;
                                     console.log(`DM Overlay: Map '${dmEntry.name}' link to '${originalName}' changed to '${newName}'.`);
-                                    if (dmEntry.name === currentlyDisplayedMapKey && currentlyDisplayedMapKey !== newName) {
+                                    if (dmEntry.name === selectedMapFileName && selectedMapFileName !== newName) {
                                         displayedMapLinksUpdated = true;
                                     }
                                 }
                             });
                         }
                     });
-
-                    // Update fileName and linkedMapName in activeMapsData
-                    let activeListNeedsRefresh = false;
-                    activeMapsData.forEach(activeMap => {
-                        let activeMapFileNameChanged = false;
-                        if (activeMap.fileName === originalName) {
-                            activeMap.fileName = newName;
-                            activeListNeedsRefresh = true;
-                            activeMapFileNameChanged = true;
-                            console.log(`Active Map: File name '${originalName}' changed to '${newName}'.`);
-                        }
-
-                        if (activeMap.overlays && activeMap.overlays.length > 0) {
-                            activeMap.overlays.forEach(overlay => {
-                                if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
-                                    overlay.linkedMapName = newName;
-                                    console.log(`Active Overlay: Map '${activeMap.fileName}' link to '${originalName}' changed to '${newName}'.`);
-                                    if (activeMap.fileName === currentlyDisplayedMapKey && !activeMapFileNameChanged) {
-                                        displayedMapLinksUpdated = true;
-                                    }
-                                    activeListNeedsRefresh = true;
-                                }
-                            });
-                        }
-                    });
-
-                    if (activeListNeedsRefresh) {
-                        renderActiveMapsList();
-                    }
 
                     let selectionUpdated = false;
-                    if (selectedMapInManager === originalName) {
-                        selectedMapInManager = newName;
-                        currentlyDisplayedMapKey = newName;
-                        selectionUpdated = true;
-                    }
-                    if (selectedMapInActiveView === originalName) {
-                        selectedMapInActiveView = newName;
-                        currentlyDisplayedMapKey = newName;
+                    if (selectedMapFileName === originalName) {
+                        selectedMapFileName = newName;
                         selectionUpdated = true;
                     }
 
                     if (selectionUpdated || displayedMapLinksUpdated) {
-                        if (currentlyDisplayedMapKey) {
-                            console.log(`Redrawing canvas for: ${currentlyDisplayedMapKey} (Selection updated: ${selectionUpdated}, Links updated: ${displayedMapLinksUpdated})`);
-                            displayMapOnCanvas(currentlyDisplayedMapKey);
+                        if (selectedMapFileName) {
+                            console.log(`Redrawing canvas for: ${selectedMapFileName} (Selection updated: ${selectionUpdated}, Links updated: ${displayedMapLinksUpdated})`);
+                            displayMapOnCanvas(selectedMapFileName);
                         }
                     }
                     updateButtonStates();
@@ -1358,8 +1134,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (editMapsIcon) {
         editMapsIcon.addEventListener('click', () => {
             isEditMode = !isEditMode;
-            uploadedMapsList.classList.toggle('edit-mode-active', isEditMode);
-            const mapItems = uploadedMapsList.querySelectorAll('li');
+            mapsList.classList.toggle('edit-mode-active', isEditMode);
+            const mapItems = mapsList.querySelectorAll('li');
             mapItems.forEach(item => {
                 item.classList.toggle('clickable-map', !isEditMode); // Toggle clickable state
                 let actionsSpan = item.querySelector('.file-actions');
@@ -1411,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (actionsSpan) {
                     actionsSpan.style.display = isEditMode ? 'inline' : 'none';
                 }
-                updateMoveIconVisibility(uploadedMapsList); // Update visibility on mode toggle
+                updateMoveIconVisibility(mapsList); // Update visibility on mode toggle
                  // If exiting edit mode and an input field is active, revert it
                 const activeInput = item.querySelector('.rename-input-active');
                 if (!isEditMode && activeInput) {
@@ -1426,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (uploadMapsInput && uploadedMapsList) {
+    if (uploadMapsInput && mapsList) {
         uploadMapsInput.addEventListener('change', (event) => {
             const files = event.target.files;
             if (!files) {
@@ -1437,35 +1213,69 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!displayedFileNames.has(file.name)) {
                     const listItem = document.createElement('li');
 
-                    // Store filename in a data attribute for later use (e.g. rename, delete)
                     listItem.dataset.fileName = file.name;
-                    listItem.classList.add('map-list-item'); // Add class for styling and event delegation
+                    listItem.classList.add('map-list-item');
 
                     const textNode = document.createTextNode(file.name);
-                    listItem.appendChild(textNode);
 
-                    uploadedMapsList.appendChild(listItem);
+                    const modeToggleContainer = document.createElement('div');
+                    modeToggleContainer.className = 'mode-toggle-container';
+
+                    const editLabel = document.createElement('span');
+                    editLabel.textContent = 'Edit';
+                    editLabel.className = 'mode-label';
+
+                    const toggleSwitch = document.createElement('label');
+                    toggleSwitch.className = 'switch';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.addEventListener('change', (e) => {
+                        const mapData = detailedMapData.get(file.name);
+                        if (mapData) {
+                            mapData.mode = e.target.checked ? 'view' : 'edit';
+                            console.log(`Map '${file.name}' mode changed to ${mapData.mode}`);
+                            if (selectedMapFileName === file.name) {
+                                displayMapOnCanvas(file.name);
+                                updateButtonStates();
+                            }
+                        }
+                    });
+                    const slider = document.createElement('span');
+                    slider.className = 'slider round';
+                    toggleSwitch.appendChild(checkbox);
+                    toggleSwitch.appendChild(slider);
+
+                    const viewLabel = document.createElement('span');
+                    viewLabel.textContent = 'View';
+                    viewLabel.className = 'mode-label';
+
+                    modeToggleContainer.appendChild(editLabel);
+                    modeToggleContainer.appendChild(toggleSwitch);
+                    modeToggleContainer.appendChild(viewLabel);
+
+                    listItem.appendChild(textNode);
+                    listItem.appendChild(modeToggleContainer);
+
+                    mapsList.appendChild(listItem);
                     displayedFileNames.add(file.name);
 
-                    // Create and store detailed map data
                     const objectURL = URL.createObjectURL(file);
                     detailedMapData.set(file.name, {
                         url: objectURL,
                         name: file.name,
-                        overlays: [] // Initialize with an empty array for overlays
+                        overlays: [],
+                        mode: 'edit'
                     });
 
-                    // Add clickable class if not in edit mode
                     if (!isEditMode) {
                         listItem.classList.add('clickable-map');
                     }
 
-                    // If edit mode is already active, add icons to the new item
                     if (isEditMode) {
                         const actionsSpan = document.createElement('span');
                         actionsSpan.classList.add('file-actions');
                         actionsSpan.style.marginLeft = '10px';
-                        actionsSpan.style.display = 'inline'; // Should be visible if created during edit mode
+                        actionsSpan.style.display = 'inline';
 
                         const renameIcon = document.createElement('span');
                         renameIcon.textContent = '✏️';
@@ -1474,9 +1284,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         renameIcon.style.cursor = 'pointer';
                         renameIcon.style.marginRight = '5px';
                         renameIcon.onclick = () => {
-                            // listItem and textNode are in the closure of this function
-                            enableRename(listItem, textNode);
+                            const textNode = Array.from(listItem.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+                            if (textNode) enableRename(listItem, textNode);
                         };
+
+                        const deleteIcon = document.createElement('span');
+                        deleteIcon.textContent = '🗑️';
+                        deleteIcon.classList.add('file-action-icon', 'delete-map');
+                        deleteIcon.title = 'Delete map';
+                        deleteIcon.style.cursor = 'pointer';
+                        deleteIcon.onclick = () => handleDelete(listItem);
 
                         const upIcon = document.createElement('span');
                         upIcon.textContent = '↑';
@@ -1491,153 +1308,131 @@ document.addEventListener('DOMContentLoaded', () => {
                         downIcon.classList.add('file-action-icon', 'move-map-down');
                         downIcon.title = 'Move down';
                         downIcon.style.cursor = 'pointer';
-                        downIcon.style.marginRight = '5px'; // Added margin for consistency
                         downIcon.onclick = () => moveItemDown(listItem);
-
-                        const deleteIcon = document.createElement('span');
-                        deleteIcon.textContent = '🗑️';
-                        deleteIcon.classList.add('file-action-icon', 'delete-map');
-                        deleteIcon.title = 'Delete map';
-                        deleteIcon.style.cursor = 'pointer';
-                        deleteIcon.onclick = () => handleDelete(listItem);
 
                         actionsSpan.appendChild(renameIcon);
                         actionsSpan.appendChild(upIcon);
                         actionsSpan.appendChild(downIcon);
                         actionsSpan.appendChild(deleteIcon);
                         listItem.appendChild(actionsSpan);
-                        updateMoveIconVisibility(uploadedMapsList); // Update after adding new item
+                        updateMoveIconVisibility(mapsList);
                     }
                 }
             }
-            event.target.value = null; // Clear the input value to allow re-uploading the same file if needed
-            updateMoveIconVisibility(uploadedMapsList); // Update after bulk upload
+            event.target.value = null;
+            updateMoveIconVisibility(mapsList);
         });
     } else {
         console.error('Could not find the upload input or the list element. Check IDs.');
     }
 
-    // Event listener for clicking on map names to display them
-    uploadedMapsList.addEventListener('click', (event) => {
+    mapsList.addEventListener('click', (event) => {
         if (isEditMode) {
-            // If in edit mode, clicks on items might be for renaming, so don't treat as selection for display
-            // Action icons (delete, move, rename) have their own handlers.
-            // We only prevent map display and selection state change here.
             return;
         }
 
         let targetItem = event.target;
-        while (targetItem && targetItem.tagName !== 'LI' && targetItem !== uploadedMapsList) {
+        while (targetItem && targetItem.tagName !== 'LI' && targetItem !== mapsList) {
             targetItem = targetItem.parentNode;
         }
 
         if (targetItem && targetItem.tagName === 'LI' && targetItem.classList.contains('map-list-item')) {
             const clickedFileName = targetItem.dataset.fileName;
             if (clickedFileName) {
-                if (isChangingChildMapForPolygon && selectedPolygonForContextMenu && selectedMapInManager) {
-                    // Handling "Change Child Map" action
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+
+                if (isChangingChildMapForPolygon && selectedPolygonForContextMenu && selectedMapData && selectedMapData.mode === 'edit') {
                     const { overlay, index, parentMapName } = selectedPolygonForContextMenu;
                     if (parentMapName === clickedFileName) {
                         alert("Cannot link a map to itself as a child. Please select a different map.");
-                        // Don't reset isChangingChildMapForPolygon yet, let them pick another.
                         return;
                     }
                     const parentMapData = detailedMapData.get(parentMapName);
                     if (parentMapData && parentMapData.overlays[index] === overlay) {
                         const oldLinkedMapName = overlay.linkedMapName;
                         parentMapData.overlays[index].linkedMapName = clickedFileName;
-
                         alert(`Child map for the selected polygon on "${parentMapName}" changed from "${oldLinkedMapName}" to "${clickedFileName}".`);
-                        console.log(`Child map for polygon on "${parentMapName}" (index ${index}) changed to "${clickedFileName}".`);
-
-                        // If the currently displayed map is the one that was modified, refresh its display
-                        if (selectedMapInManager === parentMapName) {
+                        if (selectedMapFileName === parentMapName) {
                             displayMapOnCanvas(parentMapName);
                         }
                     } else {
-                        console.error("Error changing child map: Parent map data or specific overlay not found or mismatched.");
                         alert("An error occurred while trying to change the child map. Please try again.");
                     }
                     isChangingChildMapForPolygon = false;
-                    selectedPolygonForContextMenu = null; // Clear the selection
-                    // No need to hide context menu, it's already hidden.
-                } else if (isLinkingChildMap && polygonDrawingComplete && selectedMapInManager) {
-                    // Phase 3: Linking a NEW child map (original polygon drawing flow)
-                    if (selectedMapInManager === clickedFileName) {
-                        alert("Cannot link a map to itself. Please select a different map from 'Manage Maps' to be the child.");
+                    selectedPolygonForContextMenu = null;
+                } else if (isLinkingChildMap && polygonDrawingComplete && selectedMapData && selectedMapData.mode === 'edit') {
+                    if (selectedMapFileName === clickedFileName) {
+                        alert("Cannot link a map to itself. Please select a different map to be the child.");
                         return;
                     }
 
-                    const parentMapData = detailedMapData.get(selectedMapInManager);
+                    const parentMapData = detailedMapData.get(selectedMapFileName);
                     if (parentMapData) {
                         const newOverlay = {
                             type: 'childMapLink',
-                            polygon: [...currentPolygonPoints], // Store a copy of the points
+                            polygon: [...currentPolygonPoints],
                             linkedMapName: clickedFileName
                         };
                         parentMapData.overlays.push(newOverlay);
-                        console.log(`Map "${clickedFileName}" linked as child to "${selectedMapInManager}". Overlay data:`, newOverlay);
                         alert(`Map "${clickedFileName}" successfully linked as a new child to "${parentMapData.name}".`);
-
-                        resetAllInteractiveStates(); // This will also call updateButtonStates and redraw the parent map
-                        displayMapOnCanvas(selectedMapInManager); // Ensure parent map shows new link
+                        resetAllInteractiveStates();
+                        displayMapOnCanvas(selectedMapFileName);
                     } else {
-                        console.error("Parent map data not found for new link:", selectedMapInManager);
                         alert("Error: Could not find data for the parent map. Linking failed.");
                         resetAllInteractiveStates();
                     }
                 } else {
-                    // Normal selection behavior (displaying a map from Manage Maps)
-                    if (selectedMapInManager !== null && selectedMapInManager !== clickedFileName) {
-                        // If switching from one selected manager map to another, cancel ongoing interactions
+                    // Normal selection behavior
+                    if (selectedMapFileName !== null && selectedMapFileName !== clickedFileName) {
                         resetAllInteractiveStates();
                     }
-                    selectedMapInManager = clickedFileName;
-                    selectedMapInActiveView = null;
+                    selectedMapFileName = clickedFileName;
 
                     clearAllSelections();
                     targetItem.classList.add('selected-map-item');
 
                     displayMapOnCanvas(clickedFileName);
                     updateButtonStates();
+
+                    const newSelectedMapData = detailedMapData.get(clickedFileName);
+                    if (newSelectedMapData) {
+                        modeToggleSwitch.checked = newSelectedMapData.mode === 'view';
+                        modeToggleSwitch.disabled = false;
+                        if (newSelectedMapData.mode === 'view') {
+                            sendMapToPlayerView(clickedFileName);
+                        }
+                    } else {
+                        modeToggleSwitch.disabled = true;
+                    }
                 }
             }
         }
     });
 
+    if (modeToggleSwitch) {
+        modeToggleSwitch.addEventListener('change', () => {
+            if (!selectedMapFileName) return;
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (selectedMapData) {
+                selectedMapData.mode = modeToggleSwitch.checked ? 'view' : 'edit';
+                console.log(`Map '${selectedMapFileName}' mode changed to ${selectedMapData.mode}`);
+                displayMapOnCanvas(selectedMapFileName);
+                updateButtonStates();
+                if (selectedMapData.mode === 'view') {
+                    sendMapToPlayerView(selectedMapFileName);
+                } else {
+                    // If switching back to edit, clear player view
+                    sendClearMessageToPlayerView();
+                }
+            }
+        });
+    }
+
     function clearAllSelections() {
-        const allMapItems = document.querySelectorAll('#uploaded-maps-list li, #active-maps-list li');
+        const allMapItems = document.querySelectorAll('#maps-list li');
         allMapItems.forEach(item => item.classList.remove('selected-map-item'));
     }
 
-    function renderActiveMapsList() {
-        const previouslySelectedActiveMap = selectedMapInActiveView; // Preserve selection if possible
-        activeMapsList.innerHTML = ''; // Clear current list
-
-        activeMapsData.forEach(mapData => {
-            const listItem = document.createElement('li');
-            listItem.textContent = mapData.fileName;
-            listItem.dataset.fileName = mapData.fileName;
-            listItem.classList.add('map-list-item', 'clickable-map'); // Standard classes
-
-            if (mapData.fileName === previouslySelectedActiveMap) {
-                listItem.classList.add('selected-map-item'); // Restore selection
-            }
-
-            listItem.addEventListener('click', () => {
-                selectedMapInActiveView = mapData.fileName;
-                selectedMapInManager = null;
-
-                clearAllSelections();
-                listItem.classList.add('selected-map-item');
-
-                displayMapOnCanvas(mapData.fileName);
-                updateButtonStates();
-                sendMapToPlayerView(mapData.fileName); // Send to player view
-            });
-            activeMapsList.appendChild(listItem);
-        });
-    }
 
 
     // Initial canvas setup
@@ -1662,55 +1457,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // disableMapTools(); // Will be handled by updateButtonStates
 
     function updateButtonStates() {
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        const isEditMode = selectedMapData && selectedMapData.mode === 'edit';
         const inLinkingProcess = isLinkingChildMap || polygonDrawingComplete;
 
-        // Add to Active List / Update Changes to Active List button
-        if (btnAddToActive) {
-            if (selectedMapInManager) {
-                const isAlreadyInActiveList = activeMapsData.some(map => map.fileName === selectedMapInManager);
-                if (isAlreadyInActiveList) {
-                    btnAddToActive.textContent = 'Update Changes to Active List';
-                    btnAddToActive.disabled = inLinkingProcess; // Can update unless linking
-                } else {
-                    btnAddToActive.textContent = 'Add to Active List';
-                    btnAddToActive.disabled = inLinkingProcess; // Can add unless linking
-                }
-            } else {
-                btnAddToActive.textContent = 'Add to Active List';
-                btnAddToActive.disabled = true; // No manager map selected
-            }
-        }
-
-        // Remove from Active List button
-        if (btnRemoveFromActive) btnRemoveFromActive.disabled = inLinkingProcess || !selectedMapInActiveView;
-
-        // Link to Child Map button
         if (btnLinkChildMap) {
-            if (isLinkingChildMap && !polygonDrawingComplete) { // Actively drawing polygon
+            if (isLinkingChildMap && !polygonDrawingComplete) {
                 btnLinkChildMap.textContent = 'Cancel Drawing Link';
                 btnLinkChildMap.disabled = false;
-            } else if (isLinkingChildMap && polygonDrawingComplete) { // Polygon drawn, waiting for child map selection
-                btnLinkChildMap.textContent = 'Cancel Link - Select Child'; // Or similar
-                btnLinkChildMap.disabled = false; // Still acts as a cancel
-            } else { // Initial state or after successful link/cancellation
+            } else if (isLinkingChildMap && polygonDrawingComplete) {
+                btnLinkChildMap.textContent = 'Cancel Link - Select Child';
+                btnLinkChildMap.disabled = false;
+            } else {
                 btnLinkChildMap.textContent = 'Link to Child Map';
-                btnLinkChildMap.disabled = !selectedMapInManager;
+                btnLinkChildMap.disabled = !isEditMode || inLinkingProcess;
             }
         }
 
-
-        // Future buttons: Consider disabling them during the linking process as well.
         const btnLinkNote = document.getElementById('btn-link-note');
-        if (btnLinkNote) btnLinkNote.disabled = inLinkingProcess || !selectedMapInManager;
-        if (btnLinkCharacter) btnLinkCharacter.disabled = inLinkingProcess || !selectedMapInManager;
-        // if (btnLinkTrigger) btnLinkTrigger.disabled = !selectedMapInManager; // Example
-        // if (btnRemoveLinks) btnRemoveLinks.disabled = !(selectedMapInManager || selectedMapInActiveView); // Example: if something is selected
+        if (btnLinkNote) btnLinkNote.disabled = !isEditMode || inLinkingProcess;
+        const btnLinkCharacter = document.getElementById('btn-link-character');
+        if (btnLinkCharacter) btnLinkCharacter.disabled = !isEditMode || inLinkingProcess;
     }
 
     // Initial setup calls
     resizeCanvas(); // Size canvas on load
     window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
-    renderActiveMapsList(); // Initial render for active maps list (will be empty)
     updateButtonStates(); // Set initial button states
 
     // Notes Tab Initialisation
@@ -1765,13 +1537,13 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const [name, data] of detailedMapData) {
                 serializableDetailedMapData[name] = {
                     name: data.name,
-                    overlays: data.overlays
+                    overlays: data.overlays,
+                    mode: data.mode
                 };
             }
 
             const campaignData = {
                 mapDefinitions: serializableDetailedMapData,
-                activeMaps: activeMapsData,
                 notes: notesData,
                 selectedNoteId: selectedNoteId,
                 characters: charactersToSave, // Use the version without pdfData
@@ -1831,9 +1603,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Restore selections and display
             if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
             if (selectedNoteId) loadNoteIntoEditor(selectedNoteId);
-            const mapToDisplay = selectedMapInActiveView || selectedMapInManager;
-            if (mapToDisplay) {
-                displayMapOnCanvas(mapToDisplay);
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
             } else {
                 const ctx = dmCanvas.getContext('2d');
                 ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
@@ -1869,14 +1640,13 @@ document.addEventListener('DOMContentLoaded', () => {
         displayedFileNames.clear();
 
         // Clear selections
-        selectedMapInManager = null;
-        selectedMapInActiveView = null;
+        selectedMapFileName = null;
         selectedNoteId = null;
         selectedCharacterId = null;
 
         // Reset UI components
-        uploadedMapsList.innerHTML = '';
-        activeMapsList.innerHTML = '';
+        if (modeToggleSwitch) modeToggleSwitch.disabled = true;
+        mapsList.innerHTML = '';
         notesList.innerHTML = '';
         charactersList.innerHTML = '';
         clearNoteEditor();
@@ -1886,8 +1656,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAllLists() {
-        renderUploadedMapsList();
-        renderActiveMapsList();
+        renderMapsList();
         renderNotesList();
         renderCharactersList();
     }
@@ -1901,7 +1670,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const campaignData = JSON.parse(campaignJSON);
 
         // --- Restore Data Structures (without assets yet) ---
-        activeMapsData = campaignData.activeMaps || [];
         notesData = campaignData.notes || [];
         charactersData = campaignData.characters || []; // This now includes pdfFileName
         selectedNoteId = campaignData.selectedNoteId || null;
@@ -1920,12 +1688,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailedMapData.set(mapName, {
                         name: definition.name,
                         url: url,
-                        overlays: definition.overlays || []
+                        overlays: definition.overlays || [],
+                        mode: definition.mode || 'edit' // Backward compatibility
                     });
                     displayedFileNames.add(mapName);
                 });
                 imagePromises.push(promise);
             }
+        }
+        // Handle old save format
+        if (campaignData.activeMaps) {
+            campaignData.activeMaps.forEach(activeMap => {
+                const mapData = detailedMapData.get(activeMap.fileName);
+                if (mapData) {
+                    mapData.mode = 'view';
+                }
+            });
         }
         await Promise.all(imagePromises);
 
@@ -1950,7 +1728,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const campaignData = JSON.parse(campaignJSON);
 
         // Legacy support: data structures are restored, but assets are missing.
-        activeMapsData = campaignData.activeMaps || [];
         notesData = campaignData.notes || [];
         charactersData = campaignData.characters || [];
         selectedNoteId = campaignData.selectedNoteId || null;
@@ -1962,28 +1739,76 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailedMapData.set(mapName, {
                     name: definition.name,
                     url: null, // No URL available in old format
-                    overlays: definition.overlays || []
+                    overlays: definition.overlays || [],
+                    mode: definition.mode || 'edit' // Backward compatibility
                 });
                 displayedFileNames.add(mapName);
             }
         }
+        // Handle old save format
+        if (campaignData.activeMaps) {
+            campaignData.activeMaps.forEach(activeMap => {
+                const mapData = detailedMapData.get(activeMap.fileName);
+                if (mapData) {
+                    mapData.mode = 'view';
+                }
+            });
+        }
         alert("Legacy campaign loaded. Please re-upload map and character files manually.");
     }
 
-    function renderUploadedMapsList() {
-        uploadedMapsList.innerHTML = '';
+    function renderMapsList() {
+        mapsList.innerHTML = '';
         for (const mapName of displayedFileNames) {
+            const mapData = detailedMapData.get(mapName);
+            if (!mapData) continue;
+
             const listItem = document.createElement('li');
             listItem.dataset.fileName = mapName;
-            listItem.classList.add('map-list-item', 'clickable-map');
+            listItem.classList.add('map-list-item');
+
             const textNode = document.createTextNode(mapName);
+
+            const modeToggleContainer = document.createElement('div');
+            modeToggleContainer.className = 'mode-toggle-container';
+
+            const editLabel = document.createElement('span');
+            editLabel.textContent = 'Edit';
+            editLabel.className = 'mode-label';
+
+            const toggleSwitch = document.createElement('label');
+            toggleSwitch.className = 'switch';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = mapData.mode === 'view';
+            checkbox.addEventListener('change', (e) => {
+                mapData.mode = e.target.checked ? 'view' : 'edit';
+                console.log(`Map '${mapName}' mode changed to ${mapData.mode}`);
+                if (selectedMapFileName === mapName) {
+                    displayMapOnCanvas(mapName);
+                    updateButtonStates();
+                }
+            });
+            const slider = document.createElement('span');
+            slider.className = 'slider round';
+            toggleSwitch.appendChild(checkbox);
+            toggleSwitch.appendChild(slider);
+
+            const viewLabel = document.createElement('span');
+            viewLabel.textContent = 'View';
+            viewLabel.className = 'mode-label';
+
+            modeToggleContainer.appendChild(editLabel);
+            modeToggleContainer.appendChild(toggleSwitch);
+            modeToggleContainer.appendChild(viewLabel);
+
             listItem.appendChild(textNode);
-            uploadedMapsList.appendChild(listItem);
+            listItem.appendChild(modeToggleContainer);
+            mapsList.appendChild(listItem);
         }
-        // Restore edit mode if it was active
         if (isEditMode) {
-            editMapsIcon.click(); // Toggle it off
-            editMapsIcon.click(); // and back on to refresh icons
+            editMapsIcon.click();
+            editMapsIcon.click();
         }
     }
 
@@ -1997,26 +1822,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Player View Communication ---
     function sendMapToPlayerView(mapFileName) {
         if (playerWindow && !playerWindow.closed && mapFileName) {
-            const dmMapData = detailedMapData.get(mapFileName); // Used for the base image URL
-            const activeMapInstance = activeMapsData.find(am => am.fileName === mapFileName); // Used for overlays
+            const mapData = detailedMapData.get(mapFileName);
 
-            if (dmMapData && dmMapData.url && activeMapInstance) {
-                fetch(dmMapData.url)
+            if (mapData && mapData.url && mapData.mode === 'view') {
+                fetch(mapData.url)
                     .then(response => response.blob())
                     .then(blob => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
                             const base64dataUrl = reader.result;
-                            // Filter overlays: only send those with playerVisible !== false (or true/undefined)
-                            const visibleOverlays = activeMapInstance.overlays.filter(overlay => {
+                            const visibleOverlays = mapData.overlays.filter(overlay => {
                                 return typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true;
                             });
                             playerWindow.postMessage({
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
-                                overlays: JSON.parse(JSON.stringify(visibleOverlays)) // Send a deep copy of filtered overlays
+                                overlays: JSON.parse(JSON.stringify(visibleOverlays))
                             }, '*');
-                            console.log(`Sent map "${mapFileName}" (as data URL) and ${visibleOverlays.length} visible overlays to player view.`);
+                            console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
                         };
                         reader.onerror = () => {
                             console.error(`Error converting map "${mapFileName}" to data URL for player view.`);
@@ -2027,11 +1850,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error(`Error fetching blob for map "${mapFileName}" to send to player view:`, error);
                     });
             } else {
-                console.warn(`Could not send map to player view: DM Map data, URL for "${mapFileName}", or active instance not found.`);
-            }
-        } else {
-            if (!mapFileName) {
-                console.warn("sendMapToPlayerView called without a mapFileName.");
+                console.warn(`Could not send map to player view: Map data, URL for "${mapFileName}", or mode is not 'view'.`);
             }
         }
     }
@@ -2065,16 +1884,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (playerWindow) {
                     // Send current map after a short delay to allow the window to load its listeners
                     setTimeout(() => {
-                        if (selectedMapInActiveView) { // Check selectedMapInActiveView directly
-                            sendMapToPlayerView(selectedMapInActiveView);
+                        if (selectedMapFileName) {
+                            sendMapToPlayerView(selectedMapFileName);
                         }
                     }, 500);
                 }
             } else {
                 playerWindow.focus();
                 // If focused and a map is active, ensure it has the latest.
-                if (selectedMapInActiveView) { // Check selectedMapInActiveView directly
-                     sendMapToPlayerView(selectedMapInActiveView);
+                if (selectedMapFileName) {
+                     sendMapToPlayerView(selectedMapFileName);
                 }
             }
         });
@@ -2097,8 +1916,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
 
-        // Context menu is available if a map is selected in EITHER Manage Maps OR Active View
-        if (!selectedMapInManager && !selectedMapInActiveView) {
+        if (!selectedMapFileName) {
             return;
         }
 
@@ -2106,50 +1924,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const canvasY = event.offsetY;
         const imageCoords = getRelativeCoords(canvasX, canvasY);
 
-        if (!imageCoords) return; // Click was outside the image
+        if (!imageCoords) return;
 
-        let mapToSearchForOverlays = null;
-        let overlaySource = null; // To distinguish between 'manager' and 'active'
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData || !selectedMapData.overlays) return;
 
-        if (selectedMapInActiveView) {
-            mapToSearchForOverlays = activeMapsData.find(am => am.fileName === selectedMapInActiveView);
-            overlaySource = 'active';
-        } else if (selectedMapInManager) {
-            mapToSearchForOverlays = detailedMapData.get(selectedMapInManager);
-            overlaySource = 'manager';
-        }
+        for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+            const overlay = selectedMapData.overlays[i];
+            if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                selectedPolygonForContextMenu = {
+                    overlay: overlay,
+                    index: i,
+                    parentMapName: selectedMapData.name,
+                    source: selectedMapData.mode
+                };
 
-        if (mapToSearchForOverlays && mapToSearchForOverlays.overlays) {
-            for (let i = mapToSearchForOverlays.overlays.length - 1; i >= 0; i--) {
-                const overlay = mapToSearchForOverlays.overlays[i];
-                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                    selectedPolygonForContextMenu = {
-                        overlay: overlay,
-                        index: i,
-                        parentMapName: mapToSearchForOverlays.name || mapToSearchForOverlays.fileName, // .name for detailedMapData, .fileName for activeMapsData
-                        source: overlaySource // 'manager' or 'active'
-                    };
+                const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
+                const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
+                const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
+                const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
 
-                    // Show/hide context menu items based on source
-                    const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
-                    const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
-                    const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
-                    const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
-                    const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
-
-                    if (overlaySource === 'active') {
-                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
-                        if (changeChildMapItem) changeChildMapItem.style.display = 'none';
-                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
-                        if (movePolygonItem) movePolygonItem.style.display = 'none';
-                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
-                    } else { // manager source
-                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
-                        if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
-                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
-                        if (movePolygonItem) movePolygonItem.style.display = 'list-item';
-                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
-                    }
+                if (selectedMapData.mode === 'view') {
+                    if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                    if (changeChildMapItem) changeChildMapItem.style.display = 'none';
+                    if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
+                    if (movePolygonItem) movePolygonItem.style.display = 'none';
+                    if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                } else { // edit mode
+                    if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                    if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
+                    if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
+                    if (movePolygonItem) movePolygonItem.style.display = 'list-item';
+                    if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                }
 
                     // Use pageX/pageY for positioning relative to the entire document
                     polygonContextMenu.style.left = `${event.pageX}px`;
@@ -2161,8 +1969,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedNoteForContextMenu = {
                         overlay: overlay,
                         index: i,
-                        parentMapName: mapToSearchForOverlays.name || mapToSearchForOverlays.fileName,
-                        source: overlaySource
+                        parentMapName: selectedMapData.name,
+                        source: selectedMapData.mode
                     };
 
                     const toggleVisibilityItem = noteContextMenu.querySelector('[data-action="toggle-player-visibility"]');
@@ -2170,12 +1978,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const moveNoteItem = noteContextMenu.querySelector('[data-action="move-note"]');
                     const deleteLinkItem = noteContextMenu.querySelector('[data-action="delete-link"]');
 
-                    if (overlaySource === 'active') {
+                    if (selectedMapData.mode === 'view') {
                         if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
                         if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'none';
                         if (moveNoteItem) moveNoteItem.style.display = 'none';
                         if (deleteLinkItem) deleteLinkItem.style.display = 'none';
-                    } else { // manager source
+                    } else { // edit mode
                         if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
                         if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'list-item';
                         if (moveNoteItem) moveNoteItem.style.display = 'list-item';
@@ -2191,8 +1999,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedCharacterForContextMenu = {
                         overlay: overlay,
                         index: i,
-                        parentMapName: mapToSearchForOverlays.name || mapToSearchForOverlays.fileName,
-                        source: overlaySource
+                        parentMapName: selectedMapData.name,
+                        source: selectedMapData.mode
                     };
 
                     const toggleVisibilityItem = characterContextMenu.querySelector('[data-action="toggle-player-visibility"]');
@@ -2200,12 +2008,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const moveCharacterItem = characterContextMenu.querySelector('[data-action="move-character"]');
                     const deleteLinkItem = characterContextMenu.querySelector('[data-action="delete-link"]');
 
-                    if (overlaySource === 'active') {
+                    if (selectedMapData.mode === 'view') {
                         if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
                         if (linkToCharacterItem) linkToCharacterItem.style.display = 'none';
                         if (moveCharacterItem) moveCharacterItem.style.display = 'none';
                         if (deleteLinkItem) deleteLinkItem.style.display = 'none';
-                    } else { // manager source
+                    } else { // edit mode
                         if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
                         if (linkToCharacterItem) linkToCharacterItem.style.display = 'list-item';
                         if (moveCharacterItem) moveCharacterItem.style.display = 'list-item';
@@ -2253,13 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (action && selectedPolygonForContextMenu) {
             const { overlay, index, parentMapName, source } = selectedPolygonForContextMenu;
 
-            // Determine the correct data source (manager vs active)
-            let parentMapData;
-            if (source === 'manager') {
-                parentMapData = detailedMapData.get(parentMapName);
-            } else if (source === 'active') {
-                parentMapData = activeMapsData.find(am => am.fileName === parentMapName);
-            }
+            const parentMapData = detailedMapData.get(parentMapName);
 
             if (!parentMapData) {
                 console.error(`Parent map data not found for context menu action. Name: ${parentMapName}, Source: ${source}`);
@@ -2270,52 +2072,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
             switch (action) {
                 case 'toggle-player-visibility':
-                    if (source === 'active') {
-                        // Ensure playerVisible property exists, default to true if not
+                    if (source === 'view') {
                         if (typeof overlay.playerVisible !== 'boolean') {
                             overlay.playerVisible = true;
                         }
-                        overlay.playerVisible = !overlay.playerVisible; // Toggle
+                        overlay.playerVisible = !overlay.playerVisible;
                         console.log(`Polygon visibility for "${overlay.linkedMapName}" on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
                         alert(`Player visibility for this area is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
 
-                        // If the currently displayed map is the one that was modified, refresh its display on DM canvas
-                        if (selectedMapInActiveView === parentMapName) {
+                        if (selectedMapFileName === parentMapName) {
                             displayMapOnCanvas(parentMapName);
-                            // Also, resend the entire map and visible overlays to player view for consistency
                             sendMapToPlayerView(parentMapName);
                         } else {
-                            // If the modified map is not currently displayed on DM canvas,
-                            // still need to inform player view if it's the one they are seeing.
-                            // This requires checking what map player view has.
-                            // For simplicity, if playerWindow is open, always send.
-                            // A more targeted approach would involve player view reporting its current map.
                             if (playerWindow && !playerWindow.closed) {
                                 sendMapToPlayerView(parentMapName);
                             }
                         }
-                        // The specific sendPolygonVisibilityUpdateToPlayerView might become redundant
-                        // if sendMapToPlayerView is called, as it sends the whole state.
-                        // const polygonIdentifier = JSON.stringify(overlay.polygon);
-                        // sendPolygonVisibilityUpdateToPlayerView(parentMapName, polygonIdentifier, overlay.playerVisible);
                     } else {
-                        console.warn("Toggle Player Visibility action called on a non-active map overlay.");
-                        alert("This action is only available for maps in the Active View.");
+                        console.warn("Toggle Player Visibility action called on a map not in 'view' mode.");
+                        alert("This action is only available for maps in 'View' mode.");
                     }
                     polygonContextMenu.style.display = 'none';
                     selectedPolygonForContextMenu = null;
                     break;
-                // --- Cases for 'manager' source ---
                 case 'change-child-map':
-                    if (source === 'manager') {
+                    if (source === 'edit') {
                         isChangingChildMapForPolygon = true;
-                        alert(`"Change Child Map" selected for polygon linking to "${overlay.linkedMapName}". Please click a new map from the "Manage Maps" list to be its new child.`);
-                        // selectedPolygonForContextMenu remains for the next step
+                        alert(`"Change Child Map" selected for polygon linking to "${overlay.linkedMapName}". Please click a new map from the list to be its new child.`);
                     }
                     polygonContextMenu.style.display = 'none';
                     break;
                 case 'redraw-polygon':
-                    if (source === 'manager' && parentMapData.overlays && parentMapData.overlays[index]) {
+                    if (source === 'edit' && parentMapData.overlays && parentMapData.overlays[index]) {
                         isRedrawingPolygon = true;
                         preservedLinkedMapNameForRedraw = overlay.linkedMapName;
                         currentPolygonPoints = [];
@@ -2323,11 +2111,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         parentMapData.overlays.splice(index, 1);
                         dmCanvas.style.cursor = 'crosshair';
                         alert(`Redrawing polygon for link to "${preservedLinkedMapNameForRedraw}". Click on the map to start drawing. Click the first point to close it.`);
-                        if (selectedMapInManager === parentMapName) {
+                        if (selectedMapFileName === parentMapName) {
                             displayMapOnCanvas(parentMapName);
                         }
                         console.log('Redraw Polygon initiated. Old polygon removed. Preserved link:', preservedLinkedMapNameForRedraw);
-                    } else if (source === 'manager') {
+                    } else if (source === 'edit') {
                         console.error("Error initiating redraw: Parent map data or overlay not found.");
                         alert("Error: Could not find the polygon to redraw.");
                     }
@@ -2335,7 +2123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!isRedrawingPolygon) selectedPolygonForContextMenu = null;
                     break;
                 case 'move-polygon':
-                    if (source === 'manager' && parentMapData.overlays && parentMapData.overlays[index]) {
+                    if (source === 'edit' && parentMapData.overlays && parentMapData.overlays[index]) {
                         isMovingPolygon = true;
                         polygonBeingMoved = {
                             overlayRef: overlay,
@@ -2348,7 +2136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         dmCanvas.style.cursor = 'move';
                         alert(`Move mode activated for polygon linking to "${overlay.linkedMapName}". Click and drag the polygon. Click again to place, or right-click to cancel.`);
                         console.log('Move Polygon initiated for:', polygonBeingMoved);
-                    } else if (source === 'manager') {
+                    } else if (source === 'edit') {
                         console.error("Error initiating move: Parent map data or overlay not found.");
                         alert("Error: Could not find the polygon to move.");
                     }
@@ -2356,16 +2144,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedPolygonForContextMenu = null;
                     break;
                 case 'delete-link':
-                    if (source === 'manager' && parentMapData.overlays && parentMapData.overlays[index]) {
+                    if (source === 'edit' && parentMapData.overlays && parentMapData.overlays[index]) {
                         if (confirm(`Are you sure you want to delete the link to "${overlay.linkedMapName}"?`)) {
                             parentMapData.overlays.splice(index, 1);
                             console.log(`Link to "${overlay.linkedMapName}" deleted from map "${parentMapName}".`);
                             alert(`Link to "${overlay.linkedMapName}" has been deleted.`);
-                            if (selectedMapInManager === parentMapName) {
+                            if (selectedMapFileName === parentMapName) {
                                 displayMapOnCanvas(parentMapName);
                             }
                         }
-                    } else if (source === 'manager') {
+                    } else if (source === 'edit') {
                         console.error("Error deleting link: Parent map data or overlay not found.");
                         alert("Error: Could not find the link to delete.");
                     }
@@ -2802,12 +2590,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (action && selectedNoteForContextMenu) {
                 const { overlay, index, parentMapName, source } = selectedNoteForContextMenu;
 
-                let parentMapData;
-                if (source === 'manager') {
-                    parentMapData = detailedMapData.get(parentMapName);
-                } else if (source === 'active') {
-                    parentMapData = activeMapsData.find(am => am.fileName === parentMapName);
-                }
+                const parentMapData = detailedMapData.get(parentMapName);
 
                 if (!parentMapData) {
                     console.error(`Parent map data not found for note context menu action. Name: ${parentMapName}, Source: ${source}`);
@@ -2818,49 +2601,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 switch (action) {
                     case 'link-to-new-note':
-                        if (notesData.length === 0) {
-                            alert("No notes available. Please create a new note first in the Notes tab.");
-                            noteContextMenu.style.display = 'none';
-                            selectedNoteForContextMenu = null;
-                            return;
+                        if (source === 'edit') {
+                            if (notesData.length === 0) {
+                                alert("No notes available. Please create a new note first in the Notes tab.");
+                                selectedNoteForContextMenu = null;
+                            } else {
+                                alert("Please select a note from the list in the Notes tab to link it.");
+                                switchTab('tab-notes');
+                            }
                         }
-                        alert("Please select a note from the list in the Notes tab to link it.");
-                        switchTab('tab-notes');
-                        // The actual linking will be handled by the notesList click listener
                         break;
                     case 'move-note':
-                        isMovingNote = true;
-                        noteBeingMoved = {
-                            overlayRef: overlay,
-                            originalPosition: { ...overlay.position },
-                            parentMapName: parentMapName,
-                            originalIndex: index
-                        };
-                        moveStartPoint = null;
-                        currentDragOffsets = { x: 0, y: 0 };
-                        dmCanvas.style.cursor = 'move';
-                        alert(`Move mode activated for note. Click and drag the note icon. Click again to place, or right-click to cancel.`);
-                        console.log('Move Note initiated for:', noteBeingMoved);
+                        if (source === 'edit') {
+                            isMovingNote = true;
+                            noteBeingMoved = {
+                                overlayRef: overlay,
+                                originalPosition: { ...overlay.position },
+                                parentMapName: parentMapName,
+                                originalIndex: index
+                            };
+                            moveStartPoint = null;
+                            currentDragOffsets = { x: 0, y: 0 };
+                            dmCanvas.style.cursor = 'move';
+                            alert(`Move mode activated for note. Click and drag the note icon. Click again to place, or right-click to cancel.`);
+                            console.log('Move Note initiated for:', noteBeingMoved);
+                        }
                         break;
                     case 'delete-link':
-                        if (confirm(`Are you sure you want to delete this note link?`)) {
+                        if (source === 'edit' && confirm(`Are you sure you want to delete this note link?`)) {
                             parentMapData.overlays.splice(index, 1);
                             console.log(`Note link deleted from map "${parentMapName}".`);
                             alert(`Note link has been deleted.`);
-                            if (selectedMapInManager === parentMapName) {
+                            if (selectedMapFileName === parentMapName) {
                                 displayMapOnCanvas(parentMapName);
                             }
                         }
                         break;
                     case 'toggle-player-visibility':
-                        if (source === 'active') {
+                        if (source === 'view') {
                             if (typeof overlay.playerVisible !== 'boolean') {
                                 overlay.playerVisible = true;
                             }
                             overlay.playerVisible = !overlay.playerVisible;
                             console.log(`Note visibility for note link on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
                             alert(`Player visibility for this note is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
-                            if (selectedMapInActiveView === parentMapName) {
+                            if (selectedMapFileName === parentMapName) {
                                 displayMapOnCanvas(parentMapName);
                                 sendMapToPlayerView(parentMapName);
                             }
@@ -3479,12 +3264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (action && selectedCharacterForContextMenu) {
                 const { overlay, index, parentMapName, source } = selectedCharacterForContextMenu;
 
-                let parentMapData;
-                if (source === 'manager') {
-                    parentMapData = detailedMapData.get(parentMapName);
-                } else if (source === 'active') {
-                    parentMapData = activeMapsData.find(am => am.fileName === parentMapName);
-                }
+                const parentMapData = detailedMapData.get(parentMapName);
 
                 if (!parentMapData) {
                     console.error(`Parent map data not found for character context menu action. Name: ${parentMapName}, Source: ${source}`);
@@ -3495,49 +3275,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 switch (action) {
                     case 'link-to-character':
-                        if (charactersData.length === 0) {
-                            alert("No characters available. Please create a new character first in the Characters tab.");
-                            characterContextMenu.style.display = 'none';
-                            selectedCharacterForContextMenu = null;
-                            return;
+                        if (source === 'edit') {
+                            if (charactersData.length === 0) {
+                                alert("No characters available. Please create a new character first in the Characters tab.");
+                                selectedCharacterForContextMenu = null;
+                            } else {
+                                alert("Please select a character from the list in the Characters tab to link it.");
+                                switchTab('tab-characters');
+                            }
                         }
-                        alert("Please select a character from the list in the Characters tab to link it.");
-                        switchTab('tab-characters');
-                        // The actual linking will be handled by the charactersList click listener
                         break;
                     case 'move-character':
-                        isMovingCharacter = true;
-                        characterBeingMoved = {
-                            overlayRef: overlay,
-                            originalPosition: { ...overlay.position },
-                            parentMapName: parentMapName,
-                            originalIndex: index
-                        };
-                        moveStartPoint = null;
-                        currentDragOffsets = { x: 0, y: 0 };
-                        dmCanvas.style.cursor = 'move';
-                        alert(`Move mode activated for character. Click and drag the character icon. Click again to place, or right-click to cancel.`);
-                        console.log('Move Character initiated for:', characterBeingMoved);
+                         if (source === 'edit') {
+                            isMovingCharacter = true;
+                            characterBeingMoved = {
+                                overlayRef: overlay,
+                                originalPosition: { ...overlay.position },
+                                parentMapName: parentMapName,
+                                originalIndex: index
+                            };
+                            moveStartPoint = null;
+                            currentDragOffsets = { x: 0, y: 0 };
+                            dmCanvas.style.cursor = 'move';
+                            alert(`Move mode activated for character. Click and drag the character icon. Click again to place, or right-click to cancel.`);
+                            console.log('Move Character initiated for:', characterBeingMoved);
+                        }
                         break;
                     case 'delete-link':
-                        if (confirm(`Are you sure you want to delete this character link?`)) {
+                        if (source === 'edit' && confirm(`Are you sure you want to delete this character link?`)) {
                             parentMapData.overlays.splice(index, 1);
                             console.log(`Character link deleted from map "${parentMapName}".`);
                             alert(`Character link has been deleted.`);
-                            if (selectedMapInManager === parentMapName) {
+                            if (selectedMapFileName === parentMapName) {
                                 displayMapOnCanvas(parentMapName);
                             }
                         }
                         break;
                     case 'toggle-player-visibility':
-                        if (source === 'active') {
+                        if (source === 'view') {
                             if (typeof overlay.playerVisible !== 'boolean') {
                                 overlay.playerVisible = true;
                             }
                             overlay.playerVisible = !overlay.playerVisible;
                             console.log(`Character visibility for character link on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
                             alert(`Player visibility for this character is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
-                            if (selectedMapInActiveView === parentMapName) {
+                            if (selectedMapFileName === parentMapName) {
                                 displayMapOnCanvas(parentMapName);
                                 sendMapToPlayerView(parentMapName);
                             }
