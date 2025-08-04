@@ -1556,151 +1556,268 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveCampaignButton = document.getElementById('save-campaign-button');
     const loadCampaignInput = document.getElementById('load-campaign-input');
 
-    function saveCampaign() {
-        // Prepare detailedMapData for saving: extract relevant info, discard non-serializable parts like live ObjectURLs.
-        // We save the map names and their overlays. The actual map image files are expected to be managed
-        // by the user (e.g., re-uploaded based on saved names if not embedding actual image data).
-        const serializableDetailedMapData = {};
-        for (const [name, data] of detailedMapData) {
-            serializableDetailedMapData[name] = {
-                name: data.name,
-                overlays: data.overlays // Assuming overlays are already serializable (points, linked names)
+    async function saveCampaign() {
+        saveCampaignButton.textContent = 'Saving...';
+        saveCampaignButton.disabled = true;
+
+        try {
+            const zip = new JSZip();
+            const imagesFolder = zip.folder("images");
+            const charactersFolder = zip.folder("characters");
+
+            // --- Handle Map Images ---
+            const imagePromises = [];
+            for (const [name, data] of detailedMapData.entries()) {
+                if (data.url) {
+                    const promise = fetch(data.url)
+                        .then(response => response.blob())
+                        .then(blob => {
+                            imagesFolder.file(name, blob);
+                            console.log(`Added map image to zip: ${name}`);
+                        })
+                        .catch(err => console.error(`Failed to fetch and zip map ${name}:`, err));
+                    imagePromises.push(promise);
+                }
+            }
+            await Promise.all(imagePromises);
+
+            // --- Handle Character PDFs ---
+            const charactersToSave = JSON.parse(JSON.stringify(charactersData));
+            charactersToSave.forEach(character => {
+                const originalCharacter = charactersData.find(c => c.id === character.id);
+                if (originalCharacter && originalCharacter.pdfData && originalCharacter.pdfFileName) {
+                    charactersFolder.file(originalCharacter.pdfFileName, originalCharacter.pdfData);
+                    console.log(`Added character PDF to zip: ${originalCharacter.pdfFileName}`);
+                    // We keep pdfFileName in the JSON, but remove the heavy data
+                    delete character.pdfData;
+                }
+            });
+
+            // --- Prepare and add campaign.json ---
+            const serializableDetailedMapData = {};
+            for (const [name, data] of detailedMapData) {
+                serializableDetailedMapData[name] = {
+                    name: data.name,
+                    overlays: data.overlays
+                };
+            }
+
+            const campaignData = {
+                mapDefinitions: serializableDetailedMapData,
+                activeMaps: activeMapsData,
+                notes: notesData,
+                selectedNoteId: selectedNoteId,
+                characters: charactersToSave, // Use the version without pdfData
+                selectedCharacterId: selectedCharacterId,
             };
+
+            const campaignJSON = JSON.stringify(campaignData, null, 2);
+            zip.file("campaign.json", campaignJSON);
+
+            // --- Generate and Download Zip ---
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dndemicube-campaign.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log("Campaign saved successfully to zip.");
+            alert("Campaign saved successfully!");
+
+        } catch (error) {
+            console.error("Error saving campaign to zip:", error);
+            alert("An error occurred while saving the campaign. Please check the console for details.");
+        } finally {
+            saveCampaignButton.textContent = 'Save Campaign';
+            saveCampaignButton.disabled = false;
         }
-
-        const campaignData = {
-            mapDefinitions: serializableDetailedMapData, // Holds map names and their overlay configurations
-            activeMaps: activeMapsData, // Holds the state of the active view (filenames and their instance-specific overlays)
-            notes: notesData, // Save notes
-            selectedNoteId: selectedNoteId, // Save selected note ID
-            characters: charactersData,
-            selectedCharacterId: selectedCharacterId,
-            // Add other campaign elements to save here (characters, etc.)
-            // currentSelectedMapInManager: selectedMapInManager, // Optional: save UI state
-            // currentSelectedMapInActiveView: selectedMapInActiveView // Optional: save UI state
-        };
-
-        const campaignJSON = JSON.stringify(campaignData, null, 2);
-        const blob = new Blob([campaignJSON], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'dndemicube-campaign.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        console.log("Campaign saved.", campaignData);
     }
 
-    function loadCampaign(event) {
+    async function loadCampaign(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const campaignData = JSON.parse(e.target.result);
-                console.log("Campaign data loaded:", campaignData);
+        const loadButtonLabel = document.querySelector('label[for="load-campaign-input"]');
+        loadButtonLabel.textContent = 'Loading...';
+        loadCampaignInput.disabled = true;
 
-                // Restore detailedMapData (overlays for managed maps)
-                // This part assumes that the user will re-upload the actual map image files.
-                // The loaded data only restores the *names* and *overlay configurations*.
-                // When a map file is uploaded, if its name matches one in campaignData.mapDefinitions,
-                // its overlays should be applied.
+        try {
+            // Reset entire application state
+            resetApplicationState();
 
-                // For simplicity in this step, we'll clear current detailedMapData and repopulate
-                // based on names. A more robust system would merge or prompt.
-                // Also, ObjectURLs need to be recreated when files are re-uploaded.
+            if (file.name.endsWith('.zip')) {
+                await loadFromZip(file);
+            } else if (file.name.endsWith('.json')) {
+                await loadFromJson(file);
+            } else {
+                throw new Error("Unsupported file type. Please select a .zip or .json file.");
+            }
 
-                detailedMapData.clear(); // Clear existing
-                displayedFileNames.clear(); // Clear existing
-                uploadedMapsList.innerHTML = ''; // Clear UI list
+            // --- Final UI Refresh ---
+            renderAllLists();
+            updateButtonStates();
 
-                if (campaignData.mapDefinitions) {
-                    for (const mapName in campaignData.mapDefinitions) {
-                        const definition = campaignData.mapDefinitions[mapName];
-                        // We can't recreate the ObjectURL here without the actual file.
-                        // We store the definition; when a file of this name is uploaded,
-                        // its overlays can be applied from this stored definition.
-                        // Or, if map files are part of the save (e.g. base64 data), recreate them.
-                        // For now, just note that overlays are loaded for known map names.
-                        detailedMapData.set(mapName, {
-                            name: definition.name,
-                            url: null, // To be repopulated upon file upload if not embedding image data
-                            overlays: definition.overlays || []
-                        });
-                        // We don't add to displayedFileNames or uploadedMapsList here,
-                        // as the actual files aren't loaded yet by this JSON.
-                        // This would require a more integrated file management within the save/load.
-                        // A simpler approach for now: user re-uploads maps, and if names match, overlays get applied.
-                        // To make this work, the map upload logic would need to check detailedMapData.
-                        console.log(`Overlay definition for map "${mapName}" loaded. User needs to re-upload the map file.`);
-                    }
-                }
-                 // For a fully functional load without re-upload, map image data (e.g., base64) would need to be in the save file.
-                // This example focuses on overlay and active view state persistence.
-
-                // Restore activeMapsData
-                activeMapsData = campaignData.activeMaps || [];
-                renderActiveMapsList(); // Update UI for active maps
-
-                // Restore Notes
-                notesData = campaignData.notes || [];
-                selectedNoteId = campaignData.selectedNoteId || null;
-                renderNotesList();
-                if (selectedNoteId) {
-                    const noteToLoad = notesData.find(n => n.id === selectedNoteId);
-                    if (noteToLoad) {
-                        loadNoteIntoEditor(selectedNoteId);
-                    } else {
-                        selectedNoteId = null; // ID from save file doesn't exist in notesData
-                        clearNoteEditor();
-                    }
-                } else {
-                    clearNoteEditor();
-                }
-
-                // Restore Characters
-                charactersData = campaignData.characters || [];
-                selectedCharacterId = campaignData.selectedCharacterId || null;
-                renderCharactersList();
-                if (selectedCharacterId) {
-                    const characterToLoad = charactersData.find(c => c.id === selectedCharacterId);
-                    if (characterToLoad) {
-                        loadCharacterIntoEditor(selectedCharacterId);
-                    } else {
-                        selectedCharacterId = null;
-                        clearCharacterEditor();
-                    }
-                } else {
-                    clearCharacterEditor();
-                }
-
-
-                // Optional: Restore UI selections
-                // selectedMapInManager = campaignData.currentSelectedMapInManager || null;
-                // selectedMapInActiveView = campaignData.currentSelectedMapInActiveView || null;
-                // if (selectedMapInManager) { /* find and highlight in uploadedMapsList */ }
-                // if (selectedMapInActiveView) { /* find and highlight in activeMapsList */ }
-
-                // Clear canvas and update buttons
+            // Restore selections and display
+            if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
+            if (selectedNoteId) loadNoteIntoEditor(selectedNoteId);
+            const mapToDisplay = selectedMapInActiveView || selectedMapInManager;
+            if (mapToDisplay) {
+                displayMapOnCanvas(mapToDisplay);
+            } else {
                 const ctx = dmCanvas.getContext('2d');
                 ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-                if (selectedMapInActiveView) displayMapOnCanvas(selectedMapInActiveView);
-                else if (selectedMapInManager) displayMapOnCanvas(selectedMapInManager);
-
-                updateButtonStates();
-                alert("Campaign loaded. Please re-upload map files if they are not displaying.");
-
-            } catch (error) {
-                console.error("Error loading or parsing campaign file:", error);
-                alert("Failed to load campaign data. The file might be corrupted or not a valid campaign file.");
-            } finally {
-                loadCampaignInput.value = null; // Reset input
             }
-        };
-        reader.readAsText(file);
+
+            alert("Campaign loaded successfully!");
+
+        } catch (error) {
+            console.error("Error loading campaign:", error);
+            alert(`Failed to load campaign: ${error.message}`);
+            resetApplicationState(); // Also reset on failure
+            renderAllLists();
+        } finally {
+            loadButtonLabel.textContent = 'Load Campaign';
+            loadCampaignInput.disabled = false;
+            loadCampaignInput.value = null; // Reset input
+        }
+    }
+
+    function resetApplicationState() {
+        // Clear data arrays
+        activeMapsData = [];
+        notesData = [];
+        charactersData = [];
+
+        // Revoke old object URLs and clear map data
+        for (const mapData of detailedMapData.values()) {
+            if (mapData.url) {
+                URL.revokeObjectURL(mapData.url);
+            }
+        }
+        detailedMapData.clear();
+        displayedFileNames.clear();
+
+        // Clear selections
+        selectedMapInManager = null;
+        selectedMapInActiveView = null;
+        selectedNoteId = null;
+        selectedCharacterId = null;
+
+        // Reset UI components
+        uploadedMapsList.innerHTML = '';
+        activeMapsList.innerHTML = '';
+        notesList.innerHTML = '';
+        charactersList.innerHTML = '';
+        clearNoteEditor();
+        clearCharacterEditor();
+        const ctx = dmCanvas.getContext('2d');
+        ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+    }
+
+    function renderAllLists() {
+        renderUploadedMapsList();
+        renderActiveMapsList();
+        renderNotesList();
+        renderCharactersList();
+    }
+
+    async function loadFromZip(file) {
+        const zip = await JSZip.loadAsync(file);
+        const campaignFile = zip.file("campaign.json");
+        if (!campaignFile) throw new Error("campaign.json not found in the zip file.");
+
+        const campaignJSON = await campaignFile.async("string");
+        const campaignData = JSON.parse(campaignJSON);
+
+        // --- Restore Data Structures (without assets yet) ---
+        activeMapsData = campaignData.activeMaps || [];
+        notesData = campaignData.notes || [];
+        charactersData = campaignData.characters || []; // This now includes pdfFileName
+        selectedNoteId = campaignData.selectedNoteId || null;
+        selectedCharacterId = campaignData.selectedCharacterId || null;
+        // Selections for maps are not restored yet, as they depend on UI lists
+
+        // --- Restore Assets ---
+        const imagePromises = [];
+        const imagesFolder = zip.folder("images");
+        for (const mapName in campaignData.mapDefinitions) {
+            const definition = campaignData.mapDefinitions[mapName];
+            const imageFile = imagesFolder.file(mapName);
+            if (imageFile) {
+                const promise = imageFile.async("blob").then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    detailedMapData.set(mapName, {
+                        name: definition.name,
+                        url: url,
+                        overlays: definition.overlays || []
+                    });
+                    displayedFileNames.add(mapName);
+                });
+                imagePromises.push(promise);
+            }
+        }
+        await Promise.all(imagePromises);
+
+        const characterPromises = [];
+        const charactersFolder = zip.folder("characters");
+        charactersData.forEach(character => {
+            if (character.pdfFileName) {
+                const pdfFile = charactersFolder.file(character.pdfFileName);
+                if (pdfFile) {
+                    const promise = pdfFile.async("uint8array").then(pdfData => {
+                        character.pdfData = pdfData;
+                    });
+                    characterPromises.push(promise);
+                }
+            }
+        });
+        await Promise.all(characterPromises);
+    }
+
+    async function loadFromJson(file) {
+        const campaignJSON = await file.text();
+        const campaignData = JSON.parse(campaignJSON);
+
+        // Legacy support: data structures are restored, but assets are missing.
+        activeMapsData = campaignData.activeMaps || [];
+        notesData = campaignData.notes || [];
+        charactersData = campaignData.characters || [];
+        selectedNoteId = campaignData.selectedNoteId || null;
+        selectedCharacterId = campaignData.selectedCharacterId || null;
+
+        if (campaignData.mapDefinitions) {
+            for (const mapName in campaignData.mapDefinitions) {
+                const definition = campaignData.mapDefinitions[mapName];
+                detailedMapData.set(mapName, {
+                    name: definition.name,
+                    url: null, // No URL available in old format
+                    overlays: definition.overlays || []
+                });
+                displayedFileNames.add(mapName);
+            }
+        }
+        alert("Legacy campaign loaded. Please re-upload map and character files manually.");
+    }
+
+    function renderUploadedMapsList() {
+        uploadedMapsList.innerHTML = '';
+        for (const mapName of displayedFileNames) {
+            const listItem = document.createElement('li');
+            listItem.dataset.fileName = mapName;
+            listItem.classList.add('map-list-item', 'clickable-map');
+            const textNode = document.createTextNode(mapName);
+            listItem.appendChild(textNode);
+            uploadedMapsList.appendChild(listItem);
+        }
+        // Restore edit mode if it was active
+        if (isEditMode) {
+            editMapsIcon.click(); // Toggle it off
+            editMapsIcon.click(); // and back on to refresh icons
+        }
     }
 
     if (saveCampaignButton) {
@@ -2662,6 +2779,24 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn("Character sheet iframe not ready to receive data.");
         }
 
+        // Reset PDF viewer state
+        if (pdfViewerIframe.src) {
+            URL.revokeObjectURL(pdfViewerIframe.src);
+            pdfViewerIframe.src = '';
+        }
+        characterSheetContent.style.display = 'block';
+        pdfViewerContainer.style.display = 'none';
+        viewPdfButton.textContent = 'View PDF';
+
+        // Update button visibility based on whether the character has a PDF
+        if (character.pdfData) {
+            viewPdfButton.style.display = 'inline-block';
+            deletePdfButton.style.display = 'inline-block';
+        } else {
+            viewPdfButton.style.display = 'none';
+            deletePdfButton.style.display = 'none';
+        }
+
         renderCharactersList();
     }
 
@@ -2751,16 +2886,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    let currentCharacterPdf = null;
-
     if (pdfUploadInput) {
         pdfUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
-            if (file) {
+            if (file && selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (!character) {
+                    alert("Please select a character before uploading a PDF.");
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     const pdfData = new Uint8Array(e.target.result);
-                    currentCharacterPdf = pdfData;
+                    character.pdfData = pdfData; // Store PDF data on the character object
+                    character.pdfFileName = file.name; // Store filename
+
                     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
                     const numPages = pdf.numPages;
                     let textContent = '';
@@ -2775,42 +2916,67 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log(textContent); // For debugging
                     const sheetData = parsePdfText(textContent);
                     characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
+
+                    // Update UI
                     viewPdfButton.style.display = 'inline-block';
+                    deletePdfButton.style.display = 'inline-block'; // Show delete button as well
                 };
                 reader.readAsArrayBuffer(file);
+            } else if (!selectedCharacterId) {
+                alert("No character selected. Please select a character before uploading a PDF.");
             }
         });
     }
 
     if (viewPdfButton) {
         viewPdfButton.addEventListener('click', () => {
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (!character || !character.pdfData) {
+                alert("No PDF found for this character.");
+                return;
+            }
+
             if (pdfViewerContainer.style.display === 'none') {
-                const pdfUrl = URL.createObjectURL(new Blob([currentCharacterPdf], { type: 'application/pdf' }));
+                const pdfUrl = URL.createObjectURL(new Blob([character.pdfData], { type: 'application/pdf' }));
                 pdfViewerIframe.src = pdfUrl;
                 characterSheetContent.style.display = 'none';
                 pdfViewerContainer.style.display = 'block';
                 viewPdfButton.textContent = 'Local Character Editor';
-                deletePdfButton.style.display = 'inline-block';
             } else {
+                // Revoke the object URL to free up memory when not in use
+                if (pdfViewerIframe.src) {
+                    URL.revokeObjectURL(pdfViewerIframe.src);
+                }
                 pdfViewerIframe.src = '';
                 characterSheetContent.style.display = 'block';
                 pdfViewerContainer.style.display = 'none';
                 viewPdfButton.textContent = 'View PDF';
-                deletePdfButton.style.display = 'none';
             }
         });
     }
 
     if (deletePdfButton) {
         deletePdfButton.addEventListener('click', () => {
-            currentCharacterPdf = null;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (character) {
+                character.pdfData = null;
+                character.pdfFileName = null;
+            }
+
+            // Revoke URL if it's currently being viewed
+            if (pdfViewerIframe.src) {
+                URL.revokeObjectURL(pdfViewerIframe.src);
+            }
             pdfViewerIframe.src = '';
+
             characterSheetContent.style.display = 'block';
             pdfViewerContainer.style.display = 'none';
             viewPdfButton.textContent = 'View PDF';
             viewPdfButton.style.display = 'none';
             deletePdfButton.style.display = 'none';
-            characterSheetIframe.contentWindow.postMessage({ type: 'clearCharacterSheet' }, '*');
+            // Optionally clear the sheet if desired
+            // characterSheetIframe.contentWindow.postMessage({ type: 'clearCharacterSheet' }, '*');
+            alert("PDF has been removed from this character.");
         });
     }
 
