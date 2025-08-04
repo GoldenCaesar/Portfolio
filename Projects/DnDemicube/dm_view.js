@@ -3592,12 +3592,12 @@ ${notes || ''}
 ## **Attributes**
 | Ability | Score | Modifier |
 | :--- | :---: | :---: |
-| **Strength** | ${sheetData['strength-score'] || ''} | ${sheetData['strength-modifier'] || '+0'} |
-| **Dexterity** | ${sheetData['dexterity-score'] || ''} | ${sheetData['dexterity-modifier'] || '+0'} |
-| **Constitution** | ${sheetData['constitution-score'] || ''} | ${sheetData['constitution-modifier'] || '+0'} |
-| **Intelligence**| ${sheetData['intelligence-score'] || ''} | ${sheetData['intelligence-modifier'] || '+0'} |
-| **Wisdom** | ${sheetData['wisdom-score'] || ''} | ${sheetData['wisdom-modifier'] || '+0'} |
-| **Charisma** | ${sheetData['charisma-score'] || ''} | ${sheetData['charisma-modifier'] || '+0'} |
+| **Strength** | ${sheetData['strength_score'] || ''} | ${sheetData['strength_modifier'] || '+0'} |
+| **Dexterity** | ${sheetData['dexterity_score'] || ''} | ${sheetData['dexterity_modifier'] || '+0'} |
+| **Constitution** | ${sheetData['constitution_score'] || ''} | ${sheetData['constitution_modifier'] || '+0'} |
+| **Intelligence**| ${sheetData['intelligence_score'] || ''} | ${sheetData['intelligence_modifier'] || '+0'} |
+| **Wisdom** | ${sheetData['wisdom_score'] || ''} | ${sheetData['wisdom_modifier'] || '+0'} |
+| **Charisma** | ${sheetData['charisma_score'] || ''} | ${sheetData['charisma_modifier'] || '+0'} |
 
 ---
 
