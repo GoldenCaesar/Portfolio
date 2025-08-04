@@ -2027,7 +2027,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             }
-        }
     });
 
     // Global click listener to hide context menu
