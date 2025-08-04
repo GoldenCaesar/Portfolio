@@ -169,6 +169,19 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (event.data.type === 'clearCharacterSheet') {
             clearSheetFields();
             updateAllModifiers();
+        } else if (event.data.type === 'requestSheetDataForView') {
+            const sheetData = {};
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                if (input.name) {
+                    if (input.type === 'checkbox') {
+                        sheetData[input.name] = input.checked;
+                    } else {
+                        sheetData[input.name] = input.value;
+                    }
+                }
+            });
+            window.parent.postMessage({ type: 'sheetDataForView', data: sheetData }, '*');
         }
     });
 
