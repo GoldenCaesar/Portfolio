@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hoverLabel = document.getElementById('hover-label');
     const polygonContextMenu = document.getElementById('polygon-context-menu');
     const noteContextMenu = document.getElementById('note-context-menu');
+    const characterContextMenu = document.getElementById('character-context-menu');
     const displayedFileNames = new Set();
 
     // Notes Tab Elements
@@ -58,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLinkChildMap = document.getElementById('btn-link-child-map');
     // Add other tool buttons here as needed, e.g.:
     const btnLinkNote = document.getElementById('btn-link-note');
-    // const btnLinkCharacter = document.getElementById('btn-link-character');
+    const btnLinkCharacter = document.getElementById('btn-link-character');
     // const btnLinkTrigger = document.getElementById('btn-link-trigger');
     // const btnRemoveLinks = document.getElementById('btn-remove-links');
 
@@ -88,10 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
     let isLinkingNote = false;
+    let isLinkingCharacter = false;
     let currentPolygonPoints = [];
     let polygonDrawingComplete = false; // Will be used in Phase 2
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
     let selectedNoteForContextMenu = null;
+    let selectedCharacterForContextMenu = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
     let preservedLinkedMapNameForRedraw = null; // Added: To store linked map name during redraw
@@ -103,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let polygonBeingMoved = null; // Added: { overlay: reference, originalPoints: copy, parentMapName: string }
     let isMovingNote = false;
     let noteBeingMoved = null;
+    let isMovingCharacter = false;
+    let characterBeingMoved = null;
     let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
     let currentDragOffsets = {x: 0, y: 0};
 
@@ -377,6 +382,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('📝', canvasX, canvasY);
+            } else if (overlay.type === 'characterLink' && overlay.position) {
+                const iconSize = 20; // The size of the icon on the canvas
+                let position = overlay.position;
+                if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
+                    position = {
+                        x: characterBeingMoved.originalPosition.x + currentDragOffsets.x,
+                        y: characterBeingMoved.originalPosition.y + currentDragOffsets.y
+                    };
+                }
+
+                const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+                const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+
+                let fillStyle = 'rgba(135, 206, 250, 0.9)'; // Default light blue
+                if (selectedMapInActiveView) {
+                    if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
+                        fillStyle = 'rgba(255, 102, 102, 0.7)'; // Reddish if hidden from player
+                    } else {
+                        fillStyle = 'rgba(102, 255, 102, 0.9)'; // Greenish if visible to player
+                    }
+                }
+                if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
+                    fillStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow when moving
+                }
+
+                ctx.fillStyle = fillStyle;
+                ctx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                ctx.strokeStyle = 'black';
+                ctx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                ctx.fillStyle = 'black';
+                ctx.font = `${iconSize * 0.8}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('👤', canvasX, canvasY);
             }
         });
     }
@@ -565,6 +605,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // Interaction handled
         }
 
+        if (isLinkingCharacter && selectedMapInManager) {
+            const parentMapData = detailedMapData.get(selectedMapInManager);
+            if (parentMapData) {
+                const newOverlay = {
+                    type: 'characterLink',
+                    position: imageCoords,
+                    linkedCharacterId: null // Initially unlinked
+                };
+                parentMapData.overlays.push(newOverlay);
+                console.log('Character icon placed. Overlay:', newOverlay);
+                resetAllInteractiveStates(); // This will redraw the map with the new icon
+            }
+            return; // Interaction handled
+        }
+
         // Priority 2: Interaction with Overlays in "Active View"
         if (selectedMapInActiveView) {
             const activeMapInstance = activeMapsData.find(am => am.fileName === selectedMapInActiveView);
@@ -665,6 +720,13 @@ document.addEventListener('DOMContentLoaded', () => {
                point.y >= notePos.y - iconSize / 2 && point.y <= notePos.y + iconSize / 2;
     }
 
+    function isPointInCharacterIcon(point, characterOverlay) {
+        const iconSize = 20 / currentMapDisplayData.ratio; // icon size in image coordinates
+        const charPos = characterOverlay.position;
+        return point.x >= charPos.x - iconSize / 2 && point.x <= charPos.x + iconSize / 2 &&
+               point.y >= charPos.y - iconSize / 2 && point.y <= charPos.y + iconSize / 2;
+    }
+
     function handleMouseMoveOnCanvas(event) {
         if (!currentMapDisplayData.img || !hoverLabel) return; // No map or label element
 
@@ -703,6 +765,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const note = notesData.find(n => n.id === overlay.linkedNoteId);
                     if (note) {
                         hoverLabel.textContent = note.title;
+                        hoverLabel.style.left = `${event.pageX + 10}px`;
+                        hoverLabel.style.top = `${event.pageY + 10}px`;
+                        hoverLabel.style.display = 'block';
+                        return;
+                    }
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay) && overlay.linkedCharacterId) {
+                    const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                    if (character) {
+                        hoverLabel.textContent = character.name;
                         hoverLabel.style.left = `${event.pageX + 10}px`;
                         hoverLabel.style.top = `${event.pageY + 10}px`;
                         hoverLabel.style.display = 'block';
@@ -762,9 +833,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetAllInteractiveStates() {
         isLinkingChildMap = false;
         isLinkingNote = false;
+        isLinkingCharacter = false;
         isRedrawingPolygon = false;
         isMovingPolygon = false; // Added
         isMovingNote = false;
+        isMovingCharacter = false;
 
         preservedLinkedMapNameForRedraw = null;
         currentPolygonPoints = [];
@@ -772,14 +845,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         polygonBeingMoved = null; // Added
         noteBeingMoved = null;
+        characterBeingMoved = null;
         moveStartPoint = null; // Added
         currentDragOffsets = {x: 0, y: 0}; // Added
 
         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
         if (btnLinkNote) btnLinkNote.textContent = 'Link Note';
+        if (btnLinkCharacter) btnLinkCharacter.textContent = 'Link Character';
         dmCanvas.style.cursor = 'auto';
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
+        selectedCharacterForContextMenu = null;
 
         // Redraw current map to clear any temporary states (like a polygon being dragged)
         let mapToRedraw = selectedMapInManager || selectedMapInActiveView;
@@ -823,7 +899,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote) {
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote || isLinkingCharacter) {
                 resetAllInteractiveStates();
                 console.log("Interactive operation cancelled via Link Note/Cancel button.");
             } else {
@@ -832,6 +908,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnLinkNote.textContent = 'Cancel Linking Note';
                 dmCanvas.style.cursor = 'crosshair';
                 alert("Click on the map to place a note icon.");
+                updateButtonStates();
+            }
+        });
+    }
+
+    if (btnLinkCharacter) {
+        btnLinkCharacter.addEventListener('click', () => {
+            if (!selectedMapInManager) {
+                alert("Please select a map from 'Manage Maps' first to add a character to it.");
+                return;
+            }
+
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote || isLinkingCharacter) {
+                resetAllInteractiveStates();
+                console.log("Interactive operation cancelled via Link Character/Cancel button.");
+            } else {
+                resetAllInteractiveStates();
+                isLinkingCharacter = true;
+                btnLinkCharacter.textContent = 'Cancel Linking Character';
+                dmCanvas.style.cursor = 'crosshair';
+                alert("Click on the map to place a character icon.");
                 updateButtonStates();
             }
         });
@@ -868,6 +965,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Dragging note started at:", imageCoords);
                 event.preventDefault();
             }
+        } else if (isMovingCharacter && characterBeingMoved) {
+            if (isPointInCharacterIcon(imageCoords, characterBeingMoved.overlayRef)) {
+                moveStartPoint = imageCoords;
+                moveStartPoint.x -= currentDragOffsets.x;
+                moveStartPoint.y -= currentDragOffsets.y;
+                console.log("Dragging character started at:", imageCoords);
+                event.preventDefault();
+            }
         }
     });
 
@@ -876,13 +981,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // We need to add drag logic here too, or ensure handleMouseMoveOnCanvas co-exists.
         // Let's keep hover logic and add drag logic.
 
-        if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint)) {
+        if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
             const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
             if (imageCoords) {
                 currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
                 currentDragOffsets.y = imageCoords.y - moveStartPoint.y;
 
-                const parentMapName = isMovingPolygon ? polygonBeingMoved.parentMapName : noteBeingMoved.parentMapName;
+                const parentMapName = isMovingPolygon ? polygonBeingMoved.parentMapName : (isMovingNote ? noteBeingMoved.parentMapName : characterBeingMoved.parentMapName);
 
                 if (selectedMapInManager === parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
                     const ctx = dmCanvas.getContext('2d');
@@ -928,6 +1033,16 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             console.log(`Note moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
             alert(`Note moved to new position.`);
+            resetAllInteractiveStates();
+        } else if (isMovingCharacter && characterBeingMoved && moveStartPoint) {
+            const finalDeltaX = currentDragOffsets.x;
+            const finalDeltaY = currentDragOffsets.y;
+            characterBeingMoved.overlayRef.position = {
+                x: characterBeingMoved.originalPosition.x + finalDeltaX,
+                y: characterBeingMoved.originalPosition.y + finalDeltaY
+            };
+            console.log(`Character moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
+            alert(`Character moved to new position.`);
             resetAllInteractiveStates();
         }
     });
@@ -1543,8 +1658,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Future buttons: Consider disabling them during the linking process as well.
         const btnLinkNote = document.getElementById('btn-link-note');
         if (btnLinkNote) btnLinkNote.disabled = inLinkingProcess || !selectedMapInManager;
-        // if (btnLinkNote) btnLinkNote.disabled = !selectedMapInManager; // Example
-        // if (btnLinkCharacter) btnLinkCharacter.disabled = !selectedMapInManager; // Example
+        if (btnLinkCharacter) btnLinkCharacter.disabled = inLinkingProcess || !selectedMapInManager;
         // if (btnLinkTrigger) btnLinkTrigger.disabled = !selectedMapInManager; // Example
         // if (btnRemoveLinks) btnRemoveLinks.disabled = !(selectedMapInManager || selectedMapInActiveView); // Example: if something is selected
     }
@@ -2029,6 +2143,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     noteContextMenu.style.display = 'block';
                     console.log('Right-clicked on note icon:', selectedNoteForContextMenu);
                     return;
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
+                    selectedCharacterForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: mapToSearchForOverlays.name || mapToSearchForOverlays.fileName,
+                        source: overlaySource
+                    };
+
+                    const toggleVisibilityItem = characterContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const linkToCharacterItem = characterContextMenu.querySelector('[data-action="link-to-character"]');
+                    const moveCharacterItem = characterContextMenu.querySelector('[data-action="move-character"]');
+                    const deleteLinkItem = characterContextMenu.querySelector('[data-action="delete-link"]');
+
+                    if (overlaySource === 'active') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (linkToCharacterItem) linkToCharacterItem.style.display = 'none';
+                        if (moveCharacterItem) moveCharacterItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // manager source
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (linkToCharacterItem) linkToCharacterItem.style.display = 'list-item';
+                        if (moveCharacterItem) moveCharacterItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
+
+                    characterContextMenu.style.left = `${event.pageX}px`;
+                    characterContextMenu.style.top = `${event.pageY}px`;
+                    characterContextMenu.style.display = 'block';
+                    console.log('Right-clicked on character icon:', selectedCharacterForContextMenu);
+                    return;
                 }
             }
         }
@@ -2047,6 +2191,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!noteContextMenu.contains(event.target)) {
                 noteContextMenu.style.display = 'none';
                 selectedNoteForContextMenu = null;
+            }
+        }
+        if (characterContextMenu.style.display === 'block') {
+            if (!characterContextMenu.contains(event.target)) {
+                characterContextMenu.style.display = 'none';
+                selectedCharacterForContextMenu = null;
             }
         }
     });
@@ -3202,10 +3352,97 @@ document.addEventListener('DOMContentLoaded', () => {
                     handleMoveCharacter(characterId, 'down');
                 }
             } else if (!actionIcon) {
-                if (selectedCharacterId !== characterId) {
-                    loadCharacterIntoEditor(characterId);
+                if (selectedCharacterForContextMenu) {
+                    const { overlay, parentMapName, source } = selectedCharacterForContextMenu;
+                    overlay.linkedCharacterId = characterId;
+                    alert(`Character linked successfully.`);
+                    selectedCharacterForContextMenu = null;
+                    switchTab('tab-dm-controls');
+                    displayMapOnCanvas(parentMapName);
+                } else {
+                    if (selectedCharacterId !== characterId) {
+                        loadCharacterIntoEditor(characterId);
+                    }
                 }
             }
+        });
+    }
+
+    if (characterContextMenu) {
+        characterContextMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const action = event.target.dataset.action;
+
+            if (action && selectedCharacterForContextMenu) {
+                const { overlay, index, parentMapName, source } = selectedCharacterForContextMenu;
+
+                let parentMapData;
+                if (source === 'manager') {
+                    parentMapData = detailedMapData.get(parentMapName);
+                } else if (source === 'active') {
+                    parentMapData = activeMapsData.find(am => am.fileName === parentMapName);
+                }
+
+                if (!parentMapData) {
+                    console.error(`Parent map data not found for character context menu action. Name: ${parentMapName}, Source: ${source}`);
+                    characterContextMenu.style.display = 'none';
+                    selectedCharacterForContextMenu = null;
+                    return;
+                }
+
+                switch (action) {
+                    case 'link-to-character':
+                        if (charactersData.length === 0) {
+                            alert("No characters available. Please create a new character first in the Characters tab.");
+                            characterContextMenu.style.display = 'none';
+                            selectedCharacterForContextMenu = null;
+                            return;
+                        }
+                        alert("Please select a character from the list in the Characters tab to link it.");
+                        switchTab('tab-characters');
+                        // The actual linking will be handled by the charactersList click listener
+                        break;
+                    case 'move-character':
+                        isMovingCharacter = true;
+                        characterBeingMoved = {
+                            overlayRef: overlay,
+                            originalPosition: { ...overlay.position },
+                            parentMapName: parentMapName,
+                            originalIndex: index
+                        };
+                        moveStartPoint = null;
+                        currentDragOffsets = { x: 0, y: 0 };
+                        dmCanvas.style.cursor = 'move';
+                        alert(`Move mode activated for character. Click and drag the character icon. Click again to place, or right-click to cancel.`);
+                        console.log('Move Character initiated for:', characterBeingMoved);
+                        break;
+                    case 'delete-link':
+                        if (confirm(`Are you sure you want to delete this character link?`)) {
+                            parentMapData.overlays.splice(index, 1);
+                            console.log(`Character link deleted from map "${parentMapName}".`);
+                            alert(`Character link has been deleted.`);
+                            if (selectedMapInManager === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                            }
+                        }
+                        break;
+                    case 'toggle-player-visibility':
+                        if (source === 'active') {
+                            if (typeof overlay.playerVisible !== 'boolean') {
+                                overlay.playerVisible = true;
+                            }
+                            overlay.playerVisible = !overlay.playerVisible;
+                            console.log(`Character visibility for character link on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
+                            alert(`Player visibility for this character is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
+                            if (selectedMapInActiveView === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                                sendMapToPlayerView(parentMapName);
+                            }
+                        }
+                        break;
+                }
+            }
+            characterContextMenu.style.display = 'none';
         });
     }
 
