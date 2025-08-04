@@ -426,6 +426,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const characterPreviewClose = document.getElementById('character-preview-close');
+    if (characterPreviewClose) {
+        characterPreviewClose.addEventListener('click', () => {
+            const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+            if (characterPreviewOverlay) {
+                characterPreviewOverlay.style.display = 'none';
+            }
+        });
+    }
+
     if (viewCharacterButton) {
         viewCharacterButton.addEventListener('click', () => {
             if (characterSheetIframe && characterSheetIframe.contentWindow) {
@@ -681,6 +691,20 @@ document.addEventListener('DOMContentLoaded', () => {
                                         }, '*');
                                     }
                                 }
+                            }
+                        }
+                        return; // Interaction handled
+                    } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
+                        if (overlay.linkedCharacterId) {
+                            const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                            if (character) {
+                                // Since we don't have the full sheet data here, we can't generate the markdown.
+                                // One solution is to switch to the character tab and open the view from there.
+                                // For now, let's just log it.
+                                console.log("Clicked on character:", character.name);
+                                 // For now, lets just open the character sheet in the editor
+                                loadCharacterIntoEditor(character.id);
+                                switchTab('tab-characters');
                             }
                         }
                         return; // Interaction handled
@@ -3538,11 +3562,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const character = charactersData.find(c => c.id === selectedCharacterId);
             if (character) {
                 const markdown = generateCharacterMarkdown(event.data.data, character.notes);
-                const notePreviewOverlay = document.getElementById('note-preview-overlay');
-                const notePreviewBody = document.getElementById('note-preview-body');
-                if (notePreviewOverlay && notePreviewBody) {
-                    notePreviewBody.innerHTML = markdown;
-                    notePreviewOverlay.style.display = 'flex';
+                const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                const characterPreviewBody = document.getElementById('character-preview-body');
+                if (characterPreviewOverlay && characterPreviewBody) {
+                    characterPreviewBody.innerHTML = markdown;
+                    characterPreviewOverlay.style.display = 'flex';
                 }
             }
         }
