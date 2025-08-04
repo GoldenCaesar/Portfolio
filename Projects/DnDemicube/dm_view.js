@@ -1218,43 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const textNode = document.createTextNode(file.name);
 
-                    const modeToggleContainer = document.createElement('div');
-                    modeToggleContainer.className = 'mode-toggle-container';
-
-                    const editLabel = document.createElement('span');
-                    editLabel.textContent = 'Edit';
-                    editLabel.className = 'mode-label';
-
-                    const toggleSwitch = document.createElement('label');
-                    toggleSwitch.className = 'switch';
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.addEventListener('change', (e) => {
-                        const mapData = detailedMapData.get(file.name);
-                        if (mapData) {
-                            mapData.mode = e.target.checked ? 'view' : 'edit';
-                            console.log(`Map '${file.name}' mode changed to ${mapData.mode}`);
-                            if (selectedMapFileName === file.name) {
-                                displayMapOnCanvas(file.name);
-                                updateButtonStates();
-                            }
-                        }
-                    });
-                    const slider = document.createElement('span');
-                    slider.className = 'slider round';
-                    toggleSwitch.appendChild(checkbox);
-                    toggleSwitch.appendChild(slider);
-                    
-                    const viewLabel = document.createElement('span');
-                    viewLabel.textContent = 'View';
-                    viewLabel.className = 'mode-label';
-
-                    modeToggleContainer.appendChild(editLabel);
-                    modeToggleContainer.appendChild(toggleSwitch);
-                    modeToggleContainer.appendChild(viewLabel);
-
                     listItem.appendChild(textNode);
-                    listItem.appendChild(modeToggleContainer);
 
                     mapsList.appendChild(listItem);
                     displayedFileNames.add(file.name);
@@ -1769,41 +1733,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const textNode = document.createTextNode(mapName);
 
-            const modeToggleContainer = document.createElement('div');
-            modeToggleContainer.className = 'mode-toggle-container';
-
-            const editLabel = document.createElement('span');
-            editLabel.textContent = 'Edit';
-            editLabel.className = 'mode-label';
-
-            const toggleSwitch = document.createElement('label');
-            toggleSwitch.className = 'switch';
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = mapData.mode === 'view';
-            checkbox.addEventListener('change', (e) => {
-                mapData.mode = e.target.checked ? 'view' : 'edit';
-                console.log(`Map '${mapName}' mode changed to ${mapData.mode}`);
-                if (selectedMapFileName === mapName) {
-                    displayMapOnCanvas(mapName);
-                    updateButtonStates();
-                }
-            });
-            const slider = document.createElement('span');
-            slider.className = 'slider round';
-            toggleSwitch.appendChild(checkbox);
-            toggleSwitch.appendChild(slider);
-            
-            const viewLabel = document.createElement('span');
-            viewLabel.textContent = 'View';
-            viewLabel.className = 'mode-label';
-
-            modeToggleContainer.appendChild(editLabel);
-            modeToggleContainer.appendChild(toggleSwitch);
-            modeToggleContainer.appendChild(viewLabel);
-
             listItem.appendChild(textNode);
-            listItem.appendChild(modeToggleContainer);
             mapsList.appendChild(listItem);
         }
         if (isEditMode) {
