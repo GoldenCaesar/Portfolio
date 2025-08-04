@@ -630,6 +630,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const childMapName = overlay.linkedMapName;
                     const childMapData = detailedMapData.get(childMapName);
                     if (childMapData) {
+                        childMapData.mode = 'view'; // Ensure child map is in view mode when navigated to this way
                         selectedMapFileName = childMapName;
                         clearAllSelections();
                         const mapItems = mapsList.querySelectorAll('li');
