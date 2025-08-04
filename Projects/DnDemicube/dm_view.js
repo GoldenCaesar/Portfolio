@@ -27,7 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const charactersList = document.getElementById('characters-list');
     const characterNameInput = document.getElementById('character-name-input');
     const saveCharacterButton = document.getElementById('save-character-button');
-    const fillFromPdfButton = document.getElementById('fill-from-pdf-button');
+    const clearFieldsButton = document.getElementById('clear-fields-button');
+    const fillFromButton = document.getElementById('fill-from-button');
+    const fillFromDropdown = document.getElementById('fill-from-dropdown');
+    const fillFromPdfOption = document.getElementById('fill-from-pdf-option');
+    const fillFromJsonOption = document.getElementById('fill-from-json-option');
+    const jsonModal = document.getElementById('json-modal');
+    const jsonModalCloseButton = document.getElementById('json-modal-close-button');
+    const jsonInputTextarea = document.getElementById('json-input-textarea');
+    const fillFromJsonButton = document.getElementById('fill-from-json-button');
+    const cancelJsonButton = document.getElementById('cancel-json-button');
     const pdfUploadInput = document.getElementById('pdf-upload-input');
     const characterSheetContainer = document.getElementById('character-sheet-container');
     const characterSheetIframe = document.getElementById('character-sheet-iframe');
@@ -2880,11 +2889,124 @@ document.addEventListener('DOMContentLoaded', () => {
         saveCharacterButton.addEventListener('click', handleSaveCharacter);
     }
 
-    if (fillFromPdfButton) {
-        fillFromPdfButton.addEventListener('click', () => {
-            pdfUploadInput.click();
+    if (clearFieldsButton) {
+        clearFieldsButton.addEventListener('click', () => {
+            if (characterSheetIframe && characterSheetIframe.contentWindow) {
+                characterSheetIframe.contentWindow.postMessage({ type: 'clearCharacterSheet' }, '*');
+            }
         });
     }
+
+    if (fillFromButton) {
+        fillFromButton.addEventListener('click', () => {
+            fillFromDropdown.style.display = fillFromDropdown.style.display === 'block' ? 'none' : 'block';
+        });
+    }
+
+    if (fillFromPdfOption) {
+        fillFromPdfOption.addEventListener('click', (e) => {
+            e.preventDefault();
+            pdfUploadInput.click();
+            fillFromDropdown.style.display = 'none';
+        });
+    }
+
+    const defaultCharacterJson = {
+        "character_name": "", "class_and_level": "", "background": "", "player_name": "", "race_or_species": "", "alignment": "", "experience_points": "",
+        "strength": { "score": "", "modifier": "+0" }, "dexterity": { "score": "", "modifier": "+0" }, "constitution": { "score": "", "modifier": "+0" },
+        "intelligence": { "score": "", "modifier": "+0" }, "wisdom": { "score": "", "modifier": "+0" }, "charisma": { "score": "", "modifier": "+0" },
+        "saving_throws": { "strength": "", "dexterity": "", "constitution": "", "intelligence": "", "wisdom": "", "charisma": "" },
+        "skills": {
+            "acrobatics_dex": "", "animal_handling_wis": "", "arcana_int": "", "athletics_str": "", "deception_cha": "", "history_int": "", "insight_wis": "", "intimidation_cha": "",
+            "investigation_int": "", "medicine_wis": "", "nature_int": "", "perception_wis": "", "performance_cha": "", "persuasion_cha": "", "religion_int": "",
+            "sleight_of_hand_dex": "", "stealth_dex": "", "survival_wis": ""
+        },
+        "armor_class": "", "initiative": "", "speed": "",
+        "hit_points": { "maximum": "", "current": "", "temporary": "" },
+        "hit_dice": "",
+        "death_saves": { "successes": "", "failures": "" },
+        "proficiency_bonus": "", "passive_perception": "", "passive_insight": "", "passive_investigation": "",
+        "proficiencies": { "armor": "", "weapons": "", "tools": "" },
+        "languages": "", "attacks_and_spellcasting": "", "features_and_traits": "", "equipment": "", "character_appearance": "", "character_backstory": "",
+        "personality_traits": "", "ideals": "", "bonds": "", "flaws": ""
+    };
+
+    function flattenCharacterJson(data) {
+        const flattened = {};
+        for (const key in data) {
+            if (typeof data[key] === 'object' && data[key] !== null && !Array.isArray(data[key])) {
+                for (const subKey in data[key]) {
+                    flattened[`${key}_${subKey}`] = data[key][subKey];
+                }
+            } else {
+                flattened[key] = data[key];
+            }
+        }
+        return flattened;
+    }
+
+    if (fillFromJsonOption) {
+        fillFromJsonOption.addEventListener('click', (e) => {
+            e.preventDefault();
+            jsonInputTextarea.value = JSON.stringify(defaultCharacterJson, null, 2);
+            jsonModal.style.display = 'block';
+            fillFromDropdown.style.display = 'none';
+        });
+    }
+
+    if (jsonModalCloseButton) {
+        jsonModalCloseButton.addEventListener('click', () => {
+            jsonModal.style.display = 'none';
+        });
+    }
+
+    if (cancelJsonButton) {
+        cancelJsonButton.addEventListener('click', () => {
+            jsonModal.style.display = 'none';
+        });
+    }
+
+    if (fillFromJsonButton) {
+        fillFromJsonButton.addEventListener('click', () => {
+            try {
+                const jsonData = JSON.parse(jsonInputTextarea.value);
+                const flattenedData = flattenCharacterJson(jsonData);
+
+                // Rename keys to match form field names
+                const finalData = {};
+                for (const key in flattenedData) {
+                    let newKey = key;
+                    if (key === 'race_or_species') newKey = 'race';
+                    else if (key === 'experience_points') newKey = 'xp';
+                    else if (key === 'hit_points_maximum') newKey = 'hp_max';
+                    else if (key === 'hit_points_current') newKey = 'hp_current';
+                    else if (key === 'hit_points_temporary') newKey = 'hp_temp';
+                    else if (key === 'hit_dice') newKey = 'hit_dice_total';
+                    else if (key === 'proficiencies_armor') newKey = 'armor_proficiencies';
+                    else if (key === 'proficiencies_weapons') newKey = 'weapon_proficiencies';
+                    else if (key === 'proficiencies_tools') newKey = 'tool_proficiencies';
+                    else if (key === 'character_name') newKey = 'char_name';
+                    else if (key === 'class_and_level') newKey = 'class_level';
+
+                    finalData[newKey] = flattenedData[key];
+                }
+
+                characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: finalData }, '*');
+                jsonModal.style.display = 'none';
+            } catch (error) {
+                alert('Invalid JSON format. Please check your input.');
+                console.error('Error parsing character JSON:', error);
+            }
+        });
+    }
+
+    window.addEventListener('click', (e) => {
+        if (!e.target.matches('.dropdown-toggle')) {
+            if (fillFromDropdown.style.display === 'block') {
+                fillFromDropdown.style.display = 'none';
+            }
+        }
+    });
 
     if (pdfUploadInput) {
         pdfUploadInput.addEventListener('change', (event) => {

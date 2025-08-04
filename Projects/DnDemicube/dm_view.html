@@ -101,7 +101,14 @@
             <input type="text" id="character-name-input" placeholder="Character Name" />
             <div style="display: flex; gap: 10px;">
                 <button id="save-character-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Character</button>
-                <button id="fill-from-pdf-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Fill from PDF</button>
+                <div class="dropdown">
+                    <button id="fill-from-button" class="dropdown-toggle" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Fill From</button>
+                    <div id="fill-from-dropdown" class="dropdown-menu" style="display: none;">
+                        <a href="#" id="fill-from-pdf-option">PDF</a>
+                        <a href="#" id="fill-from-json-option">JSON</a>
+                    </div>
+                </div>
+                <button id="clear-fields-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Clear Fields</button>
                 <button id="view-pdf-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start; display: none;">View PDF</button>
                 <button id="delete-pdf-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start; display: none;">Delete PDF</button>
                 <input type="file" id="pdf-upload-input" accept=".pdf" style="display: none;">
@@ -144,6 +151,19 @@
         <div class="note-preview-content">
             <button id="note-preview-close" class="note-preview-close">&times;</button>
             <div id="note-preview-body"></div>
+        </div>
+    </div>
+
+    <div id="json-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="json-modal-close-button">&times;</span>
+            <h3>Fill from JSON</h3>
+            <p>Paste your character's JSON data below and click "Fill".</p>
+            <textarea id="json-input-textarea" rows="20" style="width: 95%;"></textarea>
+            <div style="margin-top: 10px;">
+                <button id="fill-from-json-button">Fill</button>
+                <button id="cancel-json-button">Cancel</button>
+            </div>
         </div>
     </div>
 </body>
