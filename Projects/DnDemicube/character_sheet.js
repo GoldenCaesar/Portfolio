@@ -127,8 +127,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     updateAllModifiers();
 
+    function clearSheetFields() {
+        const inputs = document.querySelectorAll('input, textarea');
+        inputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else if (input.type !== 'button' && input.type !== 'submit') { // Avoid clearing button text
+                input.value = '';
+            }
+        });
+    }
+
     window.addEventListener('message', function(event) {
         if (event.data.type === 'loadCharacterSheet') {
+            clearSheetFields();
             const data = event.data.data;
             for (const key in data) {
                 const element = document.getElementsByName(key)[0];
@@ -155,14 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             window.parent.postMessage({ type: 'saveCharacterSheet', data: sheetData }, '*');
         } else if (event.data.type === 'clearCharacterSheet') {
-            const inputs = document.querySelectorAll('input, textarea');
-            inputs.forEach(input => {
-                if (input.type === 'checkbox') {
-                    input.checked = false;
-                } else {
-                    input.value = '';
-                }
-            });
+            clearSheetFields();
             updateAllModifiers();
         }
     });
