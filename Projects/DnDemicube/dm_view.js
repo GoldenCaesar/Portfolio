@@ -42,6 +42,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterSheetContainer = document.getElementById('character-sheet-container');
     const characterSheetIframe = document.getElementById('character-sheet-iframe');
     const tabCharacters = document.getElementById('tab-characters');
+    const characterNotesButton = document.getElementById('character-notes-button');
+    const viewCharacterButton = document.getElementById('view-character-button');
+    const characterNotesEditorContainer = document.getElementById('character-notes-editor-container');
+    const characterMarkdownEditor = document.getElementById('character-markdown-editor');
     const viewPdfButton = document.getElementById('view-pdf-button');
     const deletePdfButton = document.getElementById('delete-pdf-button');
     const characterSheetContent = document.getElementById('character-sheet-content');
@@ -81,9 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let easyMDE = null;
 
     // Characters State Variables
-    let charactersData = []; // Array of character objects: { id: uniqueId, name: "Character 1", sheetData: "..." }
+    let charactersData = []; // Array of character objects: { id: uniqueId, name: "Character 1", sheetData: "...", notes: "" }
     let selectedCharacterId = null;
     let isCharactersEditMode = false;
+    let characterEasyMDE = null;
 
 
     // State for 'Link to Child Map' tool
@@ -417,6 +422,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('👤', canvasX, canvasY);
+            }
+        });
+    }
+
+    if (viewCharacterButton) {
+        viewCharacterButton.addEventListener('click', () => {
+            if (characterSheetIframe && characterSheetIframe.contentWindow) {
+                characterSheetIframe.contentWindow.postMessage({ type: 'requestSheetDataForView' }, '*');
             }
         });
     }
@@ -2908,7 +2921,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const newCharacter = {
             id: newCharacterId,
             name: newName,
-            sheetData: {} // Initially empty
+            sheetData: {}, // Initially empty
+            notes: ""
         };
         charactersData.push(newCharacter);
 
@@ -2945,6 +2959,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         characterSheetContent.style.display = 'block';
         pdfViewerContainer.style.display = 'none';
+        characterNotesEditorContainer.style.display = 'none';
         viewPdfButton.textContent = 'View PDF';
 
         // Update button visibility based on whether the character has a PDF
@@ -2954,6 +2969,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             viewPdfButton.style.display = 'none';
             deletePdfButton.style.display = 'none';
+        }
+
+        if (characterEasyMDE) {
+            characterEasyMDE.value(character.notes || "");
         }
 
         renderCharactersList();
@@ -2980,6 +2999,9 @@ document.addEventListener('DOMContentLoaded', () => {
         character.name = newName;
         if (characterSheetIframe && characterSheetIframe.contentWindow) {
             characterSheetIframe.contentWindow.postMessage({ type: 'requestSheetData' }, '*');
+        }
+        if (characterEasyMDE) {
+            character.notes = characterEasyMDE.value();
         }
 
         renderCharactersList();
@@ -3029,6 +3051,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function clearCharacterEditor() {
         if (characterNameInput) characterNameInput.value = "";
+    }
+
+    function initCharacterEasyMDE() {
+        if (characterEasyMDE) {
+            return;
+        }
+        if (!characterMarkdownEditor) {
+            console.error("Character markdown textarea element not found for EasyMDE.");
+            return;
+        }
+        try {
+            characterEasyMDE = new EasyMDE({
+                element: characterMarkdownEditor,
+                spellChecker: false,
+                placeholder: "Type your character notes here...",
+                minHeight: "150px",
+                autosave: {
+                    enabled: true,
+                    uniqueId: selectedCharacterId ? `character_note_${selectedCharacterId}` : "dndemicube_unsaved_character_note",
+                    delay: 3000,
+                },
+                toolbar: [
+                    "bold", "italic", "heading", "|",
+                    "quote", "unordered-list", "ordered-list", "|",
+                    "link", "image", "table", "|",
+                    "preview", "side-by-side", "fullscreen", "|",
+                    "guide"
+                ],
+            });
+        } catch (e) {
+            console.error("Error initializing Character EasyMDE:", e);
+            characterEasyMDE = null;
+        }
+    }
+
+    if (characterNotesButton) {
+        characterNotesButton.addEventListener('click', () => {
+            if (characterNotesEditorContainer.style.display === 'none') {
+                characterNotesEditorContainer.style.display = 'block';
+                characterSheetContent.style.display = 'none';
+                pdfViewerContainer.style.display = 'none';
+                initCharacterEasyMDE();
+                if (characterEasyMDE) {
+                    characterEasyMDE.codemirror.refresh();
+                }
+            } else {
+                characterNotesEditorContainer.style.display = 'none';
+                characterSheetContent.style.display = 'block';
+            }
+        });
     }
 
     if (addCharacterButton) {
@@ -3462,8 +3534,51 @@ document.addEventListener('DOMContentLoaded', () => {
             if (selectedCharacterId) {
                 loadCharacterIntoEditor(selectedCharacterId);
             }
+        } else if (event.data.type === 'sheetDataForView') {
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (character) {
+                const markdown = generateCharacterMarkdown(event.data.data, character.notes);
+                const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                const notePreviewBody = document.getElementById('note-preview-body');
+                if (notePreviewOverlay && notePreviewBody) {
+                    notePreviewBody.innerHTML = markdown;
+                    notePreviewOverlay.style.display = 'flex';
+                }
+            }
         }
     });
+
+    function generateCharacterMarkdown(sheetData, notes) {
+        let md = ``;
+        md += `# ${sheetData.char_name || 'Unnamed Character'}\\n`;
+        md += `**Race:** ${sheetData.race || ''} | **Class & Level:** ${sheetData.class_level || ''} | **Background:** ${sheetData.background || ''}\\n`;
+        md += `**Alignment:** ${sheetData.alignment || ''} | **Player Name:** ${sheetData.player_name || ''} | **XP:** ${sheetData.xp || '0'}\\n`;
+        md += `___\\n`;
+        md += `## Stats\\n`;
+        md += `| STR | DEX | CON | INT | WIS | CHA |\\n`;
+        md += `|:---:|:---:|:---:|:---:|:---:|:---:|\\n`;
+        md += `| ${sheetData.strength_score || 10} | ${sheetData.dexterity_score || 10} | ${sheetData.constitution_score || 10} | ${sheetData.intelligence_score || 10} | ${sheetData.wisdom_score || 10} | ${sheetData.charisma_score || 10} |\\n`;
+        md += `___\\n`;
+        md += `## Combat\\n`;
+        md += `**Armor Class:** ${sheetData.ac || 10} | **Initiative:** ${sheetData.initiative || '+0'} | **Speed:** ${sheetData.speed || '30ft'}\\n`;
+        md += `**HP:** ${sheetData.hp_current || 0} / ${sheetData.hp_max || 10} | **Hit Dice:** ${sheetData.hit_dice_total || '1d8'}\\n`;
+        md += `___\\n`;
+        md += `## Character Info\\n`;
+        md += `### Personality Traits\\n`;
+        md += `${sheetData.personality_traits || ''}\\n`;
+        md += `### Ideals\\n`;
+        md += `${sheetData.ideals || ''}\\n`;
+        md += `### Bonds\\n`;
+        md += `${sheetData.bonds || ''}\\n`;
+        md += `### Flaws\\n`;
+        md += `${sheetData.flaws || ''}\\n`;
+        md += `___\\n`;
+        if (notes) {
+            md += `## Notes\\n`;
+            md += `${notes}\\n`;
+        }
+        return easyMDE.options.previewRender(md);
+    }
 
 
 });
