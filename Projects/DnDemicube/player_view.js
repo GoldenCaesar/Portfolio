@@ -200,6 +200,20 @@ window.addEventListener('message', (event) => {
                     notePreviewOverlayToHide.style.display = 'none';
                 }
                 break;
+            case 'showCharacterPreview':
+                const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                const characterPreviewBody = document.getElementById('character-preview-body');
+                if (characterPreviewOverlay && characterPreviewBody && data.content) {
+                    characterPreviewBody.innerHTML = data.content;
+                    characterPreviewOverlay.style.display = 'flex';
+                }
+                break;
+            case 'hideCharacterPreview':
+                const characterPreviewOverlayToHide = document.getElementById('character-preview-overlay');
+                if (characterPreviewOverlayToHide) {
+                    characterPreviewOverlayToHide.style.display = 'none';
+                }
+                break;
             default:
                 console.log("Player view received unhandled message type:", data.type);
                 break;
@@ -264,6 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
             window.opener.postMessage({ type: 'playerViewReady' }, '*');
             // console.log("Player view sent playerViewReady message to opener.");
         }, 100);
+    }
+
+    const characterPreviewClose = document.getElementById('character-preview-close');
+    if (characterPreviewClose) {
+        characterPreviewClose.addEventListener('click', () => {
+            const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+            if (characterPreviewOverlay) {
+                characterPreviewOverlay.style.display = 'none';
+            }
+        });
     }
 });
 
