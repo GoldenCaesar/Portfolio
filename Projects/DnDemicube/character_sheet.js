@@ -181,6 +181,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
+
+            // Manually add modifiers to the sheetData
+            for (const attr in modifiers) {
+                sheetData[`${attr}_modifier`] = modifiers[attr].textContent;
+            }
+
             window.parent.postMessage({ type: 'sheetDataForView', data: sheetData }, '*');
         }
     });
