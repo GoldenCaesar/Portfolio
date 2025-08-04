@@ -698,13 +698,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (overlay.linkedCharacterId) {
                             const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
                             if (character) {
-                                // Since we don't have the full sheet data here, we can't generate the markdown.
-                                // One solution is to switch to the character tab and open the view from there.
-                                // For now, let's just log it.
-                                console.log("Clicked on character:", character.name);
-                                 // For now, lets just open the character sheet in the editor
-                                loadCharacterIntoEditor(character.id);
-                                switchTab('tab-characters');
+                                const markdown = generateCharacterMarkdown(character.sheetData, character.notes);
+                                const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                                const characterPreviewBody = document.getElementById('character-preview-body');
+                                if (characterPreviewOverlay && characterPreviewBody) {
+                                    characterPreviewBody.innerHTML = markdown;
+                                    characterPreviewOverlay.style.display = 'flex';
+                                }
+
+                                if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                    playerWindow.postMessage({
+                                        type: 'showCharacterPreview',
+                                        content: markdown
+                                    }, '*');
+                                }
                             }
                         }
                         return; // Interaction handled
