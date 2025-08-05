@@ -595,3 +595,21 @@ input:checked + .slider:before {
 .slider.round:before {
   border-radius: 50%;
 }
+
+.button-like-a {
+    display: inline-block;
+    padding: 8px 12px;
+    background-color: #b6cae1;
+    color: #15191e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.button-like-a:hover {
+    background-color: #a0b4c9;
+}
