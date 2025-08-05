@@ -3312,6 +3312,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let md = `
 ${notes || ''}
 
+${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_portrait})` : ''}
+
 ## **Character Information**
 | Field | Value |
 | :--- | :--- |
