@@ -9,13 +9,19 @@
 <body>
     <div class="character-sheet">
         <section class="header">
-            <div class="char-name">
-                <label for="char-name-input">Character Name</label>
-                <input type="text" id="char-name-input" name="char_name">
+            <div class="char-info">
+                <div class="char-name">
+                    <label for="char-name-input">Character Name</label>
+                    <input type="text" id="char-name-input" name="char_name">
+                </div>
+            <div class="char-portrait">
+                <img id="portrait-preview" src="#" alt="Character Portrait Preview" style="display: none;">
+                <input type="file" id="portrait-upload" accept="image/*" style="display: none;">
+                <label for="portrait-upload" class="portrait-upload-label">Upload Portrait</label>
             </div>
-            <div class="char-details">
-                <div>
-                    <label for="class-level-input">Class & Level</label>
+                <div class="char-details">
+                    <div>
+                        <label for="class-level-input">Class & Level</label>
                     <input type="text" id="class-level-input" name="class_level">
                 </div>
                 <div>

@@ -412,6 +412,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('👤', canvasX, canvasY);
+
+                const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                if (character && character.sheetData && character.sheetData.character_portrait) {
+                    const img = new Image();
+                    img.onload = function() {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
+                        ctx.closePath();
+                        ctx.clip();
+
+                        ctx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                        ctx.restore();
+                    };
+                    img.src = character.sheetData.character_portrait;
+                }
             }
         });
     }

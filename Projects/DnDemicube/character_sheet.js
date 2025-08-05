@@ -153,6 +153,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             updateAllModifiers();
+
+            if (data.character_portrait) {
+                portraitPreview.src = data.character_portrait;
+                portraitPreview.style.display = 'block';
+            } else {
+                portraitPreview.src = '#';
+                portraitPreview.style.display = 'none';
+            }
         } else if (event.data.type === 'requestSheetData') {
             const sheetData = {};
             const inputs = document.querySelectorAll('input, textarea');
@@ -165,9 +173,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
+            if (portraitPreview.style.display !== 'none') {
+                sheetData['character_portrait'] = portraitPreview.src;
+            }
             window.parent.postMessage({ type: 'saveCharacterSheet', data: sheetData }, '*');
         } else if (event.data.type === 'clearCharacterSheet') {
             clearSheetFields();
+            portraitPreview.src = '#';
+            portraitPreview.style.display = 'none';
             updateAllModifiers();
         } else if (event.data.type === 'requestSheetDataForView') {
             const sheetData = {};
@@ -192,4 +205,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     window.parent.postMessage({ type: 'characterSheetReady' }, '*');
+
+    const portraitUpload = document.getElementById('portrait-upload');
+    const portraitPreview = document.getElementById('portrait-preview');
+
+    portraitUpload.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                portraitPreview.src = e.target.result;
+                portraitPreview.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
 });
