@@ -38,18 +38,6 @@
                 </div>
             </div>
 
-            <div class="sidebar-section" id="map-tools-section">
-                <h3>Map Tools</h3>
-                <div class="map-tools-buttons">
-                    <button id="btn-link-child-map" disabled>Link to Child Map</button>
-                    <button id="btn-link-note" disabled>Link Note</button>
-                    <button id="btn-link-character" disabled>Link Character</button>
-                    <button id="btn-link-trigger" disabled>Link Trigger</button>
-                    <button id="btn-remove-links" disabled>Remove Links</button>
-                </div>
-            </div>
-
-
             <div class="sidebar-section">
                 <h3>Campaign</h3>
                  <div id="campaign-io-controls">
@@ -135,6 +123,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="dm_view.js"></script>
     <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+
+    <div id="map-tools-context-menu" class="context-menu" style="display: none; position: absolute;">
+        <ul>
+            <li data-action="link-child-map">Link to Child Map</li>
+            <li data-action="link-note">Link Note</li>
+            <li data-action="link-character">Link Character</li>
+        </ul>
+    </div>
 
     <div id="polygon-context-menu" class="context-menu" style="display: none; position: absolute;">
         <ul>
