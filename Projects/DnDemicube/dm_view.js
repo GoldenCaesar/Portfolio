@@ -2665,11 +2665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (characterNameInput) characterNameInput.value = character.name;
 
         if (characterSheetIframe && characterSheetIframe.contentWindow) {
-            const dataToSend = {
-                ...(character.sheetData || {}),
-                isDetailsVisible: character.isDetailsVisible
-            };
-            characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: dataToSend }, '*');
+            characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: character.sheetData || {} }, '*');
         } else {
             // This case should not happen if the iframe is loaded, but as a fallback:
             console.warn("Character sheet iframe not ready to receive data.");
@@ -3263,13 +3259,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (event.data.type === 'characterSheetReady') {
             if (selectedCharacterId) {
                 loadCharacterIntoEditor(selectedCharacterId);
-            }
-        } else if (event.data.type === 'characterDetailsVisibilityChange') {
-            if (selectedCharacterId) {
-                const character = charactersData.find(c => c.id === selectedCharacterId);
-                if (character) {
-                    character.isDetailsVisible = event.data.isDetailsVisible;
-                }
             }
         } else if (event.data.type === 'sheetDataForView') {
             const character = charactersData.find(c => c.id === selectedCharacterId);
