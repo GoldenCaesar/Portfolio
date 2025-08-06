@@ -1454,7 +1454,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- Final UI Refresh ---
             renderAllLists();
-            updateButtonStates();
 
             // Restore selections and display
             if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
