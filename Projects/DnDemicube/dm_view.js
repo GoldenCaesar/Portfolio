@@ -1860,8 +1860,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sendClearMessageToPlayerView() {
         if (playerWindow && !playerWindow.closed) {
-            playerWindow.postMessage({ type: 'clearMap' }, '*');
-            console.log("Sent clearMap message to player view.");
+            playerWindow.postMessage({ type: 'clearMap', characters: charactersData }, '*');
+            console.log("Sent clearMap message to player view with characters data.");
         }
     }
 
