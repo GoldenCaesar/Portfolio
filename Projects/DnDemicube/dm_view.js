@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
+    const drawingCanvas = document.getElementById('drawing-canvas');
     const mapContainer = document.getElementById('map-container');
     const noteEditorContainer = document.getElementById('note-editor-container'); // New container for the editor
     const hoverLabel = document.getElementById('hover-label');
@@ -140,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
-        if (dmCanvas && mapContainer) {
+        if (dmCanvas && drawingCanvas && mapContainer) {
             const style = window.getComputedStyle(mapContainer);
             const paddingLeft = parseFloat(style.paddingLeft) || 0;
             const paddingRight = parseFloat(style.paddingRight) || 0;
@@ -154,33 +155,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let currentFileNameToRedraw = selectedMapFileName;
 
             if (mapWasDisplayed) {
-                // Note: isLinkingChildMap implies selectedMapFileName is the map being drawn on.
-                
-                // Invalidate current display data BEFORE canvas dimensions change and before displayMapOnCanvas.
-                currentMapDisplayData.img = null; 
-                console.log("Invalidated currentMapDisplayData.img due to resize preparation.");
+                currentMapDisplayData.img = null;
             }
-            
-            // Apply new dimensions to the canvas
+
+            // Apply new dimensions to both canvases
             dmCanvas.width = canvasWidth;
             dmCanvas.height = canvasHeight;
-            console.log(`Canvas resized to: ${dmCanvas.width}x${dmCanvas.height} (Container clientW/H: ${mapContainer.clientWidth}x${mapContainer.clientHeight}, Padding L/R/T/B: ${paddingLeft}/${paddingRight}/${paddingTop}/${paddingBottom})`);
+            drawingCanvas.width = canvasWidth;
+            drawingCanvas.height = canvasHeight;
 
             if (mapWasDisplayed && currentFileNameToRedraw) {
                 displayMapOnCanvas(currentFileNameToRedraw);
-            } else if (!mapWasDisplayed) {
-                // If no map was displayed but one is selected (e.g. initial load scenario or after clearing canvas)
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                } else {
-                    // No map was displayed and no map is selected, ensure canvas is clear.
-                    const ctx = dmCanvas.getContext('2d');
-                    ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-                }
+            } else if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
             } else {
-                 // mapWasDisplayed was true, but currentFileNameToRedraw is null (should not happen if logic is correct)
-                 // or mapWasDisplayed was false, and some other condition.
-                 // Ensure canvas is clear if no specific map is being redrawn.
                 const ctx = dmCanvas.getContext('2d');
                 ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
             }
@@ -204,31 +192,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // }
 
     function displayMapOnCanvas(fileName) {
-        if (!dmCanvas || !mapContainer) {
-            console.error("DM Canvas or Map Container not found!");
+        if (!dmCanvas || !drawingCanvas || !mapContainer) {
+            console.error("One or more canvas elements or map container not found!");
             return;
         }
 
-        // --- Start: Added logic to update canvas dimensions ---
-        // Ensure canvas dimensions are up-to-date based on container size each time a map is displayed.
-        // This is similar to the dimension calculation in resizeCanvas.
-        const style = window.getComputedStyle(mapContainer);
-        const paddingLeft = parseFloat(style.paddingLeft) || 0;
-        const paddingRight = parseFloat(style.paddingRight) || 0;
-        const paddingTop = parseFloat(style.paddingTop) || 0;
-        const paddingBottom = parseFloat(style.paddingBottom) || 0;
-
-        const newCanvasWidth = mapContainer.clientWidth - paddingLeft - paddingRight;
-        const newCanvasHeight = mapContainer.clientHeight - paddingTop - paddingBottom;
-
-        // Only resize if dimensions actually changed, to avoid unnecessary redraws if called repeatedly.
-        // However, for this specific problem, we want to ensure it *always* sets it before image load.
-        // Let's consider if this check is needed or if we should always set it.
-        // For now, let's always set it to ensure it's fresh.
-        dmCanvas.width = newCanvasWidth;
-        dmCanvas.height = newCanvasHeight;
-        // console.log(`displayMapOnCanvas: Canvas dimensions set to ${dmCanvas.width}x${dmCanvas.height}`);
-        // --- End: Added logic ---
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
         const mapData = detailedMapData.get(fileName);
         if (!mapData || !mapData.url) {
@@ -267,16 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateButtonStates();
 
-            // Draw existing overlays for this map
             if (mapData.overlays) {
                 drawOverlays(mapData.overlays);
             }
 
-            // If actively drawing a new polygon, draw it on top
             if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapFileName === fileName) {
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
                 if (selectedMapData && selectedMapData.mode === 'edit') {
-                    drawCurrentPolygon(true); // Pass true to indicate it's a new, temporary polygon
+                    drawCurrentPolygon();
                 }
             }
         };
@@ -487,18 +455,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function drawCurrentPolygon(isNewTemporaryPolygon = false) {
+    function drawCurrentPolygon() {
         if (currentPolygonPoints.length === 0 || !currentMapDisplayData.img) return;
-        const ctx = dmCanvas.getContext('2d');
 
-        // This function is now only responsible for drawing the temporary polygon.
-        // The canvas clearing and redrawing of the base map and other overlays
-        // is handled by displayMapOnCanvas, which should be called before this.
+        const ctx = drawingCanvas.getContext('2d');
+        ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
         ctx.beginPath();
-        ctx.strokeStyle = 'yellow'; // Yellow for the polygon being actively drawn
+        ctx.strokeStyle = 'yellow';
         ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.25)'; // A semi-transparent fill for better visibility
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.25)';
 
         currentPolygonPoints.forEach((point, index) => {
             const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
@@ -510,15 +476,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // If the polygon is complete, close the path to fill it correctly
         if (polygonDrawingComplete && currentPolygonPoints.length > 2) {
             ctx.closePath();
-            ctx.fill(); // Fill the completed polygon
+            ctx.fill();
         }
 
-        ctx.stroke(); // Stroke the lines (open or closed path)
+        ctx.stroke();
 
-        // Draw red squares for vertices on top, so they are always visible
         ctx.fillStyle = 'red';
         currentPolygonPoints.forEach(point => {
             const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
@@ -528,28 +492,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    drawingCanvas.addEventListener('click', (event) => {
+        if (!isLinkingChildMap && !isRedrawingPolygon) return;
+
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (!imageCoords) return;
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData || selectedMapData.mode !== 'edit') return;
+
+        if (!polygonDrawingComplete) {
+            const clickThreshold = 10 / currentMapDisplayData.ratio;
+            if (currentPolygonPoints.length > 0) {
+                const firstPoint = currentPolygonPoints[0];
+                const dx = Math.abs(imageCoords.x - firstPoint.x);
+                const dy = Math.abs(imageCoords.y - firstPoint.y);
+
+                if (currentPolygonPoints.length >= 2 && dx < clickThreshold && dy < clickThreshold) {
+                    currentPolygonPoints.push({ x: firstPoint.x, y: firstPoint.y });
+                    polygonDrawingComplete = true;
+                    drawingCanvas.style.pointerEvents = 'none';
+                    dmCanvas.style.cursor = 'auto';
+
+                    if (isLinkingChildMap) {
+                        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from List';
+                        alert('Polygon complete. Select a map from the list to link as its child.');
+                    } else if (isRedrawingPolygon) {
+                        // Finalize redraw logic here
+                        const newOverlay = {
+                            type: 'childMapLink',
+                            polygon: [...currentPolygonPoints],
+                            linkedMapName: preservedLinkedMapNameForRedraw
+                        };
+                        selectedMapData.overlays.push(newOverlay);
+                        alert(`Polygon redrawn successfully, linked to "${preservedLinkedMapNameForRedraw}".`);
+
+                        const drawingCtx = drawingCanvas.getContext('2d');
+                        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+                        displayMapOnCanvas(selectedMapFileName); // Redraw main canvas with new polygon
+                        resetAllInteractiveStates();
+                    }
+                } else {
+                    currentPolygonPoints.push(imageCoords);
+                }
+            } else {
+                currentPolygonPoints.push(imageCoords);
+            }
+            drawCurrentPolygon();
+        }
+    });
+
     dmCanvas.addEventListener('click', (event) => {
-        // If a move operation was just finalized by a mouseup, this click event might fire right after.
-        // resetAllInteractiveStates() should have cleared isMovingPolygon.
-        // If still in move mode (e.g. click-to-place without drag yet), this click should be handled carefully.
         if (isMovingPolygon) {
-            // If user is in "isMovingPolygon" mode (selected from context menu) but hasn't started dragging (moveStartPoint is null)
-            // A click could be interpreted as "finalize at current (original) position" or "cancel".
-            // The mouseup listener is better for finalization. A simple click here while isMovingPolygon is true
-            // and no drag has started (moveStartPoint is null) should probably do nothing or cancel.
-            // For now, let's assume mouseup handles finalization and mousedown initiates drag.
-            // A plain click here if isMovingPolygon is true and moveStartPoint is null could be a cancel.
-            // However, the "Link to Child Map" button also acts as a global cancel.
-            // Let's make this click do nothing if move mode is active but no drag has started,
-            // to prevent interference with polygon drawing logic below.
-            if (!moveStartPoint) { // In move mode, but not actively dragging (no mousedown on polygon yet)
+            if (!moveStartPoint) {
                 console.log("In move mode, click occurred but not on polygon to start drag. No action.");
-                // Optionally, this could be a way to cancel: resetAllInteractiveStates(); alert("Move cancelled.");
                 return;
             }
-            // If moveStartPoint IS set, it means a drag was happening, and mouseup should have handled it.
-            // This click listener should ideally not run if mouseup already reset isMovingPolygon.
-            // This is a safeguard.
             return;
         }
 
@@ -558,62 +560,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const imageCoords = getRelativeCoords(canvasX, canvasY);
 
         if (!imageCoords) {
-            // console.log("Clicked outside map image area.");
             return;
         }
 
         const selectedMapData = detailedMapData.get(selectedMapFileName);
         if (!selectedMapData) return;
-
-        // Priority 1: Polygon Drawing (New Link or Redraw) - Only in 'edit' mode
-        if (selectedMapData.mode === 'edit' && (isLinkingChildMap || isRedrawingPolygon) && !polygonDrawingComplete) {
-            const clickThreshold = 10 / currentMapDisplayData.ratio; // 10px radius on canvas, converted to image scale
-            if (currentPolygonPoints.length > 0) {
-                const firstPoint = currentPolygonPoints[0];
-                const dx = Math.abs(imageCoords.x - firstPoint.x);
-                const dy = Math.abs(imageCoords.y - firstPoint.y);
-
-                if (currentPolygonPoints.length >= 2 && dx < clickThreshold && dy < clickThreshold) {
-                    currentPolygonPoints.push({ x: firstPoint.x, y: firstPoint.y }); // Close the polygon
-                    polygonDrawingComplete = true;
-                    dmCanvas.style.cursor = 'auto';
-
-                    if (isLinkingChildMap) {
-                        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from List';
-                        alert('Polygon complete for new link. Now select a map from the list to link as its child.');
-                        console.log("New link polygon complete:", currentPolygonPoints);
-                    } else if (isRedrawingPolygon) {
-                        if (preservedLinkedMapNameForRedraw) {
-                            const newOverlay = {
-                                type: 'childMapLink',
-                                polygon: [...currentPolygonPoints],
-                                linkedMapName: preservedLinkedMapNameForRedraw
-                            };
-                            selectedMapData.overlays.push(newOverlay);
-                            alert(`Polygon redrawn successfully, still linked to "${preservedLinkedMapNameForRedraw}".`);
-                            console.log("Polygon redraw complete. New overlay:", newOverlay);
-                            displayMapOnCanvas(selectedMapFileName);
-                        } else {
-                            console.error("Failed to save redrawn polygon: Missing preserved link name.");
-                            alert("Error: Could not save the redrawn polygon.");
-                        }
-                        isRedrawingPolygon = false;
-                        preservedLinkedMapNameForRedraw = null;
-                        currentPolygonPoints = [];
-                        polygonDrawingComplete = false;
-                        selectedPolygonForContextMenu = null;
-                    }
-                } else {
-                    currentPolygonPoints.push(imageCoords);
-                }
-            } else {
-                currentPolygonPoints.push(imageCoords);
-            }
-            // drawCurrentPolygon(false); // Old method
-            displayMapOnCanvas(selectedMapFileName); // New method: Redraw everything
-            return;
-        }
-
         if (selectedMapData.mode === 'edit' && isLinkingNote) {
             const newOverlay = {
                 type: 'noteLink',
@@ -865,6 +816,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
         if (btnLinkNote) btnLinkNote.textContent = 'Link Note';
         if (btnLinkCharacter) btnLinkCharacter.textContent = 'Link Character';
+
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        drawingCanvas.style.pointerEvents = 'none';
         dmCanvas.style.cursor = 'auto';
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
@@ -895,9 +850,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Start linking process
                 resetAllInteractiveStates(); // Clear other states before starting a new one
                 isLinkingChildMap = true;
-                // currentPolygonPoints = []; // Handled by resetAllInteractiveStates
-                // polygonDrawingComplete = false; // Handled by resetAllInteractiveStates
                 btnLinkChildMap.textContent = 'Cancel Drawing Link';
+                drawingCanvas.style.pointerEvents = 'auto'; // Enable clicks on the drawing canvas
                 dmCanvas.style.cursor = 'crosshair';
                 alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
                 updateButtonStates(); // Reflect that linking has started
@@ -1363,6 +1317,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         parentMapData.overlays.push(newOverlay);
                         alert(`Map "${clickedFileName}" successfully linked as a new child to "${parentMapData.name}".`);
+
+                        const drawingCtx = drawingCanvas.getContext('2d');
+                        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
                         resetAllInteractiveStates();
                         displayMapOnCanvas(selectedMapFileName);
                     } else {
