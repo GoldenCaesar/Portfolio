@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const polygonContextMenu = document.getElementById('polygon-context-menu');
     const noteContextMenu = document.getElementById('note-context-menu');
     const characterContextMenu = document.getElementById('character-context-menu');
+    const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const displayedFileNames = new Set();
 
     // Notes Tab Elements
@@ -55,17 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Map Tools Elements
     const mapToolsSection = document.getElementById('map-tools-section');
-    // const mapToolButtons = mapToolsSection ? mapToolsSection.querySelectorAll('.map-tools-buttons button') : []; // Will re-evaluate usage of this
-
-    // Button References for Map Tools
-    const btnLinkChildMap = document.getElementById('btn-link-child-map');
-    // Add other tool buttons here as needed, e.g.:
-    const btnLinkNote = document.getElementById('btn-link-note');
-    const btnLinkCharacter = document.getElementById('btn-link-character');
-    // const btnLinkTrigger = document.getElementById('btn-link-trigger');
-    // const btnRemoveLinks = document.getElementById('btn-remove-links');
-
-
     // const mapObjectURLs = new Map(); // Old: To store filename -> objectURL mapping for Manage Maps
     // New structure: fileName -> { url: objectURL, name: fileName, overlays: [] }
     const detailedMapData = new Map();
@@ -851,111 +841,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function resetAllInteractiveStates() {
-        isLinkingChildMap = false;
-        isLinkingNote = false;
-        isLinkingCharacter = false;
-        isRedrawingPolygon = false;
-        isMovingPolygon = false; // Added
-        isMovingNote = false;
-        isMovingCharacter = false;
-
-        preservedLinkedMapNameForRedraw = null;
-        currentPolygonPoints = [];
-        polygonDrawingComplete = false;
-
-        polygonBeingMoved = null; // Added
-        noteBeingMoved = null;
-        characterBeingMoved = null;
-        moveStartPoint = null; // Added
-        currentDragOffsets = {x: 0, y: 0}; // Added
-
-        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
-        if (btnLinkNote) btnLinkNote.textContent = 'Link Note';
-        if (btnLinkCharacter) btnLinkCharacter.textContent = 'Link Character';
-        dmCanvas.style.cursor = 'auto';
-        selectedPolygonForContextMenu = null;
-        selectedNoteForContextMenu = null;
-        selectedCharacterForContextMenu = null;
-
-        // Redraw current map to clear any temporary states (like a polygon being dragged)
-        if (selectedMapFileName) {
-            displayMapOnCanvas(selectedMapFileName);
-        }
-        updateButtonStates();
-        console.log("All interactive states reset.");
-    }
-
-
-    if (btnLinkChildMap) {
-        btnLinkChildMap.addEventListener('click', () => {
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            if (!selectedMapData || selectedMapData.mode !== 'edit') {
-                alert("Please select a map and ensure it is in 'Edit' mode to add a link to it.");
-                return;
-            }
-
-            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote) {
-                // If any interactive mode is active, this button acts as a global cancel.
-                resetAllInteractiveStates();
-                console.log("Interactive operation cancelled via Link/Cancel button.");
-            } else {
-                // Start linking process
-                resetAllInteractiveStates(); // Clear other states before starting a new one
-                isLinkingChildMap = true;
-                // currentPolygonPoints = []; // Handled by resetAllInteractiveStates
-                // polygonDrawingComplete = false; // Handled by resetAllInteractiveStates
-                btnLinkChildMap.textContent = 'Cancel Drawing Link';
-                dmCanvas.style.cursor = 'crosshair';
-                alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
-                updateButtonStates(); // Reflect that linking has started
-            }
-        });
-    }
-
-    if (btnLinkNote) {
-        btnLinkNote.addEventListener('click', () => {
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            if (!selectedMapData || selectedMapData.mode !== 'edit') {
-                alert("Please select a map and ensure it is in 'Edit' mode to add a note to it.");
-                return;
-            }
-
-            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote || isLinkingCharacter) {
-                resetAllInteractiveStates();
-                console.log("Interactive operation cancelled via Link Note/Cancel button.");
-            } else {
-                resetAllInteractiveStates();
-                isLinkingNote = true;
-                btnLinkNote.textContent = 'Cancel Linking Note';
-                dmCanvas.style.cursor = 'crosshair';
-                alert("Click on the map to place a note icon.");
-                updateButtonStates();
-            }
-        });
-    }
-
-    if (btnLinkCharacter) {
-        btnLinkCharacter.addEventListener('click', () => {
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            if (!selectedMapData || selectedMapData.mode !== 'edit') {
-                alert("Please select a map and ensure it is in 'Edit' mode to add a character to it.");
-                return;
-            }
-
-            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote || isLinkingCharacter) {
-                resetAllInteractiveStates();
-                console.log("Interactive operation cancelled via Link Character/Cancel button.");
-            } else {
-                resetAllInteractiveStates();
-                isLinkingCharacter = true;
-                btnLinkCharacter.textContent = 'Cancel Linking Character';
-                dmCanvas.style.cursor = 'crosshair';
-                alert("Click on the map to place a character icon.");
-                updateButtonStates();
-            }
-        });
-    }
 
     // Modify existing dmCanvas click listener to NOT interfere if moving polygon (mouseup will handle finalization)
     // The dmCanvas click listener is complex; we need to ensure that if isMovingPolygon is true,
@@ -1452,34 +1337,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initially disable map tools on load
     // disableMapTools(); // Will be handled by updateButtonStates
 
-    function updateButtonStates() {
-        const selectedMapData = detailedMapData.get(selectedMapFileName);
-        const isEditMode = selectedMapData && selectedMapData.mode === 'edit';
-        const inLinkingProcess = isLinkingChildMap || polygonDrawingComplete;
-
-        if (btnLinkChildMap) {
-            if (isLinkingChildMap && !polygonDrawingComplete) {
-                btnLinkChildMap.textContent = 'Cancel Drawing Link';
-                btnLinkChildMap.disabled = false;
-            } else if (isLinkingChildMap && polygonDrawingComplete) {
-                btnLinkChildMap.textContent = 'Cancel Link - Select Child';
-                btnLinkChildMap.disabled = false;
-            } else {
-                btnLinkChildMap.textContent = 'Link to Child Map';
-                btnLinkChildMap.disabled = !isEditMode || inLinkingProcess;
-            }
-        }
-
-        const btnLinkNote = document.getElementById('btn-link-note');
-        if (btnLinkNote) btnLinkNote.disabled = !isEditMode || inLinkingProcess;
-        const btnLinkCharacter = document.getElementById('btn-link-character');
-        if (btnLinkCharacter) btnLinkCharacter.disabled = !isEditMode || inLinkingProcess;
-    }
-
     // Initial setup calls
     resizeCanvas(); // Size canvas on load
     window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
-    updateButtonStates(); // Set initial button states
 
     // Notes Tab Initialisation
     renderNotesList();
@@ -1903,8 +1763,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         polygonContextMenu.style.display = 'none'; // Hide previous menu first
         noteContextMenu.style.display = 'none';
+        characterContextMenu.style.display = 'none';
+        mapToolsContextMenu.style.display = 'none';
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
+        selectedCharacterForContextMenu = null;
+
 
         if (!selectedMapFileName) {
             return;
@@ -2020,6 +1884,39 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Global click listener to hide context menu
+    if (mapToolsContextMenu) {
+        mapToolsContextMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const action = event.target.dataset.action;
+
+            if (action) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                    alert("Please select a map and ensure it is in 'Edit' mode to use map tools.");
+                    return;
+                }
+
+                switch (action) {
+                    case 'link-child-map':
+                        isLinkingChildMap = true;
+                        dmCanvas.style.cursor = 'crosshair';
+                        alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
+                        break;
+                    case 'link-note':
+                        isLinkingNote = true;
+                        dmCanvas.style.cursor = 'crosshair';
+                        alert("Click on the map to place a note icon.");
+                        break;
+                    case 'link-character':
+                        isLinkingCharacter = true;
+                        dmCanvas.style.cursor = 'crosshair';
+                        alert("Click on the map to place a character icon.");
+                        break;
+                }
+            }
+            mapToolsContextMenu.style.display = 'none';
+        });
+    }
     document.addEventListener('click', (event) => {
         if (polygonContextMenu.style.display === 'block') {
             // Check if the click was outside the context menu
@@ -2038,6 +1935,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!characterContextMenu.contains(event.target)) {
                 characterContextMenu.style.display = 'none';
                 selectedCharacterForContextMenu = null;
+            }
+        }
+        if (mapToolsContextMenu.style.display === 'block') {
+            if (!mapToolsContextMenu.contains(event.target)) {
+                mapToolsContextMenu.style.display = 'none';
             }
         }
     });
