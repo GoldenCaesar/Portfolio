@@ -200,10 +200,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 sheetData[`${attr}_modifier`] = modifiers[attr].textContent;
             }
 
-            if (portraitPreview.style.display !== 'none') {
-                sheetData['character_portrait'] = portraitPreview.src;
-            }
-
             window.parent.postMessage({ type: 'sheetDataForView', data: sheetData }, '*');
         }
     });
