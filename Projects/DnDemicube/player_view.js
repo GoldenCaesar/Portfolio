@@ -1,7 +1,64 @@
 const playerCanvas = document.getElementById('player-canvas');
-// Ensure the container ID matches what's in player_view.html, e.g., "player-map-container"
 const playerMapContainer = document.getElementById('player-map-container');
 const pCtx = playerCanvas ? playerCanvas.getContext('2d') : null;
+
+// Slideshow elements
+const slideshowContainer = document.getElementById('slideshow-container');
+const contentContainer = document.getElementById('content-container');
+const portraitImg = document.getElementById('portrait-img');
+const quoteText = document.getElementById('quote-text');
+const authorText = document.getElementById('author-text');
+
+let slideshowActive = false;
+let currentSlideIndex = 0;
+
+const slides = [
+    {
+        image: "https://images.unsplash.com/photo-1549417235-a6e5b5655b3d?w=800",
+        quote: "The only limit to our realization of tomorrow will be our doubts of today.",
+        author: "Franklin D. Roosevelt"
+    },
+    {
+        image: "https://images.unsplash.com/photo-1549339343-9828e678a1c9?w=800",
+        quote: "The future belongs to those who believe in the beauty of their dreams.",
+        author: "Eleanor Roosevelt"
+    },
+    {
+        image: "https://images.unsplash.com/photo-1549454172-88134764b85c?w=800",
+        quote: "Do not go where the path may lead, go instead where there is no path and leave a trail.",
+        author: "Ralph Waldo Emerson"
+    }
+];
+
+function updateSlide(index) {
+    const slide = slides[index];
+    portraitImg.src = slide.image;
+    quoteText.textContent = `"${slide.quote}"`;
+    authorText.textContent = slide.author;
+}
+
+function animateSlideshow() {
+    if (!slideshowActive) return;
+
+    contentContainer.classList.remove("animate-out");
+    contentContainer.classList.add("animate-in");
+
+    updateSlide(currentSlideIndex);
+
+    setTimeout(() => {
+        if (!slideshowActive) return;
+        contentContainer.classList.remove("animate-in");
+        contentContainer.classList.add("animate-out");
+
+        setTimeout(() => {
+            if (!slideshowActive) return;
+            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+            animateSlideshow();
+        }, 1000);
+    }, 6000);
+}
+
+
 let currentMapImage = null;
 let currentOverlays = [];
 let currentMapDisplayData = {
@@ -161,6 +218,10 @@ window.addEventListener('message', (event) => {
     if (data && data.type) {
         switch (data.type) {
             case 'loadMap':
+                slideshowActive = false;
+                slideshowContainer.style.display = 'none';
+                playerMapContainer.style.display = 'flex';
+
                 if (data.mapDataUrl) {
                     // console.log(`Player view received loadMap: ${data.mapDataUrl.substring(0,30)}...`);
                     const img = new Image();
@@ -217,7 +278,11 @@ window.addEventListener('message', (event) => {
                 console.log("Player view received clearMap message.");
                 currentMapImage = null;
                 currentOverlays = [];
-                drawPlaceholder("Map cleared by DM.");
+
+                playerMapContainer.style.display = 'none';
+                slideshowContainer.style.display = 'flex';
+                slideshowActive = true;
+                animateSlideshow();
                 break;
             case 'showNotePreview':
                 const notePreviewOverlay = document.getElementById('note-preview-overlay');
