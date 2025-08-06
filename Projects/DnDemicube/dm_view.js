@@ -265,6 +265,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 scaledHeight: imgScaledHeight
             };
 
+            updateButtonStates();
+
             // Draw existing overlays for this map
             if (mapData.overlays) {
                 drawOverlays(mapData.overlays);
@@ -816,6 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (modeToggleSwitch) modeToggleSwitch.disabled = true;
                 const ctx = dmCanvas.getContext('2d');
                 ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+                updateButtonStates();
             }
 
             updateMoveIconVisibility(list); // Update move icons in case first/last item changed
@@ -1146,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             displayMapOnCanvas(selectedMapFileName);
                         }
                     }
+                    updateButtonStates();
                 }
                 listItem.replaceChild(textNode, input); // Replace input with text node after successful rename
             }
@@ -1383,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     targetItem.classList.add('selected-map-item');
 
                     displayMapOnCanvas(clickedFileName);
+                    updateButtonStates();
 
                     const newSelectedMapData = detailedMapData.get(clickedFileName);
                     if (newSelectedMapData) {
@@ -1407,6 +1412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedMapData.mode = modeToggleSwitch.checked ? 'view' : 'edit';
                 console.log(`Map '${selectedMapFileName}' mode changed to ${selectedMapData.mode}`);
                 displayMapOnCanvas(selectedMapFileName);
+                updateButtonStates();
                 if (selectedMapData.mode === 'view') {
                     sendMapToPlayerView(selectedMapFileName);
                 } else {
