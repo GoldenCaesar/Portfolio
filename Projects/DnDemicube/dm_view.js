@@ -491,31 +491,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentPolygonPoints.length === 0 || !currentMapDisplayData.img) return;
         const ctx = dmCanvas.getContext('2d');
 
-        // If it's a new temporary polygon, we need to ensure the base image and existing overlays are drawn first.
-        // displayMapOnCanvas already handles drawing the base image and its persistent overlays.
-        // So, if this is called from displayMapOnCanvas for the new polygon, we don't need to redraw the base image here.
-        // However, if called directly after adding a point (not from displayMapOnCanvas), we need to refresh.
-        if (!isNewTemporaryPolygon) { // If called after adding a point, redraw base and existing overlays
-            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-            ctx.drawImage(
-                currentMapDisplayData.img, 0, 0,
-                currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight,
-                currentMapDisplayData.offsetX, currentMapDisplayData.offsetY,
-                currentMapDisplayData.scaledWidth, currentMapDisplayData.scaledHeight
-            );
-            const parentMapData = detailedMapData.get(selectedMapInManager);
-            if (parentMapData && parentMapData.overlays) {
-                drawOverlays(parentMapData.overlays);
-            }
-        }
-
+        // This function is now only responsible for drawing the temporary polygon.
+        // The canvas clearing and redrawing of the base map and other overlays
+        // is handled by displayMapOnCanvas, which should be called before this.
 
         ctx.beginPath();
         ctx.strokeStyle = 'yellow'; // Yellow for the polygon being actively drawn
         ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.25)'; // A semi-transparent fill for better visibility
 
         currentPolygonPoints.forEach((point, index) => {
-            // Convert stored original image coordinates back to canvas coordinates for drawing
             const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
             const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
             if (index === 0) {
@@ -523,17 +508,23 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 ctx.lineTo(canvasX, canvasY);
             }
-            // Draw a small circle for each point
-            ctx.fillStyle = 'red';
-            ctx.fillRect(canvasX - 3, canvasY - 3, 6, 6); // Small square/circle for vertex
         });
 
-        if (currentPolygonPoints.length > 1 && polygonDrawingComplete) { // If complete, close the path
-            const firstPointCanvasX = (currentPolygonPoints[0].x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-            const firstPointCanvasY = (currentPolygonPoints[0].y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
-            ctx.lineTo(firstPointCanvasX, firstPointCanvasY);
+        // If the polygon is complete, close the path to fill it correctly
+        if (polygonDrawingComplete && currentPolygonPoints.length > 2) {
+            ctx.closePath();
+            ctx.fill(); // Fill the completed polygon
         }
-        ctx.stroke();
+
+        ctx.stroke(); // Stroke the lines (open or closed path)
+
+        // Draw red squares for vertices on top, so they are always visible
+        ctx.fillStyle = 'red';
+        currentPolygonPoints.forEach(point => {
+            const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+            const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+            ctx.fillRect(canvasX - 3, canvasY - 3, 6, 6);
+        });
     }
 
 
@@ -618,7 +609,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 currentPolygonPoints.push(imageCoords);
             }
-            drawCurrentPolygon(false);
+            // drawCurrentPolygon(false); // Old method
+            displayMapOnCanvas(selectedMapFileName); // New method: Redraw everything
             return;
         }
 
