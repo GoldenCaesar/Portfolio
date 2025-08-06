@@ -10,8 +10,9 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
 
 /* Main content area containers: #map-container and #note-editor-container */
 #map-container {
+    position: relative; /* This is key for stacking canvases */
     flex-grow: 1;
-    display: flex; /* Default visible, unless .hidden is applied by JS */
+    display: flex;
     justify-content: center;
     align-items: center;
     overflow: hidden;
@@ -26,13 +27,25 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
 #note-editor-container.active {
     display: flex !important; /* Override inline display: none */
     flex-direction: column; /* To make #note-editor-area inside it grow */
-    /* flex-grow: 1; and padding: 10px; are already set inline */
-    /* Optional: Add border/background if it should differ from map-container or body */
-    /* border: 1px solid #3f4c5a; */
-    /* background-color: #2a3138; */
 }
 
-#dm-canvas { max-width: 100%; max-height: 100%; border: 1px solid #3f4c5a; background-color: #2a3138; }
+#dm-canvas, #drawing-canvas {
+    position: absolute;
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid #3f4c5a;
+}
+
+#dm-canvas {
+    background-color: #2a3138;
+    z-index: 1; /* Base canvas */
+}
+
+#drawing-canvas {
+    background-color: transparent;
+    z-index: 2; /* Drawing canvas on top */
+    pointer-events: none; /* Allows clicks to pass through to the dm-canvas */
+}
 button, input[type="file"] {
     padding: 8px 12px;
     background-color: #b6cae1;
