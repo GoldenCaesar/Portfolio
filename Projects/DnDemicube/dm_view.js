@@ -13,6 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterContextMenu = document.getElementById('character-context-menu');
     const displayedFileNames = new Set();
 
+    // Dice Roller Elements
+    const diceRollerIcon = document.getElementById('dice-roller-icon');
+    const diceRollerOverlay = document.getElementById('dice-roller-overlay');
+    const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
+
     // Notes Tab Elements
     const createNewNoteButton = document.getElementById('create-new-note-button');
     const editNotesIcon = document.getElementById('edit-notes-icon');
@@ -3469,5 +3474,29 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return easyMDE.options.previewRender(md);
 }
 
+    // Dice Roller Overlay Logic
+    if (diceRollerIcon) {
+        diceRollerIcon.addEventListener('click', () => {
+            if (diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'flex';
+            }
+        });
+    }
 
+    if (diceRollerCloseButton) {
+        diceRollerCloseButton.addEventListener('click', () => {
+            if (diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'none';
+            }
+        });
+    }
+
+    if (diceRollerOverlay) {
+        diceRollerOverlay.addEventListener('click', (event) => {
+            // Close if the click is on the overlay background, but not on its content
+            if (event.target === diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'none';
+            }
+        });
+    }
 });

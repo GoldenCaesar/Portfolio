@@ -2,6 +2,11 @@ const playerCanvas = document.getElementById('player-canvas');
 const playerMapContainer = document.getElementById('player-map-container');
 const pCtx = playerCanvas ? playerCanvas.getContext('2d') : null;
 
+// Dice Roller Elements
+const diceRollerIcon = document.getElementById('dice-roller-icon');
+const diceRollerOverlay = document.getElementById('dice-roller-overlay');
+const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
+
 // Slideshow elements
 const slideshowContainer = document.getElementById('slideshow-container');
 const contentContainer = document.getElementById('content-container');
@@ -464,6 +469,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const characterPreviewOverlay = document.getElementById('character-preview-overlay');
             if (characterPreviewOverlay) {
                 characterPreviewOverlay.style.display = 'none';
+            }
+        });
+    }
+
+    // Dice Roller Overlay Logic
+    if (diceRollerIcon) {
+        diceRollerIcon.addEventListener('click', () => {
+            if (diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'flex';
+            }
+        });
+    }
+
+    if (diceRollerCloseButton) {
+        diceRollerCloseButton.addEventListener('click', () => {
+            if (diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'none';
+            }
+        });
+    }
+
+    if (diceRollerOverlay) {
+        diceRollerOverlay.addEventListener('click', (event) => {
+            // Close if the click is on the overlay background, but not on its content
+            if (event.target === diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'none';
             }
         });
     }
