@@ -121,8 +121,11 @@
             ></p>
         </div>
     </div>
-    <div id="player-map-container">
+    <div id="player-map-container" class="relative">
         <canvas id="player-canvas"></canvas>
+        <div id="dice-roller-icon" class="absolute bottom-5 right-5 w-12 h-12 cursor-pointer z-10">
+            <img src="https://raw.githubusercontent.com/demicube/dndemicube-d20-icon/main/d20-icon-white.svg" alt="d20 icon" class="w-full h-full">
+        </div>
     </div>
     <div id="note-preview-overlay" class="note-preview-overlay" style="display: none;">
         <div class="note-preview-content">
@@ -138,5 +141,22 @@
     </div>
     <script src="quote_map.json"></script>
     <script src="player_view.js"></script>
+
+    <div id="dice-roller-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-20" style="display: none;">
+        <div class="bg-gray-800 p-5 rounded-lg max-w-2xl w-full relative text-white">
+            <span id="dice-roller-close-button" class="absolute top-2 right-3 text-gray-400 text-3xl font-bold cursor-pointer hover:text-white">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Dice Roller & Initiative Tracker</h2>
+            <div class="flex justify-between space-x-4">
+                <div id="dice-roller-placeholder" class="w-1/2 border border-gray-600 p-4 rounded">
+                    <h3 class="text-xl font-semibold mb-2">Dice Rolling</h3>
+                    <p>Dice rolling functionality will be implemented here.</p>
+                </div>
+                <div id="initiative-tracker-placeholder" class="w-1/2 border border-gray-600 p-4 rounded">
+                    <h3 class="text-xl font-semibold mb-2">Initiative Tracker</h3>
+                    <p>Initiative tracking functionality will be implemented here.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

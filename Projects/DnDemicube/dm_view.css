@@ -636,3 +636,62 @@ input:checked + .slider:before {
     margin-right: 15px;
     margin-bottom: 10px;
 }
+
+/* For the floating d20 icon */
+.floating-icon {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    /* background-color: #333; */
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 1000;
+    /* box-shadow: 0 2px 5px rgba(0,0,0,0.2); */
+}
+
+/* .floating-icon:hover {
+    background-color: #555;
+} */
+
+/* For the overlay */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001; /* Ensure it's above the icon */
+}
+
+.overlay-content {
+    background-color: #2a3138;
+    padding: 20px;
+    border: 1px solid #3f4c5a;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 5px;
+    position: relative;
+    color: #e0e0e0;
+}
+
+.dice-roller-content {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#dice-roller-placeholder, #initiative-tracker-placeholder {
+    width: 48%;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    border-radius: 4px;
+}
