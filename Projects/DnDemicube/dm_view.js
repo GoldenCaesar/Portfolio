@@ -133,6 +133,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function filterPlayerContent(content) {
+        if (!content) return "";
+        return content.replace(/\[dm\](.*?)\[\/dm\]/gs, '');
+    }
+
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
         if (dmCanvas && mapContainer) {
@@ -675,9 +680,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 notePreviewBody.innerHTML = renderedHTML;
                                 notePreviewOverlay.style.display = 'flex';
                                 if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                    const playerNoteContent = filterPlayerContent(note.content);
+                                    const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
                                     playerWindow.postMessage({
                                         type: 'showNotePreview',
-                                        content: renderedHTML
+                                        content: playerRenderedHTML
                                     }, '*');
                                 }
                             }
@@ -688,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (overlay.linkedCharacterId) {
                         const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
                         if (character) {
-                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes);
+                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
                             const characterPreviewOverlay = document.getElementById('character-preview-overlay');
                             const characterPreviewBody = document.getElementById('character-preview-body');
                             if (characterPreviewOverlay && characterPreviewBody) {
@@ -697,9 +704,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
 
                             if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                const playerMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, true, character.isDetailsVisible);
                                 playerWindow.postMessage({
                                     type: 'showCharacterPreview',
-                                    content: markdown
+                                    content: playerMarkdown
                                 }, '*');
                             }
                         }
@@ -1654,6 +1662,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Restore Data Structures (without assets yet) ---
         notesData = campaignData.notes || [];
         charactersData = campaignData.characters || []; // This now includes pdfFileName
+        charactersData.forEach(character => {
+            if (typeof character.isDetailsVisible === 'undefined') {
+                character.isDetailsVisible = true;
+            }
+        });
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
         // Selections for maps are not restored yet, as they depend on UI lists
@@ -1712,6 +1725,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Legacy support: data structures are restored, but assets are missing.
         notesData = campaignData.notes || [];
         charactersData = campaignData.characters || [];
+        charactersData.forEach(character => {
+            if (typeof character.isDetailsVisible === 'undefined') {
+                character.isDetailsVisible = true;
+            }
+        });
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
 
@@ -2154,7 +2172,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     "quote", "unordered-list", "ordered-list", "|",
                     "link", "image", "table", "|",
                     "preview", "side-by-side", "fullscreen", "|",
-                    "guide"
+                    "guide", "|",
+                    {
+                        name: "dm-mode",
+                        action: function(editor) {
+                            const cm = editor.codemirror;
+                            const selection = cm.getSelection();
+                            cm.replaceSelection(`[dm]${selection}[/dm]`);
+                        },
+                        className: "fa fa-user-secret",
+                        title: "DM Only Content",
+                    }
                 ],
                 // Handle image uploads by pasting or dragging - converts to base64
                 uploadImage: true,
@@ -2697,7 +2725,8 @@ document.addEventListener('DOMContentLoaded', () => {
             id: newCharacterId,
             name: newName,
             sheetData: {}, // Initially empty
-            notes: ""
+            notes: "",
+            isDetailsVisible: true
         };
         charactersData.push(newCharacter);
 
@@ -2852,7 +2881,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     "quote", "unordered-list", "ordered-list", "|",
                     "link", "image", "table", "|",
                     "preview", "side-by-side", "fullscreen", "|",
-                    "guide"
+                    "guide", "|",
+                    {
+                        name: "dm-mode",
+                        action: function(editor) {
+                            const cm = editor.codemirror;
+                            const selection = cm.getSelection();
+                            cm.replaceSelection(`[dm]${selection}[/dm]`);
+                        },
+                        className: "fa fa-user-secret",
+                        title: "DM Only Content",
+                    }
                 ],
             });
         } catch (e) {
@@ -3309,7 +3348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (event.data.type === 'sheetDataForView') {
             const character = charactersData.find(c => c.id === selectedCharacterId);
             if (character) {
-                const markdown = generateCharacterMarkdown(event.data.data, character.notes);
+                const markdown = generateCharacterMarkdown(event.data.data, character.notes, false, character.isDetailsVisible);
                 const characterPreviewOverlay = document.getElementById('character-preview-overlay');
                 const characterPreviewBody = document.getElementById('character-preview-body');
                 if (characterPreviewOverlay && characterPreviewBody) {
@@ -3317,14 +3356,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     characterPreviewOverlay.style.display = 'flex';
                 }
             }
+        } else if (event.data.type === 'characterDetailsVisibilityChange') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.isDetailsVisible = event.data.isDetailsVisible;
+                }
+            }
         }
     });
 
-    function generateCharacterMarkdown(sheetData, notes) {
-    let md = `
-${notes || ''}
+function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDetailsVisible = true) {
+    const playerNotes = forPlayerView ? filterPlayerContent(notes) : notes;
 
-${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_portrait})` : ''}
+    let md = `${playerNotes || ''}\n\n${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_portrait})` : ''}`;
+
+    if (!forPlayerView || (forPlayerView && isDetailsVisible)) {
+        md += `
 
 ## **Character Information**
 | Field | Value |
@@ -3443,6 +3491,7 @@ ${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_po
 | **Bonds** | ${sheetData.bonds || ''} |
 | **Flaws** | ${sheetData.flaws || ''} |
 `;
+    }
     return easyMDE.options.previewRender(md);
 }
 

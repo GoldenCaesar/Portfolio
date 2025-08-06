@@ -138,6 +138,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const detailsVisibilityToggle = document.getElementById('details-visibility-toggle');
+
+    if (detailsVisibilityToggle) {
+        detailsVisibilityToggle.addEventListener('change', function() {
+            window.parent.postMessage({
+                type: 'characterDetailsVisibilityChange',
+                isDetailsVisible: this.checked
+            }, '*');
+        });
+    }
+
     window.addEventListener('message', function(event) {
         if (event.data.type === 'loadCharacterSheet') {
             clearSheetFields();
@@ -160,6 +171,10 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 portraitPreview.src = '#';
                 portraitPreview.style.display = 'none';
+            }
+
+            if (detailsVisibilityToggle) {
+                detailsVisibilityToggle.checked = typeof data.isDetailsVisible === 'boolean' ? data.isDetailsVisible : true;
             }
         } else if (event.data.type === 'requestSheetData') {
             const sheetData = {};
