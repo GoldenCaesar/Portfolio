@@ -444,6 +444,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const characterPreviewOverlay = document.getElementById('character-preview-overlay');
             if (characterPreviewOverlay) {
                 characterPreviewOverlay.style.display = 'none';
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'hideCharacterPreview' }, '*');
+                }
             }
         });
     }
@@ -623,7 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const newOverlay = {
                 type: 'noteLink',
                 position: imageCoords,
-                linkedNoteId: null
+                linkedNoteId: null,
+                playerVisible: false
             };
             selectedMapData.overlays.push(newOverlay);
             console.log('Note icon placed. Overlay:', newOverlay);
@@ -635,7 +639,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const newOverlay = {
                 type: 'characterLink',
                 position: imageCoords,
-                linkedCharacterId: null
+                linkedCharacterId: null,
+                playerVisible: false
             };
             selectedMapData.overlays.push(newOverlay);
             console.log('Character icon placed. Overlay:', newOverlay);
@@ -1361,7 +1366,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const newOverlay = {
                             type: 'childMapLink',
                             polygon: [...currentPolygonPoints],
-                            linkedMapName: clickedFileName
+                            linkedMapName: clickedFileName,
+                            playerVisible: false
                         };
                         parentMapData.overlays.push(newOverlay);
                         alert(`Map "${clickedFileName}" successfully linked as a new child to "${parentMapData.name}".`);
@@ -1680,10 +1686,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (imageFile) {
                 const promise = imageFile.async("blob").then(blob => {
                     const url = URL.createObjectURL(blob);
+                    const overlays = definition.overlays || [];
+                    overlays.forEach(overlay => {
+                        if (typeof overlay.playerVisible === 'undefined') {
+                            overlay.playerVisible = true;
+                        }
+                    });
                     detailedMapData.set(mapName, {
                         name: definition.name,
                         url: url,
-                        overlays: definition.overlays || [],
+                        overlays: overlays,
                         mode: definition.mode || 'edit' // Backward compatibility
                     });
                     displayedFileNames.add(mapName);
