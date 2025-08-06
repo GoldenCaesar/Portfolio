@@ -2048,6 +2048,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentPolygonPoints = [];
                         polygonDrawingComplete = false;
                         parentMapData.overlays.splice(index, 1);
+                        drawingCanvas.style.pointerEvents = 'auto';
                         dmCanvas.style.cursor = 'crosshair';
                         alert(`Redrawing polygon for link to "${preservedLinkedMapNameForRedraw}". Click on the map to start drawing. Click the first point to close it.`);
                         if (selectedMapFileName === parentMapName) {
