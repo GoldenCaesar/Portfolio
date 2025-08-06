@@ -115,6 +115,39 @@ function drawOverlays_PlayerView(overlays) {
             pCtx.textAlign = 'center';
             pCtx.textBaseline = 'middle';
             pCtx.fillText('📝', canvasX, canvasY);
+        } else if (overlay.type === 'characterLink' && overlay.position) {
+            const iconSize = 20; // The size of the icon on the canvas
+            const canvasX = (overlay.position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+            const canvasY = (overlay.position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+
+            let fillStyle = 'rgba(102, 255, 102, 0.9)'; // Greenish if visible to player
+
+            pCtx.fillStyle = fillStyle;
+            pCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+            pCtx.strokeStyle = 'black';
+            pCtx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+            pCtx.fillStyle = 'black';
+            pCtx.font = `${iconSize * 0.8}px sans-serif`;
+            pCtx.textAlign = 'center';
+            pCtx.textBaseline = 'middle';
+            pCtx.fillText('👤', canvasX, canvasY);
+
+            if (overlay.character_portrait) {
+                const img = new Image();
+                img.onload = function() {
+                    pCtx.save();
+                    pCtx.beginPath();
+                    pCtx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
+                    pCtx.closePath();
+                    pCtx.clip();
+
+                    pCtx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                    pCtx.restore();
+                };
+                img.src = overlay.character_portrait;
+            }
         }
     });
 }
