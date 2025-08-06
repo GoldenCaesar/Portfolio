@@ -667,6 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         });
                         displayMapOnCanvas(childMapName);
+                        updateButtonStates();
                         sendMapToPlayerView(childMapName);
                         console.log(`Switched to child map: ${childMapName}`);
                     } else {
@@ -1916,40 +1917,39 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!imageCoords) return;
 
         const selectedMapData = detailedMapData.get(selectedMapFileName);
-        if (!selectedMapData) return;
+        if (!selectedMapData || !selectedMapData.overlays) return;
 
-        // Check for overlay interaction first
-        if (selectedMapData.overlays) {
-            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
-                const overlay = selectedMapData.overlays[i];
-                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                    selectedPolygonForContextMenu = {
-                        overlay: overlay,
-                        index: i,
-                        parentMapName: selectedMapData.name,
-                        source: selectedMapData.mode
-                    };
+        for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+            const overlay = selectedMapData.overlays[i];
+            if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                selectedPolygonForContextMenu = {
+                    overlay: overlay,
+                    index: i,
+                    parentMapName: selectedMapData.name,
+                    source: selectedMapData.mode
+                };
 
-                    const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
-                    const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
-                    const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
-                    const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
-                    const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
+                const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
+                const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
+                const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
+                const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
 
-                    if (selectedMapData.mode === 'view') {
-                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
-                        if (changeChildMapItem) changeChildMapItem.style.display = 'none';
-                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
-                        if (movePolygonItem) movePolygonItem.style.display = 'none';
-                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
-                    } else { // edit mode
-                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
-                        if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
-                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
-                        if (movePolygonItem) movePolygonItem.style.display = 'list-item';
-                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
-                    }
+                if (selectedMapData.mode === 'view') {
+                    if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                    if (changeChildMapItem) changeChildMapItem.style.display = 'none';
+                    if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
+                    if (movePolygonItem) movePolygonItem.style.display = 'none';
+                    if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                } else { // edit mode
+                    if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                    if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
+                    if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
+                    if (movePolygonItem) movePolygonItem.style.display = 'list-item';
+                    if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                }
 
+                    // Use pageX/pageY for positioning relative to the entire document
                     polygonContextMenu.style.left = `${event.pageX}px`;
                     polygonContextMenu.style.top = `${event.pageY}px`;
                     polygonContextMenu.style.display = 'block';
@@ -2017,14 +2017,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             }
-        }
-
-        // If no overlay was hit, show the general map tools menu, but only in edit mode.
-        if (selectedMapData.mode === 'edit') {
-            mapToolsContextMenu.style.left = `${event.pageX}px`;
-            mapToolsContextMenu.style.top = `${event.pageY}px`;
-            mapToolsContextMenu.style.display = 'block';
-        }
     });
 
     // Global click listener to hide context menu
