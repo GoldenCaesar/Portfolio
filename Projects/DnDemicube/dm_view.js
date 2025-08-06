@@ -1779,9 +1779,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         const reader = new FileReader();
                         reader.onloadend = () => {
                             const base64dataUrl = reader.result;
-                            const visibleOverlays = mapData.overlays.filter(overlay => {
-                                return typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true;
-                            });
+                            const visibleOverlays = mapData.overlays
+                                .filter(overlay => (typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true))
+                                .map(overlay => {
+                                    if (overlay.type === 'characterLink' && overlay.linkedCharacterId) {
+                                        const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                                        if (character && character.sheetData && character.sheetData.character_portrait) {
+                                            return {
+                                                ...overlay,
+                                                character_portrait: character.sheetData.character_portrait
+                                            };
+                                        }
+                                    }
+                                    return overlay;
+                                });
+
                             playerWindow.postMessage({
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
