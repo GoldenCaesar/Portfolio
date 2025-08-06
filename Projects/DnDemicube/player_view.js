@@ -21,17 +21,27 @@ fetch('quote_map.json')
     });
 
 function getRandomStat(character) {
-    const stats = Object.keys(character.sheetData);
-    if (stats.length === 0) {
+    if (!quoteMap) return null;
+
+    const characterStats = Object.keys(character.sheetData);
+    const availableQuoteStats = [
+        ...Object.keys(quoteMap.ability_scores),
+        ...Object.keys(quoteMap.character_details),
+        ...Object.keys(quoteMap.combat_stats),
+        ...Object.keys(quoteMap.roleplaying_details)
+    ];
+
+    const validStats = characterStats.filter(stat => availableQuoteStats.includes(stat) && character.sheetData[stat]);
+
+    if (validStats.length === 0) {
         return null;
     }
-    let randomStat = stats[Math.floor(Math.random() * stats.length)];
-    while (!character.sheetData[randomStat]) {
-        randomStat = stats[Math.floor(Math.random() * stats.length)];
-    }
+
+    const randomStatName = validStats[Math.floor(Math.random() * validStats.length)];
+
     return {
-        statName: randomStat,
-        statValue: character.sheetData[randomStat]
+        statName: randomStatName,
+        statValue: character.sheetData[randomStatName]
     };
 }
 
