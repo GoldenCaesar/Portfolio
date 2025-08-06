@@ -11,30 +11,97 @@ const authorText = document.getElementById('author-text');
 
 let slideshowActive = false;
 let currentSlideIndex = 0;
+let shuffledCharacters = [];
+let quoteMap = null;
 
-const slides = [
-    {
-        image: "https://images.unsplash.com/photo-1549417235-a6e5b5655b3d?w=800",
-        quote: "The only limit to our realization of tomorrow will be our doubts of today.",
-        author: "Franklin D. Roosevelt"
-    },
-    {
-        image: "https://images.unsplash.com/photo-1549339343-9828e678a1c9?w=800",
-        quote: "The future belongs to those who believe in the beauty of their dreams.",
-        author: "Eleanor Roosevelt"
-    },
-    {
-        image: "https://images.unsplash.com/photo-1549454172-88134764b85c?w=800",
-        quote: "Do not go where the path may lead, go instead where there is no path and leave a trail.",
-        author: "Ralph Waldo Emerson"
+fetch('quote_map.json')
+    .then(response => response.json())
+    .then(data => {
+        quoteMap = data;
+    });
+
+function getRandomStat(character) {
+    const stats = Object.keys(character.sheetData);
+    if (stats.length === 0) {
+        return null;
     }
-];
+    let randomStat = stats[Math.floor(Math.random() * stats.length)];
+    while (!character.sheetData[randomStat]) {
+        randomStat = stats[Math.floor(Math.random() * stats.length)];
+    }
+    return {
+        statName: randomStat,
+        statValue: character.sheetData[randomStat]
+    };
+}
 
-function updateSlide(index) {
-    const slide = slides[index];
-    portraitImg.src = slide.image;
-    quoteText.textContent = `"${slide.quote}"`;
-    authorText.textContent = slide.author;
+function getQuote(stat, character) {
+    if (!quoteMap) {
+        return "Loading quotes...";
+    }
+
+    const visibility = character.isDetailsVisible ? 'visible' : 'notVisible';
+
+    if (quoteMap.ability_scores[stat.statName]) {
+        const score = parseInt(stat.statValue.score, 10);
+        const tiers = quoteMap.ability_scores[stat.statName];
+        for (const tier of tiers) {
+            if (score >= tier.condition.min && score <= tier.condition.max) {
+                const quotes = tier[visibility];
+                let quote = quotes[Math.floor(Math.random() * quotes.length)];
+                if (visibility === 'visible') {
+                    quote = quote.replace('{{score}}', stat.statValue.score).replace('{{modifier}}', stat.statValue.modifier);
+                }
+                return quote;
+            }
+        }
+    } else if (quoteMap.character_details[stat.statName]) {
+        const quotes = quoteMap.character_details[stat.statName][visibility];
+        let quote = quotes[Math.floor(Math.random() * quotes.length)];
+        if (visibility === 'visible') {
+            if (stat.statName === 'class_and_level') {
+                const level = stat.statValue.match(/\d+/);
+                const className = stat.statValue.replace(/\d+/,'').trim();
+                quote = quote.replace('{{level}}', level ? level[0] : '').replace('{{class}}', className);
+            } else {
+                quote = quote.replace('{{race}}', stat.statValue);
+            }
+        }
+        return quote;
+    } else if (quoteMap.roleplaying_details[stat.statName]) {
+        const hasValue = stat.statValue ? 'has_value' : 'no_value';
+        const quotes = quoteMap.roleplaying_details[stat.statName][hasValue][visibility];
+        let quote = quotes[Math.floor(Math.random() * quotes.length)];
+        if (visibility === 'visible' && hasValue === 'has_value') {
+            quote = quote.replace('{{value}}', stat.statValue);
+        }
+        return quote;
+    }
+
+    return "No quote found.";
+}
+
+
+function updateSlide() {
+    if (shuffledCharacters.length === 0) {
+        return;
+    }
+    const character = shuffledCharacters[currentSlideIndex];
+    const randomStat = getRandomStat(character);
+
+    if (character.isDetailsVisible) {
+        portraitImg.src = character.sheetData.character_portrait || 'https://images.unsplash.com/photo-1549417235-a6e5b5655b3d?w=800';
+        authorText.textContent = `${character.name} (${character.sheetData.player_name || 'N/A'})`;
+    } else {
+        portraitImg.src = 'https://images.unsplash.com/photo-1549417235-a6e5b5655b3d?w=800';
+        authorText.textContent = '???';
+    }
+
+    if (randomStat) {
+        quoteText.textContent = `"${getQuote(randomStat, character)}"`;
+    } else {
+        quoteText.textContent = '"..."';
+    }
 }
 
 function animateSlideshow() {
@@ -43,7 +110,7 @@ function animateSlideshow() {
     contentContainer.classList.remove("animate-out");
     contentContainer.classList.add("animate-in");
 
-    updateSlide(currentSlideIndex);
+    updateSlide();
 
     setTimeout(() => {
         if (!slideshowActive) return;
@@ -52,7 +119,7 @@ function animateSlideshow() {
 
         setTimeout(() => {
             if (!slideshowActive) return;
-            currentSlideIndex = (currentSlideIndex + 1) % slides.length;
+            currentSlideIndex = (currentSlideIndex + 1) % shuffledCharacters.length;
             animateSlideshow();
         }, 1000);
     }, 6000);
@@ -278,6 +345,9 @@ window.addEventListener('message', (event) => {
                 console.log("Player view received clearMap message.");
                 currentMapImage = null;
                 currentOverlays = [];
+
+                shuffledCharacters = data.characters.sort(() => 0.5 - Math.random());
+                currentSlideIndex = 0;
 
                 playerMapContainer.style.display = 'none';
                 slideshowContainer.style.display = 'flex';
