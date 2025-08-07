@@ -1640,18 +1640,19 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterId = campaignData.selectedCharacterId || null;
         diceRollHistory = campaignData.diceRollHistory || [];
         diceDialogueRecord.innerHTML = '';
-        diceRollHistory.forEach(message => {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('dice-dialogue-message');
-            messageElement.textContent = message;
-            diceDialogueRecord.prepend(messageElement);
-        });
-        diceRollHistory = campaignData.diceRollHistory || [];
-        diceDialogueRecord.innerHTML = '';
-        diceRollHistory.forEach(message => {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('dice-dialogue-message');
-            messageElement.textContent = message;
+        diceRollHistory.forEach(historyMessage => {
+            const parts = historyMessage.split(': ');
+            const sum = parts[0];
+            const roll = parts.length > 1 ? parts.slice(1).join(': ') : '';
+
+            const rollData = {
+                sum: sum,
+                roll: roll,
+                characterName: 'Dice Roller',
+                playerName: 'DM'
+            };
+
+            const messageElement = createDiceRollCard(rollData);
             diceDialogueRecord.prepend(messageElement);
         });
         // Selections for maps are not restored yet, as they depend on UI lists
@@ -3503,15 +3504,44 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return easyMDE.options.previewRender(md);
 }
 
-    function showDiceDialogue(message) {
-        if (!diceDialogueRecord) return;
-
-        diceRollHistory.push(message);
-
-        // Create and add the new message
+    function createDiceRollCard(rollData) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('dice-dialogue-message');
-        messageElement.textContent = message;
+
+        const cardContent = document.createElement('div');
+        cardContent.classList.add('dice-roll-card-content');
+        messageElement.appendChild(cardContent);
+
+        const profilePic = document.createElement('div');
+        profilePic.classList.add('dice-roll-profile-pic');
+        profilePic.textContent = 'DM';
+        cardContent.appendChild(profilePic);
+
+        const textContainer = document.createElement('div');
+        textContainer.classList.add('dice-roll-text-container');
+        cardContent.appendChild(textContainer);
+
+        const namePara = document.createElement('p');
+        namePara.classList.add('dice-roll-name');
+        namePara.innerHTML = `<strong>${rollData.characterName}</strong> played by <strong>${rollData.playerName}</strong>`;
+        textContainer.appendChild(namePara);
+
+        const detailsPara = document.createElement('p');
+        detailsPara.classList.add('dice-roll-details');
+        detailsPara.textContent = rollData.roll;
+        textContainer.appendChild(detailsPara);
+
+        return messageElement;
+    }
+
+    function showDiceDialogue(rollData) {
+        if (!diceDialogueRecord) return;
+
+        const historyMessage = `${rollData.sum}: ${rollData.roll}`;
+        diceRollHistory.push(historyMessage);
+
+        const messageElement = createDiceRollCard(rollData);
+
         const minimizeButton = document.getElementById('action-log-minimize-button');
         if (minimizeButton) {
             minimizeButton.after(messageElement);
@@ -3519,15 +3549,13 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             diceDialogueRecord.prepend(messageElement);
         }
 
-
-        // Show the dialogue
         diceDialogueRecord.style.display = 'flex';
 
         if (!diceDialogueRecord.classList.contains('persistent-log')) {
             clearTimeout(diceDialogueTimeout);
             diceDialogueTimeout = setTimeout(() => {
                 diceDialogueRecord.style.display = 'none';
-            }, 10000); // 10 seconds
+            }, 10000);
         }
     }
 
@@ -3623,8 +3651,13 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             }
             const detailsMessage = `Custom: ${detailsParts.join(', ')}`;
             diceResultDetails.textContent = detailsMessage;
-            const dialogueMessage = `${totalSum}: ${detailsMessage}`;
-            showDiceDialogue(dialogueMessage);
+
+            showDiceDialogue({
+                characterName: 'Dice Roller',
+                playerName: 'DM',
+                roll: detailsMessage,
+                sum: totalSum
+            });
 
             sendDiceRollToPlayerView(allRolls, totalSum);
 
