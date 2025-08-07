@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const diceRollerIcon = document.getElementById('dice-roller-icon');
     const diceRollerOverlay = document.getElementById('dice-roller-overlay');
     const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
+    const diceDialogueRecord = document.getElementById('dice-dialogue-record');
+    let diceDialogueTimeout;
 
     // Notes Tab Elements
     const createNewNoteButton = document.getElementById('create-new-note-button');
@@ -3474,6 +3476,28 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return easyMDE.options.previewRender(md);
 }
 
+    function showDiceDialogue(message) {
+        if (!diceDialogueRecord) return;
+
+        // Create and add the new message
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('dice-dialogue-message');
+        messageElement.textContent = message;
+        diceDialogueRecord.prepend(messageElement);
+
+        // Keep only the last 5 messages
+        while (diceDialogueRecord.children.length > 5) {
+            diceDialogueRecord.removeChild(diceDialogueRecord.lastChild);
+        }
+
+        // Show the dialogue and set a timeout to hide it
+        diceDialogueRecord.style.display = 'flex';
+        clearTimeout(diceDialogueTimeout);
+        diceDialogueTimeout = setTimeout(() => {
+            diceDialogueRecord.style.display = 'none';
+        }, 10000); // 10 seconds
+    }
+
     function sendDiceMenuStateToPlayerView(isOpen) {
         if (playerWindow && !playerWindow.closed) {
             playerWindow.postMessage({ type: 'diceMenuState', isOpen: isOpen }, '*');
@@ -3527,31 +3551,46 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         rollButton.addEventListener('click', () => {
             let allRolls = [];
             let totalSum = 0;
+            const rollsByDie = {};
 
             for (const die in diceCounts) {
                 const count = diceCounts[die];
                 if (count === 0) continue;
 
                 let sides;
+                let dieName = die;
                 if (die === 'd_custom') {
                     sides = parseInt(customDieInput.value, 10);
                     if (isNaN(sides) || sides < 2 || sides > 1000) {
                         alert("Custom die must have between 2 and 1000 sides.");
                         continue;
                     }
+                    dieName = `d${sides}`;
                 } else {
                     sides = parseInt(die.substring(1), 10);
+                }
+
+                if (!rollsByDie[dieName]) {
+                    rollsByDie[dieName] = [];
                 }
 
                 for (let i = 0; i < count; i++) {
                     const roll = Math.floor(Math.random() * sides) + 1;
                     allRolls.push(roll);
                     totalSum += roll;
+                    rollsByDie[dieName].push(roll);
                 }
             }
 
             diceResultSum.textContent = totalSum;
-            diceResultDetails.textContent = `Rolls: [${allRolls.join(', ')}]`;
+
+            const detailsParts = [];
+            for (const dieName in rollsByDie) {
+                detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
+            }
+            const detailsMessage = `Custom: ${detailsParts.join(', ')}`;
+            diceResultDetails.textContent = detailsMessage;
+            showDiceDialogue(detailsMessage);
 
             sendDiceRollToPlayerView(allRolls, totalSum);
 

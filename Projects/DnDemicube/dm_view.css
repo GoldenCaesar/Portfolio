@@ -700,3 +700,28 @@ input:checked + .slider:before {
     padding: 10px;
     border-radius: 4px;
 }
+
+.dice-dialogue {
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    width: 300px;
+    max-height: 200px;
+    background-color: rgba(40, 50, 60, 0.9);
+    border-radius: 10px;
+    padding: 10px;
+    display: none; /* Initially hidden */
+    flex-direction: column-reverse;
+    overflow: hidden;
+    border: 1px solid #4a5f7a;
+}
+
+.dice-dialogue-message {
+    background-color: rgba(21, 25, 30, 0.8);
+    color: #e0e0e0;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    border-left: 3px solid #76a9d7;
+}
