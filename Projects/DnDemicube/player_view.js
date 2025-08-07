@@ -2,7 +2,10 @@ const playerCanvas = document.getElementById('player-canvas');
 const playerMapContainer = document.getElementById('player-map-container');
 const pCtx = playerCanvas ? playerCanvas.getContext('2d') : null;
 
-// Dice Roller Elements will be initialized in DOMContentLoaded
+// Dice Roller Elements
+const diceRollerIcon = document.getElementById('dice-roller-icon');
+const diceRollerOverlay = document.getElementById('dice-roller-overlay');
+const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
 
 // Slideshow elements
 const slideshowContainer = document.getElementById('slideshow-container');
@@ -288,126 +291,133 @@ function drawOverlays_PlayerView(overlays) {
     });
 }
 
-// Initial DOMContentLoaded setup
-document.addEventListener('DOMContentLoaded', () => {
-    // Re-check elements as they should be available now.
-    const localPlayerCanvas = document.getElementById('player-canvas');
-    const localPlayerMapContainer = document.getElementById('player-map-container');
-    const localPCtx = localPlayerCanvas ? localPlayerCanvas.getContext('2d') : null;
-    const diceRollerOverlay = document.getElementById('dice-roller-overlay');
+window.addEventListener('message', (event) => {
+    // Basic security: check origin if DM view is on a different domain in production.
+    // Example: if (event.origin !== "https://your-dm-view-domain.com") return;
+    const data = event.data;
+    console.log('Player view received message:', data);
 
-    window.addEventListener('message', (event) => {
-        const data = event.data;
-        console.log('Player view received message:', data);
+    if (data && data.type) {
+        switch (data.type) {
+            case 'loadMap':
+                slideshowActive = false;
+                slideshowContainer.style.display = 'none';
+                playerMapContainer.style.display = 'flex';
 
-        if (data && data.type) {
-            switch (data.type) {
-                case 'loadMap':
-                    slideshowActive = false;
-                    slideshowContainer.style.display = 'none';
-                    playerMapContainer.style.display = 'flex';
-
-                    if (data.mapDataUrl) {
-                        const img = new Image();
-                        img.onload = () => {
-                            currentMapImage = img;
-                            currentOverlays = data.overlays || [];
-                            drawMapAndOverlays();
-                        };
-                        img.onerror = () => {
-                            console.error(`Error loading image for player view (loadMap).`);
-                            drawPlaceholder("Error loading map.");
-                            currentMapImage = null;
-                            currentOverlays = [];
-                        };
-                        img.src = data.mapDataUrl;
-                    } else {
-                        console.warn("loadMap message received without mapDataUrl.");
-                        drawPlaceholder("Received invalid map data from DM.");
-                    }
-                    break;
-                case 'polygonVisibilityUpdate':
-                     if (currentMapImage && data.mapFileName && currentMapDisplayData.img && data.mapFileName === currentMapDisplayData.img.name) {
-                        const polygonIdToUpdate = data.polygonIdentifier;
-                        let changed = false;
-                        if (data.isVisible) {
-                            console.log("Player view: 'polygonVisibilityUpdate' (visible:true) received. Expecting DM to have sent full map state.");
-                        } else {
-                            const initialOverlayCount = currentOverlays.length;
-                            currentOverlays = currentOverlays.filter(ov => JSON.stringify(ov.polygon) !== polygonIdToUpdate);
-                            if (currentOverlays.length < initialOverlayCount) {
-                                changed = true;
-                            }
+                if (data.mapDataUrl) {
+                    // console.log(`Player view received loadMap: ${data.mapDataUrl.substring(0,30)}...`);
+                    const img = new Image();
+                    img.onload = () => {
+                        currentMapImage = img;
+                        currentOverlays = data.overlays || [];
+                        console.log("Player view: Map image loaded, drawing map and overlays. Overlays received:", currentOverlays.length);
+                        drawMapAndOverlays();
+                    };
+                    img.onerror = () => {
+                        console.error(`Error loading image for player view (loadMap).`);
+                        drawPlaceholder("Error loading map.");
+                        currentMapImage = null;
+                        currentOverlays = [];
+                    };
+                    img.src = data.mapDataUrl; // Expecting base64 Data URL
+                } else {
+                    console.warn("loadMap message received without mapDataUrl.");
+                    drawPlaceholder("Received invalid map data from DM.");
+                }
+                break;
+            // Note: 'polygonVisibilityUpdate' from DM is largely superseded by DM sending
+            // the full 'loadMap' with the updated set of visible overlays.
+            // Handling it here defensively or if DM's strategy changes.
+            case 'polygonVisibilityUpdate':
+                 if (currentMapImage && data.mapFileName && currentMapDisplayData.img && data.mapFileName === currentMapDisplayData.img.name) {
+                    const polygonIdToUpdate = data.polygonIdentifier;
+                    let changed = false;
+                    if (data.isVisible) {
+                        // This case implies DM would need to send the polygon data for it to be added.
+                        // Current DM logic resends the whole map.
+                        console.log("Player view: 'polygonVisibilityUpdate' (visible:true) received. Expecting DM to have sent full map state.");
+                        // If polygonData was included in message:
+                        // if (data.polygonData && !currentOverlays.some(ov => JSON.stringify(ov.polygon) === polygonIdToUpdate)) {
+                        //    currentOverlays.push(data.polygonData);
+                        //    changed = true;
+                        // }
+                    } else { // isVisible is false
+                        const initialOverlayCount = currentOverlays.length;
+                        currentOverlays = currentOverlays.filter(ov => JSON.stringify(ov.polygon) !== polygonIdToUpdate);
+                        if (currentOverlays.length < initialOverlayCount) {
+                            changed = true;
                         }
-                        if (changed) {
-                            drawMapAndOverlays();
-                        }
-                    } else {
-                         console.warn("Player view: Received polygonVisibilityUpdate for a non-matching/non-loaded map.");
                     }
-                    break;
-                case 'clearMap':
-                    console.log("Player view received clearMap message.");
-                    currentMapImage = null;
-                    currentOverlays = [];
+                    if (changed) {
+                        console.log("Player view: Overlays updated by polygonVisibilityUpdate, redrawing.");
+                        drawMapAndOverlays();
+                    }
+                } else {
+                     console.warn("Player view: Received polygonVisibilityUpdate for a non-matching/non-loaded map.");
+                }
+                break;
+            case 'clearMap':
+                console.log("Player view received clearMap message.");
+                currentMapImage = null;
+                currentOverlays = [];
 
-                    shuffledCharacters = data.characters.sort(() => 0.5 - Math.random());
-                    currentSlideIndex = 0;
+                shuffledCharacters = data.characters.sort(() => 0.5 - Math.random());
+                currentSlideIndex = 0;
 
-                    playerMapContainer.style.display = 'none';
-                    slideshowContainer.style.display = 'flex';
-                    slideshowActive = true;
-                    animateSlideshow();
-                    break;
-                case 'showNotePreview':
-                    const notePreviewOverlay = document.getElementById('note-preview-overlay');
-                    const notePreviewBody = document.getElementById('note-preview-body');
-                    if (notePreviewOverlay && notePreviewBody && data.content) {
-                        notePreviewBody.innerHTML = data.content;
-                        notePreviewOverlay.style.display = 'flex';
-                    }
-                    break;
-                case 'hideNotePreview':
-                    const notePreviewOverlayToHide = document.getElementById('note-preview-overlay');
-                    if (notePreviewOverlayToHide) {
-                        notePreviewOverlayToHide.style.display = 'none';
-                    }
-                    break;
-                case 'showCharacterPreview':
-                    const characterPreviewOverlay = document.getElementById('character-preview-overlay');
-                    const characterPreviewBody = document.getElementById('character-preview-body');
-                    if (characterPreviewOverlay && characterPreviewBody && data.content) {
-                        characterPreviewBody.innerHTML = data.content;
-                        characterPreviewOverlay.style.display = 'flex';
-                    }
-                    break;
-                case 'hideCharacterPreview':
-                    const characterPreviewOverlayToHide = document.getElementById('character-preview-overlay');
-                    if (characterPreviewOverlayToHide) {
-                        characterPreviewOverlayToHide.style.display = 'none';
-                    }
-                    break;
-                case 'diceMenuState':
-                    if (diceRollerOverlay) {
-                        diceRollerOverlay.style.display = data.isOpen ? 'flex' : 'none';
-                    }
-                    break;
-                case 'diceRoll':
-                    const diceResultSum = document.getElementById('dice-result-sum');
-                    const diceResultDetails = document.getElementById('dice-result-details');
-                    if (diceResultSum && diceResultDetails) {
-                        diceResultSum.textContent = data.sum;
-                        diceResultDetails.textContent = `Rolls: [${data.results.join(', ')}]`;
-                    }
-                    break;
-                default:
-                    console.log("Player view received unhandled message type:", data.type);
-                    break;
-            }
-        } else {
-            console.log("Player view received non-standard message:", data);
+                playerMapContainer.style.display = 'none';
+                slideshowContainer.style.display = 'flex';
+                slideshowActive = true;
+                animateSlideshow();
+                break;
+            case 'showNotePreview':
+                const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                const notePreviewBody = document.getElementById('note-preview-body');
+                if (notePreviewOverlay && notePreviewBody && data.content) {
+                    notePreviewBody.innerHTML = data.content;
+                    notePreviewOverlay.style.display = 'flex';
+                }
+                break;
+            case 'hideNotePreview':
+                const notePreviewOverlayToHide = document.getElementById('note-preview-overlay');
+                if (notePreviewOverlayToHide) {
+                    notePreviewOverlayToHide.style.display = 'none';
+                }
+                break;
+            case 'showCharacterPreview':
+                const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                const characterPreviewBody = document.getElementById('character-preview-body');
+                if (characterPreviewOverlay && characterPreviewBody && data.content) {
+                    characterPreviewBody.innerHTML = data.content;
+                    characterPreviewOverlay.style.display = 'flex';
+                }
+                break;
+            case 'hideCharacterPreview':
+                const characterPreviewOverlayToHide = document.getElementById('character-preview-overlay');
+                if (characterPreviewOverlayToHide) {
+                    characterPreviewOverlayToHide.style.display = 'none';
+                }
+                break;
+            case 'diceMenuState':
+                if (diceRollerOverlay) {
+                    diceRollerOverlay.style.display = data.isOpen ? 'flex' : 'none';
+                }
+                break;
+            case 'diceRoll':
+                const diceResultSum = document.getElementById('dice-result-sum');
+                const diceResultDetails = document.getElementById('dice-result-details');
+                if (diceResultSum && diceResultDetails) {
+                    diceResultSum.textContent = data.sum;
+                    diceResultDetails.textContent = `Rolls: [${data.results.join(', ')}]`;
+                }
+                break;
+            default:
+                console.log("Player view received unhandled message type:", data.type);
+                break;
         }
-    });
+    } else {
+        console.log("Player view received non-standard message:", data);
+    }
+});
 
 function resizeAndRedraw() {
     if (currentMapImage && currentMapImage.complete) {
