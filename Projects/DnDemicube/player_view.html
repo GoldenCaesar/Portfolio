@@ -142,40 +142,120 @@
     <script src="quote_map.json"></script>
     <script src="player_view.js"></script>
 
-    <div id="dice-roller-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-20" style="display: none;">
-        <div class="bg-gray-800/80 p-5 rounded-lg max-w-2xl w-full relative text-white [text-shadow:1px_1px_3px_rgba(0,0,0,0.7)]">
-            <span id="dice-roller-close-button" class="absolute top-2 right-3 text-gray-400 text-3xl font-bold cursor-pointer hover:text-white">&times;</span>
-            <h2 class="text-2xl font-bold mb-4 [text-shadow:2px_2px_4px_rgba(0,0,0,0.5)]">Dice Roller & Initiative Tracker</h2>
-            <div class="flex justify-between space-x-4">
-                <div id="dice-roller-content-container" class="w-1/2 border-gray-600 p-4 rounded">
-                    <div id="dice-tray" class="h-16 border-b border-gray-600 mb-4 flex justify-center items-center text-4xl">
-                        <span id="dice-result-sum">0</span>
-                    </div>
-                    <div id="dice-result-details" class="h-8 text-sm text-gray-400 text-center mb-4"></div>
-                    <div id="dice-controls" class="flex flex-col items-center gap-4">
-                        <button id="roll-button" class="w-1/2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Roll</button>
-                        <div id="dice-buttons-grid" class="grid grid-cols-4 gap-2 w-full">
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d4">d4 <span class="dice-count"></span></button>
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d6">d6 <span class="dice-count"></span></button>
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d8">d8 <span class="dice-count"></span></button>
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d10">d10 <span class="dice-count"></span></button>
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d12">d12 <span class="dice-count"></span></button>
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d20">d20 <span class="dice-count"></span></button>
-                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d100">d100 <span class="dice-count"></span></button>
-                            <div class="flex items-center gap-1">
-                                <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded flex-grow" data-die="d_custom">d</button>
-                                <input type="number" id="custom-die-input" min="2" max="1000" value="100" class="w-16 text-center bg-gray-900 border border-gray-600 text-white rounded">
-                                <span class="dice-count" data-die-custom></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div id="initiative-tracker-placeholder" class="w-1/2 border border-gray-600 p-4 rounded">
-                    <h3 class="text-xl font-semibold mb-2">Initiative Tracker</h3>
-                    <p>Initiative tracking functionality will be implemented here.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="dice-roller-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-20" style="display: none; font-family: 'Space Grotesk', 'Noto Sans', sans-serif;">
+        <div class="relative flex size-full min-h-screen flex-col bg-[#111418] dark justify-between group/design-root overflow-x-hidden">
+            <div>
+                <div class="flex items-center bg-[#111418] p-4 pb-2 justify-between">
+                    <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pl-12">Roll</h2>
+                    <div class="flex w-12 items-center justify-end">
+                        <button id="dice-roller-close-button" class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-transparent text-white gap-2 text-base font-bold leading-normal tracking-[0.015em] min-w-0 p-0">
+                            <div class="text-white" data-icon="Gear" data-size="24px" data-weight="regular">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
+                                    <path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"></path>
++                                </svg>
++                            </div>
++                        </button>
++                    </div>
++                </div>
++                <h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Dice</h2>
++                <div id="dice-buttons-grid" class="grid grid-cols-[repeat(auto-fit,minmax(158px,1fr))] gap-3 p-4">
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="coin">
++                        <div class="text-white" data-icon="Coin" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M207.58,63.84C186.85,53.48,159.33,48,128,48S69.15,53.48,48.42,63.84,16,88.78,16,104v48c0,15.22,11.82,29.85,32.42,40.16S96.67,208,128,208s58.85-5.48,79.58-15.84S240,167.22,240,152V104C240,88.78,228.18,74.15,207.58,63.84ZM128,64c62.64,0,96,23.23,96,40s-33.36,40-96,40-96-23.23-96-40S65.36,64,128,64Zm-8,95.86v32c-19-.62-35-3.42-48-7.49V153.05A203.43,203.43,0,0,0,120,159.86Zm16,0a203.43,203.43,0,0,0,48-6.81v31.31c-13,4.07-29,6.87-48,7.49ZM32,152V133.53a82.88,82.88,0,0,0,16.42,10.63c2.43,1.21,5,2.35,7.58,3.43V178C40.17,170.16,32,160.29,32,152Zm168,26V147.59c2.61-1.08,5.15-2.22,7.58-3.43A82.88,82.88,0,0,0,224,133.53V152C224,160.29,215.83,170.16,200,178Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">Coin</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d4">
++                        <div class="text-white" data-icon="DiceFour" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16Zm-96-92a12,12,0,1,1-12-12A12,12,0,0,1,112,100Zm56,0a12,12,0,1,1-12-12A12,12,0,0,1,168,100Zm-56,56a12,12,0,1,1-12-12A12,12,0,0,1,112,156Zm56,0a12,12,0,1,1-12-12A12,12,0,0,1,168,156Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d4</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d6">
++                        <div class="text-white" data-icon="DiceSix" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16ZM104,84A12,12,0,1,1,92,72,12,12,0,0,1,104,84Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,84Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,128Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,128Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,172Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,172Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d6</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d8">
++                        <div class="text-white" data-icon="DiceSix" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16ZM104,84A12,12,0,1,1,92,72,12,12,0,0,1,104,84Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,84Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,128Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,128Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,172Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,172Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d8</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d10">
++                        <div class="text-white" data-icon="DiceSix" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16ZM104,84A12,12,0,1,1,92,72,12,12,0,0,1,104,84Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,84Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,128Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,128Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,172Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,172Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d10</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d12">
++                        <div class="text-white" data-icon="DiceSix" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16ZM104,84A12,12,0,1,1,92,72,12,12,0,0,1,104,84Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,84Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,128Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,128Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,172Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,172Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d12</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d20">
++                        <div class="text-white" data-icon="DiceTwo" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16Zm-88-84a12,12,0,1,1-12-12A12,12,0,0,1,120,108Zm40,40a12,12,0,1,1-12-12A12,12,0,0,1,160,148Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d20</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d100">
++                        <div class="text-white" data-icon="DiceOne" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16Zm-68-64a12,12,0,1,1-12-12A12,12,0,0,1,140,128Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d100</h2>
++                    </div>
++                    <div class="flex flex-1 gap-3 rounded-lg border border-[#3b4754] bg-[#1b2127] p-4 items-center dice-button" data-die="d_custom">
++                        <div class="text-white" data-icon="DiceSix" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32Zm16,160a16,16,0,0,1-16,16H64a16,16,0,0,1-16-16V64A16,16,0,0,1,64,48H192a16,16,0,0,1,16,16ZM104,84A12,12,0,1,1,92,72,12,12,0,0,1,104,84Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,84Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,128Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,128Zm-72,44a12,12,0,1,1-12-12A12,12,0,0,1,104,172Zm72,0a12,12,0,1,1-12-12A12,12,0,0,1,176,172Z"></path></svg>
++                        </div>
++                        <h2 class="text-white text-base font-bold leading-tight">d__</h2>
++                        <input type="number" id="custom-die-input" min="2" max="1000" value="100" style="width: 60px; text-align: center; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0;">
++                    </div>
++                </div>
++                <div id="dice-result-sum" class="text-white text-4xl text-center p-4"></div>
++                <div id="dice-result-details" class="text-white text-center p-2"></div>
++                <h2 class="text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Roll</h2>
++                <div class="flex items-center gap-4 bg-[#111418] px-4 min-h-14 justify-between">
++                    <p class="text-white text-base font-normal leading-normal flex-1 truncate">Name</p>
++                    <div class="shrink-0"><p class="text-white text-base font-normal leading-normal">Unnamed Roll</p></div>
++                </div>
++                <div class="flex items-center gap-4 bg-[#111418] px-4 min-h-14 justify-between">
++                    <p class="text-white text-base font-normal leading-normal flex-1 truncate">Save</p>
++                    <div class="shrink-0">
++                        <label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-[#3d99f5]">
++                            <div class="h-full w-[27px] rounded-full bg-white" style="box-shadow: rgba(0, 0, 0, 0.15) 0px 3px 8px, rgba(0, 0, 0, 0.06) 0px 3px 1px;"></div>
++                            <input type="checkbox" class="invisible absolute" />
++                        </label>
++                    </div>
++                </div>
++            </div>
++            <div>
++                <div class="flex gap-2 border-t border-[#283039] bg-[#1b2127] px-4 pb-3 pt-2">
++                    <a id="roll-button" class="just flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-white" href="#">
++                        <div class="text-white flex h-8 items-center justify-center" data-icon="DiceSix" data-size="24px" data-weight="fill">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M192,32H64A32,32,0,0,0,32,64V192a32,32,0,0,0,32,32H192a32,32,0,0,0,32-32V64A32,32,0,0,0,192,32ZM92,184a12,12,0,1,1,12-12A12,12,0,0,1,92,184Zm0-44a12,12,0,1,1,12-12A12,12,0,0,1,92,140Zm0-44a12,12,0,1,1,12-12A12,12,0,0,1,92,96Zm72,88a12,12,0,1,1,12-12A12,12,0,0,1,164,184Zm0-44a12,12,0,1,1,12-12A12,12,0,0,1,164,140Zm0-44a12,12,0,1,1,12-12A12,12,0,0,1,164,96Z"></path></svg>
++                        </div>
++                        <p class="text-white text-xs font-medium leading-normal tracking-[0.015em]">Roll</p>
++                    </a>
++                    <a id="saved-rolls-button" class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#9cabba]" href="#">
++                        <div class="text-[#9cabba] flex h-8 items-center justify-center" data-icon="Bookmark" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,16V161.57l-51.77-32.35a8,8,0,0,0-8.48,0L72,161.56V48ZM132.23,177.22a8,8,0,0,0-8.48,0L72,209.57V180.43l56-35,56,35v29.14Z"></path></svg>
++                        </div>
++                        <p class="text-[#9cabba] text-xs font-medium leading-normal tracking-[0.015em]">Saved Rolls</p>
++                    </a>
++                    <a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#9cabba]" href="#">
++                        <div class="text-[#9cabba] flex h-8 items-center justify-center" data-icon="Gear" data-size="24px" data-weight="regular">
++                            <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"></path></svg>
++                        </div>
++                        <p class="text-[#9cabba] text-xs font-medium leading-normal tracking-[0.015em]">Settings</p>
++                    </a>
++                </div>
++                <div class="h-5 bg-[#1b2127]"></div>
++            </div>
++        </div>
++    </div>
 </body>
 </html>

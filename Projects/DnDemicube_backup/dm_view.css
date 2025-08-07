@@ -556,7 +556,7 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
   height: 34px;
 }
 
-.switch input { 
+.switch input {
   opacity: 0;
   width: 0;
   height: 0;
@@ -637,3 +637,190 @@ input:checked + .slider:before {
     margin-bottom: 10px;
 }
 
+/* For the floating d20 icon */
+.floating-icon {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    /* background-color: #333; */
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 1000;
+    /* box-shadow: 0 2px 5px rgba(0,0,0,0.2); */
+}
+
+/* .floating-icon:hover {
+    background-color: #555;
+} */
+
+/* For the overlay */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001; /* Ensure it's above the icon */
+}
+
+.overlay-content {
+    background-color: rgba(42, 49, 56, 0.85); /* Semi-transparent background */
+    padding: 20px;
+    border: 1px solid #3f4c5a;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 5px;
+    position: relative;
+    color: #e0e0e0;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Shadow for all text */
+}
+
+.overlay-content h2 {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* More pronounced shadow for the title */
+}
+
+.dice-roller-content {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#dice-roller-placeholder, #initiative-tracker-placeholder {
+    width: 48%;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.dice-dialogue {
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    width: 300px;
+    max-height: 200px;
+    background-color: rgba(40, 50, 60, 0.9);
+    border-radius: 10px;
+    padding: 10px;
+    display: none; /* Initially hidden */
+    flex-direction: column-reverse;
+    overflow: hidden;
+    border: 1px solid #4a5f7a;
+    z-index: 3;
+}
+
+.dice-dialogue-message {
+    background-color: rgba(21, 25, 30, 0.8);
+    color: #e0e0e0;
+    padding: 0;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    border-left: 3px solid #76a9d7;
+}
+
+/* Dice Icon Menu */
+.dice-icon-menu {
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    background-color: #2a3138;
+    border: 1px solid #3f4c5a;
+    border-radius: 5px;
+    z-index: 1001;
+    width: 200px;
+}
+
+.dice-menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: #e0e0e0;
+}
+
+.dice-menu-item:hover {
+    background-color: #3f4c5a;
+    color: #b6cae1;
+}
+
+/* Persistent Action Log */
+.dice-dialogue.persistent-log {
+    position: fixed;
+    bottom: 20px;
+    right: 80px;
+    width: 350px;
+    height: 400px;
+    max-height: 80vh;
+    flex-direction: column;
+    overflow-y: auto;
+    /* The rest of the styling is inherited from .dice-dialogue */
+}
+
+#action-log-minimize-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+/* Dice Roll Card */
+.dice-roll-card-content {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+}
+
+.dice-roll-profile-pic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #4a5f7a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #e0e0e0;
+    flex-shrink: 0;
+}
+
+.dice-roll-text-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dice-roll-name {
+    font-size: 16px;
+    line-height: 1.25;
+    margin: 0;
+}
+
+.dice-roll-name strong {
+    font-weight: bold;
+}
+
+.dice-roll-details {
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0;
+    color: #a0b4c9;
+}
+
+.dice-roll-sum-text {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #e0e0e0; /* Make it stand out more than the rest of the details */
+}
