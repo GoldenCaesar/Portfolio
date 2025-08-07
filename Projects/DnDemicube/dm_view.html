@@ -203,18 +203,19 @@
     </div>
 
     <div id="dice-roller-overlay" class="overlay" style="display: none;">
-        <div class="overlay-content">
+        <div class="overlay-content" style="display: flex; flex-direction: column; max-width: 800px; width: 90%;">
             <span id="dice-roller-close-button" class="close-button">&times;</span>
-            <h2>Dice Roller & Initiative Tracker</h2>
-            <div class="dice-roller-content">
-                <div id="dice-roller-content-container">
+            <h2>Dice Roller</h2>
+            <div class="dice-roller-content" style="display: flex; flex-grow: 1; gap: 20px;">
+                <!-- Left Column: Dice Rolling -->
+                <div id="dice-roller-main-container" style="flex: 1; display: flex; flex-direction: column;">
                     <div id="dice-tray" style="height: 60px; border-bottom: 1px solid #4a5f7a; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; font-size: 2em;">
                         <span id="dice-result-sum">0</span>
                     </div>
                     <div id="dice-result-details" style="height: 30px; font-size: 0.9em; color: #a0b4c9; text-align: center; margin-bottom: 15px;"></div>
                     <div id="dice-controls" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-                        <button id="roll-button" style="width: 50%;">Roll</button>
-                        <div id="dice-buttons-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%;">
+                        <button id="roll-button" style="width: 80%;">Roll</button>
+                        <div id="dice-buttons-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%;">
                             <button class="dice-button" data-die="d4">d4 <span class="dice-count"></span></button>
                             <button class="dice-button" data-die="d6">d6 <span class="dice-count"></span></button>
                             <button class="dice-button" data-die="d8">d8 <span class="dice-count"></span></button>
@@ -230,9 +231,21 @@
                         </div>
                     </div>
                 </div>
-                <div id="initiative-tracker-placeholder">
-                    <h3>Initiative Tracker</h3>
-                    <p>Initiative tracking functionality will be implemented here.</p>
+
+                <!-- Right Column: Saved Rolls -->
+                <div id="saved-rolls-container" style="flex: 1; border-left: 1px solid #4a5f7a; padding-left: 20px; display: flex; flex-direction: column;">
+                    <h3>Save Roll</h3>
+                    <div id="save-roll-form" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="text" id="save-roll-name-input" placeholder="Roll Name (e.g. Crossbow)" style="flex-grow: 1; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0; padding: 5px;">
+                        <button id="save-roll-button">Save</button>
+                    </div>
+
+                    <h3>Saved Rolls</h3>
+                    <div id="saved-rolls-list-container" style="flex-grow: 1; overflow-y: auto; background-color: #15191e; border: 1px solid #3f4c5a; padding: 10px;">
+                        <ul id="saved-rolls-list" style="list-style: none; padding: 0; margin: 0;">
+                            <!-- Saved rolls will be populated here by JavaScript -->
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
