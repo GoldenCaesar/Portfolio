@@ -673,7 +673,7 @@ input:checked + .slider:before {
 }
 
 .overlay-content {
-    background-color: #2a3138;
+    background-color: rgba(42, 49, 56, 0.85); /* Semi-transparent background */
     padding: 20px;
     border: 1px solid #3f4c5a;
     width: 80%;
@@ -681,6 +681,11 @@ input:checked + .slider:before {
     border-radius: 5px;
     position: relative;
     color: #e0e0e0;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Shadow for all text */
+}
+
+.overlay-content h2 {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* More pronounced shadow for the title */
 }
 
 .dice-roller-content {

@@ -94,7 +94,7 @@
         <canvas id="dm-canvas"></canvas>
         <canvas id="drawing-canvas"></canvas>
         <div id="dice-roller-icon" class="floating-icon">
-            <img src="https://raw.githubusercontent.com/demicube/dndemicube-d20-icon/main/d20-icon-white.svg" alt="d20 icon" style="width: 100%; height: 100%;">
+            <img src="assets/d20icon.png" alt="d20 icon" style="width: 100%; height: 100%;">
         </div>
     </div>
     <div id="note-editor-container" style="display: none; flex-grow: 1; padding: 10px;"><div id="note-editor-area" style="display: flex; flex-direction: column; height: 100%;">
@@ -201,9 +201,28 @@
             <span id="dice-roller-close-button" class="close-button">&times;</span>
             <h2>Dice Roller & Initiative Tracker</h2>
             <div class="dice-roller-content">
-                <div id="dice-roller-placeholder">
-                    <h3>Dice Rolling</h3>
-                    <p>Dice rolling functionality will be implemented here.</p>
+                <div id="dice-roller-content-container">
+                    <div id="dice-tray" style="height: 60px; border-bottom: 1px solid #4a5f7a; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; font-size: 2em;">
+                        <span id="dice-result-sum">0</span>
+                    </div>
+                    <div id="dice-result-details" style="height: 30px; font-size: 0.9em; color: #a0b4c9; text-align: center; margin-bottom: 15px;"></div>
+                    <div id="dice-controls" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                        <button id="roll-button" style="width: 50%;">Roll</button>
+                        <div id="dice-buttons-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%;">
+                            <button class="dice-button" data-die="d4">d4 <span class="dice-count"></span></button>
+                            <button class="dice-button" data-die="d6">d6 <span class="dice-count"></span></button>
+                            <button class="dice-button" data-die="d8">d8 <span class="dice-count"></span></button>
+                            <button class="dice-button" data-die="d10">d10 <span class="dice-count"></span></button>
+                            <button class="dice-button" data-die="d12">d12 <span class="dice-count"></span></button>
+                            <button class="dice-button" data-die="d20">d20 <span class="dice-count"></span></button>
+                            <button class="dice-button" data-die="d100">d100 <span class="dice-count"></span></button>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <button class="dice-button" data-die="d_custom" style="flex-grow: 1;">d</button>
+                                <input type="number" id="custom-die-input" min="2" max="1000" value="100" style="width: 60px; text-align: center; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0;">
+                                <span class="dice-count" data-die-custom></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="initiative-tracker-placeholder">
                     <h3>Initiative Tracker</h3>

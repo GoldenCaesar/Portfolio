@@ -397,6 +397,19 @@ window.addEventListener('message', (event) => {
                     characterPreviewOverlayToHide.style.display = 'none';
                 }
                 break;
+            case 'diceMenuState':
+                if (diceRollerOverlay) {
+                    diceRollerOverlay.style.display = data.isOpen ? 'flex' : 'none';
+                }
+                break;
+            case 'diceRoll':
+                const diceResultSum = document.getElementById('dice-result-sum');
+                const diceResultDetails = document.getElementById('dice-result-details');
+                if (diceResultSum && diceResultDetails) {
+                    diceResultSum.textContent = data.sum;
+                    diceResultDetails.textContent = `Rolls: [${data.results.join(', ')}]`;
+                }
+                break;
             default:
                 console.log("Player view received unhandled message type:", data.type);
                 break;
@@ -473,31 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Dice Roller Overlay Logic
-    if (diceRollerIcon) {
-        diceRollerIcon.addEventListener('click', () => {
-            if (diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'flex';
-            }
-        });
-    }
-
-    if (diceRollerCloseButton) {
-        diceRollerCloseButton.addEventListener('click', () => {
-            if (diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'none';
-            }
-        });
-    }
-
-    if (diceRollerOverlay) {
-        diceRollerOverlay.addEventListener('click', (event) => {
-            // Close if the click is on the overlay background, but not on its content
-            if (event.target === diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'none';
-            }
-        });
-    }
+    // Dice Roller Overlay Logic is now controlled by the DM
 });
 
 // Fallback if script runs before DOM is fully ready and elements aren't found.

@@ -124,7 +124,7 @@
     <div id="player-map-container" class="relative">
         <canvas id="player-canvas"></canvas>
         <div id="dice-roller-icon" class="absolute bottom-5 right-5 w-12 h-12 cursor-pointer z-10">
-            <img src="https://raw.githubusercontent.com/demicube/dndemicube-d20-icon/main/d20-icon-white.svg" alt="d20 icon" class="w-full h-full">
+            <img src="assets/d20icon.png" alt="d20 icon" class="w-full h-full">
         </div>
     </div>
     <div id="note-preview-overlay" class="note-preview-overlay" style="display: none;">
@@ -143,13 +143,32 @@
     <script src="player_view.js"></script>
 
     <div id="dice-roller-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-20" style="display: none;">
-        <div class="bg-gray-800 p-5 rounded-lg max-w-2xl w-full relative text-white">
+        <div class="bg-gray-800/80 p-5 rounded-lg max-w-2xl w-full relative text-white [text-shadow:1px_1px_3px_rgba(0,0,0,0.7)]">
             <span id="dice-roller-close-button" class="absolute top-2 right-3 text-gray-400 text-3xl font-bold cursor-pointer hover:text-white">&times;</span>
-            <h2 class="text-2xl font-bold mb-4">Dice Roller & Initiative Tracker</h2>
+            <h2 class="text-2xl font-bold mb-4 [text-shadow:2px_2px_4px_rgba(0,0,0,0.5)]">Dice Roller & Initiative Tracker</h2>
             <div class="flex justify-between space-x-4">
-                <div id="dice-roller-placeholder" class="w-1/2 border border-gray-600 p-4 rounded">
-                    <h3 class="text-xl font-semibold mb-2">Dice Rolling</h3>
-                    <p>Dice rolling functionality will be implemented here.</p>
+                <div id="dice-roller-content-container" class="w-1/2 border-gray-600 p-4 rounded">
+                    <div id="dice-tray" class="h-16 border-b border-gray-600 mb-4 flex justify-center items-center text-4xl">
+                        <span id="dice-result-sum">0</span>
+                    </div>
+                    <div id="dice-result-details" class="h-8 text-sm text-gray-400 text-center mb-4"></div>
+                    <div id="dice-controls" class="flex flex-col items-center gap-4">
+                        <button id="roll-button" class="w-1/2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Roll</button>
+                        <div id="dice-buttons-grid" class="grid grid-cols-4 gap-2 w-full">
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d4">d4 <span class="dice-count"></span></button>
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d6">d6 <span class="dice-count"></span></button>
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d8">d8 <span class="dice-count"></span></button>
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d10">d10 <span class="dice-count"></span></button>
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d12">d12 <span class="dice-count"></span></button>
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d20">d20 <span class="dice-count"></span></button>
+                            <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded" data-die="d100">d100 <span class="dice-count"></span></button>
+                            <div class="flex items-center gap-1">
+                                <button class="dice-button bg-gray-700 hover:bg-gray-600 p-2 rounded flex-grow" data-die="d_custom">d</button>
+                                <input type="number" id="custom-die-input" min="2" max="1000" value="100" class="w-16 text-center bg-gray-900 border border-gray-600 text-white rounded">
+                                <span class="dice-count" data-die-custom></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="initiative-tracker-placeholder" class="w-1/2 border border-gray-600 p-4 rounded">
                     <h3 class="text-xl font-semibold mb-2">Initiative Tracker</h3>
