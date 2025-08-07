@@ -714,6 +714,7 @@ input:checked + .slider:before {
     flex-direction: column-reverse;
     overflow: hidden;
     border: 1px solid #4a5f7a;
+    z-index: 3;
 }
 
 .dice-dialogue-message {
