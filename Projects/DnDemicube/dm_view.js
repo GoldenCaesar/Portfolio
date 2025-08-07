@@ -1504,7 +1504,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 characters: charactersToSave, // Use the version without pdfData
                 selectedCharacterId: selectedCharacterId,
                 diceRollHistory: diceRollHistory,
-                savedRolls: savedRolls,
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1640,7 +1639,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
         diceRollHistory = campaignData.diceRollHistory || [];
-        savedRolls = campaignData.savedRolls || [];
         diceDialogueRecord.innerHTML = '';
         diceRollHistory.forEach(historyMessage => {
             const parts = historyMessage.split(': ');
@@ -3574,28 +3572,22 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     }
 
     // --- Dice Roller Logic ---
-    const diceCounts = { coin: 0, d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, d100: 0, d_custom: 0 };
+    const diceCounts = { d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, d100: 0, d_custom: 0 };
     const diceButtons = document.querySelectorAll('.dice-button');
     const rollButton = document.getElementById('roll-button');
     const diceResultSum = document.getElementById('dice-result-sum');
     const diceResultDetails = document.getElementById('dice-result-details');
     const customDieInput = document.getElementById('custom-die-input');
-    const saveRollToggle = document.querySelector('input[type="checkbox"]');
-    const savedRollsButton = document.getElementById('saved-rolls-button');
-    let savedRolls = [];
 
     function updateDiceCountDisplay(die) {
         const count = diceCounts[die];
-        const h2 = document.querySelector(`.dice-button[data-die="${die}"] h2`);
-        if (h2) {
-            if (count > 0) {
-                if (!h2.textContent.includes(`+`)) {
-                    h2.textContent += ` +${count}`;
-                } else {
-                    h2.textContent = h2.textContent.replace(/\+\d+/, `+${count}`);
-                }
-            } else {
-                h2.textContent = h2.textContent.replace(/ \+\d+/, '');
+        const span = document.querySelector(`.dice-button[data-die="${die}"] .dice-count`);
+        if (span) {
+            span.textContent = count > 0 ? `+${count}` : '';
+        } else if (die === 'd_custom') {
+            const customSpan = document.querySelector('.dice-count[data-die-custom]');
+            if (customSpan) {
+                customSpan.textContent = count > 0 ? `+${count}` : '';
             }
         }
     }
@@ -3626,18 +3618,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 const count = diceCounts[die];
                 if (count === 0) continue;
 
-                if (die === 'coin') {
-                    for (let i = 0; i < count; i++) {
-                        const roll = Math.random() < 0.5 ? 'Heads' : 'Tails';
-                        allRolls.push(roll);
-                        if (!rollsByDie['coin']) {
-                            rollsByDie['coin'] = [];
-                        }
-                        rollsByDie['coin'].push(roll);
-                    }
-                    continue;
-                }
-
                 let sides;
                 let dieName = die;
                 if (die === 'd_custom') {
@@ -3663,33 +3643,19 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 }
             }
 
-            if(allRolls.some(r => typeof r === 'string')) {
-                diceResultSum.textContent = '';
-                const detailsMessage = Object.entries(rollsByDie).map(([die, rolls]) => `${die}: ${rolls.join(', ')}`).join('; ');
-                diceResultDetails.textContent = detailsMessage;
-            } else {
-                diceResultSum.textContent = totalSum;
-                const detailsParts = [];
-                for (const dieName in rollsByDie) {
-                    detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
-                }
-                const detailsMessage = `Custom: ${detailsParts.join(', ')}`;
-                diceResultDetails.textContent = detailsMessage;
-            }
+            diceResultSum.textContent = totalSum;
 
-
-            if (saveRollToggle.checked) {
-                const rollName = document.querySelector('.flex.items-center.gap-4.bg-\\[\\#111418\\] .shrink-0 p').textContent;
-                savedRolls.push({
-                    name: rollName,
-                    diceCounts: { ...diceCounts }
-                });
+            const detailsParts = [];
+            for (const dieName in rollsByDie) {
+                detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
             }
+            const detailsMessage = `Custom: ${detailsParts.join(', ')}`;
+            diceResultDetails.textContent = detailsMessage;
 
             showDiceDialogue({
                 characterName: 'Dice Roller',
                 playerName: 'DM',
-                roll: diceResultDetails.textContent,
+                roll: detailsMessage,
                 sum: totalSum
             });
 
@@ -3707,10 +3673,9 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     if (diceRollerIcon) {
         diceRollerIcon.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (diceRollerOverlay) {
-                const isVisible = diceRollerOverlay.style.display === 'flex';
-                diceRollerOverlay.style.display = isVisible ? 'none' : 'flex';
-                sendDiceMenuStateToPlayerView(!isVisible);
+            if (diceIconMenu) {
+                const isVisible = diceIconMenu.style.display === 'block';
+                diceIconMenu.style.display = isVisible ? 'none' : 'block';
             }
         });
     }

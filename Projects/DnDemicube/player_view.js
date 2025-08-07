@@ -406,15 +406,8 @@ window.addEventListener('message', (event) => {
                 const diceResultSum = document.getElementById('dice-result-sum');
                 const diceResultDetails = document.getElementById('dice-result-details');
                 if (diceResultSum && diceResultDetails) {
-                    if(data.results.some(r => typeof r === 'string')) {
-                        diceResultSum.textContent = '';
-                        const detailsMessage = data.results.join(', ');
-                        diceResultDetails.textContent = detailsMessage;
-                    } else {
-                        diceResultSum.textContent = data.sum;
-                        const detailsMessage = `Rolls: [${data.results.join(', ')}]`;
-                        diceResultDetails.textContent = detailsMessage;
-                    }
+                    diceResultSum.textContent = data.sum;
+                    diceResultDetails.textContent = `Rolls: [${data.results.join(', ')}]`;
                 }
                 break;
             default:
