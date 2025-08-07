@@ -3590,7 +3590,8 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             }
             const detailsMessage = `Custom: ${detailsParts.join(', ')}`;
             diceResultDetails.textContent = detailsMessage;
-            showDiceDialogue(detailsMessage);
+            const dialogueMessage = `${totalSum}: ${detailsMessage}`;
+            showDiceDialogue(dialogueMessage);
 
             sendDiceRollToPlayerView(allRolls, totalSum);
 
