@@ -3474,11 +3474,102 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return easyMDE.options.previewRender(md);
 }
 
+    function sendDiceMenuStateToPlayerView(isOpen) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'diceMenuState', isOpen: isOpen }, '*');
+        }
+    }
+
+    function sendDiceRollToPlayerView(results, sum) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'diceRoll', results: results, sum: sum }, '*');
+        }
+    }
+
+    // --- Dice Roller Logic ---
+    const diceCounts = { d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, d100: 0, d_custom: 0 };
+    const diceButtons = document.querySelectorAll('.dice-button');
+    const rollButton = document.getElementById('roll-button');
+    const diceResultSum = document.getElementById('dice-result-sum');
+    const diceResultDetails = document.getElementById('dice-result-details');
+    const customDieInput = document.getElementById('custom-die-input');
+
+    function updateDiceCountDisplay(die) {
+        const count = diceCounts[die];
+        const span = document.querySelector(`.dice-button[data-die="${die}"] .dice-count`);
+        if (span) {
+            span.textContent = count > 0 ? `+${count}` : '';
+        } else if (die === 'd_custom') {
+            const customSpan = document.querySelector('.dice-count[data-die-custom]');
+            if (customSpan) {
+                customSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        }
+    }
+
+    diceButtons.forEach(button => {
+        const die = button.dataset.die;
+        button.addEventListener('click', () => {
+            diceCounts[die]++;
+            updateDiceCountDisplay(die);
+        });
+
+        button.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (diceCounts[die] > 0) {
+                diceCounts[die]--;
+                updateDiceCountDisplay(die);
+            }
+        });
+    });
+
+    if (rollButton) {
+        rollButton.addEventListener('click', () => {
+            let allRolls = [];
+            let totalSum = 0;
+
+            for (const die in diceCounts) {
+                const count = diceCounts[die];
+                if (count === 0) continue;
+
+                let sides;
+                if (die === 'd_custom') {
+                    sides = parseInt(customDieInput.value, 10);
+                    if (isNaN(sides) || sides < 2 || sides > 1000) {
+                        alert("Custom die must have between 2 and 1000 sides.");
+                        continue;
+                    }
+                } else {
+                    sides = parseInt(die.substring(1), 10);
+                }
+
+                for (let i = 0; i < count; i++) {
+                    const roll = Math.floor(Math.random() * sides) + 1;
+                    allRolls.push(roll);
+                    totalSum += roll;
+                }
+            }
+
+            diceResultSum.textContent = totalSum;
+            diceResultDetails.textContent = `Rolls: [${allRolls.join(', ')}]`;
+
+            sendDiceRollToPlayerView(allRolls, totalSum);
+
+            // Reset counts
+            for (const die in diceCounts) {
+                diceCounts[die] = 0;
+                updateDiceCountDisplay(die);
+            }
+        });
+    }
+
     // Dice Roller Overlay Logic
     if (diceRollerIcon) {
         diceRollerIcon.addEventListener('click', () => {
             if (diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'flex';
+                const isOpen = diceRollerOverlay.style.display !== 'flex';
+                diceRollerOverlay.style.display = isOpen ? 'flex' : 'none';
+                sendDiceMenuStateToPlayerView(isOpen);
             }
         });
     }
@@ -3487,6 +3578,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         diceRollerCloseButton.addEventListener('click', () => {
             if (diceRollerOverlay) {
                 diceRollerOverlay.style.display = 'none';
+                sendDiceMenuStateToPlayerView(false);
             }
         });
     }
@@ -3496,6 +3588,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             // Close if the click is on the overlay background, but not on its content
             if (event.target === diceRollerOverlay) {
                 diceRollerOverlay.style.display = 'none';
+                sendDiceMenuStateToPlayerView(false);
             }
         });
     }
