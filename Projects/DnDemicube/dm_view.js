@@ -3567,9 +3567,8 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     if (diceRollerIcon) {
         diceRollerIcon.addEventListener('click', () => {
             if (diceRollerOverlay) {
-                const isOpen = diceRollerOverlay.style.display !== 'flex';
-                diceRollerOverlay.style.display = isOpen ? 'flex' : 'none';
-                sendDiceMenuStateToPlayerView(isOpen);
+                diceRollerOverlay.style.display = 'flex';
+                sendDiceMenuStateToPlayerView(true);
             }
         });
     }
