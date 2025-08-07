@@ -15,10 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Dice Roller Elements
     const diceRollerIcon = document.getElementById('dice-roller-icon');
+    const diceIconMenu = document.getElementById('dice-icon-menu');
     const diceRollerOverlay = document.getElementById('dice-roller-overlay');
     const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
     const diceDialogueRecord = document.getElementById('dice-dialogue-record');
     let diceDialogueTimeout;
+    let diceRollHistory = [];
 
     // Notes Tab Elements
     const createNewNoteButton = document.getElementById('create-new-note-button');
@@ -1501,6 +1503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedNoteId: selectedNoteId,
                 characters: charactersToSave, // Use the version without pdfData
                 selectedCharacterId: selectedCharacterId,
+                diceRollHistory: diceRollHistory,
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1606,6 +1609,9 @@ document.addEventListener('DOMContentLoaded', () => {
         clearCharacterEditor();
         const ctx = dmCanvas.getContext('2d');
         ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+        diceRollHistory = [];
+        diceDialogueRecord.innerHTML = '';
+        diceDialogueRecord.style.display = 'none';
     }
 
     function renderAllLists() {
@@ -1632,6 +1638,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
+        diceRollHistory = campaignData.diceRollHistory || [];
+        diceDialogueRecord.innerHTML = '';
+        diceRollHistory.forEach(message => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('dice-dialogue-message');
+            messageElement.textContent = message;
+            diceDialogueRecord.prepend(messageElement);
+        });
+        diceRollHistory = campaignData.diceRollHistory || [];
+        diceDialogueRecord.innerHTML = '';
+        diceRollHistory.forEach(message => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('dice-dialogue-message');
+            messageElement.textContent = message;
+            diceDialogueRecord.prepend(messageElement);
+        });
         // Selections for maps are not restored yet, as they depend on UI lists
 
         // --- Restore Assets ---
@@ -1978,6 +2000,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Global click listener to hide context menu
     document.addEventListener('click', (event) => {
+        if (diceIconMenu && diceIconMenu.style.display === 'block') {
+            if (!diceRollerIcon.contains(event.target) && !diceIconMenu.contains(event.target)) {
+                diceIconMenu.style.display = 'none';
+            }
+        }
         if (polygonContextMenu.style.display === 'block') {
             // Check if the click was outside the context menu
             if (!polygonContextMenu.contains(event.target)) {
@@ -3479,23 +3506,29 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     function showDiceDialogue(message) {
         if (!diceDialogueRecord) return;
 
+        diceRollHistory.push(message);
+
         // Create and add the new message
         const messageElement = document.createElement('div');
         messageElement.classList.add('dice-dialogue-message');
         messageElement.textContent = message;
-        diceDialogueRecord.prepend(messageElement);
-
-        // Keep only the last 5 messages
-        while (diceDialogueRecord.children.length > 5) {
-            diceDialogueRecord.removeChild(diceDialogueRecord.lastChild);
+        const minimizeButton = document.getElementById('action-log-minimize-button');
+        if (minimizeButton) {
+            minimizeButton.after(messageElement);
+        } else {
+            diceDialogueRecord.prepend(messageElement);
         }
 
-        // Show the dialogue and set a timeout to hide it
+
+        // Show the dialogue
         diceDialogueRecord.style.display = 'flex';
-        clearTimeout(diceDialogueTimeout);
-        diceDialogueTimeout = setTimeout(() => {
-            diceDialogueRecord.style.display = 'none';
-        }, 10000); // 10 seconds
+
+        if (!diceDialogueRecord.classList.contains('persistent-log')) {
+            clearTimeout(diceDialogueTimeout);
+            diceDialogueTimeout = setTimeout(() => {
+                diceDialogueRecord.style.display = 'none';
+            }, 10000); // 10 seconds
+        }
     }
 
     function sendDiceMenuStateToPlayerView(isOpen) {
@@ -3605,10 +3638,78 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     // Dice Roller Overlay Logic
     if (diceRollerIcon) {
-        diceRollerIcon.addEventListener('click', () => {
-            if (diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'flex';
-                sendDiceMenuStateToPlayerView(true);
+        diceRollerIcon.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (diceIconMenu) {
+                const isVisible = diceIconMenu.style.display === 'block';
+                diceIconMenu.style.display = isVisible ? 'none' : 'block';
+            }
+        });
+    }
+
+    document.addEventListener('click', (event) => {
+        if (diceIconMenu && diceIconMenu.style.display === 'block') {
+            if (!diceRollerIcon.contains(event.target) && !diceIconMenu.contains(event.target)) {
+                diceIconMenu.style.display = 'none';
+            }
+        }
+        if (polygonContextMenu.style.display === 'block') {
+            // Check if the click was outside the context menu
+            if (!polygonContextMenu.contains(event.target)) {
+                polygonContextMenu.style.display = 'none';
+                selectedPolygonForContextMenu = null;
+            }
+        }
+        if (noteContextMenu.style.display === 'block') {
+            if (!noteContextMenu.contains(event.target)) {
+                noteContextMenu.style.display = 'none';
+                selectedNoteForContextMenu = null;
+            }
+        }
+        if (characterContextMenu.style.display === 'block') {
+            if (!characterContextMenu.contains(event.target)) {
+                characterContextMenu.style.display = 'none';
+                selectedCharacterForContextMenu = null;
+            }
+        }
+    });
+
+    if (diceIconMenu) {
+        diceIconMenu.addEventListener('click', (event) => {
+            const action = event.target.dataset.action;
+            if (action) {
+                diceIconMenu.style.display = 'none'; // Hide menu after action
+                switch (action) {
+                    case 'open-dice-roller':
+                        if (diceRollerOverlay) {
+                            diceRollerOverlay.style.display = 'flex';
+                            sendDiceMenuStateToPlayerView(true);
+                        }
+                        break;
+                    case 'open-action-log':
+                        if (diceDialogueRecord) {
+                            diceDialogueRecord.classList.add('persistent-log');
+                            diceDialogueRecord.style.display = 'flex';
+                            // Add minimize button if it doesn't exist
+                            if (!document.getElementById('action-log-minimize-button')) {
+                                const minimizeButton = document.createElement('button');
+                                minimizeButton.id = 'action-log-minimize-button';
+                                minimizeButton.textContent = '—';
+                                minimizeButton.onclick = () => {
+                                    diceDialogueRecord.classList.remove('persistent-log');
+                                    diceDialogueRecord.style.display = 'none';
+                                    const btn = document.getElementById('action-log-minimize-button');
+                                    if(btn) btn.remove();
+                                };
+                                diceDialogueRecord.prepend(minimizeButton);
+                            }
+                        }
+                        break;
+                    case 'open-initiative-tracker':
+                        // Functionality to be implemented later
+                        alert('Initiative Tracker is not yet implemented.');
+                        break;
+                }
             }
         });
     }
