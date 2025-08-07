@@ -21,6 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const diceDialogueRecord = document.getElementById('dice-dialogue-record');
     let diceDialogueTimeout;
     let diceRollHistory = [];
+    let savedRolls = []; // To store saved roll configurations
+    const saveRollNameInput = document.getElementById('save-roll-name-input');
+    const saveRollButton = document.getElementById('save-roll-button');
+    const savedRollsList = document.getElementById('saved-rolls-list');
+
 
     // Notes Tab Elements
     const createNewNoteButton = document.getElementById('create-new-note-button');
@@ -1504,6 +1509,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 characters: charactersToSave, // Use the version without pdfData
                 selectedCharacterId: selectedCharacterId,
                 diceRollHistory: diceRollHistory,
+                savedRolls: savedRolls,
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1612,6 +1618,8 @@ document.addEventListener('DOMContentLoaded', () => {
         diceRollHistory = [];
         diceDialogueRecord.innerHTML = '';
         diceDialogueRecord.style.display = 'none';
+        savedRolls = [];
+        renderSavedRolls();
     }
 
     function renderAllLists() {
@@ -1639,6 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
         diceRollHistory = campaignData.diceRollHistory || [];
+        savedRolls = campaignData.savedRolls || [];
         diceDialogueRecord.innerHTML = '';
         diceRollHistory.forEach(historyMessage => {
             const parts = historyMessage.split(': ');
@@ -1724,6 +1733,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
+        savedRolls = campaignData.savedRolls || [];
 
         if (campaignData.mapDefinitions) {
             for (const mapName in campaignData.mapDefinitions) {
@@ -3569,6 +3579,135 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         if (playerWindow && !playerWindow.closed) {
             playerWindow.postMessage({ type: 'diceRoll', results: results, sum: sum }, '*');
         }
+    }
+
+    // --- Saved Rolls Logic ---
+    function renderSavedRolls() {
+        if (!savedRollsList) return;
+        savedRollsList.innerHTML = ''; // Clear existing list
+
+        if (savedRolls.length === 0) {
+            const placeholder = document.createElement('li');
+            placeholder.textContent = 'No rolls saved yet.';
+            placeholder.style.color = '#a0b4c9';
+            savedRollsList.appendChild(placeholder);
+            return;
+        }
+
+        savedRolls.forEach((savedRoll, index) => {
+            const listItem = document.createElement('li');
+            listItem.style.display = 'flex';
+            listItem.style.justifyContent = 'space-between';
+            listItem.style.alignItems = 'center';
+            listItem.style.marginBottom = '10px';
+            listItem.dataset.index = index;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = savedRoll.name;
+            listItem.appendChild(nameSpan);
+
+            const buttonsDiv = document.createElement('div');
+            const rollBtn = document.createElement('button');
+            rollBtn.textContent = 'Roll';
+            rollBtn.dataset.action = 'roll';
+            rollBtn.style.marginRight = '5px';
+            buttonsDiv.appendChild(rollBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Del';
+            deleteBtn.dataset.action = 'delete';
+            buttonsDiv.appendChild(deleteBtn);
+
+            listItem.appendChild(buttonsDiv);
+            savedRollsList.appendChild(listItem);
+        });
+    }
+
+    if (saveRollButton) {
+        saveRollButton.addEventListener('click', () => {
+            const name = saveRollNameInput.value.trim();
+            if (!name) {
+                alert('Please enter a name for the roll.');
+                return;
+            }
+
+            // Capture the current dice selection
+            const currentDice = { ...diceCounts };
+            const hasDice = Object.values(currentDice).some(count => count > 0);
+
+            if (!hasDice) {
+                alert('Please select at least one die to save.');
+                return;
+            }
+
+            savedRolls.push({ name: name, dice: currentDice });
+            saveRollNameInput.value = ''; // Clear input
+            renderSavedRolls();
+        });
+    }
+
+    if (savedRollsList) {
+        savedRollsList.addEventListener('click', (event) => {
+            const target = event.target;
+            const action = target.dataset.action;
+            const listItem = target.closest('li');
+            if (!action || !listItem) return;
+
+            const index = parseInt(listItem.dataset.index, 10);
+            if (isNaN(index) || index >= savedRolls.length) return;
+
+            if (action === 'roll') {
+                const savedRoll = savedRolls[index];
+                let allRolls = [];
+                let totalSum = 0;
+                const rollsByDie = {};
+
+                for (const die in savedRoll.dice) {
+                    const count = savedRoll.dice[die];
+                    if (count === 0) continue;
+
+                    let sides;
+                    let dieName = die;
+                    if (die === 'd_custom') {
+                        sides = parseInt(customDieInput.value, 10); // Use current custom value
+                        if (isNaN(sides) || sides < 2 || sides > 1000) continue; // Skip if invalid
+                        dieName = `d${sides}`;
+                    } else {
+                        sides = parseInt(die.substring(1), 10);
+                    }
+
+                    if (!rollsByDie[dieName]) rollsByDie[dieName] = [];
+                    for (let i = 0; i < count; i++) {
+                        const roll = Math.floor(Math.random() * sides) + 1;
+                        allRolls.push(roll);
+                        totalSum += roll;
+                        rollsByDie[dieName].push(roll);
+                    }
+                }
+
+                const detailsParts = [];
+                for (const dieName in rollsByDie) {
+                    detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
+                }
+                const detailsMessage = `${savedRoll.name}: ${detailsParts.join(', ')}`;
+
+                diceResultSum.textContent = totalSum;
+                diceResultDetails.textContent = detailsMessage;
+                showDiceDialogue({
+                    characterName: 'Dice Roller',
+                    playerName: 'DM',
+                    roll: detailsMessage,
+                    sum: totalSum
+                });
+                sendDiceRollToPlayerView(allRolls, totalSum);
+
+            } else if (action === 'delete') {
+                if (confirm(`Are you sure you want to delete the "${savedRolls[index].name}" roll?`)) {
+                    savedRolls.splice(index, 1);
+                    renderSavedRolls();
+                }
+            }
+        });
     }
 
     // --- Dice Roller Logic ---
