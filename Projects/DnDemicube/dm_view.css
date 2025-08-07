@@ -726,3 +726,51 @@ input:checked + .slider:before {
     font-size: 0.9em;
     border-left: 3px solid #76a9d7;
 }
+
+/* Dice Icon Menu */
+.dice-icon-menu {
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    background-color: #2a3138;
+    border: 1px solid #3f4c5a;
+    border-radius: 5px;
+    z-index: 1001;
+    width: 200px;
+}
+
+.dice-menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: #e0e0e0;
+}
+
+.dice-menu-item:hover {
+    background-color: #3f4c5a;
+    color: #b6cae1;
+}
+
+/* Persistent Action Log */
+.dice-dialogue.persistent-log {
+    position: fixed;
+    bottom: 20px;
+    right: 80px;
+    width: 350px;
+    height: 400px;
+    max-height: 80vh;
+    flex-direction: column;
+    overflow-y: auto;
+    /* The rest of the styling is inherited from .dice-dialogue */
+}
+
+#action-log-minimize-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+}
