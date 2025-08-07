@@ -824,3 +824,69 @@ input:checked + .slider:before {
     font-weight: bold;
     color: #e0e0e0; /* Make it stand out more than the rest of the details */
 }
+
+#initiative-tracker-overlay .overlay-content {
+    background-color: rgba(30, 36, 43, 0.85);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+#initiative-tracker-overlay h3 {
+    border-bottom: 1px solid #3f4c5a;
+    padding-bottom: 10px;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    color: #b6cae1;
+}
+
+#available-characters-list-container,
+#current-initiative-list-container,
+#saved-initiatives-list-container {
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    border-radius: 4px;
+    height: 100%;
+}
+
+#available-characters-list li,
+#current-initiative-list li,
+#saved-initiatives-list li {
+    padding: 8px;
+    border-bottom: 1px solid #2a333d;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#available-characters-list li:last-child,
+#current-initiative-list li:last-child,
+#saved-initiatives-list li:last-child {
+    border-bottom: none;
+}
+
+#available-characters-list li:hover,
+#saved-initiatives-list li:hover {
+    background-color: #2a333d;
+}
+
+#current-initiative-list li {
+    background-color: #20262d;
+}
+
+.initiative-character-name {
+    font-weight: bold;
+}
+
+.initiative-character-details {
+    font-size: 0.8em;
+    color: #a0b4c9;
+}
+
+.initiative-roll {
+    font-size: 0.9em;
+    color: #b6cae1;
+    margin-top: 4px;
+}
