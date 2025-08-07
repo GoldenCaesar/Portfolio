@@ -818,3 +818,9 @@ input:checked + .slider:before {
     margin: 0;
     color: #a0b4c9;
 }
+
+.dice-roll-sum-text {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #e0e0e0; /* Make it stand out more than the rest of the details */
+}

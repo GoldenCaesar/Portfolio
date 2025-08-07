@@ -3528,7 +3528,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
         const detailsPara = document.createElement('p');
         detailsPara.classList.add('dice-roll-details');
-        detailsPara.textContent = rollData.roll;
+        detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${rollData.sum}</strong> | ${rollData.roll}`;
         textContainer.appendChild(detailsPara);
 
         return messageElement;
