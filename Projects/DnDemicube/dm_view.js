@@ -116,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initiative Tracker State Variables
     let savedInitiatives = [];
     let isInitiativeActive = false;
+    let currentInitiativeName = null;
 
 
     // State for 'Link to Child Map' tool
@@ -452,14 +453,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (autoRollInitiativeButton) {
         autoRollInitiativeButton.addEventListener('click', () => {
+            startInitiative(currentInitiativeName);
             rollInitiativeAutomatically();
             initiativeRollModal.style.display = 'none';
         });
     }
 
     if (manualRollInitiativeButton) {
-        manualRollInitiativeButton.addEventListener('click', () => {
-            rollInitiativeManually();
+        manualRollInitiativeButton.addEventListener('click', async () => {
+            startInitiative(currentInitiativeName);
+            await rollInitiativeManually();
             initiativeRollModal.style.display = 'none';
         });
     }
@@ -481,10 +484,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             initiativeRollElement.textContent = `Initiative: ${totalInitiative}`;
             charElement.dataset.initiative = totalInitiative;
+
+            logInitiativeRoll(characterData, totalInitiative, roll);
         });
 
         sortInitiativeList();
-        startInitiative();
     }
 
     async function rollInitiativeManually() {
@@ -503,9 +507,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 initiativeRollElement.textContent = `Initiative: ${totalInitiative}`;
                 charElement.dataset.initiative = totalInitiative;
                 sortInitiativeList();
+
+                const charId = charElement.dataset.characterId;
+                const characterData = charactersData.find(c => c.id == charId);
+                logInitiativeRoll(characterData, totalInitiative);
             }
         }
-        startInitiative();
     }
 
     function sortInitiativeList() {
@@ -518,19 +525,18 @@ document.addEventListener('DOMContentLoaded', () => {
         characters.forEach(char => currentInitiativeList.appendChild(char));
     }
 
-    function startInitiative() {
+    function startInitiative(initiativeName) {
         isInitiativeActive = true;
         document.getElementById('end-initiative-button').style.display = 'inline-block';
         startInitiativeButton.style.display = 'none';
-        // Add a marker to the action log
-        const startMarker = document.createElement('div');
-        startMarker.textContent = `--- Initiative Started: ${new Date().toLocaleTimeString()} ---`;
-        startMarker.style.cssText = 'text-align: center; color: #b6cae1; font-style: italic;';
+
+        const startMarker = createInitiativeStartCard(initiativeName);
         diceDialogueRecord.prepend(startMarker);
     }
 
     document.getElementById('end-initiative-button').addEventListener('click', () => {
         isInitiativeActive = false;
+        currentInitiativeName = null;
         document.getElementById('end-initiative-button').style.display = 'none';
         startInitiativeButton.style.display = 'inline-block';
         // Add a marker to the action log
@@ -3701,6 +3707,83 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return easyMDE.options.previewRender(md);
 }
 
+    function createInitiativeStartCard(initiativeName) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('dice-dialogue-message');
+
+        const cardContent = document.createElement('div');
+        cardContent.classList.add('dice-roll-card-content');
+        messageElement.appendChild(cardContent);
+
+        const profilePic = document.createElement('div');
+        profilePic.classList.add('dice-roll-profile-pic');
+        profilePic.textContent = '⚔️';
+        cardContent.appendChild(profilePic);
+
+        const textContainer = document.createElement('div');
+        textContainer.classList.add('dice-roll-text-container');
+        cardContent.appendChild(textContainer);
+
+        const namePara = document.createElement('p');
+        namePara.classList.add('dice-roll-name');
+        namePara.innerHTML = `<strong>--- Initiative Started ---</strong>`;
+        textContainer.appendChild(namePara);
+
+        if (initiativeName) {
+            const detailsPara = document.createElement('p');
+            detailsPara.classList.add('dice-roll-details');
+            detailsPara.textContent = `Encounter: ${initiativeName}`;
+            textContainer.appendChild(detailsPara);
+        }
+
+        return messageElement;
+    }
+
+    function createInitiativeRollCard(characterName, roll, bonus, total) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('dice-dialogue-message');
+
+        const cardContent = document.createElement('div');
+        cardContent.classList.add('dice-roll-card-content');
+        messageElement.appendChild(cardContent);
+
+        const profilePic = document.createElement('div');
+        profilePic.classList.add('dice-roll-profile-pic');
+        profilePic.textContent = characterName.substring(0, 2).toUpperCase();
+        cardContent.appendChild(profilePic);
+
+        const textContainer = document.createElement('div');
+        textContainer.classList.add('dice-roll-text-container');
+        cardContent.appendChild(textContainer);
+
+        const namePara = document.createElement('p');
+        namePara.classList.add('dice-roll-name');
+        namePara.innerHTML = `<strong>${characterName}</strong>'s Initiative`;
+        textContainer.appendChild(namePara);
+
+        const detailsPara = document.createElement('p');
+        detailsPara.classList.add('dice-roll-details');
+        const bonusSign = bonus >= 0 ? '+' : '-';
+        const bonusValue = Math.abs(bonus);
+        detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${total}</strong> | ${roll} (d20) ${bonusSign} ${bonusValue} (bonus)`;
+        textContainer.appendChild(detailsPara);
+
+        return messageElement;
+    }
+
+    function logInitiativeRoll(characterData, totalInitiative, roll) {
+        const characterName = characterData.name;
+        const initiativeMod = parseInt(characterData.sheetData.initiative) || 0;
+
+        let d20roll = roll;
+        if (d20roll === undefined || d20roll === null) {
+            d20roll = totalInitiative - initiativeMod;
+        }
+
+        const initiativeCard = createInitiativeRollCard(characterName, d20roll, initiativeMod, totalInitiative);
+        diceDialogueRecord.prepend(initiativeCard);
+    }
+
     function createDiceRollCard(rollData) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('dice-dialogue-message');
@@ -4303,6 +4386,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
             if (action === 'load') {
                 const savedInitiative = savedInitiatives[index];
+                currentInitiativeName = savedInitiative.name;
                 currentInitiativeList.innerHTML = '';
                 savedInitiative.characters.forEach(characterId => {
                     const character = charactersData.find(c => c.id == characterId);
