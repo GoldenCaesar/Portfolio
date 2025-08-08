@@ -658,61 +658,69 @@ input:checked + .slider:before {
     background-color: #555;
 } */
 
-#overlay-container {
+/* For the overlay */
+.overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: none; /* Hidden by default */
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
     justify-content: center;
     align-items: center;
-    gap: 20px;
-    z-index: 1001;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-.overlay {
-    display: none; /* Overlays are hidden by default */
-    flex: 3;
-    height: 100%;
-    max-height: 85vh;
-    background-color: rgba(30, 36, 43, 0.85);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    border-radius: 5px;
+    z-index: 1001; /* Ensure it's above the icon */
 }
 
 .overlay-content {
+    background-color: rgba(42, 49, 56, 0.85); /* Semi-transparent background */
     padding: 20px;
-    width: 100%;
+    border: 1px solid #3f4c5a;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 5px;
+    position: relative;
     color: #e0e0e0;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Shadow for all text */
 }
 
 .overlay-content h2 {
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* More pronounced shadow for the title */
+}
+
+.dice-roller-content {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#dice-roller-placeholder, #initiative-tracker-placeholder {
+    width: 48%;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    border-radius: 4px;
 }
 
 .dice-dialogue {
-    display: none;
-    flex: 1;
-    height: 100%;
-    max-height: 85vh;
-    background-color: rgba(21, 25, 30, 0.9);
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    width: 300px;
+    max-height: 200px;
+    background-color: rgba(40, 50, 60, 0.9);
     border-radius: 10px;
     padding: 10px;
+    display: none; /* Initially hidden */
     flex-direction: column-reverse;
-    overflow-y: auto;
+    overflow: hidden;
     border: 1px solid #4a5f7a;
+    z-index: 3;
 }
 
 .dice-dialogue-message {
     background-color: rgba(21, 25, 30, 0.8);
     color: #e0e0e0;
-    padding: 10px;
+    padding: 0;
     margin-bottom: 5px;
     border-radius: 5px;
     font-size: 0.9em;
@@ -722,7 +730,7 @@ input:checked + .slider:before {
 /* Dice Icon Menu */
 .dice-icon-menu {
     position: absolute;
-    bottom: 80px;
+    bottom: 80px; /* Position above the d20 icon */
     right: 20px;
     background-color: #2a3138;
     border: 1px solid #3f4c5a;
@@ -740,6 +748,31 @@ input:checked + .slider:before {
 .dice-menu-item:hover {
     background-color: #3f4c5a;
     color: #b6cae1;
+}
+
+/* Persistent Action Log */
+.dice-dialogue.persistent-log {
+    position: fixed;
+    bottom: 20px;
+    right: 80px;
+    width: 350px;
+    height: 400px;
+    max-height: 80vh;
+    flex-direction: column;
+    overflow-y: auto;
+    /* The rest of the styling is inherited from .dice-dialogue */
+}
+
+#action-log-minimize-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
 }
 
 /* Dice Roll Card */
@@ -793,9 +826,9 @@ input:checked + .slider:before {
 }
 
 #initiative-tracker-overlay .overlay-content {
-    background-color: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    background-color: rgba(30, 36, 43, 0.85);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
 }
 
 #initiative-tracker-overlay h3 {
