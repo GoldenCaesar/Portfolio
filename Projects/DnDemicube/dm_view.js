@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const autoRollInitiativeButton = document.getElementById('auto-roll-initiative-button');
     const manualRollInitiativeButton = document.getElementById('manual-roll-initiative-button');
     const cancelInitiativeRollButton = document.getElementById('cancel-initiative-roll-button');
+    const overlayContainer = document.getElementById('overlay-container');
 
 
     // Notes Tab Elements
@@ -530,6 +531,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('end-initiative-button').style.display = 'inline-block';
         startInitiativeButton.style.display = 'none';
 
+        overlayContainer.classList.remove('log-only');
+        overlayContainer.style.display = 'flex';
+        initiativeTrackerOverlay.style.display = 'flex';
+        diceRollerOverlay.style.display = 'none';
+        diceDialogueRecord.style.display = 'flex';
+        
         const startMarker = createInitiativeStartCard(initiativeName);
         diceDialogueRecord.prepend(startMarker);
     }
@@ -539,6 +546,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentInitiativeName = null;
         document.getElementById('end-initiative-button').style.display = 'none';
         startInitiativeButton.style.display = 'inline-block';
+
+        overlayContainer.style.display = 'none';
+
         // Add a marker to the action log
         const endMarker = document.createElement('div');
         endMarker.textContent = `--- Initiative Ended: ${new Date().toLocaleTimeString()} ---`;
@@ -1799,8 +1809,7 @@ document.addEventListener('DOMContentLoaded', () => {
             campaignData.currentInitiative.forEach(char => {
                 const character = charactersData.find(c => c.id == char.id);
                 if (character) {
-                    addCharacterToInitiative(character);
-                    const charElement = currentInitiativeList.querySelector(`li[data-character-id="${char.id}"]`);
+                    const charElement = addCharacterToInitiative(character);
                     if (charElement) {
                         charElement.dataset.initiative = char.initiative;
                         let initiativeRollElement = charElement.querySelector('.initiative-roll');
@@ -1814,7 +1823,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             sortInitiativeList();
-            startInitiative();
+            isInitiativeActive = true;
+            document.getElementById('end-initiative-button').style.display = 'inline-block';
+            startInitiativeButton.style.display = 'none';
         }
         diceRollHistory.forEach(historyMessage => {
             const parts = historyMessage.split(': ');
@@ -1910,8 +1921,7 @@ document.addEventListener('DOMContentLoaded', () => {
             campaignData.currentInitiative.forEach(char => {
                 const character = charactersData.find(c => c.id == char.id);
                 if (character) {
-                    addCharacterToInitiative(character);
-                    const charElement = currentInitiativeList.querySelector(`li[data-character-id="${char.id}"]`);
+                    const charElement = addCharacterToInitiative(character);
                     if (charElement) {
                         charElement.dataset.initiative = char.initiative;
                         let initiativeRollElement = charElement.querySelector('.initiative-roll');
@@ -1925,7 +1935,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             sortInitiativeList();
-            startInitiative();
+            isInitiativeActive = true;
+            document.getElementById('end-initiative-button').style.display = 'inline-block';
+            startInitiativeButton.style.display = 'none';
         }
 
         if (campaignData.mapDefinitions) {
@@ -2497,7 +2509,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const newNote = {
             id: newNoteId,
             title: newTitle,
-            content: `# ${newTitle}\n\nStart writing your notes here.`
+            content: `# ${newTitle}
+
+Start writing your notes here.`
         };
         notesData.push(newNote);
 
@@ -3356,12 +3370,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Character Info
         sheetData.char_name = extract(/CHARACTER NAME\s*([A-Z\s]+)\s*EXPERIENCE POINTS/);
         console.log("Extracted char_name:", sheetData.char_name);
-        sheetData.class_level = extract(/CLASS & LEVEL\s*([^\n]+)/);
-        sheetData.background = extract(/BACKGROUND\s*([^\n]+)/);
-        sheetData.player_name = extract(/PLAYER NAME\s*([^\n]+)/);
-        sheetData.race = extract(/RACE\s*([^\n]+)/);
-        sheetData.alignment = extract(/ALIGNMENT\s*([^\n]+)/);
-        sheetData.xp = extract(/EXPERIENCE POINTS\s*([^\n]+)/);
+        sheetData.class_level = extract(/CLASS & LEVEL\s*([^
+]+)/);
+        sheetData.background = extract(/BACKGROUND\s*([^
+]+)/);
+        sheetData.player_name = extract(/PLAYER NAME\s*([^
+]+)/);
+        sheetData.race = extract(/RACE\s*([^
+]+)/);
+        sheetData.alignment = extract(/ALIGNMENT\s*([^
+]+)/);
+        sheetData.xp = extract(/EXPERIENCE POINTS\s*([^
+]+)/);
 
         // Ability Scores
         sheetData.strength_score = extract(/STRENGTH\s*(\d+)/);
@@ -3374,12 +3394,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Combat Stats
         sheetData.ac = extract(/ARMOR CLASS\s*(\d+)/);
         sheetData.initiative = extract(/INITIATIVE\s*([+-]?\d+)/);
-        sheetData.speed = extract(/SPEED\s*([^\n]+)/);
+        sheetData.speed = extract(/SPEED\s*([^
+]+)/);
         sheetData.hp_max = extract(/HIT POINT MAXIMUM\s*(\d+)/);
         sheetData.hp_current = extract(/CURRENT HIT POINTS\s*(\d*)/);
         sheetData.hp_temp = extract(/TEMPORARY HIT POINTS\s*(\d*)/);
-        sheetData.hit_dice_total = extract(/TOTAL\s*([^\n]+)\s*HIT DICE/);
-        sheetData.hit_dice_current = extract(/HIT DICE\s*([^\n]+)/);
+        sheetData.hit_dice_total = extract(/TOTAL\s*([^
+]+)\s*HIT DICE/);
+        sheetData.hit_dice_current = extract(/HIT DICE\s*([^
+]+)/);
         sheetData.proficiency_bonus = extract(/PROFICIENCY BONUS\s*([+-]?\d+)/);
         sheetData.passive_perception = extract(/PASSIVE PERCEPTION\s*(\d+)/);
         sheetData.passive_insight = extract(/PASSIVE INSIGHT\s*(\d+)/);
@@ -3387,7 +3410,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Text Areas
         const extractTextArea = (start, end) => {
-            const regex = new RegExp(`${start}\\s*([\\s\\S]*?)\\s*${end}`);
+            const regex = new RegExp(`${start}\s*([\s\S]*?)\s*${end}`);
             const match = upperText.match(regex);
             return match ? match[1].trim() : null;
         };
@@ -3581,7 +3604,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDetailsVisible = true) {
     const playerNotes = forPlayerView ? filterPlayerContent(notes) : notes;
 
-    let md = `${playerNotes || ''}\n\n${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_portrait})` : ''}`;
+    let md = `${playerNotes || ''}
+
+${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_portrait})` : ''}`;
 
     if (!forPlayerView || (forPlayerView && isDetailsVisible)) {
         md += `
@@ -3735,7 +3760,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             detailsPara.textContent = `Encounter: ${initiativeName}`;
             textContainer.appendChild(detailsPara);
         }
-
+        
         return messageElement;
     }
 
@@ -4092,68 +4117,39 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
-    document.addEventListener('click', (event) => {
-        if (diceIconMenu && diceIconMenu.style.display === 'block') {
-            if (!diceRollerIcon.contains(event.target) && !diceIconMenu.contains(event.target)) {
-                diceIconMenu.style.display = 'none';
-            }
-        }
-        if (polygonContextMenu.style.display === 'block') {
-            // Check if the click was outside the context menu
-            if (!polygonContextMenu.contains(event.target)) {
-                polygonContextMenu.style.display = 'none';
-                selectedPolygonForContextMenu = null;
-            }
-        }
-        if (noteContextMenu.style.display === 'block') {
-            if (!noteContextMenu.contains(event.target)) {
-                noteContextMenu.style.display = 'none';
-                selectedNoteForContextMenu = null;
-            }
-        }
-        if (characterContextMenu.style.display === 'block') {
-            if (!characterContextMenu.contains(event.target)) {
-                characterContextMenu.style.display = 'none';
-                selectedCharacterForContextMenu = null;
-            }
-        }
-    });
-
     if (diceIconMenu) {
         diceIconMenu.addEventListener('click', (event) => {
             const action = event.target.dataset.action;
             if (action) {
                 diceIconMenu.style.display = 'none'; // Hide menu after action
+                const overlayContainer = document.getElementById('overlay-container');
+                overlayContainer.classList.remove('log-only');
                 switch (action) {
                     case 'open-dice-roller':
-                        if (diceRollerOverlay) {
+                        if (overlayContainer && diceRollerOverlay) {
+                            overlayContainer.style.display = 'flex';
                             diceRollerOverlay.style.display = 'flex';
+                            initiativeTrackerOverlay.style.display = 'none';
+                            diceDialogueRecord.style.display = 'flex';
                             sendDiceMenuStateToPlayerView(true);
                         }
                         break;
                     case 'open-action-log':
-                        if (diceDialogueRecord) {
-                            diceDialogueRecord.classList.add('persistent-log');
+                        if (overlayContainer && diceDialogueRecord) {
+                            overlayContainer.classList.add('log-only');
+                            overlayContainer.style.display = 'flex';
+                            diceRollerOverlay.style.display = 'none';
+                            initiativeTrackerOverlay.style.display = 'none';
                             diceDialogueRecord.style.display = 'flex';
-                            // Add minimize button if it doesn't exist
-                            if (!document.getElementById('action-log-minimize-button')) {
-                                const minimizeButton = document.createElement('button');
-                                minimizeButton.id = 'action-log-minimize-button';
-                                minimizeButton.textContent = '—';
-                                minimizeButton.onclick = () => {
-                                    diceDialogueRecord.classList.remove('persistent-log');
-                                    diceDialogueRecord.style.display = 'none';
-                                    const btn = document.getElementById('action-log-minimize-button');
-                                    if(btn) btn.remove();
-                                };
-                                diceDialogueRecord.prepend(minimizeButton);
-                            }
                         }
                         break;
                     case 'open-initiative-tracker':
-                        if (initiativeTrackerOverlay) {
+                        if (overlayContainer && initiativeTrackerOverlay) {
                             populateAvailableCharacters();
+                            overlayContainer.style.display = 'flex';
+                            diceRollerOverlay.style.display = 'none';
                             initiativeTrackerOverlay.style.display = 'flex';
+                            diceDialogueRecord.style.display = 'flex';
                         }
                         break;
                 }
@@ -4163,26 +4159,26 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     if (initiativeTrackerCloseButton) {
         initiativeTrackerCloseButton.addEventListener('click', () => {
-            if (initiativeTrackerOverlay) {
-                initiativeTrackerOverlay.style.display = 'none';
+            if (overlayContainer) {
+                overlayContainer.style.display = 'none';
             }
         });
     }
 
     if (diceRollerCloseButton) {
         diceRollerCloseButton.addEventListener('click', () => {
-            if (diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'none';
+            if (overlayContainer) {
+                overlayContainer.style.display = 'none';
                 sendDiceMenuStateToPlayerView(false);
             }
         });
     }
 
-    if (diceRollerOverlay) {
-        diceRollerOverlay.addEventListener('click', (event) => {
+    if (overlayContainer) {
+        overlayContainer.addEventListener('click', (event) => {
             // Close if the click is on the overlay background, but not on its content
-            if (event.target === diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'none';
+            if (event.target === overlayContainer) {
+                overlayContainer.style.display = 'none';
                 sendDiceMenuStateToPlayerView(false);
             }
         });
@@ -4231,10 +4227,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     function addCharacterToInitiative(character) {
         if (!currentInitiativeList) return;
 
-        // Check if character is already in the list
-        if (document.querySelector(`#current-initiative-list li[data-character-id="${character.id}"]`)) {
-            return; // Don't add duplicates
-        }
 
         const listItem = document.createElement('li');
         listItem.dataset.characterId = character.id;
@@ -4255,6 +4247,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         listItem.appendChild(deleteButton);
 
         currentInitiativeList.appendChild(listItem);
+        return listItem;
     }
 
     if (currentInitiativeList) {
@@ -4327,7 +4320,15 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 return;
             }
 
-            savedInitiatives.push({ name: name, characters: initiativeCharacters });
+            const existingIndex = savedInitiatives.findIndex(i => i.name === name);
+
+            if (existingIndex !== -1) {
+                // Overwrite existing
+                savedInitiatives[existingIndex].characters = initiativeCharacters;
+            } else {
+                // Add as new
+                savedInitiatives.push({ name: name, characters: initiativeCharacters });
+            }
             saveInitiativeNameInput.value = ''; // Clear input
             renderSavedInitiatives();
         });
@@ -4387,6 +4388,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             if (action === 'load') {
                 const savedInitiative = savedInitiatives[index];
                 currentInitiativeName = savedInitiative.name;
+                saveInitiativeNameInput.value = savedInitiative.name;
                 currentInitiativeList.innerHTML = '';
                 savedInitiative.characters.forEach(characterId => {
                     const character = charactersData.find(c => c.id == characterId);
