@@ -529,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isInitiativeActive = true;
         document.getElementById('end-initiative-button').style.display = 'inline-block';
         startInitiativeButton.style.display = 'none';
-        
+
         const startMarker = createInitiativeStartCard(initiativeName);
         diceDialogueRecord.prepend(startMarker);
     }
@@ -3735,7 +3735,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             detailsPara.textContent = `Encounter: ${initiativeName}`;
             textContainer.appendChild(detailsPara);
         }
-        
+
         return messageElement;
     }
 
