@@ -754,12 +754,13 @@ input:checked + .slider:before {
 .dice-dialogue.persistent-log {
     position: fixed;
     bottom: 20px;
-    right: 80px;
+    left: 20px;
     width: 350px;
     height: 400px;
     max-height: 80vh;
     flex-direction: column;
     overflow-y: auto;
+    z-index: 1002;
     /* The rest of the styling is inherited from .dice-dialogue */
 }
 
