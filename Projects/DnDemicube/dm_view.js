@@ -526,7 +526,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startInitiative(initiativeName) {
-        if (isInitiativeActive) return;
         isInitiativeActive = true;
         document.getElementById('end-initiative-button').style.display = 'inline-block';
         startInitiativeButton.style.display = 'none';
@@ -1795,12 +1794,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSavedInitiatives();
         diceDialogueRecord.innerHTML = '';
         if (campaignData.isInitiativeActive && campaignData.currentInitiative) {
+            isInitiativeActive = true;
             currentInitiativeList.innerHTML = '';
             campaignData.currentInitiative.forEach(char => {
                 const character = charactersData.find(c => c.id == char.id);
                 if (character) {
                     addCharacterToInitiative(character);
-                    const charElement = currentInitiativeList.lastElementChild;
+                    const charElement = currentInitiativeList.querySelector(`li[data-character-id="${char.id}"]`);
                     if (charElement) {
                         charElement.dataset.initiative = char.initiative;
                         let initiativeRollElement = charElement.querySelector('.initiative-roll');
@@ -1905,12 +1905,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSavedInitiatives();
 
         if (campaignData.isInitiativeActive && campaignData.currentInitiative) {
+            isInitiativeActive = true;
             currentInitiativeList.innerHTML = '';
             campaignData.currentInitiative.forEach(char => {
                 const character = charactersData.find(c => c.id == char.id);
                 if (character) {
                     addCharacterToInitiative(character);
-                    const charElement = currentInitiativeList.lastElementChild;
+                    const charElement = currentInitiativeList.querySelector(`li[data-character-id="${char.id}"]`);
                     if (charElement) {
                         charElement.dataset.initiative = char.initiative;
                         let initiativeRollElement = charElement.querySelector('.initiative-roll');
@@ -4230,6 +4231,10 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     function addCharacterToInitiative(character) {
         if (!currentInitiativeList) return;
 
+        // Check if character is already in the list
+        if (document.querySelector(`#current-initiative-list li[data-character-id="${character.id}"]`)) {
+            return; // Don't add duplicates
+        }
 
         const listItem = document.createElement('li');
         listItem.dataset.characterId = character.id;
@@ -4322,17 +4327,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 return;
             }
 
-            const existingIndex = savedInitiatives.findIndex(i => i.name === name);
-            if (existingIndex !== -1) {
-                if (confirm(`An initiative named "${name}" already exists. Overwrite it?`)) {
-                    savedInitiatives[existingIndex] = { name: name, characters: initiativeCharacters };
-                } else {
-                    return;
-                }
-            } else {
-                savedInitiatives.push({ name: name, characters: initiativeCharacters });
-            }
-
+            savedInitiatives.push({ name: name, characters: initiativeCharacters });
             saveInitiativeNameInput.value = ''; // Clear input
             renderSavedInitiatives();
         });
@@ -4392,7 +4387,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             if (action === 'load') {
                 const savedInitiative = savedInitiatives[index];
                 currentInitiativeName = savedInitiative.name;
-                saveInitiativeNameInput.value = savedInitiative.name;
                 currentInitiativeList.innerHTML = '';
                 savedInitiative.characters.forEach(characterId => {
                     const character = charactersData.find(c => c.id == characterId);
