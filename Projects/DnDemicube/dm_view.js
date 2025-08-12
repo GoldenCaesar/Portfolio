@@ -208,22 +208,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // function enableMapTools() { // Replaced by updateButtonStates or direct enabling in displayMapOnCanvas
-    //     if (mapToolsSection) {
-    //         // mapToolsSection.classList.remove('disabled'); // Or however you manage overall section appearance
-    //     }
-    //     // mapToolButtons.forEach(button => button.disabled = false); // This was too broad
-    //     console.log("Map tools potentially enabled by displayMapOnCanvas");
-    // }
-
-    // function disableMapTools() { // Replaced by updateButtonStates
-    //     if (mapToolsSection) {
-    //         // mapToolsSection.classList.add('disabled'); // Or however you manage overall section appearance
-    //     }
-    //    // mapToolButtons.forEach(button => button.disabled = true); // This was too broad
-    //     console.log("Map tools potentially disabled");
-    // }
-
     function displayMapOnCanvas(fileName) {
         if (!dmCanvas || !drawingCanvas || !mapContainer) {
             console.error("One or more canvas elements or map container not found!");
@@ -296,26 +280,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         overlays.forEach(overlay => {
             if (overlay.type === 'childMapLink' && overlay.polygon) {
-                // For DM view, respect playerVisible for styling. For player view, this function won't be called if not visible.
-                // The actual filtering for player view happens before calling drawOverlays in sendMapToPlayerView.
                 if (isPlayerViewContext && (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible)) {
-                    return; // Don't draw if not player visible in player view context (though filtering should prevent this)
+                    return;
                 }
 
                 ctx.beginPath();
                 let currentPointsToDraw = overlay.polygon;
-                let strokeStyle = 'rgba(0, 0, 255, 0.7)'; // Default: Blue for 'edit' mode
+                let strokeStyle = 'rgba(0, 0, 255, 0.7)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
-                if (selectedMapData && selectedMapData.mode === 'view') { // Special styling for 'view' mode
+                if (selectedMapData && selectedMapData.mode === 'view') {
                     if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
-                        strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Red and more transparent if hidden from player
+                        strokeStyle = 'rgba(255, 0, 0, 0.5)';
                     } else {
-                        strokeStyle = 'rgba(0, 255, 0, 0.7)'; // Green if visible to player in 'view' mode
+                        strokeStyle = 'rgba(0, 255, 0, 0.7)';
                     }
                 }
-                // Moving polygon overrides visibility-based styling for immediate feedback
                 if (isMovingPolygon && polygonBeingMoved && overlay === polygonBeingMoved.overlayRef) {
-                    strokeStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow while moving (changed from green for better contrast)
+                    strokeStyle = 'rgba(255, 255, 0, 0.9)';
                     currentPointsToDraw = polygonBeingMoved.originalPoints.map(p => ({
                         x: p.x + currentDragOffsets.x,
                         y: p.y + currentDragOffsets.y
@@ -335,10 +316,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                if (currentPointsToDraw.length > 2) { // Ensure there's a polygon to close
+                if (currentPointsToDraw.length > 2) {
                     const firstPoint = currentPointsToDraw[0];
                     const lastPoint = currentPointsToDraw[currentPointsToDraw.length - 1];
-                    // Close path if not already closed by data
                     if (firstPoint.x !== lastPoint.x || firstPoint.y !== lastPoint.y) {
                         const firstPointCanvasX = (firstPoint.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
                         const firstPointCanvasY = (firstPoint.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
@@ -347,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 ctx.stroke();
             } else if (overlay.type === 'noteLink' && overlay.position) {
-                const iconSize = 20; // The size of the icon on the canvas
+                const iconSize = 20;
                 let position = overlay.position;
                 if (isMovingNote && noteBeingMoved && overlay === noteBeingMoved.overlayRef) {
                     position = {
@@ -359,17 +339,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
                 const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
 
-                let fillStyle = 'rgba(255, 255, 102, 0.9)'; // Default yellow
+                let fillStyle = 'rgba(255, 255, 102, 0.9)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
                 if (selectedMapData && selectedMapData.mode === 'view') {
                     if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
-                        fillStyle = 'rgba(255, 102, 102, 0.7)'; // Reddish if hidden from player
+                        fillStyle = 'rgba(255, 102, 102, 0.7)';
                     } else {
-                        fillStyle = 'rgba(102, 255, 102, 0.9)'; // Greenish if visible to player
+                        fillStyle = 'rgba(102, 255, 102, 0.9)';
                     }
                 }
                 if (isMovingNote && noteBeingMoved && overlay === noteBeingMoved.overlayRef) {
-                    fillStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow when moving
+                    fillStyle = 'rgba(255, 255, 0, 0.9)';
                 }
 
                 ctx.fillStyle = fillStyle;
@@ -383,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.textBaseline = 'middle';
                 ctx.fillText('📝', canvasX, canvasY);
             } else if (overlay.type === 'characterLink' && overlay.position) {
-                const iconSize = 20; // The size of the icon on the canvas
+                const iconSize = 20;
                 let position = overlay.position;
                 if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
                     position = {
@@ -395,17 +375,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
                 const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
 
-                let fillStyle = 'rgba(135, 206, 250, 0.9)'; // Default light blue
+                let fillStyle = 'rgba(135, 206, 250, 0.9)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
                 if (selectedMapData && selectedMapData.mode === 'view') {
                     if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
-                        fillStyle = 'rgba(255, 102, 102, 0.7)'; // Reddish if hidden from player
+                        fillStyle = 'rgba(255, 102, 102, 0.7)';
                     } else {
-                        fillStyle = 'rgba(102, 255, 102, 0.9)'; // Greenish if visible to player
+                        fillStyle = 'rgba(102, 255, 102, 0.9)';
                     }
                 }
                 if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
-                    fillStyle = 'rgba(255, 255, 0, 0.9)'; // Bright yellow when moving
+                    fillStyle = 'rgba(255, 255, 0, 0.9)';
                 }
 
                 ctx.fillStyle = fillStyle;
@@ -461,17 +441,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Helper to convert canvas click coords to image-relative coords
     function getRelativeCoords(canvasX, canvasY) {
-        // If currentMapDisplayData.img is null, it means we are in a resize/reload cycle.
-        // If currentMapDisplayData.img.complete is false, the image is still loading.
         if (!currentMapDisplayData.img || !currentMapDisplayData.img.complete) {
             console.warn("getRelativeCoords: currentMapDisplayData.img is null or image not complete. Map not ready for coordinate conversion.");
             return null;
         }
 
-        // Check if click is within the bounds of the displayed image
-        // Ensure scaledWidth and scaledHeight are valid before using them
         if (typeof currentMapDisplayData.scaledWidth === 'undefined' || typeof currentMapDisplayData.scaledHeight === 'undefined') {
             console.warn("getRelativeCoords: scaledWidth or scaledHeight is undefined in currentMapDisplayData.");
             return null;
@@ -479,8 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (canvasX < currentMapDisplayData.offsetX || canvasX > currentMapDisplayData.offsetX + currentMapDisplayData.scaledWidth ||
             canvasY < currentMapDisplayData.offsetY || canvasY > currentMapDisplayData.offsetY + currentMapDisplayData.scaledHeight) {
-            // console.log("Clicked outside map image area."); // This can be noisy, enable if needed for debugging
-            return null; // Click was outside the image
+            return null;
         }
 
         const imageX = (canvasX - currentMapDisplayData.offsetX) / currentMapDisplayData.ratio;
@@ -555,7 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from List';
                         alert('Polygon complete. Select a map from the list to link as its child.');
                     } else if (isRedrawingPolygon) {
-                        // Finalize redraw logic here
                         const newOverlay = {
                             type: 'childMapLink',
                             polygon: [...currentPolygonPoints],
@@ -567,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const drawingCtx = drawingCanvas.getContext('2d');
                         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
-                        displayMapOnCanvas(selectedMapFileName); // Redraw main canvas with new polygon
+                        displayMapOnCanvas(selectedMapFileName);
                         resetAllInteractiveStates();
                     }
                 } else {
@@ -625,7 +598,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Priority 2: Interaction with Overlays in "View" mode
         if (selectedMapData.mode === 'view' && selectedMapData.overlays) {
             for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
                 const overlay = selectedMapData.overlays[i];
@@ -634,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const childMapName = overlay.linkedMapName;
                     const childMapData = detailedMapData.get(childMapName);
                     if (childMapData) {
-                        childMapData.mode = 'view'; // Ensure child map is in view mode when navigated to this way
+                        childMapData.mode = 'view';
                         selectedMapFileName = childMapName;
                         clearAllSelections();
                         const mapItems = mapsList.querySelectorAll('li');
@@ -698,12 +670,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-
-        // If no interaction above, click might be for future pan/zoom or deselecting things.
-        // console.log("Canvas clicked, no specific overlay interaction.", imageCoords);
     });
 
-    // Point-in-polygon helper function (Ray casting algorithm)
     function isPointInPolygon(point, polygon) {
         if (!polygon || polygon.length < 3) return false;
         let x = point.x, y = point.y;
@@ -718,21 +686,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isPointInNoteIcon(point, noteOverlay) {
-        const iconSize = 20 / currentMapDisplayData.ratio; // icon size in image coordinates
+        const iconSize = 20 / currentMapDisplayData.ratio;
         const notePos = noteOverlay.position;
         return point.x >= notePos.x - iconSize / 2 && point.x <= notePos.x + iconSize / 2 &&
                point.y >= notePos.y - iconSize / 2 && point.y <= notePos.y + iconSize / 2;
     }
 
     function isPointInCharacterIcon(point, characterOverlay) {
-        const iconSize = 20 / currentMapDisplayData.ratio; // icon size in image coordinates
+        const iconSize = 20 / currentMapDisplayData.ratio;
         const charPos = characterOverlay.position;
         return point.x >= charPos.x - iconSize / 2 && point.x <= charPos.x + iconSize / 2 &&
                point.y >= charPos.y - iconSize / 2 && point.y <= charPos.y + iconSize / 2;
     }
 
     function handleMouseMoveOnCanvas(event) {
-        if (!currentMapDisplayData.img || !hoverLabel) return; // No map or label element
+        if (!currentMapDisplayData.img || !hoverLabel) return;
 
         const rect = dmCanvas.getBoundingClientRect();
         const canvasX = Math.round(event.clientX - rect.left);
@@ -743,7 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let overlaysToCheck = selectedMapData ? selectedMapData.overlays : null;
 
         if (imageCoords && overlaysToCheck && overlaysToCheck.length > 0) {
-            for (let i = overlaysToCheck.length - 1; i >= 0; i--) { // Iterate in reverse for top-most
+            for (let i = overlaysToCheck.length - 1; i >= 0; i--) {
                 const overlay = overlaysToCheck[i];
                 if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
                     hoverLabel.textContent = overlay.linkedMapName;
@@ -773,7 +741,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // If no overlay was hovered or mouse is outside image bounds for imageCoords
         hoverLabel.style.display = 'none';
     }
 
@@ -784,7 +751,6 @@ document.addEventListener('DOMContentLoaded', () => {
             item.remove();
             displayedFileNames.delete(fileName);
 
-            // Revoke ObjectURL
             const mapDataEntry = detailedMapData.get(fileName);
             if (mapDataEntry && mapDataEntry.url) {
                 URL.revokeObjectURL(mapDataEntry.url);
@@ -799,7 +765,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateButtonStates();
             }
 
-            updateMoveIconVisibility(list); // Update move icons in case first/last item changed
+            updateMoveIconVisibility(list);
         }
     }
 
@@ -833,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isLinkingNote = false;
         isLinkingCharacter = false;
         isRedrawingPolygon = false;
-        isMovingPolygon = false; // Added
+        isMovingPolygon = false;
         isMovingNote = false;
         isMovingCharacter = false;
 
@@ -841,11 +807,11 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPolygonPoints = [];
         polygonDrawingComplete = false;
 
-        polygonBeingMoved = null; // Added
+        polygonBeingMoved = null;
         noteBeingMoved = null;
         characterBeingMoved = null;
-        moveStartPoint = null; // Added
-        currentDragOffsets = {x: 0, y: 0}; // Added
+        moveStartPoint = null;
+        currentDragOffsets = {x: 0, y: 0};
 
         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
         if (btnLinkNote) btnLinkNote.textContent = 'Link Note';
@@ -859,7 +825,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedNoteForContextMenu = null;
         selectedCharacterForContextMenu = null;
 
-        // Redraw current map to clear any temporary states (like a polygon being dragged)
         if (selectedMapFileName) {
             displayMapOnCanvas(selectedMapFileName);
         }
@@ -877,18 +842,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote) {
-                // If any interactive mode is active, this button acts as a global cancel.
                 resetAllInteractiveStates();
                 console.log("Interactive operation cancelled via Link/Cancel button.");
             } else {
-                // Start linking process
-                resetAllInteractiveStates(); // Clear other states before starting a new one
+                resetAllInteractiveStates();
                 isLinkingChildMap = true;
                 btnLinkChildMap.textContent = 'Cancel Drawing Link';
-                drawingCanvas.style.pointerEvents = 'auto'; // Enable clicks on the drawing canvas
+                drawingCanvas.style.pointerEvents = 'auto';
                 dmCanvas.style.cursor = 'crosshair';
                 alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
-                updateButtonStates(); // Reflect that linking has started
+                updateButtonStates();
             }
         });
     }
@@ -937,14 +900,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Modify existing dmCanvas click listener to NOT interfere if moving polygon (mouseup will handle finalization)
-    // The dmCanvas click listener is complex; we need to ensure that if isMovingPolygon is true,
-    // its default behavior (like trying to draw a new polygon or navigate) is suppressed
-    // until the move is completed or cancelled.
-
-    // New event listeners for polygon move:
     dmCanvas.addEventListener('mousedown', (event) => {
-        if (event.button !== 0) return; // Only main (left) click
+        if (event.button !== 0) return;
 
         const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
         if (!imageCoords) return;
@@ -980,10 +937,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     dmCanvas.addEventListener('mousemove', (event) => {
-        // This is the general mousemove for hover labels.
-        // We need to add drag logic here too, or ensure handleMouseMoveOnCanvas co-exists.
-        // Let's keep hover logic and add drag logic.
-
         if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
             const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
             if (imageCoords) {
@@ -1050,28 +1003,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Modify the main canvas click listener (dmCanvas.addEventListener('click', ...))
-    // to be aware of isMovingPolygon.
-    // Original dmCanvas click listener:
-    // dmCanvas.addEventListener('click', (event) => { ... });
-    // We need to ensure that if isMovingPolygon is true, this listener doesn't execute
-    // things like trying to draw a new polygon or navigate on overlay click.
-    // One way is to add checks at the beginning of that listener.
-    // (This will be done in a subsequent step if needed, the mousedown/move/mouseup should capture most interactions for move)
-
-
     function enableRename(listItem, textNode) {
         const currentName = textNode.textContent;
         const input = document.createElement('input');
         input.type = 'text';
         input.value = currentName;
-        input.classList.add('rename-input-active'); // For styling
+        input.classList.add('rename-input-active');
         input.addEventListener('blur', () => finishRename(listItem, textNode, input, currentName));
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                input.blur(); // Trigger blur to save
+                input.blur();
             } else if (e.key === 'Escape') {
-                // Revert to original name and remove input
                 textNode.textContent = currentName;
                 listItem.replaceChild(textNode, input);
             }
@@ -1079,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         listItem.replaceChild(input, textNode);
         input.focus();
-        input.select(); // Select the text in input for easy editing
+        input.select();
     }
 
     function finishRename(listItem, textNode, input, originalName) {
@@ -1087,23 +1029,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newName && newName !== originalName) {
             if (displayedFileNames.has(newName)) {
                 alert(`A map with the name "${newName}" already exists. Please choose a different name.`);
-                textNode.textContent = originalName; // Revert to original text node content
-                listItem.replaceChild(textNode, input); // Replace input with text node
+                textNode.textContent = originalName;
+                listItem.replaceChild(textNode, input);
             } else {
-                textNode.textContent = newName; // Update text node content for display
-                listItem.dataset.fileName = newName; // Update data attribute
+                textNode.textContent = newName;
+                listItem.dataset.fileName = newName;
                 displayedFileNames.delete(originalName);
                 displayedFileNames.add(newName);
 
                 const mapDataEntry = detailedMapData.get(originalName);
                 if (mapDataEntry) {
-                    mapDataEntry.name = newName; // Update the name within the object
+                    mapDataEntry.name = newName;
                     detailedMapData.delete(originalName);
                     detailedMapData.set(newName, mapDataEntry);
 
                     let displayedMapLinksUpdated = false;
 
-                    // Update linkedMapName in all map overlays in detailedMapData
                     detailedMapData.forEach(dmEntry => {
                         if (dmEntry.overlays && dmEntry.overlays.length > 0) {
                             dmEntry.overlays.forEach(overlay => {
@@ -1132,12 +1073,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     updateButtonStates();
                 }
-                listItem.replaceChild(textNode, input); // Replace input with text node after successful rename
+                listItem.replaceChild(textNode, input);
             }
         } else {
-            // If name is empty or unchanged, revert to original
-            textNode.textContent = originalName; // Ensure text node has original name
-            listItem.replaceChild(textNode, input); // Replace input with text node
+            textNode.textContent = originalName;
+            listItem.replaceChild(textNode, input);
         }
     }
 
@@ -1148,7 +1088,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mapsList.classList.toggle('edit-mode-active', isEditMode);
             const mapItems = mapsList.querySelectorAll('li');
             mapItems.forEach(item => {
-                item.classList.toggle('clickable-map', !isEditMode); // Toggle clickable state
+                item.classList.toggle('clickable-map', !isEditMode);
                 let actionsSpan = item.querySelector('.file-actions');
                 if (!actionsSpan && isEditMode) {
                     actionsSpan = document.createElement('span');
@@ -1162,7 +1102,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     renameIcon.style.cursor = 'pointer';
                     renameIcon.style.marginRight = '5px';
                     renameIcon.onclick = () => {
-                        // Ensure only the text node is passed for renaming, not the whole li
                         const textNode = Array.from(item.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
                         if (textNode) enableRename(item, textNode);
                     };
@@ -1172,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteIcon.classList.add('file-action-icon', 'delete-map');
                     deleteIcon.title = 'Delete map';
                     deleteIcon.style.cursor = 'pointer';
-                    deleteIcon.onclick = () => handleDelete(item); // Placeholder for delete
+                    deleteIcon.onclick = () => handleDelete(item);
 
                     const upIcon = document.createElement('span');
                     upIcon.textContent = '↑';
@@ -1198,14 +1137,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (actionsSpan) {
                     actionsSpan.style.display = isEditMode ? 'inline' : 'none';
                 }
-                updateMoveIconVisibility(mapsList); // Update visibility on mode toggle
-                 // If exiting edit mode and an input field is active, revert it
+                updateMoveIconVisibility(mapsList);
                 const activeInput = item.querySelector('.rename-input-active');
                 if (!isEditMode && activeInput) {
-                    const originalName = item.dataset.fileName; // Assuming original name is stored or can be retrieved
+                    const originalName = item.dataset.fileName;
                     const textNode = document.createTextNode(originalName);
                     item.replaceChild(textNode, activeInput);
-                    // Ensure the text node is correctly placed before the actions span if it exists
                     if (actionsSpan) item.insertBefore(textNode, actionsSpan);
                 }
             });
@@ -1362,7 +1299,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         resetAllInteractiveStates();
                     }
                 } else {
-                    // Normal selection behavior
                     if (selectedMapFileName !== null && selectedMapFileName !== clickedFileName) {
                         resetAllInteractiveStates();
                     }
@@ -1401,7 +1337,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (selectedMapData.mode === 'view') {
                     sendMapToPlayerView(selectedMapFileName);
                 } else {
-                    // If switching back to edit, clear player view
                     sendClearMessageToPlayerView();
                 }
             }
@@ -1413,14 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allMapItems.forEach(item => item.classList.remove('selected-map-item'));
     }
 
-
-
-    // Initial canvas setup
     if (dmCanvas && mapContainer) {
-        // Call resizeCanvas directly on initial load. The debounced version is for subsequent resize events.
-        // resizeCanvas(); // This will be called as part of Initial setup calls below
-
-        // Listen to resize events using the debounced version of resizeCanvas
         window.addEventListener('resize', debounce(resizeCanvas, 250)); 
         
         dmCanvas.addEventListener('mousemove', handleMouseMoveOnCanvas);
@@ -1432,9 +1360,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error("Could not find DM canvas or map container for initial sizing.");
     }
-
-    // Initially disable map tools on load
-    // disableMapTools(); // Will be handled by updateButtonStates
 
     function updateButtonStates() {
         const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -1460,18 +1385,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnLinkCharacter) btnLinkCharacter.disabled = !isEditMode || inLinkingProcess;
     }
 
-    // Initial setup calls
-    resizeCanvas(); // Size canvas on load
-    window.addEventListener('resize', resizeCanvas); // Adjust canvas on window resize
-    updateButtonStates(); // Set initial button states
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    updateButtonStates();
 
-    // Notes Tab Initialisation
     renderNotesList();
     renderCharactersList();
-    // Add other notes event listeners here if needed immediately, or within DOMContentLoaded
 
-
-    // --- Campaign Save/Load ---
     const saveCampaignButton = document.getElementById('save-campaign-button');
     const loadCampaignInput = document.getElementById('load-campaign-input');
 
@@ -1484,7 +1404,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const imagesFolder = zip.folder("images");
             const charactersFolder = zip.folder("characters");
 
-            // --- Handle Map Images ---
             const imagePromises = [];
             for (const [name, data] of detailedMapData.entries()) {
                 if (data.url) {
@@ -1500,19 +1419,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await Promise.all(imagePromises);
 
-            // --- Handle Character PDFs ---
             const charactersToSave = JSON.parse(JSON.stringify(charactersData));
             charactersToSave.forEach(character => {
                 const originalCharacter = charactersData.find(c => c.id === character.id);
                 if (originalCharacter && originalCharacter.pdfData && originalCharacter.pdfFileName) {
                     charactersFolder.file(originalCharacter.pdfFileName, originalCharacter.pdfData);
                     console.log(`Added character PDF to zip: ${originalCharacter.pdfFileName}`);
-                    // We keep pdfFileName in the JSON, but remove the heavy data
                     delete character.pdfData;
                 }
             });
 
-            // --- Prepare and add campaign.json ---
             const serializableDetailedMapData = {};
             for (const [name, data] of detailedMapData) {
                 serializableDetailedMapData[name] = {
@@ -1526,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 mapDefinitions: serializableDetailedMapData,
                 notes: notesData,
                 selectedNoteId: selectedNoteId,
-                characters: charactersToSave, // Use the version without pdfData
+                characters: charactersToSave,
                 selectedCharacterId: selectedCharacterId,
                 diceRollHistory: diceRollHistory,
                 savedRolls: savedRolls,
@@ -1536,7 +1452,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const campaignJSON = JSON.stringify(campaignData, null, 2);
             zip.file("campaign.json", campaignJSON);
 
-            // --- Generate and Download Zip ---
             const zipBlob = await zip.generateAsync({ type: "blob" });
             const url = URL.createObjectURL(zipBlob);
             const a = document.createElement('a');
@@ -1568,7 +1483,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCampaignInput.disabled = true;
 
         try {
-            // Reset entire application state
             resetApplicationState();
 
             if (file.name.endsWith('.zip')) {
@@ -1579,12 +1493,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("Unsupported file type. Please select a .zip or .json file.");
             }
 
-            // --- Final UI Refresh ---
             renderAllLists();
             renderSavedInitiativesList();
             updateButtonStates();
 
-            // Restore selections and display
             if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
             if (selectedNoteId) loadNoteIntoEditor(selectedNoteId);
             if (selectedMapFileName) {
@@ -1599,22 +1511,20 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Error loading campaign:", error);
             alert(`Failed to load campaign: ${error.message}`);
-            resetApplicationState(); // Also reset on failure
+            resetApplicationState();
             renderAllLists();
         } finally {
             loadButtonLabel.textContent = 'Load Campaign';
             loadCampaignInput.disabled = false;
-            loadCampaignInput.value = null; // Reset input
+            loadCampaignInput.value = null;
         }
     }
 
     function resetApplicationState() {
-        // Clear data arrays
         activeMapsData = [];
         notesData = [];
         charactersData = [];
 
-        // Revoke old object URLs and clear map data
         for (const mapData of detailedMapData.values()) {
             if (mapData.url) {
                 URL.revokeObjectURL(mapData.url);
@@ -1623,12 +1533,10 @@ document.addEventListener('DOMContentLoaded', () => {
         detailedMapData.clear();
         displayedFileNames.clear();
 
-        // Clear selections
         selectedMapFileName = null;
         selectedNoteId = null;
         selectedCharacterId = null;
 
-        // Reset UI components
         if (modeToggleSwitch) modeToggleSwitch.disabled = true;
         mapsList.innerHTML = '';
         notesList.innerHTML = '';
@@ -1658,9 +1566,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const campaignJSON = await campaignFile.async("string");
         const campaignData = JSON.parse(campaignJSON);
 
-        // --- Restore Data Structures (without assets yet) ---
         notesData = campaignData.notes || [];
-        charactersData = campaignData.characters || []; // This now includes pdfFileName
+        charactersData = campaignData.characters || [];
         charactersData.forEach(character => {
             if (typeof character.isDetailsVisible === 'undefined') {
                 character.isDetailsVisible = true;
@@ -1687,9 +1594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const messageElement = createDiceRollCard(rollData);
             diceDialogueRecord.prepend(messageElement);
         });
-        // Selections for maps are not restored yet, as they depend on UI lists
 
-        // --- Restore Assets ---
         const imagePromises = [];
         const imagesFolder = zip.folder("images");
         for (const mapName in campaignData.mapDefinitions) {
@@ -1708,14 +1613,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: definition.name,
                         url: url,
                         overlays: overlays,
-                        mode: definition.mode || 'edit' // Backward compatibility
+                        mode: definition.mode || 'edit'
                     });
                     displayedFileNames.add(mapName);
                 });
                 imagePromises.push(promise);
             }
         }
-        // Handle old save format
         if (campaignData.activeMaps) {
             campaignData.activeMaps.forEach(activeMap => {
                 const mapData = detailedMapData.get(activeMap.fileName);
@@ -1746,7 +1650,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const campaignJSON = await file.text();
         const campaignData = JSON.parse(campaignJSON);
 
-        // Legacy support: data structures are restored, but assets are missing.
         notesData = campaignData.notes || [];
         charactersData = campaignData.characters || [];
         charactersData.forEach(character => {
@@ -1764,14 +1667,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const definition = campaignData.mapDefinitions[mapName];
                 detailedMapData.set(mapName, {
                     name: definition.name,
-                    url: null, // No URL available in old format
+                    url: null,
                     overlays: definition.overlays || [],
-                    mode: definition.mode || 'edit' // Backward compatibility
+                    mode: definition.mode || 'edit'
                 });
                 displayedFileNames.add(mapName);
             }
         }
-        // Handle old save format
         if (campaignData.activeMaps) {
             campaignData.activeMaps.forEach(activeMap => {
                 const mapData = detailedMapData.get(activeMap.fileName);
@@ -1811,7 +1713,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCampaignInput.addEventListener('change', loadCampaign);
     }
 
-    // --- Player View Communication ---
     function sendMapToPlayerView(mapFileName) {
         if (playerWindow && !playerWindow.closed && mapFileName) {
             const mapData = detailedMapData.get(mapFileName);
@@ -1864,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', () => {
             playerWindow.postMessage({
                 type: 'polygonVisibilityUpdate',
                 mapFileName: mapFileName,
-                polygonIdentifier: polygonIdentifier, // This needs to be a way to uniquely ID the polygon (e.g., its points array stringified)
+                polygonIdentifier: polygonIdentifier,
                 isVisible: isVisible
             }, '*');
             console.log(`Sent polygon visibility update to player view: Map: ${mapFileName}, Visible: ${isVisible}`);
@@ -1879,14 +1780,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Player View Button ---
     if (openPlayerViewButton) {
         openPlayerViewButton.addEventListener('click', () => {
-            const playerViewUrl = 'player_view.html'; // Corrected path assuming it's relative to dm_view.html
+            const playerViewUrl = 'player_view.html';
             if (playerWindow === null || playerWindow.closed) {
                 playerWindow = window.open(playerViewUrl, 'PlayerViewDnDemicube', 'width=800,height=600,resizable=yes,scrollbars=yes');
                 if (playerWindow) {
-                    // Send current map after a short delay to allow the window to load its listeners
                     setTimeout(() => {
                         if (selectedMapFileName) {
                             sendMapToPlayerView(selectedMapFileName);
@@ -1895,7 +1794,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 playerWindow.focus();
-                // If focused and a map is active, ensure it has the latest.
                 if (selectedMapFileName) {
                      sendMapToPlayerView(selectedMapFileName);
                 }
@@ -1903,19 +1801,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
-    // --- Context Menu Logic ---
     dmCanvas.addEventListener('contextmenu', (event) => {
-        event.preventDefault(); // Prevent default browser context menu
+        event.preventDefault();
 
         if (isMovingPolygon) {
-            resetAllInteractiveStates(); // Cancel move mode on right-click
+            resetAllInteractiveStates();
             alert("Polygon move cancelled.");
             console.log("Polygon move cancelled via right-click.");
             return;
         }
 
-        polygonContextMenu.style.display = 'none'; // Hide previous menu first
+        polygonContextMenu.style.display = 'none';
         noteContextMenu.style.display = 'none';
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
@@ -1963,7 +1859,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
                 }
 
-                    // Use pageX/pageY for positioning relative to the entire document
                     polygonContextMenu.style.left = `${event.pageX}px`;
                     polygonContextMenu.style.top = `${event.pageY}px`;
                     polygonContextMenu.style.display = 'block';
@@ -2033,7 +1928,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
     });
 
-    // Global click listener to hide context menu
     document.addEventListener('click', (event) => {
         if (diceIconMenu && diceIconMenu.style.display === 'block') {
             if (!diceRollerIcon.contains(event.target) && !diceIconMenu.contains(event.target)) {
@@ -2041,7 +1935,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         if (polygonContextMenu.style.display === 'block') {
-            // Check if the click was outside the context menu
             if (!polygonContextMenu.contains(event.target)) {
                 polygonContextMenu.style.display = 'none';
                 selectedPolygonForContextMenu = null;
@@ -2061,9 +1954,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Prevent context menu click from propagating to the document listener and closing itself
     polygonContextMenu.addEventListener('click', (event) => {
-        event.stopPropagation(); // Stop click from closing menu immediately
+        event.stopPropagation();
         const action = event.target.dataset.action;
 
         if (action && selectedPolygonForContextMenu) {
@@ -2177,11 +2069,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Notes Tab Functionality ---
-
     function initEasyMDE() {
         if (easyMDE) {
-            // console.log("EasyMDE already initialized.");
             return;
         }
         if (!markdownEditorTextarea) {
@@ -2196,7 +2085,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 minHeight: "150px",
                 autosave: {
                     enabled: true,
-                    uniqueId: selectedNoteId ? `note_${selectedNoteId}` : "dndemicube_unsaved_note", // Prefix to avoid collision
+                    uniqueId: selectedNoteId ? `note_${selectedNoteId}` : "dndemicube_unsaved_note",
                     delay: 3000,
                 },
                 toolbar: [
@@ -2216,12 +2105,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         title: "DM Only Content",
                     }
                 ],
-                // Handle image uploads by pasting or dragging - converts to base64
                 uploadImage: true,
                 imageUploadFunction: function(file, onSuccess, onError) {
                     const reader = new FileReader();
                     reader.onload = function (event) {
-                        onSuccess(event.target.result); // Pass base64 data URL
+                        onSuccess(event.target.result);
                     };
                     reader.onerror = function (error) {
                         onError("Error reading file: " + error);
@@ -2229,14 +2117,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     reader.readAsDataURL(file);
                 },
             });
-            // console.log("EasyMDE initialized. Autosave ID:", easyMDE.options.autosave.uniqueId);
 
             if (tabNotes && tabNotes.classList.contains('active') && easyMDE.codemirror) {
                 setTimeout(() => easyMDE.codemirror.refresh(), 10);
             }
         } catch (e) {
             console.error("Error initializing EasyMDE:", e);
-            easyMDE = null; // Ensure it's null if init failed
+            easyMDE = null;
         }
     }
 
@@ -2248,7 +2135,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error destroying EasyMDE:", e);
             }
             easyMDE = null;
-            // console.log("EasyMDE instance destroyed.");
         }
     }
 
@@ -2265,7 +2151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderNotesList() {
         if (!notesList) return;
-        const currentScrollTop = notesList.scrollTop; // Preserve scroll position
+        const currentScrollTop = notesList.scrollTop;
         notesList.innerHTML = '';
 
         notesData.forEach(note => {
@@ -2301,7 +2187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notesList.appendChild(listItem);
         });
         updateNoteMoveIconVisibility();
-        notesList.scrollTop = currentScrollTop; // Restore scroll position
+        notesList.scrollTop = currentScrollTop;
     }
 
     function updateNoteMoveIconVisibility() {
@@ -2317,7 +2203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCreateNewNote() {
-        const newNoteId = Date.now(); // Simple unique ID
+        const newNoteId = Date.now();
         let noteCounter = 1;
         let newTitle = `Note ${noteCounter}`;
         while (notesData.some(note => note.title === newTitle)) {
@@ -2332,7 +2218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         notesData.push(newNote);
 
-        loadNoteIntoEditor(newNoteId); // This will set selectedNoteId and init/update EasyMDE
+        loadNoteIntoEditor(newNoteId);
         if (noteTitleInput) noteTitleInput.focus();
     }
 
@@ -2340,7 +2226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const note = notesData.find(n => n.id === noteId);
         if (!note) {
             console.error("Note not found for ID:", noteId);
-            if (selectedNoteId === noteId) { // If the missing note was selected
+            if (selectedNoteId === noteId) {
                  selectedNoteId = null;
                  clearNoteEditor();
                  if (easyMDE && easyMDE.options.autosave) {
@@ -2355,17 +2241,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (noteTitleInput) noteTitleInput.value = note.title;
 
         if (!easyMDE && markdownEditorTextarea) {
-            initEasyMDE(); // Initialize with a generic or no specific ID first
+            initEasyMDE();
         }
 
         if (easyMDE) {
             if (easyMDE.options.autosave) {
-                // To prevent loading stale data from a previously selected note's autosave slot.
                 if (easyMDE.options.autosave.uniqueId !== `note_${note.id}`) {
-                     // console.log(`Switching autosave ID from ${easyMDE.options.autosave.uniqueId} to note_${note.id}`);
-                     // EasyMDE doesn't have a direct way to clear *another* slot.
-                     // It loads from current uniqueId on value set if content is empty.
-                     // So, set uniqueId, then set value.
                 }
                 easyMDE.options.autosave.uniqueId = `note_${note.id}`;
             }
@@ -2406,9 +2287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderNotesList();
-        // console.log("Note saved:", note);
-        // Autosave should handle persistence, explicit alert might be too much if autosaving frequently.
-        // Consider a more subtle save indicator if needed.
     }
 
     function handleRenameNote(noteId) {
@@ -2433,11 +2311,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm(`Are you sure you want to delete "${note.title}"?`)) {
 
             if (easyMDE && easyMDE.options.autosave.enabled && selectedNoteId === noteId) {
-                // Temporarily change uniqueId to something else, clear, then set back or to generic.
                 const oldUniqueId = easyMDE.options.autosave.uniqueId;
-                easyMDE.options.autosave.uniqueId = `deleting_${noteId}_${Date.now()}`; // Temp unique
+                easyMDE.options.autosave.uniqueId = `deleting_${noteId}_${Date.now()}`;
                 easyMDE.clearAutosavedValue();
-                // console.log("Cleared autosave for deleted note by changing ID and clearing:", oldUniqueId);
             }
 
             notesData.splice(noteIndex, 1);
@@ -2447,7 +2323,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearNoteEditor();
                 if (easyMDE && easyMDE.options.autosave) {
                     easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
-                    // console.log("Reset EasyMDE autosave ID to generic after delete:", easyMDE.options.autosave.uniqueId);
                 }
             }
             renderNotesList();
@@ -2474,14 +2349,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveNoteButton) {
         saveNoteButton.addEventListener('click', handleSaveNote);
     }
-    // Auto-save title when input blurs or Enter is pressed
     if (noteTitleInput) {
         noteTitleInput.addEventListener('blur', handleSaveNote);
         noteTitleInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                e.preventDefault(); // Prevent form submission if any
+                e.preventDefault();
                 handleSaveNote();
-                if(easyMDE) easyMDE.codemirror.focus(); // Move focus to editor
+                if(easyMDE) easyMDE.codemirror.focus();
             }
         });
     }
@@ -2533,7 +2407,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Tab switching logic
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -2689,11 +2562,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Characters Tab Functionality ---
-
     function renderCharactersList() {
         if (!charactersList) return;
-        const currentScrollTop = charactersList.scrollTop; // Preserve scroll position
+        const currentScrollTop = charactersList.scrollTop;
         charactersList.innerHTML = '';
 
         charactersData.forEach(character => {
@@ -2729,7 +2600,7 @@ document.addEventListener('DOMContentLoaded', () => {
             charactersList.appendChild(listItem);
         });
         updateCharacterMoveIconVisibility();
-        charactersList.scrollTop = currentScrollTop; // Restore scroll position
+        charactersList.scrollTop = currentScrollTop;
     }
 
     function updateCharacterMoveIconVisibility() {
@@ -2745,7 +2616,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCreateCharacter() {
-        const newCharacterId = Date.now(); // Simple unique ID
+        const newCharacterId = Date.now();
         let characterCounter = 1;
         let newName = `Character ${characterCounter}`;
         while (charactersData.some(character => character.name === newName)) {
@@ -2756,7 +2627,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newCharacter = {
             id: newCharacterId,
             name: newName,
-            sheetData: {}, // Initially empty
+            sheetData: {},
             notes: "",
             isDetailsVisible: true
         };
@@ -2788,11 +2659,9 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: dataToSend }, '*');
         } else {
-            // This case should not happen if the iframe is loaded, but as a fallback:
             console.warn("Character sheet iframe not ready to receive data.");
         }
 
-        // Reset PDF viewer state
         if (pdfViewerIframe.src) {
             URL.revokeObjectURL(pdfViewerIframe.src);
             pdfViewerIframe.src = '';
@@ -2802,7 +2671,6 @@ document.addEventListener('DOMContentLoaded', () => {
         characterNotesEditorContainer.style.display = 'none';
         viewPdfButton.textContent = 'View PDF';
 
-        // Update button visibility based on whether the character has a PDF
         if (character.pdfData) {
             viewPdfButton.style.display = 'inline-block';
             deletePdfButton.style.display = 'inline-block';
@@ -3044,7 +2912,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const jsonData = JSON.parse(jsonInputTextarea.value);
                 const flattenedData = flattenCharacterJson(jsonData);
 
-                // Rename keys to match form field names
                 const finalData = {};
                 for (const key in flattenedData) {
                     let newKey = key;
@@ -3093,8 +2960,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     const pdfData = new Uint8Array(e.target.result);
-                    character.pdfData = pdfData; // Store PDF data on the character object
-                    character.pdfFileName = file.name; // Store filename
+                    character.pdfData = pdfData;
+                    character.pdfFileName = file.name;
 
                     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
                     const numPages = pdf.numPages;
@@ -3107,13 +2974,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         textContent += strings.join(' ');
                     }
 
-                    console.log(textContent); // For debugging
+                    console.log(textContent);
                     const sheetData = parsePdfText(textContent);
                     characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
 
-                    // Update UI
                     viewPdfButton.style.display = 'inline-block';
-                    deletePdfButton.style.display = 'inline-block'; // Show delete button as well
+                    deletePdfButton.style.display = 'inline-block';
                 };
                 reader.readAsArrayBuffer(file);
             } else if (!selectedCharacterId) {
@@ -3137,7 +3003,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 pdfViewerContainer.style.display = 'block';
                 viewPdfButton.textContent = 'Local Character Editor';
             } else {
-                // Revoke the object URL to free up memory when not in use
                 if (pdfViewerIframe.src) {
                     URL.revokeObjectURL(pdfViewerIframe.src);
                 }
@@ -3157,7 +3022,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 character.pdfFileName = null;
             }
 
-            // Revoke URL if it's currently being viewed
             if (pdfViewerIframe.src) {
                 URL.revokeObjectURL(pdfViewerIframe.src);
             }
@@ -3168,8 +3032,6 @@ document.addEventListener('DOMContentLoaded', () => {
             viewPdfButton.textContent = 'View PDF';
             viewPdfButton.style.display = 'none';
             deletePdfButton.style.display = 'none';
-            // Optionally clear the sheet if desired
-            // characterSheetIframe.contentWindow.postMessage({ type: 'clearCharacterSheet' }, '*');
             alert("PDF has been removed from this character.");
         });
     }
@@ -3178,13 +3040,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const sheetData = {};
         const upperText = text.toUpperCase();
 
-        // Helper function to extract a value based on a regex pattern
         const extract = (regex) => {
             const match = upperText.match(regex);
             return match ? match[1].trim() : null;
         };
 
-        // Character Info
         sheetData.char_name = extract(/CHARACTER NAME\s*([A-Z\s]+)\s*EXPERIENCE POINTS/);
         console.log("Extracted char_name:", sheetData.char_name);
         sheetData.class_level = extract(/CLASS & LEVEL\s*([^\n]+)/);
@@ -3194,7 +3054,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sheetData.alignment = extract(/ALIGNMENT\s*([^\n]+)/);
         sheetData.xp = extract(/EXPERIENCE POINTS\s*([^\n]+)/);
 
-        // Ability Scores
         sheetData.strength_score = extract(/STRENGTH\s*(\d+)/);
         sheetData.dexterity_score = extract(/DEXTERITY\s*(\d+)/);
         sheetData.constitution_score = extract(/CONSTITUTION\s*(\d+)/);
@@ -3202,7 +3061,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sheetData.wisdom_score = extract(/WISDOM\s*(\d+)/);
         sheetData.charisma_score = extract(/CHARISMA\s*(\d+)/);
 
-        // Combat Stats
         sheetData.ac = extract(/ARMOR CLASS\s*(\d+)/);
         sheetData.initiative = extract(/INITIATIVE\s*([+-]?\d+)/);
         sheetData.speed = extract(/SPEED\s*([^\n]+)/);
@@ -3216,7 +3074,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sheetData.passive_insight = extract(/PASSIVE INSIGHT\s*(\d+)/);
         sheetData.passive_investigation = extract(/PASSIVE INVESTIGATION\s*(\d+)/);
 
-        // Text Areas
         const extractTextArea = (start, end) => {
             const regex = new RegExp(`${start}\\s*([\\s\\S]*?)\\s*${end}`);
             const match = upperText.match(regex);
@@ -3605,10 +3462,9 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         }
     }
 
-    // --- Saved Rolls Logic ---
     function renderSavedRolls() {
         if (!savedRollsList) return;
-        savedRollsList.innerHTML = ''; // Clear existing list
+        savedRollsList.innerHTML = '';
 
         if (savedRolls.length === 0) {
             const placeholder = document.createElement('li');
@@ -3655,7 +3511,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 return;
             }
 
-            // Capture the current dice selection
             const currentDice = { ...diceCounts };
             const hasDice = Object.values(currentDice).some(count => count > 0);
 
@@ -3665,7 +3520,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             }
 
             savedRolls.push({ name: name, dice: currentDice });
-            saveRollNameInput.value = ''; // Clear input
+            saveRollNameInput.value = '';
             renderSavedRolls();
         });
     }
@@ -3693,8 +3548,8 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                     let sides;
                     let dieName = die;
                     if (die === 'd_custom') {
-                        sides = parseInt(customDieInput.value, 10); // Use current custom value
-                        if (isNaN(sides) || sides < 2 || sides > 1000) continue; // Skip if invalid
+                        sides = parseInt(customDieInput.value, 10);
+                        if (isNaN(sides) || sides < 2 || sides > 1000) continue;
                         dieName = `d${sides}`;
                     } else {
                         sides = parseInt(die.substring(1), 10);
@@ -3734,7 +3589,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
-    // --- Dice Roller Logic ---
     const diceCounts = { d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, d100: 0, d_custom: 0 };
     const diceButtons = document.querySelectorAll('.dice-button');
     const rollButton = document.getElementById('roll-button');
@@ -3824,7 +3678,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
             sendDiceRollToPlayerView(allRolls, totalSum);
 
-            // Reset counts
             for (const die in diceCounts) {
                 diceCounts[die] = 0;
                 updateDiceCountDisplay(die);
@@ -3832,7 +3685,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
-    // Dice Roller Overlay Logic
     if (diceRollerIcon) {
         diceRollerIcon.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -3843,38 +3695,11 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
-    document.addEventListener('click', (event) => {
-        if (diceIconMenu && diceIconMenu.style.display === 'block') {
-            if (!diceRollerIcon.contains(event.target) && !diceIconMenu.contains(event.target)) {
-                diceIconMenu.style.display = 'none';
-            }
-        }
-        if (polygonContextMenu.style.display === 'block') {
-            // Check if the click was outside the context menu
-            if (!polygonContextMenu.contains(event.target)) {
-                polygonContextMenu.style.display = 'none';
-                selectedPolygonForContextMenu = null;
-            }
-        }
-        if (noteContextMenu.style.display === 'block') {
-            if (!noteContextMenu.contains(event.target)) {
-                noteContextMenu.style.display = 'none';
-                selectedNoteForContextMenu = null;
-            }
-        }
-        if (characterContextMenu.style.display === 'block') {
-            if (!characterContextMenu.contains(event.target)) {
-                characterContextMenu.style.display = 'none';
-                selectedCharacterForContextMenu = null;
-            }
-        }
-    });
-
     if (diceIconMenu) {
         diceIconMenu.addEventListener('click', (event) => {
             const action = event.target.dataset.action;
             if (action) {
-                diceIconMenu.style.display = 'none'; // Hide menu after action
+                diceIconMenu.style.display = 'none';
                 switch (action) {
                     case 'open-initiative-tracker':
                         if (initiativeTrackerOverlay) {
@@ -3892,7 +3717,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                         if (diceDialogueRecord) {
                             diceDialogueRecord.classList.add('persistent-log');
                             diceDialogueRecord.style.display = 'flex';
-                            // Add minimize button if it doesn't exist
                             if (!document.getElementById('action-log-minimize-button')) {
                                 const minimizeButton = document.createElement('button');
                                 minimizeButton.id = 'action-log-minimize-button';
@@ -3923,7 +3747,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     if (diceRollerOverlay) {
         diceRollerOverlay.addEventListener('click', (event) => {
-            // Close if the click is on the overlay background, but not on its content
             if (event.target === diceRollerOverlay) {
                 diceRollerOverlay.style.display = 'none';
                 sendDiceMenuStateToPlayerView(false);
@@ -3949,13 +3772,29 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
+    function getInitials(name) {
+        if (!name) return '??';
+        const parts = name.split(' ');
+        if (parts.length > 1) {
+            return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
+        }
+        return name.substring(0, 2);
+    }
+
     function createInitiativeCharacterCard(character) {
         const li = document.createElement('li');
         li.className = 'initiative-character-card';
 
-        const portrait = document.createElement('img');
-        portrait.src = character.sheetData?.character_portrait || 'assets/default-portrait.png'; // Use a default portrait if none exists
-        li.appendChild(portrait);
+        if (character.sheetData?.character_portrait) {
+            const portrait = document.createElement('img');
+            portrait.src = character.sheetData.character_portrait;
+            li.appendChild(portrait);
+        } else {
+            const initials = document.createElement('div');
+            initials.className = 'initiative-character-initials';
+            initials.textContent = getInitials(character.name);
+            li.appendChild(initials);
+        }
 
         const info = document.createElement('div');
         info.className = 'initiative-character-info';
@@ -3965,7 +3804,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         info.appendChild(name);
 
         const details = document.createElement('p');
-        details.textContent = `Lvl ${character.sheetData?.class_level || 'N/A'} ${character.sheetData?.race || ''} ${character.sheetData?.class_level || ''}`;
+        details.textContent = `${character.sheetData?.class_level || 'N/A'} ${character.sheetData?.race || ''} ${character.sheetData?.class_level || ''}`;
         info.appendChild(details);
 
         li.appendChild(info);
@@ -3990,7 +3829,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     if(activeInitiativeList) {
         activeInitiativeList.addEventListener('dragover', (e) => {
-            e.preventDefault(); // Allow drop
+            e.preventDefault();
         });
 
         activeInitiativeList.addEventListener('drop', (e) => {
@@ -4002,20 +3841,17 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
             const characterId = e.dataTransfer.getData('text/plain');
 
-            // Check if it's a reorder or a new addition
             const existingCharacter = activeInitiative.find(c => c.uniqueId == characterId);
 
             if(existingCharacter) {
-                // Reordering
                 const newIndex = Array.from(activeInitiativeList.children).indexOf(e.target.closest('.initiative-character-card'));
                 const oldIndex = activeInitiative.indexOf(existingCharacter);
                 activeInitiative.splice(oldIndex, 1);
                 activeInitiative.splice(newIndex, 0, existingCharacter);
             } else {
-                // New addition
                 const character = charactersData.find(c => c.id == characterId);
                 if (character) {
-                    const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() }; // Add uniqueId for multiple instances
+                    const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() };
                     activeInitiative.push(newInitiativeCharacter);
                 }
             }
@@ -4042,7 +3878,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             card.dataset.uniqueId = character.uniqueId;
             card.draggable = true;
 
-            // Make initiative editable
             const initiativeValueDiv = card.querySelector('.initiative-value');
             initiativeValueDiv.textContent = character.initiative ?? '-';
             initiativeValueDiv.contentEditable = true;
@@ -4132,13 +3967,17 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     if(startInitiativeButton) {
         startInitiativeButton.addEventListener('click', () => {
-            if (initiativeTurn === -1) { // Start initiative
+            if (activeInitiative.length === 0) {
+                alert("Please add characters to the initiative before starting.");
+                return;
+            }
+            if (initiativeTurn === -1) {
                 initiativeTurn = 0;
                 startInitiativeButton.textContent = 'Stop Initiative';
                 nextTurnButton.style.display = 'inline-block';
                 prevTurnButton.style.display = 'inline-block';
                 highlightActiveTurn();
-            } else { // Stop initiative
+            } else {
                 initiativeTurn = -1;
                 startInitiativeButton.textContent = 'Start Initiative';
                 nextTurnButton.style.display = 'none';
@@ -4168,10 +4007,12 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     function highlightActiveTurn() {
         clearTurnHighlight();
-        const card = activeInitiativeList.querySelector(`[data-unique-id="${activeInitiative[initiativeTurn].uniqueId}"]`);
-        if (card) {
-            card.classList.add('active-turn');
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (activeInitiative.length > 0) {
+            const card = activeInitiativeList.querySelector(`[data-unique-id="${activeInitiative[initiativeTurn].uniqueId}"]`);
+            if (card) {
+                card.classList.add('active-turn');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     }
 
