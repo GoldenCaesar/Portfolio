@@ -141,34 +141,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     updateAllModifiers();
 
-    const attributeBoxes = document.querySelectorAll('.attr-box');
-    attributeBoxes.forEach(box => {
-        box.classList.add('clickable');
-        box.addEventListener('click', (event) => {
-            if (event.target.tagName === 'INPUT') return;
-            const label = box.querySelector('label').textContent;
-            const modifier = box.querySelector('.attr-modifier').textContent;
-            window.parent.postMessage({
-                type: 'attributeRoll',
-                attributeName: label,
-                modifier: modifier
-            }, '*');
-        });
-    });
-
-    const initiativeBox = document.querySelector('.initiative');
-    if (initiativeBox) {
-        initiativeBox.classList.add('clickable');
-        initiativeBox.addEventListener('click', (event) => {
-            if (event.target.tagName === 'INPUT') return;
-            const modifier = document.getElementById('initiative').value;
-            window.parent.postMessage({
-                type: 'initiativeRoll',
-                modifier: modifier
-            }, '*');
-        });
-    }
-
     function clearSheetFields() {
         const inputs = document.querySelectorAll('input, textarea');
         inputs.forEach(input => {
