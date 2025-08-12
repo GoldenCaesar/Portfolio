@@ -3223,69 +3223,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.addEventListener('message', (event) => {
-        if (event.data.type === 'attributeRoll') {
-            const { attributeName, modifier } = event.data;
-            const roll = Math.floor(Math.random() * 20) + 1;
-            const parsedModifier = parseInt(modifier, 10) || 0;
-            const total = roll + parsedModifier;
-            const character = charactersData.find(c => c.id === selectedCharacterId);
-            const characterName = character ? character.name : 'Unknown Character';
-            const playerName = character && character.sheetData && character.sheetData.player_name ? character.sheetData.player_name : 'Player';
-
-            const rollData = {
-                sum: `${total}`,
-                roll: `d20(${roll}) + ${parsedModifier} for ${attributeName} Check`,
-                characterName: characterName,
-                playerName: playerName
-            };
-
-            showDiceDialogue(rollData);
-            sendDiceRollToPlayerView([roll, parsedModifier], total);
-            return;
-        }
-
-        if (event.data.type === 'initiativeRoll') {
-            const { modifier } = event.data;
-            const roll = Math.floor(Math.random() * 20) + 1;
-            const parsedModifier = parseInt(modifier, 10) || 0;
-            const total = roll + parsedModifier;
-            const character = charactersData.find(c => c.id === selectedCharacterId);
-            const characterName = character ? character.name : 'Unknown Character';
-            const playerName = character && character.sheetData && character.sheetData.player_name ? character.sheetData.player_name : 'Player';
-
-            const rollData = {
-                sum: `${total}`,
-                roll: `d20(${roll}) + ${parsedModifier} for Initiative`,
-                characterName: characterName,
-                playerName: playerName
-            };
-
-            showDiceDialogue(rollData);
-            sendDiceRollToPlayerView([roll, parsedModifier], total);
-            return;
-        }
-
-        if (event.data.type === 'skillRoll') {
-            const { skillName, modifier } = event.data;
-            const roll = Math.floor(Math.random() * 20) + 1;
-            const parsedModifier = parseInt(modifier, 10) || 0;
-            const total = roll + parsedModifier;
-            const character = charactersData.find(c => c.id === selectedCharacterId);
-            const characterName = character ? character.name : 'Unknown Character';
-            const playerName = character && character.sheetData && character.sheetData.player_name ? character.sheetData.player_name : 'Player';
-
-            const rollData = {
-                sum: `${total}`,
-                roll: `d20(${roll}) + ${parsedModifier} for ${skillName}`,
-                characterName: characterName,
-                playerName: playerName
-            };
-
-            showDiceDialogue(rollData);
-            sendDiceRollToPlayerView([roll, parsedModifier], total);
-            return;
-        }
-
         if (event.source !== characterSheetIframe.contentWindow) {
             return;
         }
@@ -3319,6 +3256,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     characterPreviewOverlay.style.display = 'flex';
                 }
             }
+        } else if (event.data.type === 'characterDetailsVisibilityChange') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.isDetailsVisible = event.data.isDetailsVisible;
+                }
+            }
+        } else if (event.data.type === 'skillRoll') {
+            const { skillName, modifier } = event.data;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            const characterName = character ? character.name : 'Unknown';
+            const playerName = character && character.sheetData ? character.sheetData.player_name : 'DM';
+
+            const d20Roll = Math.floor(Math.random() * 20) + 1;
+            const total = d20Roll + parseInt(modifier);
+
+            const rollData = {
+                characterName: characterName,
+                playerName: playerName,
+                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${skillName}`,
+                sum: total
+            };
+
+            showDiceDialogue(rollData);
+            sendDiceRollToPlayerView([d20Roll], total);
         }
     });
 
@@ -3461,16 +3423,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
         const profilePic = document.createElement('div');
         profilePic.classList.add('dice-roll-profile-pic');
-
-        const character = charactersData.find(c => c.name === rollData.characterName);
-        if (character && character.sheetData && character.sheetData.character_portrait) {
-            const img = document.createElement('img');
-            img.src = character.sheetData.character_portrait;
-            img.alt = getInitials(character.name);
-            profilePic.appendChild(img);
-        } else {
-            profilePic.textContent = getInitials(rollData.characterName);
-        }
+        profilePic.textContent = 'DM';
         cardContent.appendChild(profilePic);
 
         const textContainer = document.createElement('div');
