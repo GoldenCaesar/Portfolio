@@ -3928,7 +3928,11 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     if(saveInitiativeButton) {
         saveInitiativeButton.addEventListener('click', () => {
-            const name = saveInitiativeNameInput.value.trim() || `Initiative_${Object.keys(savedInitiatives).length + 1}`;
+            const name = saveInitiativeNameInput.value.trim();
+            if (!name) {
+                alert("Please enter a name for the initiative to save it.");
+                return;
+            }
             savedInitiatives[name] = JSON.parse(JSON.stringify(activeInitiative));
             renderSavedInitiativesList();
         });
@@ -3956,6 +3960,21 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             const li = document.createElement('li');
             li.textContent = name;
             li.dataset.name = name;
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = '🗑️';
+            deleteButton.classList.add('delete-initiative-button');
+            deleteButton.style.marginLeft = '10px';
+            deleteButton.onclick = (e) => {
+                e.stopPropagation(); // prevent the li click event from firing
+                if (confirm(`Are you sure you want to delete the initiative "${name}"?`)) {
+                    delete savedInitiatives[name];
+                    renderSavedInitiativesList();
+                }
+            };
+
+            li.appendChild(deleteButton);
+
             li.addEventListener('click', () => {
                 const current = savedInitiativesList.querySelector('.selected');
                 if (current) current.classList.remove('selected');
