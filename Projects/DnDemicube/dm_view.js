@@ -18,11 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const diceIconMenu = document.getElementById('dice-icon-menu');
     const diceRollerOverlay = document.getElementById('dice-roller-overlay');
     const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
-    const initiativeTrackerOverlay = document.getElementById('initiative-tracker-overlay');
-    const initiativeTrackerCloseButton = document.getElementById('initiative-tracker-close-button');
-    const availableCharactersList = document.getElementById('available-characters-list');
-    const currentInitiativeList = document.getElementById('current-initiative-list');
-    const savedInitiativesList = document.getElementById('saved-initiatives-list');
     const diceDialogueRecord = document.getElementById('dice-dialogue-record');
     let diceDialogueTimeout;
     let diceRollHistory = [];
@@ -30,13 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveRollNameInput = document.getElementById('save-roll-name-input');
     const saveRollButton = document.getElementById('save-roll-button');
     const savedRollsList = document.getElementById('saved-rolls-list');
-    const saveInitiativeButton = document.getElementById('save-initiative-button');
-    const saveInitiativeNameInput = document.getElementById('save-initiative-name-input');
-    const startInitiativeButton = document.getElementById('start-initiative-button');
-    const initiativeRollModal = document.getElementById('initiative-roll-modal');
-    const autoRollInitiativeButton = document.getElementById('auto-roll-initiative-button');
-    const manualRollInitiativeButton = document.getElementById('manual-roll-initiative-button');
-    const cancelInitiativeRollButton = document.getElementById('cancel-initiative-roll-button');
 
 
     // Notes Tab Elements
@@ -112,11 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedCharacterId = null;
     let isCharactersEditMode = false;
     let characterEasyMDE = null;
-
-    // Initiative Tracker State Variables
-    let savedInitiatives = [];
-    let isInitiativeActive = false;
-
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
@@ -434,119 +417,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-    if (startInitiativeButton) {
-        startInitiativeButton.addEventListener('click', () => {
-            if (currentInitiativeList.children.length > 0) {
-                initiativeRollModal.style.display = 'block';
-            } else {
-                alert('Please add characters to the initiative first.');
-            }
-        });
-    }
-
-    if (cancelInitiativeRollButton) {
-        cancelInitiativeRollButton.addEventListener('click', () => {
-            initiativeRollModal.style.display = 'none';
-        });
-    }
-
-    if (autoRollInitiativeButton) {
-        autoRollInitiativeButton.addEventListener('click', () => {
-            rollInitiativeAutomatically();
-            initiativeRollModal.style.display = 'none';
-        });
-    }
-
-    if (manualRollInitiativeButton) {
-        manualRollInitiativeButton.addEventListener('click', () => {
-            rollInitiativeManually();
-            initiativeRollModal.style.display = 'none';
-        });
-    }
-
-    function rollInitiativeAutomatically() {
-        const characters = Array.from(currentInitiativeList.querySelectorAll('li'));
-        characters.forEach(charElement => {
-            const charId = charElement.dataset.characterId;
-            const characterData = charactersData.find(c => c.id == charId);
-            const initiativeMod = parseInt(characterData.sheetData.initiative) || 0;
-            const roll = Math.floor(Math.random() * 20) + 1;
-            const totalInitiative = roll + initiativeMod;
-
-            let initiativeRollElement = charElement.querySelector('.initiative-roll');
-            if (!initiativeRollElement) {
-                initiativeRollElement = document.createElement('div');
-                initiativeRollElement.className = 'initiative-roll';
-                charElement.appendChild(initiativeRollElement);
-            }
-            initiativeRollElement.textContent = `Initiative: ${totalInitiative}`;
-            charElement.dataset.initiative = totalInitiative;
-        });
-
-        sortInitiativeList();
-        startInitiative();
-    }
-
-    async function rollInitiativeManually() {
-        const characters = Array.from(currentInitiativeList.querySelectorAll('li'));
-        for (const charElement of characters) {
-            const charName = charElement.querySelector('.initiative-character-name').textContent;
-            const initiative = await promptAsync(`Enter initiative for ${charName}:`);
-            if (initiative !== null) {
-                const totalInitiative = parseInt(initiative) || 0;
-                let initiativeRollElement = charElement.querySelector('.initiative-roll');
-                if (!initiativeRollElement) {
-                    initiativeRollElement = document.createElement('div');
-                    initiativeRollElement.className = 'initiative-roll';
-                    charElement.appendChild(initiativeRollElement);
-                }
-                initiativeRollElement.textContent = `Initiative: ${totalInitiative}`;
-                charElement.dataset.initiative = totalInitiative;
-                sortInitiativeList();
-            }
-        }
-        startInitiative();
-    }
-
-    function sortInitiativeList() {
-        const characters = Array.from(currentInitiativeList.querySelectorAll('li'));
-        characters.sort((a, b) => {
-            const aInit = parseInt(a.dataset.initiative) || 0;
-            const bInit = parseInt(b.dataset.initiative) || 0;
-            return bInit - aInit;
-        });
-        characters.forEach(char => currentInitiativeList.appendChild(char));
-    }
-
-    function startInitiative() {
-        isInitiativeActive = true;
-        document.getElementById('end-initiative-button').style.display = 'inline-block';
-        startInitiativeButton.style.display = 'none';
-        // Add a marker to the action log
-        const startMarker = document.createElement('div');
-        startMarker.textContent = `--- Initiative Started: ${new Date().toLocaleTimeString()} ---`;
-        startMarker.style.cssText = 'text-align: center; color: #b6cae1; font-style: italic;';
-        diceDialogueRecord.prepend(startMarker);
-    }
-
-    document.getElementById('end-initiative-button').addEventListener('click', () => {
-        isInitiativeActive = false;
-        document.getElementById('end-initiative-button').style.display = 'none';
-        startInitiativeButton.style.display = 'inline-block';
-        // Add a marker to the action log
-        const endMarker = document.createElement('div');
-        endMarker.textContent = `--- Initiative Ended: ${new Date().toLocaleTimeString()} ---`;
-        endMarker.style.cssText = 'text-align: center; color: #b6cae1; font-style: italic;';
-        diceDialogueRecord.prepend(endMarker);
-    });
-
-
-    function promptAsync(message) {
-        return new Promise((resolve) => {
-            const result = prompt(message);
-            resolve(result);
-        });
-    }
         });
     }
 
@@ -1639,13 +1509,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 characters: charactersToSave, // Use the version without pdfData
                 selectedCharacterId: selectedCharacterId,
                 diceRollHistory: diceRollHistory,
-                savedRolls: savedRolls,
-                savedInitiatives: savedInitiatives,
-                isInitiativeActive: isInitiativeActive,
-                currentInitiative: isInitiativeActive ? Array.from(currentInitiativeList.querySelectorAll('li')).map(li => ({
-                    id: li.dataset.characterId,
-                    initiative: li.dataset.initiative
-                })) : []
+                savedRolls: savedRolls
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1784,32 +1648,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterId = campaignData.selectedCharacterId || null;
         diceRollHistory = campaignData.diceRollHistory || [];
         savedRolls = campaignData.savedRolls || [];
-        savedInitiatives = campaignData.savedInitiatives || [];
-        renderSavedInitiatives();
         diceDialogueRecord.innerHTML = '';
-        if (campaignData.isInitiativeActive && campaignData.currentInitiative) {
-            isInitiativeActive = true;
-            currentInitiativeList.innerHTML = '';
-            campaignData.currentInitiative.forEach(char => {
-                const character = charactersData.find(c => c.id == char.id);
-                if (character) {
-                    addCharacterToInitiative(character);
-                    const charElement = currentInitiativeList.querySelector(`li[data-character-id="${char.id}"]`);
-                    if (charElement) {
-                        charElement.dataset.initiative = char.initiative;
-                        let initiativeRollElement = charElement.querySelector('.initiative-roll');
-                        if (!initiativeRollElement) {
-                            initiativeRollElement = document.createElement('div');
-                            initiativeRollElement.className = 'initiative-roll';
-                            charElement.appendChild(initiativeRollElement);
-                        }
-                        initiativeRollElement.textContent = `Initiative: ${char.initiative}`;
-                    }
-                }
-            });
-            sortInitiativeList();
-            startInitiative();
-        }
         diceRollHistory.forEach(historyMessage => {
             const parts = historyMessage.split(': ');
             const sum = parts[0];
@@ -1895,32 +1734,6 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
         savedRolls = campaignData.savedRolls || [];
-        savedInitiatives = campaignData.savedInitiatives || [];
-        renderSavedInitiatives();
-
-        if (campaignData.isInitiativeActive && campaignData.currentInitiative) {
-            isInitiativeActive = true;
-            currentInitiativeList.innerHTML = '';
-            campaignData.currentInitiative.forEach(char => {
-                const character = charactersData.find(c => c.id == char.id);
-                if (character) {
-                    addCharacterToInitiative(character);
-                    const charElement = currentInitiativeList.querySelector(`li[data-character-id="${char.id}"]`);
-                    if (charElement) {
-                        charElement.dataset.initiative = char.initiative;
-                        let initiativeRollElement = charElement.querySelector('.initiative-roll');
-                        if (!initiativeRollElement) {
-                            initiativeRollElement = document.createElement('div');
-                            initiativeRollElement.className = 'initiative-roll';
-                            charElement.appendChild(initiativeRollElement);
-                        }
-                        initiativeRollElement.textContent = `Initiative: ${char.initiative}`;
-                    }
-                }
-            });
-            sortInitiativeList();
-            startInitiative();
-        }
 
         if (campaignData.mapDefinitions) {
             for (const mapName in campaignData.mapDefinitions) {
@@ -4067,21 +3880,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                             }
                         }
                         break;
-                    case 'open-initiative-tracker':
-                        if (initiativeTrackerOverlay) {
-                            populateAvailableCharacters();
-                            initiativeTrackerOverlay.style.display = 'flex';
-                        }
-                        break;
                 }
-            }
-        });
-    }
-
-    if (initiativeTrackerCloseButton) {
-        initiativeTrackerCloseButton.addEventListener('click', () => {
-            if (initiativeTrackerOverlay) {
-                initiativeTrackerOverlay.style.display = 'none';
             }
         });
     }
@@ -4101,220 +3900,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             if (event.target === diceRollerOverlay) {
                 diceRollerOverlay.style.display = 'none';
                 sendDiceMenuStateToPlayerView(false);
-            }
-        });
-    }
-
-    function populateAvailableCharacters() {
-        if (!availableCharactersList) return;
-        availableCharactersList.innerHTML = ''; // Clear existing list
-
-        charactersData.forEach(character => {
-            const listItem = document.createElement('li');
-            listItem.dataset.characterId = character.id;
-
-            const characterInfo = document.createElement('div');
-            const name = character.name || 'Unnamed Character';
-            const classAndLevel = character.sheetData?.class_level || 'N/A';
-            const race = character.sheetData?.race || 'N/A';
-
-            characterInfo.innerHTML = `<div class="initiative-character-name">${name}</div><div class="initiative-character-details">${race} ${classAndLevel}</div>`;
-            listItem.appendChild(characterInfo);
-
-            const addButton = document.createElement('button');
-            addButton.textContent = 'Add';
-            addButton.dataset.action = 'add-to-initiative';
-            listItem.appendChild(addButton);
-
-            availableCharactersList.appendChild(listItem);
-        });
-    }
-
-    if (availableCharactersList) {
-        availableCharactersList.addEventListener('click', (event) => {
-            const target = event.target;
-            if (target.dataset.action === 'add-to-initiative') {
-                const listItem = target.closest('li');
-                const characterId = listItem.dataset.characterId;
-                const character = charactersData.find(c => c.id == characterId);
-
-                if (character) {
-                    addCharacterToInitiative(character);
-                }
-            }
-        });
-    }
-
-    function addCharacterToInitiative(character) {
-        if (!currentInitiativeList) return;
-
-        // Check if character is already in the list
-        if (document.querySelector(`#current-initiative-list li[data-character-id="${character.id}"]`)) {
-            return; // Don't add duplicates
-        }
-
-        const listItem = document.createElement('li');
-        listItem.dataset.characterId = character.id;
-        listItem.draggable = true;
-
-        const characterInfo = document.createElement('div');
-        const name = character.name || 'Unnamed Character';
-        const classAndLevel = character.sheetData?.class_level || 'N/A';
-        const race = character.sheetData?.race || 'N/A';
-
-        characterInfo.innerHTML = `<div class="initiative-character-name">${name}</div><div class="initiative-character-details">${race} ${classAndLevel}</div>`;
-        listItem.appendChild(characterInfo);
-
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'X';
-        deleteButton.dataset.action = 'remove-from-initiative';
-        deleteButton.style.cssText = 'background-color: #8b0000; color: white;';
-        listItem.appendChild(deleteButton);
-
-        currentInitiativeList.appendChild(listItem);
-    }
-
-    if (currentInitiativeList) {
-        currentInitiativeList.addEventListener('click', (event) => {
-            const target = event.target;
-            if (target.dataset.action === 'remove-from-initiative') {
-                const listItem = target.closest('li');
-                listItem.remove();
-            }
-        });
-
-        let draggedItem = null;
-
-        currentInitiativeList.addEventListener('dragstart', (event) => {
-            draggedItem = event.target;
-            setTimeout(() => {
-                event.target.style.display = 'none';
-            }, 0);
-        });
-
-        currentInitiativeList.addEventListener('dragend', (event) => {
-            setTimeout(() => {
-                draggedItem.style.display = 'flex';
-                draggedItem = null;
-            }, 0);
-        });
-
-        currentInitiativeList.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            const afterElement = getDragAfterElement(currentInitiativeList, event.clientY);
-            const container = currentInitiativeList;
-            if (afterElement == null) {
-                container.appendChild(draggedItem);
-            } else {
-                container.insertBefore(draggedItem, afterElement);
-            }
-        });
-
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
-
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-    }
-
-    if (saveInitiativeButton) {
-        saveInitiativeButton.addEventListener('click', () => {
-            const name = saveInitiativeNameInput.value.trim();
-            if (!name) {
-                alert('Please enter a name for the initiative.');
-                return;
-            }
-
-            const initiativeCharacters = [];
-            const characterElements = currentInitiativeList.querySelectorAll('li');
-            characterElements.forEach(el => {
-                initiativeCharacters.push(el.dataset.characterId);
-            });
-
-            if (initiativeCharacters.length === 0) {
-                alert('Please add at least one character to the initiative to save.');
-                return;
-            }
-
-            savedInitiatives.push({ name: name, characters: initiativeCharacters });
-            saveInitiativeNameInput.value = ''; // Clear input
-            renderSavedInitiatives();
-        });
-    }
-
-    function renderSavedInitiatives() {
-        if (!savedInitiativesList) return;
-        savedInitiativesList.innerHTML = ''; // Clear existing list
-
-        if (savedInitiatives.length === 0) {
-            const placeholder = document.createElement('li');
-            placeholder.textContent = 'No initiatives saved yet.';
-            placeholder.style.color = '#a0b4c9';
-            savedInitiativesList.appendChild(placeholder);
-            return;
-        }
-
-        savedInitiatives.forEach((savedInitiative, index) => {
-            const listItem = document.createElement('li');
-            listItem.style.display = 'flex';
-            listItem.style.justifyContent = 'space-between';
-            listItem.style.alignItems = 'center';
-            listItem.style.marginBottom = '10px';
-            listItem.dataset.index = index;
-
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = savedInitiative.name;
-            listItem.appendChild(nameSpan);
-
-            const buttonsDiv = document.createElement('div');
-            const loadBtn = document.createElement('button');
-            loadBtn.textContent = 'Load';
-            loadBtn.dataset.action = 'load';
-            loadBtn.style.marginRight = '5px';
-            buttonsDiv.appendChild(loadBtn);
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Del';
-            deleteBtn.dataset.action = 'delete';
-            buttonsDiv.appendChild(deleteBtn);
-
-            listItem.appendChild(buttonsDiv);
-            savedInitiativesList.appendChild(listItem);
-        });
-    }
-
-    if (savedInitiativesList) {
-        savedInitiativesList.addEventListener('click', (event) => {
-            const target = event.target;
-            const action = target.dataset.action;
-            const listItem = target.closest('li');
-            if (!action || !listItem) return;
-
-            const index = parseInt(listItem.dataset.index, 10);
-            if (isNaN(index) || index >= savedInitiatives.length) return;
-
-            if (action === 'load') {
-                const savedInitiative = savedInitiatives[index];
-                currentInitiativeList.innerHTML = '';
-                savedInitiative.characters.forEach(characterId => {
-                    const character = charactersData.find(c => c.id == characterId);
-                    if (character) {
-                        addCharacterToInitiative(character);
-                    }
-                });
-            } else if (action === 'delete') {
-                if (confirm(`Are you sure you want to delete the "${savedInitiatives[index].name}" initiative?`)) {
-                    savedInitiatives.splice(index, 1);
-                    renderSavedInitiatives();
-                }
             }
         });
     }
