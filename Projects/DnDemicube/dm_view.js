@@ -26,6 +26,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveRollButton = document.getElementById('save-roll-button');
     const savedRollsList = document.getElementById('saved-rolls-list');
 
+    // Initiative Tracker Elements
+    const initiativeTrackerOverlay = document.getElementById('initiative-tracker-overlay');
+    const initiativeTrackerCloseButton = document.getElementById('initiative-tracker-close-button');
+    const initiativeTrackerTitle = document.getElementById('initiative-tracker-title');
+    const masterCharacterList = document.getElementById('initiative-master-character-list');
+    const activeInitiativeList = document.getElementById('initiative-active-list');
+    const savedInitiativesList = document.getElementById('saved-initiatives-list');
+    const autoInitiativeButton = document.getElementById('auto-initiative-button');
+    const saveInitiativeNameInput = document.getElementById('save-initiative-name-input');
+    const saveInitiativeButton = document.getElementById('save-initiative-button');
+    const loadInitiativeButton = document.getElementById('load-initiative-button');
+    const startInitiativeButton = document.getElementById('start-initiative-button');
+    const prevTurnButton = document.getElementById('prev-turn-button');
+    const nextTurnButton = document.getElementById('next-turn-button');
+
 
     // Notes Tab Elements
     const createNewNoteButton = document.getElementById('create-new-note-button');
@@ -100,6 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedCharacterId = null;
     let isCharactersEditMode = false;
     let characterEasyMDE = null;
+
+    // Initiative Tracker State Variables
+    let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
+    let activeInitiative = []; // Array of character objects in the current initiative
+    let initiativeTurn = -1; // Index of the current turn in activeInitiative
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
@@ -1509,7 +1529,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 characters: charactersToSave, // Use the version without pdfData
                 selectedCharacterId: selectedCharacterId,
                 diceRollHistory: diceRollHistory,
-                savedRolls: savedRolls
+                savedRolls: savedRolls,
+                savedInitiatives: savedInitiatives
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1560,6 +1581,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- Final UI Refresh ---
             renderAllLists();
+            renderSavedInitiativesList();
             updateButtonStates();
 
             // Restore selections and display
@@ -1648,6 +1670,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterId = campaignData.selectedCharacterId || null;
         diceRollHistory = campaignData.diceRollHistory || [];
         savedRolls = campaignData.savedRolls || [];
+        savedInitiatives = campaignData.savedInitiatives || {};
         diceDialogueRecord.innerHTML = '';
         diceRollHistory.forEach(historyMessage => {
             const parts = historyMessage.split(': ');
@@ -1734,6 +1757,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
         savedRolls = campaignData.savedRolls || [];
+        savedInitiatives = campaignData.savedInitiatives || {};
 
         if (campaignData.mapDefinitions) {
             for (const mapName in campaignData.mapDefinitions) {
@@ -3852,6 +3876,12 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             if (action) {
                 diceIconMenu.style.display = 'none'; // Hide menu after action
                 switch (action) {
+                    case 'open-initiative-tracker':
+                        if (initiativeTrackerOverlay) {
+                            initiativeTrackerOverlay.style.display = 'flex';
+                            renderInitiativeMasterList();
+                        }
+                        break;
                     case 'open-dice-roller':
                         if (diceRollerOverlay) {
                             diceRollerOverlay.style.display = 'flex';
@@ -3900,4 +3930,281 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             }
         });
     }
+
+    // --- Initiative Tracker Logic ---
+
+    function renderInitiativeMasterList() {
+        if (!masterCharacterList) return;
+        masterCharacterList.innerHTML = '';
+        charactersData.forEach(character => {
+            const card = createInitiativeCharacterCard(character);
+            card.dataset.characterId = character.id;
+            card.draggable = true;
+            card.addEventListener('dragstart', handleInitiativeDragStart);
+            masterCharacterList.appendChild(card);
+        });
+    }
+
+    function createInitiativeCharacterCard(character) {
+        const li = document.createElement('li');
+        li.className = 'initiative-character-card';
+
+        const portrait = document.createElement('img');
+        portrait.src = character.sheetData?.character_portrait || 'assets/default-portrait.png'; // Use a default portrait if none exists
+        li.appendChild(portrait);
+
+        const info = document.createElement('div');
+        info.className = 'initiative-character-info';
+
+        const name = document.createElement('h4');
+        name.textContent = character.name;
+        info.appendChild(name);
+
+        const details = document.createElement('p');
+        details.textContent = `Lvl ${character.sheetData?.class_level || 'N/A'} ${character.sheetData?.race || ''} ${character.sheetData?.class_level || ''}`;
+        info.appendChild(details);
+
+        li.appendChild(info);
+
+        const hp = document.createElement('div');
+        hp.className = 'initiative-character-hp';
+        hp.textContent = `HP: ${character.sheetData?.hp_current || 'N/A'}/${character.sheetData?.hp_max || 'N/A'}`;
+        li.appendChild(hp);
+
+        const initiativeValue = document.createElement('div');
+        initiativeValue.className = 'initiative-value';
+        initiativeValue.textContent = '-';
+        li.appendChild(initiativeValue);
+
+        return li;
+    }
+
+    function handleInitiativeDragStart(e) {
+        e.dataTransfer.setData('text/plain', e.target.dataset.characterId);
+        e.target.classList.add('dragging');
+    }
+
+    if(activeInitiativeList) {
+        activeInitiativeList.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Allow drop
+        });
+
+        activeInitiativeList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const draggingElement = document.querySelector('.dragging');
+            if(draggingElement) {
+                draggingElement.classList.remove('dragging');
+            }
+
+            const characterId = e.dataTransfer.getData('text/plain');
+
+            // Check if it's a reorder or a new addition
+            const existingCharacter = activeInitiative.find(c => c.uniqueId == characterId);
+
+            if(existingCharacter) {
+                // Reordering
+                const newIndex = Array.from(activeInitiativeList.children).indexOf(e.target.closest('.initiative-character-card'));
+                const oldIndex = activeInitiative.indexOf(existingCharacter);
+                activeInitiative.splice(oldIndex, 1);
+                activeInitiative.splice(newIndex, 0, existingCharacter);
+            } else {
+                // New addition
+                const character = charactersData.find(c => c.id == characterId);
+                if (character) {
+                    const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() }; // Add uniqueId for multiple instances
+                    activeInitiative.push(newInitiativeCharacter);
+                }
+            }
+            renderActiveInitiativeList();
+        });
+
+        activeInitiativeList.addEventListener('dragenter', e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(activeInitiativeList, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (afterElement == null) {
+                activeInitiativeList.appendChild(draggable);
+            } else {
+                activeInitiativeList.insertBefore(draggable, afterElement);
+            }
+        });
+    }
+
+    function renderActiveInitiativeList() {
+        if (!activeInitiativeList) return;
+        activeInitiativeList.innerHTML = '';
+        activeInitiative.forEach(character => {
+            const card = createInitiativeCharacterCard(character);
+            card.dataset.uniqueId = character.uniqueId;
+            card.draggable = true;
+
+            // Make initiative editable
+            const initiativeValueDiv = card.querySelector('.initiative-value');
+            initiativeValueDiv.textContent = character.initiative ?? '-';
+            initiativeValueDiv.contentEditable = true;
+            initiativeValueDiv.addEventListener('blur', (e) => {
+                const newInitiative = parseInt(e.target.textContent, 10);
+                character.initiative = isNaN(newInitiative) ? null : newInitiative;
+                sortActiveInitiative();
+                renderActiveInitiativeList();
+            });
+
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.dataset.uniqueId);
+                e.target.classList.add('dragging');
+            });
+            card.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+            });
+
+            activeInitiativeList.appendChild(card);
+        });
+    }
+
+    function sortActiveInitiative() {
+        activeInitiative.sort((a, b) => {
+            if (b.initiative === null) return -1;
+            if (a.initiative === null) return 1;
+            return b.initiative - a.initiative;
+        });
+    }
+
+    if(initiativeTrackerCloseButton) {
+        initiativeTrackerCloseButton.addEventListener('click', () => {
+            initiativeTrackerOverlay.style.display = 'none';
+        });
+    }
+
+    if(autoInitiativeButton) {
+        autoInitiativeButton.addEventListener('click', () => {
+            activeInitiative.forEach(character => {
+                const initiativeBonus = parseInt(character.sheetData?.initiative || 0, 10);
+                const roll = Math.floor(Math.random() * 20) + 1;
+                character.initiative = roll + initiativeBonus;
+            });
+            sortActiveInitiative();
+            renderActiveInitiativeList();
+        });
+    }
+
+    if(saveInitiativeButton) {
+        saveInitiativeButton.addEventListener('click', () => {
+            const name = saveInitiativeNameInput.value.trim() || `Initiative_${Object.keys(savedInitiatives).length + 1}`;
+            savedInitiatives[name] = JSON.parse(JSON.stringify(activeInitiative));
+            renderSavedInitiativesList();
+        });
+    }
+
+    if(loadInitiativeButton) {
+        loadInitiativeButton.addEventListener('click', () => {
+            const selectedItem = savedInitiativesList.querySelector('.selected');
+            if (selectedItem) {
+                const name = selectedItem.dataset.name;
+                activeInitiative = JSON.parse(JSON.stringify(savedInitiatives[name]));
+                initiativeTrackerTitle.textContent = name;
+                saveInitiativeNameInput.value = name;
+                renderActiveInitiativeList();
+            } else {
+                alert("Please select a saved initiative to load.");
+            }
+        });
+    }
+
+    function renderSavedInitiativesList() {
+        if (!savedInitiativesList) return;
+        savedInitiativesList.innerHTML = '';
+        Object.keys(savedInitiatives).forEach(name => {
+            const li = document.createElement('li');
+            li.textContent = name;
+            li.dataset.name = name;
+            li.addEventListener('click', () => {
+                const current = savedInitiativesList.querySelector('.selected');
+                if (current) current.classList.remove('selected');
+                li.classList.add('selected');
+            });
+            savedInitiativesList.appendChild(li);
+        });
+    }
+
+    if(startInitiativeButton) {
+        startInitiativeButton.addEventListener('click', () => {
+            if (initiativeTurn === -1) { // Start initiative
+                initiativeTurn = 0;
+                startInitiativeButton.textContent = 'Stop Initiative';
+                nextTurnButton.style.display = 'inline-block';
+                prevTurnButton.style.display = 'inline-block';
+                highlightActiveTurn();
+            } else { // Stop initiative
+                initiativeTurn = -1;
+                startInitiativeButton.textContent = 'Start Initiative';
+                nextTurnButton.style.display = 'none';
+                prevTurnButton.style.display = 'none';
+                clearTurnHighlight();
+            }
+        });
+    }
+
+    if(nextTurnButton) {
+        nextTurnButton.addEventListener('click', () => {
+            if(initiativeTurn !== -1) {
+                initiativeTurn = (initiativeTurn + 1) % activeInitiative.length;
+                highlightActiveTurn();
+            }
+        });
+    }
+
+    if(prevTurnButton) {
+        prevTurnButton.addEventListener('click', () => {
+            if(initiativeTurn !== -1) {
+                initiativeTurn = (initiativeTurn - 1 + activeInitiative.length) % activeInitiative.length;
+                highlightActiveTurn();
+            }
+        });
+    }
+
+    function highlightActiveTurn() {
+        clearTurnHighlight();
+        const card = activeInitiativeList.querySelector(`[data-unique-id="${activeInitiative[initiativeTurn].uniqueId}"]`);
+        if (card) {
+            card.classList.add('active-turn');
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function clearTurnHighlight() {
+        const highlighted = activeInitiativeList.querySelector('.active-turn');
+        if (highlighted) {
+            highlighted.classList.remove('active-turn');
+        }
+    }
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.initiative-character-card:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    document.body.addEventListener('drop', (e) => {
+        const draggingElement = document.querySelector('.dragging');
+        if (draggingElement && !activeInitiativeList.contains(e.target) && !masterCharacterList.contains(e.target)) {
+            const uniqueId = draggingElement.dataset.uniqueId;
+            const index = activeInitiative.findIndex(c => c.uniqueId == uniqueId);
+            if (index > -1) {
+                activeInitiative.splice(index, 1);
+                renderActiveInitiativeList();
+            }
+        }
+    });
+
+    document.body.addEventListener('dragover', e => {
+        e.preventDefault();
+    });
 });
