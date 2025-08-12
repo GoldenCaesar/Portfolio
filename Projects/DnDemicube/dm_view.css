@@ -824,3 +824,84 @@ input:checked + .slider:before {
     font-weight: bold;
     color: #e0e0e0; /* Make it stand out more than the rest of the details */
 }
+
+/* Initiative Tracker Styles */
+#initiative-tracker-overlay .list-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    min-height: 300px; /* Ensure lists have a minimum height */
+}
+
+.initiative-character-card {
+    display: flex;
+    align-items: center;
+    background-color: #2a3138;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    border-left: 5px solid #4a5f7a; /* Default border color */
+    cursor: grab;
+}
+
+.initiative-character-card.dragging {
+    opacity: 0.5;
+    background: #5f6a7a;
+}
+
+.initiative-character-card.active-turn {
+    border-left-color: #b6cae1;
+    box-shadow: 0 0 10px #b6cae1;
+}
+
+.initiative-character-card img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    object-fit: cover;
+}
+
+.initiative-character-info {
+    flex-grow: 1;
+}
+
+.initiative-character-info h4 {
+    margin: 0 0 5px 0;
+    color: #e0e0e0;
+}
+
+.initiative-character-info p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #a0b4c9;
+}
+
+.initiative-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-left: 15px;
+    min-width: 40px;
+    text-align: center;
+}
+
+#saved-initiatives-list li {
+    padding: 8px 10px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+#saved-initiatives-list li:hover {
+    background-color: #2a3138;
+}
+
+#saved-initiatives-list li.selected {
+    background-color: #3a4f6a !important;
+    border-left: 3px solid #b6cae1;
+    font-weight: bold;
+    color: #ffffff !important;
+}
