@@ -3263,6 +3263,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     character.isDetailsVisible = event.data.isDetailsVisible;
                 }
             }
+        } else if (event.data.type === 'characterSkillRoll') {
+            showDiceDialogue(event.data.data);
         }
     });
 
@@ -3403,10 +3405,21 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         cardContent.classList.add('dice-roll-card-content');
         messageElement.appendChild(cardContent);
 
-        const profilePic = document.createElement('div');
-        profilePic.classList.add('dice-roll-profile-pic');
-        profilePic.textContent = 'DM';
-        cardContent.appendChild(profilePic);
+        const profilePicContainer = document.createElement('div');
+        profilePicContainer.classList.add('dice-roll-profile-pic');
+
+        if (rollData.characterPortrait) {
+            const profileImg = document.createElement('img');
+            profileImg.src = rollData.characterPortrait;
+            profileImg.alt = 'Portrait';
+            profileImg.style.width = '100%';
+            profileImg.style.height = '100%';
+            profileImg.style.objectFit = 'cover';
+            profilePicContainer.appendChild(profileImg);
+        } else {
+            profilePicContainer.textContent = getInitials(rollData.characterName);
+        }
+        cardContent.appendChild(profilePicContainer);
 
         const textContainer = document.createElement('div');
         textContainer.classList.add('dice-roll-text-container');
