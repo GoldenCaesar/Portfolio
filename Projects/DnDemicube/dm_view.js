@@ -3939,8 +3939,12 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         charactersData.forEach(character => {
             const card = createInitiativeCharacterCard(character);
             card.dataset.characterId = character.id;
-            card.draggable = true;
-            card.addEventListener('dragstart', handleInitiativeDragStart);
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', () => {
+                const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() };
+                activeInitiative.push(newInitiativeCharacter);
+                renderActiveInitiativeList();
+            });
             masterCharacterList.appendChild(card);
         });
     }
