@@ -89,26 +89,67 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function rollSkill(skillName, modifier) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const modifierValue = parseInt(modifier) || 0;
+        const total = roll + modifierValue;
+
+        const characterName = document.getElementById('char-name-input').value || 'Unknown Character';
+        const playerName = document.getElementById('player-name-input').value || 'Unknown Player';
+        const portraitPreview = document.getElementById('portrait-preview');
+        const characterPortrait = portraitPreview.style.display !== 'none' ? portraitPreview.src : null;
+
+
+        const rollData = {
+            characterName: characterName,
+            playerName: playerName,
+            roll: `1d20${modifierValue >= 0 ? '+' : ''}${modifierValue} (${skillName})`,
+            sum: total,
+            characterPortrait: characterPortrait
+        };
+
+        window.parent.postMessage({ type: 'characterSkillRoll', data: rollData }, '*');
+    }
+
     function createSavingThrow(attr) {
         const div = document.createElement('div');
+        const skillId = `save-${attr}`;
+        const profId = `${skillId}-prof`;
+        const modId = `${skillId}-mod`;
+        const label = attr.charAt(0).toUpperCase() + attr.slice(1);
+
         div.innerHTML = `
-            <input type="checkbox" id="save-${attr}-prof" name="save_${attr}_prof">
-            <label for="save-${attr}-prof">${attr.charAt(0).toUpperCase() + attr.slice(1)}</label>
-            <input type="text" id="save-${attr}-mod" name="save_${attr}_mod" readonly>
+            <input type="checkbox" id="${profId}" name="save_${attr}_prof">
+            <a href="#" id="${skillId}-roll" class="skill-roll-link">${label}</a>
+            <input type="text" id="${modId}" name="save_${attr}_mod" readonly>
         `;
         savingThrowsContainer.appendChild(div);
-        document.getElementById(`save-${attr}-prof`).addEventListener('change', updateSavingThrows);
+        document.getElementById(profId).addEventListener('change', updateSavingThrows);
+        document.getElementById(`${skillId}-roll`).addEventListener('click', (event) => {
+            event.preventDefault();
+            const modifier = document.getElementById(modId).value;
+            rollSkill(label, modifier);
+        });
     }
 
     function createSkill(skill, attr) {
         const div = document.createElement('div');
+        const skillId = `skill-${skill.replace(/\s+/g, '-').toLowerCase()}`;
+        const profId = `${skillId}-prof`;
+        const modId = `${skillId}-mod`;
+
         div.innerHTML = `
-            <input type="checkbox" id="skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_prof">
-            <label for="skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof">${skill} (${attr.slice(0, 3).toUpperCase()})</label>
-            <input type="text" id="skill-${skill.replace(/\s+/g, '-').toLowerCase()}-mod" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" readonly>
+            <input type="checkbox" id="${profId}" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_prof">
+            <a href="#" id="${skillId}-roll" class="skill-roll-link">${skill} (${attr.slice(0, 3).toUpperCase()})</a>
+            <input type="text" id="${modId}" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" readonly>
         `;
         skillsContainer.appendChild(div);
-        document.getElementById(`skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof`).addEventListener('change', updateSkills);
+        document.getElementById(profId).addEventListener('change', updateSkills);
+        document.getElementById(`${skillId}-roll`).addEventListener('click', (event) => {
+            event.preventDefault();
+            const modifier = document.getElementById(modId).value;
+            rollSkill(skill, modifier);
+        });
     }
 
     savingThrowAttrs.forEach(createSavingThrow);
