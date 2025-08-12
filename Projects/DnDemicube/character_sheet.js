@@ -103,17 +103,19 @@ document.addEventListener('DOMContentLoaded', function() {
     function createSkill(skill, attr) {
         const skillId = skill.replace(/\s+/g, '-').toLowerCase();
         const div = document.createElement('div');
+        div.classList.add('skill-entry', 'clickable');
         div.innerHTML = `
             <input type="checkbox" id="skill-${skillId}-prof" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_prof">
             <label for="skill-${skillId}-prof">${skill} (${attr.slice(0, 3).toUpperCase()})</label>
-            <input type="text" id="skill-${skillId}-mod" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" class="clickable" readonly>
+            <input type="text" id="skill-${skillId}-mod" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" readonly>
         `;
         skillsContainer.appendChild(div);
 
         document.getElementById(`skill-${skillId}-prof`).addEventListener('change', updateSkills);
 
-        const modInput = document.getElementById(`skill-${skillId}-mod`);
-        modInput.addEventListener('click', () => {
+        div.addEventListener('click', (event) => {
+            if (event.target.type === 'checkbox') return;
+            const modInput = document.getElementById(`skill-${skillId}-mod`);
             const modifier = modInput.value;
             window.parent.postMessage({
                 type: 'skillRoll',
