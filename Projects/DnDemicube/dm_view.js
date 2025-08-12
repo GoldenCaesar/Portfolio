@@ -3263,6 +3263,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     character.isDetailsVisible = event.data.isDetailsVisible;
                 }
             }
+        } else if (event.data.type === 'skillRoll') {
+            const { skillName, modifier } = event.data;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            const characterName = character ? character.name : 'Unknown';
+            const playerName = character && character.sheetData ? character.sheetData.player_name : 'DM';
+
+            const d20Roll = Math.floor(Math.random() * 20) + 1;
+            const total = d20Roll + parseInt(modifier);
+
+            const rollData = {
+                characterName: characterName,
+                playerName: playerName,
+                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${skillName}`,
+                sum: total
+            };
+
+            showDiceDialogue(rollData);
+            sendDiceRollToPlayerView([d20Roll], total);
         }
     });
 

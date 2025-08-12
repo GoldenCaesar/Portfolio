@@ -101,14 +101,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createSkill(skill, attr) {
+        const skillId = skill.replace(/\s+/g, '-').toLowerCase();
         const div = document.createElement('div');
         div.innerHTML = `
-            <input type="checkbox" id="skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_prof">
-            <label for="skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof">${skill} (${attr.slice(0, 3).toUpperCase()})</label>
-            <input type="text" id="skill-${skill.replace(/\s+/g, '-').toLowerCase()}-mod" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" readonly>
+            <input type="checkbox" id="skill-${skillId}-prof" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_prof">
+            <label for="skill-${skillId}-prof">${skill} (${attr.slice(0, 3).toUpperCase()})</label>
+            <input type="text" id="skill-${skillId}-mod" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" class="clickable" readonly>
         `;
         skillsContainer.appendChild(div);
-        document.getElementById(`skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof`).addEventListener('change', updateSkills);
+
+        document.getElementById(`skill-${skillId}-prof`).addEventListener('change', updateSkills);
+
+        const modInput = document.getElementById(`skill-${skillId}-mod`);
+        modInput.addEventListener('click', () => {
+            const modifier = modInput.value;
+            window.parent.postMessage({
+                type: 'skillRoll',
+                skillName: skill,
+                modifier: modifier
+            }, '*');
+        });
     }
 
     savingThrowAttrs.forEach(createSavingThrow);
