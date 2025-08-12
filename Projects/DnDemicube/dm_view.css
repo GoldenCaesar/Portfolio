@@ -277,6 +277,21 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+.initiative-character-initials {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #4a5f7a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #e0e0e0;
+    flex-shrink: 0;
+    margin-right: 15px;
+    font-size: 1.2em;
+}
+
 #notes-list li.selected-note-item:hover {
     background-color: #4a5f7a !important;
 }
