@@ -90,61 +90,6 @@
             </div>
         </div>
     </div>
-    <div id="initiative-roll-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3>Roll for Initiative</h3>
-            <p>How would you like to set the initiative order?</p>
-            <button id="auto-roll-initiative-button">Roll Automatically</button>
-            <button id="manual-roll-initiative-button">Enter Manually</button>
-            <button id="cancel-initiative-roll-button">Cancel</button>
-        </div>
-    </div>
-    <div id="initiative-tracker-overlay" class="overlay" style="display: none;">
-        <div class="overlay-content" style="display: flex; flex-direction: column; max-width: 900px; width: 90%; height: 80vh;">
-            <span id="initiative-tracker-close-button" class="close-button">&times;</span>
-            <h2>Initiative Tracker</h2>
-            <div class="initiative-tracker-content" style="display: flex; flex-grow: 1; gap: 20px;">
-                <!-- Left Column: Available Characters -->
-                <div id="available-characters-container" style="flex: 1; display: flex; flex-direction: column;">
-                    <h3>Available Characters</h3>
-                    <div id="available-characters-list-container" style="flex-grow: 1; overflow-y: auto; background-color: #15191e; border: 1px solid #3f4c5a; padding: 10px;">
-                        <ul id="available-characters-list" style="list-style: none; padding: 0; margin: 0;">
-                            <!-- JS will populate this -->
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Middle Column: Current Initiative -->
-                <div id="current-initiative-container" style="flex: 2; display: flex; flex-direction: column;">
-                    <h3>Current Initiative</h3>
-                    <div id="current-initiative-list-container" style="flex-grow: 1; overflow-y: auto; background-color: #15191e; border: 1px solid #3f4c5a; padding: 10px;">
-                        <ul id="current-initiative-list" style="list-style: none; padding: 0; margin: 0;">
-                            <!-- JS will populate this, draggable -->
-                        </ul>
-                    </div>
-                    <div id="initiative-controls" style="padding-top: 10px;">
-                        <button id="start-initiative-button">Start Initiative</button>
-                        <button id="end-initiative-button" style="display: none;">End Initiative</button>
-                    </div>
-                </div>
-
-                <!-- Right Column: Saved Initiatives -->
-                <div id="saved-initiatives-container" style="flex: 1; display: flex; flex-direction: column;">
-                    <h3>Save Initiative</h3>
-                    <div id="save-initiative-form" style="display: flex; gap: 10px; margin-bottom: 20px;">
-                        <input type="text" id="save-initiative-name-input" placeholder="Initiative Name" style="flex-grow: 1; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0; padding: 5px;">
-                        <button id="save-initiative-button">Save</button>
-                    </div>
-                    <h3>Saved Initiatives</h3>
-                    <div id="saved-initiatives-list-container" style="flex-grow: 1; overflow-y: auto; background-color: #15191e; border: 1px solid #3f4c5a; padding: 10px;">
-                        <ul id="saved-initiatives-list" style="list-style: none; padding: 0; margin: 0;">
-                            <!-- JS will populate this -->
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <div id="map-container">
         <canvas id="dm-canvas"></canvas>
         <canvas id="drawing-canvas"></canvas>
@@ -154,7 +99,6 @@
         </div>
         <div id="dice-icon-menu" class="dice-icon-menu" style="display: none;">
             <div class="dice-menu-item" data-action="open-dice-roller">Dice Roller</div>
-            <div class="dice-menu-item" data-action="open-initiative-tracker">Initiative Tracker</div>
             <div class="dice-menu-item" data-action="open-action-log">Action Log</div>
         </div>
     </div>
