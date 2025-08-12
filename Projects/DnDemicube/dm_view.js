@@ -3548,9 +3548,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         if (!diceDialogueRecord) return;
 
         const historyMessage = `${rollData.sum}: ${rollData.roll}`;
-        if (isInitiativeActive) {
-            historyMessage = `(Initiative) ${historyMessage}`;
-        }
         diceRollHistory.push(historyMessage);
 
         const messageElement = createDiceRollCard(rollData);
