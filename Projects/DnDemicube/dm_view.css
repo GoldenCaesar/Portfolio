@@ -1,0 +1,922 @@
+body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; background-color: #15191e; color: #e0e0e0; }
+#sidebar { width: 250px; background-color: #20262d; padding: 15px; border-right: 1px solid #3f4c5a; display: flex; flex-direction: column; gap: 10px; }
+.sidebar-section { margin-bottom: 20px; border-top: 1px solid #3f4c5a; padding-top: 10px; }
+.sidebar-section h3, .sidebar-section h4 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
+.tabs { display: flex; border-bottom: 1px solid #3f4c5a; margin-bottom: 10px;}
+.tab-button { background: none; border: none; padding: 10px 15px; cursor: pointer; color: #e0e0e0; font-size: 14px; border-bottom: 2px solid transparent; }
+.tab-button.active { border-bottom-color: #b6cae1; color: #b6cae1; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Main content area containers: #map-container and #note-editor-container */
+#map-container {
+    position: relative; /* This is key for stacking canvases */
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    padding: 10px;
+}
+#map-container.hidden {
+    display: none !important;
+}
+
+/* #note-editor-container has initial inline styles: display: none; flex-grow: 1; padding: 10px; */
+/* JS will toggle this class to show it and ensure flex properties */
+#note-editor-container.active {
+    display: flex !important; /* Override inline display: none */
+    flex-direction: column; /* To make #note-editor-area inside it grow */
+}
+
+#dm-canvas, #drawing-canvas {
+    position: absolute;
+    max-width: 100%;
+    max-height: 100%;
+    border: 1px solid #3f4c5a;
+}
+
+#dm-canvas {
+    background-color: #2a3138;
+    z-index: 1; /* Base canvas */
+}
+
+#drawing-canvas {
+    background-color: transparent;
+    z-index: 2; /* Drawing canvas on top */
+    pointer-events: none; /* Allows clicks to pass through to the dm-canvas */
+}
+button, input[type="file"] {
+    padding: 8px 12px;
+    background-color: #b6cae1;
+    max-width: 100%;
+    box-sizing: border-box;
+    color: #15191e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+button:hover, input[type="file"]:hover {
+    background-color: #a0b4c9;
+}
+
+/* Styling for buttons in the map tools section */
+#map-tools-section .map-tools-buttons button {
+    display: block; /* Stack buttons vertically */
+    width: 100%; /* Make buttons take full width of their container */
+    margin-bottom: 5px; /* Space between buttons */
+    box-sizing: border-box; /* Ensure padding and border don't expand width */
+}
+
+#map-tools-section .map-tools-buttons button:last-child {
+    margin-bottom: 0; /* No margin for the last button */
+}
+
+/* Styling for disabled map tool buttons */
+#map-tools-section .map-tools-buttons button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #5f6a7a; /* Darker, less prominent background */
+    color: #a0a0a0; /* Greyed out text */
+}
+
+/* Ensure non-disabled buttons in map tools still use default button styles if overridden by [disabled] */
+#map-tools-section .map-tools-buttons button:not([disabled]):hover {
+    background-color: #a0b4c9; /* Standard hover from general button styles */
+}
+
+
+label { display: block; margin-bottom: 5px; }
+h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
+.button-like-label {
+    padding: 8px 12px;
+    background-color: #b6cae1;
+    color: #15191e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-block; /* To behave like a button */
+}
+.button-like-label:hover {
+    background-color: #a0b4c9;
+}
+.visibility-icon {
+    margin-right: 8px;
+    cursor: pointer;
+    display: inline-block; /* Ensures it takes space */
+    width: 20px; /* Give it a fixed width for alignment */
+    text-align: center;
+}
+#active-maps-list, #active-maps-list ul {
+    list-style-type: none;
+    padding-left: 0; /* Reset default browser padding for ULs */
+    margin-top: 0; /* Optional: Reset default margins */
+    margin-bottom: 0; /* Optional: Reset default margins */
+}
+/* Individual list items will still have padding-left set by JS for hierarchy */
+.edit-icon {
+    cursor: pointer;
+    margin-left: 8px;
+    font-size: 0.9em; /* Slightly smaller than h3 */
+    display: inline-block; /* Allows margin and proper positioning */
+}
+
+/* Styling for map list items */
+.map-list-item {
+    padding: 5px 2px; /* Add some padding for easier clicking */
+    border-radius: 3px;
+    margin-bottom: 2px; /* Slight spacing between items */
+}
+
+.map-list-item.clickable-map:hover {
+    background-color: #2a3138; /* Hover effect when clickable */
+    cursor: pointer;
+}
+
+/* When in edit mode, the hover effect is different (or can be non-existent if preferred) */
+.uploaded-maps-list.edit-mode-active .map-list-item:hover {
+     background-color: #313842; /* Different hover for edit mode, or remove if not desired */
+}
+
+.file-actions {
+    margin-left: 10px; /* Spacing between filename and action icons */
+}
+.file-action-icon {
+    cursor: pointer;
+    margin-left: 5px; /* Spacing between icons */
+    display: none; /* Hidden by default, shown when .file-actions is displayed */
+    padding: 2px; /* Make click target slightly larger */
+    border-radius: 3px; /* Slightly rounded corners for icons if they had a background */
+}
+.file-action-icon:hover {
+    /* background-color: #3f4c5a; */ /* Optional: Subtle hover for icons */
+    color: #b6cae1; /* Highlight icon color on hover */
+}
+/* Ensure icons within an active .file-actions span are visible */
+.edit-mode-active .file-actions .file-action-icon {
+    display: inline-block;
+}
+/* Specific styling for move icons if needed, e.g., to prevent them from looking too large */
+.move-map-up, .move-map-down {
+    font-weight: bold;
+}
+
+#active-maps-list.edit-mode-active .map-name-span:hover {
+    /* Optional: Style for map names when in edit mode, e.g., different background */
+    /* background-color: #3a4148; */ /* Example */
+}
+
+/* Styling for selected map items in either list */
+.selected-map-item {
+    background-color: #3a4f6a !important; /* A distinct background color for selection */
+    /* border-left: 3px solid #b6cae1; */ /* Example: a border indicator */
+    font-weight: bold; /* Make text bold */
+    color: #ffffff !important; /* Ensure text is readable */
+}
+/* Ensure hover on a selected item doesn't obscure selection, or is complementary */
+.selected-map-item:hover {
+    background-color: #4a5f7a !important; /* Slightly different hover for selected item */
+}
+
+.rename-input-active {
+    /* Basic styling for the rename input field */
+    padding: 2px 4px;
+    border: 1px solid #b6cae1;
+    background-color: #15191e;
+    color: #e0e0e0;
+    border-radius: 3px;
+}
+
+.hover-label {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none; /* Allows mouse events to pass through to the canvas */
+    z-index: 1000; /* Ensure it's on top */
+    /* display: none; is handled by inline style initially and JS */
+}
+
+/* Context Menu Styling */
+.context-menu {
+    background-color: #2a3138; /* Dark background, similar to canvas */
+    border: 1px solid #3f4c5a; /* Border similar to other elements */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Subtle shadow for depth */
+    z-index: 1001; /* Ensure it's above the hover-label and canvas elements */
+    color: #e0e0e0; /* Light text color */
+    border-radius: 4px; /* Rounded corners */
+}
+
+.context-menu ul {
+    list-style: none;
+    padding: 5px 0;
+    margin: 0;
+}
+
+.context-menu ul li {
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.context-menu ul li:hover {
+    background-color: #3f4c5a; /* Hover effect for menu items */
+    color: #b6cae1; /* Highlight text on hover */
+}
+
+/* Notes Tab Styles */
+/* #tab-notes no longer needs to be a flex column for the editor,
+   but keeping it block or flex for its children (controls, list) is fine.
+   Height 100% might also not be necessary if it's just for the list area,
+   which will have its own scroll. */
+#tab-notes {
+    /* display: flex; */ /* Not strictly necessary anymore for editor */
+    /* flex-direction: column; */
+    /* height: 100%; */ /* Let content define its height within sidebar constraints */
+}
+
+.notes-controls {
+    padding-bottom: 10px; /* Add some space below the controls */
+}
+
+#create-new-note-button {
+    width: 100%;
+    margin-top: 5px;
+}
+
+#notes-sidebar {
+    /* border-top: 1px solid #3f4c5a; Already part of .sidebar-section */
+    /* padding-top: 10px; Already part of .sidebar-section */
+    /* max-height is set inline in HTML, can be moved here if preferred */
+    overflow-y: auto;
+}
+
+#notes-list li {
+    padding: 8px 10px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border: 1px solid transparent; /* For consistent sizing with selected */
+    display: flex; /* To align text and icons */
+    justify-content: space-between; /* Pushes icons to the right */
+    align-items: center; /* Vertically aligns text and icons */
+}
+
+#notes-list li:hover {
+    background-color: #2a3138;
+}
+
+#notes-list li.selected-note-item {
+    background-color: #3a4f6a !important;
+    border-left: 3px solid #b6cae1;
+    font-weight: bold;
+    color: #ffffff !important;
+}
+
+.initiative-character-initials {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #4a5f7a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #e0e0e0;
+    flex-shrink: 0;
+    margin-right: 15px;
+    font-size: 1.2em;
+}
+
+#notes-list li.selected-note-item:hover {
+    background-color: #4a5f7a !important;
+}
+
+/* Styles for note actions (rename, move, delete) - similar to map actions */
+.note-actions {
+    margin-left: 10px;
+}
+
+.note-action-icon {
+    cursor: pointer;
+    margin-left: 8px;
+    display: none; /* Hidden by default */
+}
+.note-action-icon:hover {
+    color: #b6cae1;
+}
+
+#notes-list.edit-mode-active .note-action-icon {
+    display: inline-block; /* Show icons in edit mode */
+}
+#notes-list.edit-mode-active .note-list-item-name:hover {
+    /* Optional: style for note names when in edit mode and hovering name part */
+    /* background-color: #313842; */
+}
+
+
+#note-editor-area {
+    flex-grow: 1; /* Takes remaining space in its container (#note-editor-container) */
+    display: flex;
+    flex-direction: column;
+    /* padding-top: 15px; /* Padding is now on #note-editor-container */
+    overflow-y: hidden; /* EasyMDE handles its own scrolling */
+}
+
+#note-title-input {
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #2a3138;
+    color: #e0e0e0;
+    border: 1px solid #3f4c5a;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#save-note-button {
+    margin-bottom: 10px;
+    align-self: flex-start; /* Or 'flex-end' or 'center' as preferred */
+}
+
+/* EasyMDE Specific Styles - adjust if necessary */
+#note-editor-area .EasyMDEContainer {
+    flex-grow: 1; /* Allows the editor to fill available vertical space */
+    display: flex; /* Helps manage internal layout of EasyMDE if it needs to fill space */
+    flex-direction: column;
+    min-height: 200px; /* Ensure it has a minimum height */
+}
+
+#note-editor-area .EasyMDEContainer .CodeMirror {
+    flex-grow: 1; /* Make CodeMirror instance fill the EasyMDEContainer */
+    height: auto; /* Override fixed height if any, to allow flex growth */
+    border: 1px solid #3f4c5a;
+    background-color: #2a3138;
+    color: #e0e0e0;
+}
+#note-editor-area .EasyMDEContainer .CodeMirror-focused {
+    border-color: #b6cae1;
+}
+#note-editor-area .editor-toolbar {
+    border-top: 1px solid #3f4c5a;
+    border-left: 1px solid #3f4c5a;
+    border-right: 1px solid #3f4c5a;
+    background-color: #20262d; /* Match sidebar for toolbar */
+}
+#note-editor-area .editor-toolbar button,
+#note-editor-area .editor-toolbar button.active {
+    color: #e0e0e0; /* Light icon color */
+    border-color: #3f4c5a;
+}
+#note-editor-area .editor-toolbar button:hover {
+    background-color: #3f4c5a;
+    border-color: #5f6a7a;
+}
+
+#note-editor-area .editor-preview,
+#note-editor-area .editor-preview-side {
+    background-color: #2a3138; /* Match editor background */
+    border: 1px solid #3f4c5a;
+    color: #e0e0e0;
+}
+/* Ensure links in preview are visible */
+#note-editor-area .editor-preview a,
+#note-editor-area .editor-preview-side a {
+    color: #8ab4f8; /* A common link color, adjust as needed */
+}
+#note-editor-area .editor-preview img,
+#note-editor-area .editor-preview-side img {
+    max-width: 100%; /* Ensure images are responsive within the preview */
+    height: auto;
+}
+
+.note-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1002;
+}
+
+.note-preview-content {
+    background-color: #2a3138;
+    padding: 20px;
+    border-radius: 5px;
+    max-width: 80%;
+    max-height: 80%;
+    overflow-y: auto;
+    position: relative;
+}
+
+.note-preview-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #e0e0e0;
+    cursor: pointer;
+}
+
+/* Character Tab Styles */
+#character-sheet-container.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+#character-sheet-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#character-name-input {
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #2a3138;
+    color: #e0e0e0;
+    border: 1px solid #3f4c5a;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#characters-list li {
+    padding: 8px 10px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border: 1px solid transparent; /* For consistent sizing with selected */
+    display: flex; /* To align text and icons */
+    justify-content: space-between; /* Pushes icons to the right */
+    align-items: center; /* Vertically aligns text and icons */
+}
+
+#characters-list li:hover {
+    background-color: #2a3138;
+}
+
+#characters-list li.selected-character-item {
+    background-color: #3a4f6a !important;
+    border-left: 3px solid #b6cae1;
+    font-weight: bold;
+    color: #ffffff !important;
+}
+
+#characters-list li.selected-character-item:hover {
+    background-color: #4a5f7a !important;
+}
+
+.character-actions {
+    margin-left: 10px;
+}
+
+.character-action-icon {
+    cursor: pointer;
+    margin-left: 8px;
+    display: none; /* Hidden by default */
+}
+.character-action-icon:hover {
+    color: #b6cae1;
+}
+
+#characters-list.edit-mode-active .character-action-icon {
+    display: inline-block; /* Show icons in edit mode */
+}
+
+/* Dropdown styles */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    background-color: #f1f1f1;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+}
+
+.dropdown-menu a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+}
+
+.dropdown-menu a:hover {
+    background-color: #ddd;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #2a3138;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 700px;
+    border-radius: 5px;
+}
+
+.close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: white;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Mode Toggle Switch */
+.mode-toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #5f6a7a; /* Darker grey for off state */
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #3a4f6a; /* Use the selected item color */
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #3a4f6a;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.button-like-a {
+    display: inline-block;
+    padding: 8px 12px;
+    background-color: #b6cae1;
+    color: #15191e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.button-like-a:hover {
+    background-color: #a0b4c9;
+}
+
+#character-preview-body img {
+    max-width: 150px;
+    max-height: 150px;
+    object-fit: cover;
+    border-radius: 5px;
+    float: left;
+    margin-right: 15px;
+    margin-bottom: 10px;
+}
+
+/* For the floating d20 icon */
+.floating-icon {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    /* background-color: #333; */
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 1000;
+    /* box-shadow: 0 2px 5px rgba(0,0,0,0.2); */
+}
+
+/* .floating-icon:hover {
+    background-color: #555;
+} */
+
+/* For the overlay */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001; /* Ensure it's above the icon */
+}
+
+.overlay-content {
+    background-color: rgba(42, 49, 56, 0.85); /* Semi-transparent background */
+    padding: 20px;
+    border: 1px solid #3f4c5a;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 5px;
+    position: relative;
+    color: #e0e0e0;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Shadow for all text */
+}
+
+.overlay-content h2 {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* More pronounced shadow for the title */
+}
+
+.dice-roller-content {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+#dice-roller-placeholder {
+    width: 48%;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.dice-dialogue {
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    width: 300px;
+    max-height: 200px;
+    background-color: rgba(40, 50, 60, 0.9);
+    border-radius: 10px;
+    padding: 10px;
+    display: none; /* Initially hidden */
+    flex-direction: column-reverse;
+    overflow: hidden;
+    border: 1px solid #4a5f7a;
+    z-index: 3;
+}
+
+.dice-dialogue-message {
+    background-color: rgba(21, 25, 30, 0.8);
+    color: #e0e0e0;
+    padding: 0;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    border-left: 3px solid #76a9d7;
+}
+
+/* Dice Icon Menu */
+.dice-icon-menu {
+    position: absolute;
+    bottom: 80px; /* Position above the d20 icon */
+    right: 20px;
+    background-color: #2a3138;
+    border: 1px solid #3f4c5a;
+    border-radius: 5px;
+    z-index: 1001;
+    width: 200px;
+}
+
+.dice-menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: #e0e0e0;
+}
+
+.dice-menu-item:hover {
+    background-color: #3f4c5a;
+    color: #b6cae1;
+}
+
+/* Persistent Action Log */
+.dice-dialogue.persistent-log {
+    position: fixed;
+    bottom: 20px;
+    right: 80px;
+    width: 350px;
+    height: 400px;
+    max-height: 80vh;
+    flex-direction: column;
+    overflow-y: auto;
+    /* The rest of the styling is inherited from .dice-dialogue */
+}
+
+#action-log-minimize-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+/* Dice Roll Card */
+.dice-roll-card-content {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+}
+
+.dice-roll-profile-pic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #4a5f7a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #e0e0e0;
+    flex-shrink: 0;
+}
+
+.dice-roll-text-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dice-roll-name {
+    font-size: 16px;
+    line-height: 1.25;
+    margin: 0;
+}
+
+.dice-roll-name strong {
+    font-weight: bold;
+}
+
+.dice-roll-details {
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0;
+    color: #a0b4c9;
+}
+
+.dice-roll-sum-text {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #e0e0e0; /* Make it stand out more than the rest of the details */
+}
+
+/* Initiative Tracker Styles */
+#initiative-tracker-overlay .list-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    padding: 10px;
+    min-height: 300px; /* Ensure lists have a minimum height */
+}
+
+.initiative-character-card {
+    display: flex;
+    align-items: center;
+    background-color: #2a3138;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    border-left: 5px solid #4a5f7a; /* Default border color */
+    cursor: grab;
+}
+
+.initiative-character-card.dragging {
+    opacity: 0.5;
+    background: #5f6a7a;
+}
+
+.initiative-character-card.active-turn {
+    border-left-color: #b6cae1;
+    box-shadow: 0 0 10px #b6cae1;
+}
+
+.initiative-character-card img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    object-fit: cover;
+}
+
+.initiative-character-info {
+    flex-grow: 1;
+}
+
+.initiative-character-info h4 {
+    margin: 0 0 5px 0;
+    color: #e0e0e0;
+}
+
+.initiative-character-info p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #a0b4c9;
+}
+
+.initiative-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-left: 15px;
+    min-width: 40px;
+    text-align: center;
+}
+
+#saved-initiatives-list li {
+    padding: 8px 10px;
+    border-radius: 3px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+#saved-initiatives-list li:hover {
+    background-color: #2a3138;
+}
+
+#saved-initiatives-list li.selected {
+    background-color: #3a4f6a !important;
+    border-left: 3px solid #b6cae1;
+    font-weight: bold;
+    color: #ffffff !important;
+}
