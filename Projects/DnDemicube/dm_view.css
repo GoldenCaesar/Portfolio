@@ -10,7 +10,7 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
 
 /* Main content area containers: #map-container and #note-editor-container */
 #map-container {
-    position: relative; /* This is key for stacking canvases */
+    position: relative; /* This is key for stacking canvases and containing overlays */
     flex-grow: 1;
     display: flex;
     justify-content: center;
@@ -541,18 +541,21 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     border-radius: 5px;
 }
 
-.close-button {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
+.overlay-minimize-button {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    font-size: 24px;
     font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
 }
 
-.close-button:hover,
-.close-button:focus {
-    color: white;
-    text-decoration: none;
-    cursor: pointer;
+.overlay-minimize-button:hover {
+    color: #b6cae1;
 }
 
 /* Mode Toggle Switch */
@@ -675,7 +678,7 @@ input:checked + .slider:before {
 
 /* For the overlay */
 .overlay {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
@@ -697,6 +700,23 @@ input:checked + .slider:before {
     position: relative;
     color: #e0e0e0;
     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Shadow for all text */
+    display: flex;
+    flex-direction: column;
+}
+
+#dice-roller-overlay .overlay-content,
+#initiative-tracker-overlay .overlay-content {
+    width: 800px;
+    max-width: 90vw;
+    height: 600px;
+    max-height: 80vh;
+}
+
+#saved-rolls-list-container,
+#initiative-master-character-list-container .list-container,
+#initiative-active-list-container .list-container,
+#initiative-saved-list-container .list-container {
+    overflow-y: auto;
 }
 
 .overlay-content h2 {
