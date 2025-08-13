@@ -4428,6 +4428,9 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
+        if (selectedMapFileName) {
+            displayMapOnCanvas(selectedMapFileName);
+        }
     }
 
     function clearTurnHighlight() {
