@@ -3728,8 +3728,6 @@ function displayToast(messageElement) {
             diceDialogueRecord.prepend(messageElement);
         }
 
-        diceDialogueRecord.style.display = 'flex';
-
     displayToast(messageElement);
     }
 
@@ -4405,7 +4403,6 @@ function displayToast(messageElement) {
 
                 const startEvent = createLogEntry("Combat Started");
                 diceDialogueRecord.prepend(startEvent);
-                diceDialogueRecord.style.display = 'flex';
                 displayToast(startEvent);
 
                 startInitiativeButton.textContent = 'Stop Initiative';
