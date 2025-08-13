@@ -270,6 +270,19 @@ document.addEventListener('DOMContentLoaded', () => {
             updateButtonStates();
 
             if (mapData.overlays) {
+                const imageWidth = img.width;
+                const imageHeight = img.height;
+                mapData.overlays.forEach(overlay => {
+                    if (overlay.type === 'characterLink' && overlay.position && !overlay.position.isRelative) {
+                        if (overlay.position.x > 1 || overlay.position.y > 1) { // Heuristic check
+                            overlay.position = {
+                                x: overlay.position.x / imageWidth,
+                                y: overlay.position.y / imageHeight,
+                                isRelative: true
+                            };
+                        }
+                    }
+                });
                 drawOverlays(mapData.overlays);
             }
 
@@ -456,16 +469,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillText('📝', canvasX, canvasY);
             } else if (overlay.type === 'characterLink' && overlay.position) {
                 const iconSize = 20;
-                let position = overlay.position;
+                let positionToDraw;
+
                 if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
-                    position = {
-                        x: characterBeingMoved.originalPosition.x + currentDragOffsets.x,
-                        y: characterBeingMoved.originalPosition.y + currentDragOffsets.y
+                    const absOriginal = {
+                        x: characterBeingMoved.originalPosition.x * currentMapDisplayData.imgWidth,
+                        y: characterBeingMoved.originalPosition.y * currentMapDisplayData.imgHeight
+                    };
+                    positionToDraw = {
+                        x: absOriginal.x + currentDragOffsets.x,
+                        y: absOriginal.y + currentDragOffsets.y
+                    };
+                } else {
+                    positionToDraw = {
+                        x: overlay.position.x * currentMapDisplayData.imgWidth,
+                        y: overlay.position.y * currentMapDisplayData.imgHeight
                     };
                 }
 
-                const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                const canvasX = (positionToDraw.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+                const canvasY = (positionToDraw.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
 
                 let fillStyle = 'rgba(135, 206, 250, 0.9)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -687,7 +710,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedMapData.mode === 'edit' && isLinkingCharacter) {
             const newOverlay = {
                 type: 'characterLink',
-                position: imageCoords,
+            position: {
+                x: imageCoords.x / currentMapDisplayData.imgWidth,
+                y: imageCoords.y / currentMapDisplayData.imgHeight,
+                isRelative: true
+            },
                 linkedCharacterId: null,
                 playerVisible: false
             };
@@ -793,9 +820,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function isPointInCharacterIcon(point, characterOverlay) {
         const iconSize = 20 / currentMapDisplayData.ratio;
-        const charPos = characterOverlay.position;
-        return point.x >= charPos.x - iconSize / 2 && point.x <= charPos.x + iconSize / 2 &&
-               point.y >= charPos.y - iconSize / 2 && point.y <= charPos.y + iconSize / 2;
+
+        let absCharPos;
+        if (characterOverlay.position.isRelative) {
+            absCharPos = {
+                x: characterOverlay.position.x * currentMapDisplayData.imgWidth,
+                y: characterOverlay.position.y * currentMapDisplayData.imgHeight
+            };
+        } else {
+            // Fallback for old data that hasn't been converted yet
+            absCharPos = characterOverlay.position;
+        }
+
+        return point.x >= absCharPos.x - iconSize / 2 && point.x <= absCharPos.x + iconSize / 2 &&
+               point.y >= absCharPos.y - iconSize / 2 && point.y <= absCharPos.y + iconSize / 2;
     }
 
     function isPointInToken(point, token) {
@@ -1134,13 +1172,23 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`Note moved to new position.`);
             resetAllInteractiveStates();
         } else if (isMovingCharacter && characterBeingMoved && moveStartPoint) {
-            const finalDeltaX = currentDragOffsets.x;
-            const finalDeltaY = currentDragOffsets.y;
-            characterBeingMoved.overlayRef.position = {
-                x: characterBeingMoved.originalPosition.x + finalDeltaX,
-                y: characterBeingMoved.originalPosition.y + finalDeltaY
+            const absOriginal = {
+                x: characterBeingMoved.originalPosition.x * currentMapDisplayData.imgWidth,
+                y: characterBeingMoved.originalPosition.y * currentMapDisplayData.imgHeight
             };
-            console.log(`Character moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
+
+            const newAbsPos = {
+                x: absOriginal.x + currentDragOffsets.x,
+                y: absOriginal.y + currentDragOffsets.y
+            };
+
+            characterBeingMoved.overlayRef.position = {
+                x: newAbsPos.x / currentMapDisplayData.imgWidth,
+                y: newAbsPos.y / currentMapDisplayData.imgHeight,
+                isRelative: true
+            };
+
+            console.log(`Character moved.`);
             alert(`Character moved to new position.`);
             resetAllInteractiveStates();
         }
@@ -3669,6 +3717,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         diceRollHistory.push(historyMessage);
 
         const messageElement = createDiceRollCard(rollData);
+        const isPersistent = diceDialogueRecord.classList.contains('persistent-log');
 
         const minimizeButton = document.getElementById('action-log-minimize-button');
         if (minimizeButton) {
@@ -3679,13 +3728,11 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
         diceDialogueRecord.style.display = 'flex';
 
-        if (!diceDialogueRecord.classList.contains('persistent-log')) {
+        if (!isPersistent) {
             setTimeout(() => {
-                if (!diceDialogueRecord.classList.contains('persistent-log')) {
-                    messageElement.remove();
-                    if (diceDialogueRecord.querySelectorAll('.dice-dialogue-message').length === 0) {
-                        diceDialogueRecord.style.display = 'none';
-                    }
+                messageElement.remove();
+                if (diceDialogueRecord.querySelectorAll('.dice-dialogue-message').length === 0 && !diceDialogueRecord.classList.contains('persistent-log')) {
+                    diceDialogueRecord.style.display = 'none';
                 }
             }, 5000);
         }
