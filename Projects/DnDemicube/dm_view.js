@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameTime = 0;
     let initiativeRound = 0;
     let initiativeTokens = [];
-    let mapIconSize = 40;
+    let mapIconSize = 5;
     let isDraggingToken = false;
     let draggedToken = null;
     let dragStartX = 0;
@@ -292,7 +292,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawToken(ctx, token) {
         const canvasX = (token.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
         const canvasY = (token.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
-        const size = token.size * currentMapDisplayData.ratio;
+
+        const percentage = token.size / 100;
+        const baseDimension = currentMapDisplayData.imgWidth;
+        const pixelSizeOnImage = percentage * baseDimension;
+        const size = pixelSizeOnImage * currentMapDisplayData.ratio;
 
         // Highlight for active turn
         if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
@@ -795,7 +799,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isPointInToken(point, token) {
-        const tokenRadius = (token.size / 2) / currentMapDisplayData.ratio; // Convert pixel radius to image coordinate radius
+        const percentage = token.size / 100;
+        const baseDimension = currentMapDisplayData.imgWidth;
+        const pixelSizeOnImage = percentage * baseDimension;
+        const tokenRadius = pixelSizeOnImage / 2;
         const dx = point.x - token.x;
         const dy = point.y - token.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1700,9 +1707,9 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = [];
         renderSavedRolls();
         initiativeTokens = [];
-        mapIconSize = 40;
+        mapIconSize = 5;
         if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
     }
 
     function renderAllLists() {
@@ -1732,9 +1739,16 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
-        mapIconSize = campaignData.mapIconSize || 40;
+
+        let loadedMapIconSize = campaignData.mapIconSize || 40;
+        if (loadedMapIconSize > 20) { // Likely old pixel value
+            mapIconSize = 5; // Default to 5%
+        } else {
+            mapIconSize = loadedMapIconSize;
+        }
+
         if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
@@ -1825,9 +1839,16 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
-        mapIconSize = campaignData.mapIconSize || 40;
+
+        let loadedMapIconSize = campaignData.mapIconSize || 40;
+        if (loadedMapIconSize > 20) { // Likely old pixel value
+            mapIconSize = 5; // Default to 5%
+        } else {
+            mapIconSize = loadedMapIconSize;
+        }
+
         if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
@@ -3659,12 +3680,14 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         diceDialogueRecord.style.display = 'flex';
 
         if (!diceDialogueRecord.classList.contains('persistent-log')) {
-            clearTimeout(diceDialogueTimeout);
-            diceDialogueTimeout = setTimeout(() => {
+            setTimeout(() => {
                 if (!diceDialogueRecord.classList.contains('persistent-log')) {
-                    diceDialogueRecord.style.display = 'none';
+                    messageElement.remove();
+                    if (diceDialogueRecord.querySelectorAll('.dice-dialogue-message').length === 0) {
+                        diceDialogueRecord.style.display = 'none';
+                    }
                 }
-            }, 10000);
+            }, 5000);
         }
     }
 
@@ -4348,6 +4371,8 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 initiativeTokens = [];
                 let tokenX = 50;
                 let tokenY = 50;
+                let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
+
                 activeInitiative.forEach(character => {
                     const token = {
                         characterId: character.id,
@@ -4361,7 +4386,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                         initials: getInitials(character.name)
                     };
                     initiativeTokens.push(token);
-                    tokenX += mapIconSize + 10;
+                    tokenX += tokenPixelSize + 10;
                 });
 
                 if (selectedMapFileName) {
@@ -4473,7 +4498,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     if (mapIconSizeSlider && mapIconSizeValue) {
         mapIconSizeSlider.addEventListener('input', (e) => {
             mapIconSize = parseInt(e.target.value, 10);
-            mapIconSizeValue.textContent = `${mapIconSize}px`;
+            mapIconSizeValue.textContent = `${mapIconSize}%`;
             if (initiativeTokens.length > 0) {
                 initiativeTokens.forEach(token => {
                     token.size = mapIconSize;
