@@ -3281,6 +3281,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             showDiceDialogue(rollData);
             sendDiceRollToPlayerView([d20Roll], total);
+        } else if (event.data.type === 'statRoll') {
+            const { rollName, modifier } = event.data;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            const characterName = character ? character.name : 'Unknown';
+            const playerName = character && character.sheetData ? character.sheetData.player_name : 'DM';
+            const characterPortrait = character && character.sheetData ? character.sheetData.character_portrait : null;
+            const characterInitials = getInitials(characterName);
+
+            const d20Roll = Math.floor(Math.random() * 20) + 1;
+            const total = d20Roll + parseInt(modifier);
+
+            const rollData = {
+                characterName: characterName,
+                playerName: playerName,
+                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${rollName}`,
+                sum: total,
+                characterPortrait: characterPortrait,
+                characterInitials: characterInitials
+            };
+
+            showDiceDialogue(rollData);
+            sendDiceRollToPlayerView([d20Roll], total);
         }
     });
 
@@ -3423,7 +3445,14 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
         const profilePic = document.createElement('div');
         profilePic.classList.add('dice-roll-profile-pic');
-        profilePic.textContent = 'DM';
+        if (rollData.characterPortrait) {
+            const img = document.createElement('img');
+            img.src = rollData.characterPortrait;
+            img.alt = rollData.characterName;
+            profilePic.appendChild(img);
+        } else {
+            profilePic.textContent = rollData.characterInitials || '??';
+        }
         cardContent.appendChild(profilePic);
 
         const textContainer = document.createElement('div');

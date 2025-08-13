@@ -134,6 +134,31 @@ document.addEventListener('DOMContentLoaded', function() {
         attributes[attr].addEventListener('input', updateAllModifiers);
     }
 
+    // Add click event listeners for stat rolls
+    for (const attr in attributes) {
+        const attrBox = attributes[attr].closest('.attr-box');
+        if (attrBox) {
+            // Capitalize the first letter of the attribute for the roll name
+            const statName = attr.charAt(0).toUpperCase() + attr.slice(1);
+
+            attrBox.addEventListener('click', (event) => {
+                // Avoid triggering a roll when the user is editing the score
+                if (event.target.tagName === 'INPUT') {
+                    return;
+                }
+
+                const modifier = modifiers[attr].textContent;
+
+                // Post a message to the parent window (dm_view.html) to perform the roll
+                window.parent.postMessage({
+                    type: 'statRoll',
+                    rollName: `${statName} Check`,
+                    modifier: modifier
+                }, '*');
+            });
+        }
+    }
+
     document.getElementById('proficiency-bonus').addEventListener('input', () => {
         updateSavingThrows();
         updateSkills();
