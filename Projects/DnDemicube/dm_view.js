@@ -3825,6 +3825,38 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     // --- Initiative Tracker Logic ---
 
+    function rollInitiativeForCharacter(character, newInitiative = null) {
+        const initiativeBonus = parseInt(character.sheetData?.initiative || 0, 10);
+        let roll;
+        let total;
+
+        if (newInitiative !== null) {
+            total = newInitiative;
+            roll = newInitiative - initiativeBonus;
+        } else {
+            roll = Math.floor(Math.random() * 20) + 1;
+            total = roll + initiativeBonus;
+        }
+
+        const characterName = character.name || 'Unknown';
+        const playerName = character.sheetData?.player_name || 'DM';
+        const characterPortrait = character.sheetData?.character_portrait || null;
+        const characterInitials = getInitials(characterName);
+
+        const rollData = {
+            characterName: characterName,
+            playerName: playerName,
+            roll: `d20(${roll}) + ${initiativeBonus} for Initiative`,
+            sum: total,
+            characterPortrait: characterPortrait,
+            characterInitials: characterInitials
+        };
+
+        showDiceDialogue(rollData);
+        sendDiceRollToPlayerView([roll], total);
+        return total;
+    }
+
     function renderInitiativeMasterList() {
         if (!masterCharacterList) return;
         masterCharacterList.innerHTML = '';
@@ -3951,8 +3983,12 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
             initiativeValueDiv.textContent = character.initiative ?? '-';
             initiativeValueDiv.contentEditable = true;
             initiativeValueDiv.addEventListener('blur', (e) => {
-                const newInitiative = parseInt(e.target.textContent, 10);
-                character.initiative = isNaN(newInitiative) ? null : newInitiative;
+                const newInitiativeValue = parseInt(e.target.textContent, 10);
+                if (!isNaN(newInitiativeValue)) {
+                    character.initiative = rollInitiativeForCharacter(character, newInitiativeValue);
+                } else {
+                    character.initiative = null;
+                }
                 sortActiveInitiative();
                 renderActiveInitiativeList();
             });
@@ -3988,9 +4024,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     if(autoInitiativeButton) {
         autoInitiativeButton.addEventListener('click', () => {
             activeInitiative.forEach(character => {
-                const initiativeBonus = parseInt(character.sheetData?.initiative || 0, 10);
-                const roll = Math.floor(Math.random() * 20) + 1;
-                character.initiative = roll + initiativeBonus;
+                character.initiative = rollInitiativeForCharacter(character);
             });
             sortActiveInitiative();
             renderActiveInitiativeList();
