@@ -130,8 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameTime = 0;
     let initiativeRound = 0;
     let initiativeTokens = [];
-    let mapIconSizePercent = 50;
-    let calculatedIconPixelSize = 0;
+    let mapIconSize = 40;
     let isDraggingToken = false;
     let draggedToken = null;
     let dragStartX = 0;
@@ -171,12 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
         imgHeight: 0
     };
 
-
-    function calculateTokenPixelSize() {
-        if (!dmCanvas) return;
-        const maxPixelSize = Math.min(dmCanvas.width, dmCanvas.height) * 0.05;
-        calculatedIconPixelSize = maxPixelSize * (mapIconSizePercent / 100);
-    }
 
     // Debounce utility function
     function debounce(func, delay) {
@@ -218,8 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
             dmCanvas.height = canvasHeight;
             drawingCanvas.width = canvasWidth;
             drawingCanvas.height = canvasHeight;
-
-            calculateTokenPixelSize();
 
             if (mapWasDisplayed && currentFileNameToRedraw) {
                 displayMapOnCanvas(currentFileNameToRedraw);
@@ -301,12 +292,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawToken(ctx, token) {
         const canvasX = (token.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
         const canvasY = (token.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
-        const size = calculatedIconPixelSize;
+        const size = token.size * currentMapDisplayData.ratio;
 
         // Highlight for active turn
         if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, (size / 2) + 5, 0, Math.PI * 2, true);
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
             ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'; // Golden glow
             ctx.fill();
         }
@@ -353,18 +344,18 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
         ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * currentMapDisplayData.ratio;
         ctx.stroke();
 
         // Draw name and player name
         ctx.fillStyle = 'white';
         ctx.shadowColor = 'black';
         ctx.shadowBlur = 2;
-        ctx.font = `bold 12px sans-serif`;
+        ctx.font = `bold ${12 * currentMapDisplayData.ratio}px sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText(token.name, canvasX, canvasY + size / 2 + 14);
-        ctx.font = `10px sans-serif`;
-        ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + 26);
+        ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * currentMapDisplayData.ratio));
+        ctx.font = `${10 * currentMapDisplayData.ratio}px sans-serif`;
+        ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * currentMapDisplayData.ratio));
         ctx.shadowBlur = 0;
     }
 
@@ -804,7 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isPointInToken(point, token) {
-        const tokenRadius = (calculatedIconPixelSize / 2) / currentMapDisplayData.ratio; // Convert canvas pixel radius to image coordinate radius
+        const tokenRadius = (token.size / 2) / currentMapDisplayData.ratio; // Convert pixel radius to image coordinate radius
         const dx = point.x - token.x;
         const dy = point.y - token.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1604,7 +1595,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 savedInitiatives: savedInitiatives,
                 combatLog: diceDialogueRecord.innerHTML,
                 initiativeTokens: initiativeTokens,
-                mapIconSizePercent: mapIconSizePercent
+                mapIconSize: mapIconSize
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1709,10 +1700,9 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = [];
         renderSavedRolls();
         initiativeTokens = [];
-        mapIconSizePercent = 50;
-        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSizePercent;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSizePercent}%`;
-        calculateTokenPixelSize();
+        mapIconSize = 40;
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
     }
 
     function renderAllLists() {
@@ -1742,9 +1732,9 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
-        mapIconSizePercent = campaignData.mapIconSizePercent || 50;
-        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSizePercent;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSizePercent}%`;
+        mapIconSize = campaignData.mapIconSize || 40;
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
@@ -1835,9 +1825,9 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
-        mapIconSizePercent = campaignData.mapIconSizePercent || 50;
-        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSizePercent;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSizePercent}%`;
+        mapIconSize = campaignData.mapIconSize || 40;
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
@@ -4364,6 +4354,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                         uniqueId: character.uniqueId,
                         x: tokenX,
                         y: tokenY,
+                        size: mapIconSize,
                         name: character.name,
                         playerName: character.sheetData.player_name,
                         portrait: character.sheetData.character_portrait,
@@ -4437,9 +4428,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
-        if (selectedMapFileName) {
-            displayMapOnCanvas(selectedMapFileName);
-        }
     }
 
     function clearTurnHighlight() {
@@ -4481,10 +4469,12 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
     if (mapIconSizeSlider && mapIconSizeValue) {
         mapIconSizeSlider.addEventListener('input', (e) => {
-            mapIconSizePercent = parseInt(e.target.value, 10);
-            mapIconSizeValue.textContent = `${mapIconSizePercent}%`;
-            calculateTokenPixelSize();
+            mapIconSize = parseInt(e.target.value, 10);
+            mapIconSizeValue.textContent = `${mapIconSize}px`;
             if (initiativeTokens.length > 0) {
+                initiativeTokens.forEach(token => {
+                    token.size = mapIconSize;
+                });
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
