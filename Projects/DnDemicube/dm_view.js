@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const startInitiativeButton = document.getElementById('start-initiative-button');
     const prevTurnButton = document.getElementById('prev-turn-button');
     const nextTurnButton = document.getElementById('next-turn-button');
+    const initiativeTimers = document.getElementById('initiative-timers');
+    const realTimeTimer = document.getElementById('real-time-timer');
+    const gameTimeTimer = document.getElementById('game-time-timer');
 
 
     // Notes Tab Elements
@@ -120,6 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
     let activeInitiative = []; // Array of character objects in the current initiative
     let initiativeTurn = -1; // Index of the current turn in activeInitiative
+    let initiativeStartTime = null;
+    let realTimeInterval = null;
+    let gameTime = 0;
+    let initiativeRound = 0;
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
@@ -1446,7 +1453,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedCharacterId: selectedCharacterId,
                 diceRollHistory: diceRollHistory,
                 savedRolls: savedRolls,
-                savedInitiatives: savedInitiatives
+                savedInitiatives: savedInitiatives,
+                combatLog: diceDialogueRecord.innerHTML
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1578,22 +1586,27 @@ document.addEventListener('DOMContentLoaded', () => {
         diceRollHistory = campaignData.diceRollHistory || [];
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
-        diceDialogueRecord.innerHTML = '';
-        diceRollHistory.forEach(historyMessage => {
-            const parts = historyMessage.split(': ');
-            const sum = parts[0];
-            const roll = parts.length > 1 ? parts.slice(1).join(': ') : '';
+        if (campaignData.combatLog) {
+            diceDialogueRecord.innerHTML = campaignData.combatLog;
+            diceDialogueRecord.style.display = 'flex';
+        } else {
+            diceDialogueRecord.innerHTML = '';
+            diceRollHistory.forEach(historyMessage => {
+                const parts = historyMessage.split(': ');
+                const sum = parts[0];
+                const roll = parts.length > 1 ? parts.slice(1).join(': ') : '';
 
-            const rollData = {
-                sum: sum,
-                roll: roll,
-                characterName: 'Dice Roller',
-                playerName: 'DM'
-            };
+                const rollData = {
+                    sum: sum,
+                    roll: roll,
+                    characterName: 'Dice Roller',
+                    playerName: 'DM'
+                };
 
-            const messageElement = createDiceRollCard(rollData);
-            diceDialogueRecord.prepend(messageElement);
-        });
+                const messageElement = createDiceRollCard(rollData);
+                diceDialogueRecord.prepend(messageElement);
+            });
+        }
 
         const imagePromises = [];
         const imagesFolder = zip.folder("images");
@@ -1661,6 +1674,11 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterId = campaignData.selectedCharacterId || null;
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
+
+        if (campaignData.combatLog) {
+            diceDialogueRecord.innerHTML = campaignData.combatLog;
+            diceDialogueRecord.style.display = 'flex';
+        }
 
         if (campaignData.mapDefinitions) {
             for (const mapName in campaignData.mapDefinitions) {
@@ -3912,8 +3930,13 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
         const hp = document.createElement('div');
         hp.className = 'initiative-character-hp';
-        hp.textContent = `HP: ${character.sheetData?.hp_current || 'N/A'}/${character.sheetData?.hp_max || 'N/A'}`;
+        hp.innerHTML = `HP: <input type="number" value="${character.sheetData?.hp_current || ''}" style="width: 50px;" data-character-id="${character.uniqueId}" data-hp-input /> / ${character.sheetData?.hp_max || 'N/A'}`;
         li.appendChild(hp);
+
+        const damageDealt = document.createElement('div');
+        damageDealt.className = 'initiative-character-damage';
+        damageDealt.innerHTML = `Dmg Dealt: <input type="number" value="0" style="width: 50px;" data-character-id="${character.uniqueId}" data-damage-input />`;
+        li.appendChild(damageDealt);
 
         const initiativeValue = document.createElement('div');
         initiativeValue.className = 'initiative-value';
@@ -3991,6 +4014,22 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 }
                 sortActiveInitiative();
                 renderActiveInitiativeList();
+            });
+
+            const hpInput = card.querySelector('[data-hp-input]');
+            hpInput.addEventListener('change', (e) => {
+                const char = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
+                if(char) {
+                    char.sheetData.hp_current = e.target.value;
+                }
+            });
+
+            const damageInput = card.querySelector('[data-damage-input]');
+            damageInput.addEventListener('change', (e) => {
+                const char = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
+                if(char) {
+                    char.damageDealt = e.target.value;
+                }
             });
 
             card.addEventListener('dragstart', (e) => {
@@ -4089,20 +4128,82 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
+    function updateRealTimeTimer() {
+        const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
+        const hours = Math.floor(elapsedSeconds / 3600);
+        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+        const seconds = elapsedSeconds % 60;
+        realTimeTimer.textContent =
+            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function updateGameTimeTimer() {
+        gameTimeTimer.textContent = `${gameTime}s`;
+    }
+
+    function createLogEntry(message) {
+        const entry = document.createElement('div');
+        entry.classList.add('dice-dialogue-message');
+        entry.innerHTML = `<div class="dice-roll-card-content"><p class="dice-roll-details">${message}</p></div>`;
+        return entry;
+    }
+
+    function createSurvivorStatus() {
+        const container = document.createElement('div');
+        container.classList.add('dice-dialogue-message');
+
+        let html = '<div class="dice-roll-card-content"><p class="dice-roll-details"><strong>Survivor Status:</strong></p><ul>';
+        activeInitiative.forEach(char => {
+            html += `<li>${char.name}: HP ${char.startingHP} -> ${char.sheetData.hp_current}, Damage Dealt: ${char.damageDealt}</li>`;
+        });
+        html += '</ul></div>';
+
+        container.innerHTML = html;
+        return container;
+    }
+
     if(startInitiativeButton) {
         startInitiativeButton.addEventListener('click', () => {
             if (activeInitiative.length === 0) {
                 alert("Please add characters to the initiative before starting.");
                 return;
             }
-            if (initiativeTurn === -1) {
+            if (initiativeTurn === -1) { // Starting initiative
                 initiativeTurn = 0;
+                initiativeRound = 1;
+                gameTime = 0;
+
+                activeInitiative.forEach(character => {
+                    character.startingHP = character.sheetData.hp_current;
+                    character.damageDealt = 0;
+                });
+
+                initiativeStartTime = Date.now();
+                realTimeInterval = setInterval(updateRealTimeTimer, 1000);
+                initiativeTimers.style.display = 'flex';
+                updateGameTimeTimer();
+
+                const startEvent = createLogEntry("Combat Started");
+                diceDialogueRecord.prepend(startEvent);
+                diceDialogueRecord.style.display = 'flex';
+
                 startInitiativeButton.textContent = 'Stop Initiative';
                 nextTurnButton.style.display = 'inline-block';
                 prevTurnButton.style.display = 'inline-block';
                 highlightActiveTurn();
-            } else {
+            } else { // Stopping initiative
+                clearInterval(realTimeInterval);
+                const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
+                const elapsedFormatted = new Date(elapsedSeconds * 1000).toISOString().substr(11, 8);
+
+                const endEvent = createLogEntry(`Combat Ended. Real Time: ${elapsedFormatted}, Game Time: ${gameTime}s`);
+                const survivorStatus = createSurvivorStatus();
+                diceDialogueRecord.prepend(survivorStatus);
+                diceDialogueRecord.prepend(endEvent);
+
                 initiativeTurn = -1;
+                initiativeStartTime = null;
+                initiativeTimers.style.display = 'none';
                 startInitiativeButton.textContent = 'Start Initiative';
                 nextTurnButton.style.display = 'none';
                 prevTurnButton.style.display = 'none';
@@ -4115,6 +4216,13 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         nextTurnButton.addEventListener('click', () => {
             if(initiativeTurn !== -1) {
                 initiativeTurn = (initiativeTurn + 1) % activeInitiative.length;
+                if (initiativeTurn === 0) {
+                    initiativeRound++;
+                    gameTime += 6;
+                    updateGameTimeTimer();
+                    const roundEvent = createLogEntry(`Round ${initiativeRound} Started`);
+                    diceDialogueRecord.prepend(roundEvent);
+                }
                 highlightActiveTurn();
             }
         });
