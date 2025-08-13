@@ -3565,7 +3565,8 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 return;
             }
 
-            savedRolls.push({ name: name, dice: currentDice });
+            const modifier = parseInt(modifierInput.value, 10) || 0;
+            savedRolls.push({ name: name, dice: currentDice, modifier: modifier });
             saveRollNameInput.value = '';
             renderSavedRolls();
         });
@@ -3586,6 +3587,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 let allRolls = [];
                 let totalSum = 0;
                 const rollsByDie = {};
+                const modifier = savedRoll.modifier || 0;
 
                 for (const die in savedRoll.dice) {
                     const count = savedRoll.dice[die];
@@ -3610,11 +3612,16 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                     }
                 }
 
+                totalSum += modifier;
+
                 const detailsParts = [];
                 for (const dieName in rollsByDie) {
                     detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
                 }
-                const detailsMessage = `${savedRoll.name}: ${detailsParts.join(', ')}`;
+                let detailsMessage = `${savedRoll.name}: ${detailsParts.join(', ')}`;
+                if (modifier !== 0) {
+                    detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+                }
 
                 diceResultSum.textContent = totalSum;
                 diceResultDetails.textContent = detailsMessage;
@@ -3641,6 +3648,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     const diceResultSum = document.getElementById('dice-result-sum');
     const diceResultDetails = document.getElementById('dice-result-details');
     const customDieInput = document.getElementById('custom-die-input');
+    const modifierInput = document.getElementById('dice-roll-modifier-input');
 
     function updateDiceCountDisplay(die) {
         const count = diceCounts[die];
@@ -3706,13 +3714,18 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 }
             }
 
+            const modifier = parseInt(modifierInput.value, 10) || 0;
+            totalSum += modifier;
             diceResultSum.textContent = totalSum;
 
             const detailsParts = [];
             for (const dieName in rollsByDie) {
                 detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
             }
-            const detailsMessage = `Custom: ${detailsParts.join(', ')}`;
+            let detailsMessage = `Custom: ${detailsParts.join(', ')}`;
+            if (modifier !== 0) {
+                detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+            }
             diceResultDetails.textContent = detailsMessage;
 
             showDiceDialogue({
