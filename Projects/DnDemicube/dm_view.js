@@ -3446,10 +3446,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         const profilePic = document.createElement('div');
         profilePic.classList.add('dice-roll-profile-pic');
         if (rollData.characterPortrait) {
-            const img = document.createElement('img');
-            img.src = rollData.characterPortrait;
-            img.alt = rollData.characterName;
-            profilePic.appendChild(img);
+            profilePic.style.backgroundImage = `url('${rollData.characterPortrait}')`;
         } else {
             profilePic.textContent = rollData.characterInitials || '??';
         }
