@@ -267,6 +267,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 scaledHeight: imgScaledHeight
             };
 
+            // Clamp initiative tokens to be within the new map's boundaries
+            if (initiativeTokens.length > 0) {
+                const imgWidth = currentMapDisplayData.imgWidth;
+                const imgHeight = currentMapDisplayData.imgHeight;
+                initiativeTokens.forEach(token => {
+                    // The token's radius on the image is half its size (which is a percentage of the image width).
+                    const tokenRadius = (token.size / 100 * imgWidth) / 2;
+
+                    // Clamp coordinates to ensure the token is fully on the map.
+                    token.x = Math.max(tokenRadius, Math.min(token.x, imgWidth - tokenRadius));
+                    token.y = Math.max(tokenRadius, Math.min(token.y, imgHeight - tokenRadius));
+                });
+            }
+
             updateButtonStates();
 
             if (mapData.overlays) {
@@ -3628,6 +3642,43 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return easyMDE.options.previewRender(md);
 }
 
+let activeToastTimers = [];
+
+function clearToasts() {
+    const toastContainer = document.getElementById('toast-container');
+    if (toastContainer) {
+        toastContainer.innerHTML = '';
+    }
+    activeToastTimers.forEach(timerId => clearTimeout(timerId));
+    activeToastTimers = [];
+}
+
+function displayToast(messageElement) {
+    const toastContainer = document.getElementById('toast-container');
+    // Do not show toasts if the container doesn't exist or if the main log is open
+    if (!toastContainer || diceDialogueRecord.classList.contains('persistent-log')) {
+        return;
+    }
+
+    const toastNode = messageElement.cloneNode(true);
+    toastNode.classList.add('toast-message');
+    toastContainer.appendChild(toastNode);
+
+    const timerId = setTimeout(() => {
+        // Add a fade-out animation before removing for a smoother experience
+        toastNode.style.animation = 'toast-fade-out 0.5s ease-out forwards';
+        toastNode.addEventListener('animationend', () => {
+            toastNode.remove();
+            const index = activeToastTimers.indexOf(timerId);
+            if (index > -1) {
+                activeToastTimers.splice(index, 1);
+            }
+        });
+    }, 4500); // Start fade-out at 4.5s for a 5s total lifespan
+
+    activeToastTimers.push(timerId);
+}
+
     function createDiceRollCard(rollData) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('dice-dialogue-message');
@@ -3679,16 +3730,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 
         diceDialogueRecord.style.display = 'flex';
 
-        if (!diceDialogueRecord.classList.contains('persistent-log')) {
-            setTimeout(() => {
-                if (!diceDialogueRecord.classList.contains('persistent-log')) {
-                    messageElement.remove();
-                    if (diceDialogueRecord.querySelectorAll('.dice-dialogue-message').length === 0) {
-                        diceDialogueRecord.style.display = 'none';
-                    }
-                }
-            }, 5000);
-        }
+    displayToast(messageElement);
     }
 
     function sendDiceMenuStateToPlayerView(isOpen) {
@@ -3988,6 +4030,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                         break;
                     case 'open-action-log':
                         if (diceDialogueRecord) {
+                            clearToasts(); // Clear any active toasts
                             diceDialogueRecord.classList.add('persistent-log');
                             diceDialogueRecord.style.display = 'flex';
                             if (!document.getElementById('action-log-minimize-button')) {
@@ -4363,6 +4406,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 const startEvent = createLogEntry("Combat Started");
                 diceDialogueRecord.prepend(startEvent);
                 diceDialogueRecord.style.display = 'flex';
+                displayToast(startEvent);
 
                 startInitiativeButton.textContent = 'Stop Initiative';
                 nextTurnButton.style.display = 'inline-block';
@@ -4429,6 +4473,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                     updateGameTimeTimer();
                     const roundEvent = createLogEntry(`Round ${initiativeRound} Started`);
                     diceDialogueRecord.prepend(roundEvent);
+                    displayToast(roundEvent);
                 }
                 highlightActiveTurn();
             }

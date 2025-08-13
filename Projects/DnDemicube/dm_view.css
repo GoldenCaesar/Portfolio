@@ -277,6 +277,48 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+/* Toast Notification Styles */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050; /* High z-index to be on top of most elements */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none; /* Allow clicks to pass through the container */
+}
+
+.toast-message {
+    pointer-events: auto; /* Re-enable pointer events for the toast itself */
+    width: 350px;
+    /* Re-uses styles from .dice-dialogue-message for consistency */
+    animation: toast-fade-in 0.5s ease-out;
+}
+
+@keyframes toast-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toast-fade-out {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
 .initiative-character-hp, .initiative-character-damage {
     margin-left: 10px;
     font-size: 0.9em;
