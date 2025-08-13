@@ -297,6 +297,18 @@
                          <button id="load-initiative-button" style="width: 100%;">Load Initiative</button>
                     </div>
                 </div>
+
+                <!-- Right Column: Settings -->
+                <div id="initiative-settings-container" style="flex: 1; display: flex; flex-direction: column;">
+                    <h3>Settings</h3>
+                    <div class="list-container" style="flex-grow: 1; overflow-y: auto; background-color: #15191e; border: 1px solid #3f4c5a; padding: 10px;">
+                        <div class="setting-item">
+                            <label for="map-icon-size-slider">Map Icon Size</label>
+                            <input type="range" id="map-icon-size-slider" min="20" max="100" value="40">
+                            <span id="map-icon-size-value">40px</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div id="initiative-controls" style="margin-top: 20px; display: flex; justify-content: center; align-items: center; gap: 15px;">
                 <div id="initiative-timers" style="display: none; position: absolute; left: 20px; gap: 20px; background-color: #15191e; padding: 5px 10px; border-radius: 5px;">
