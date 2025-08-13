@@ -3275,7 +3275,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rollData = {
                 characterName: characterName,
                 playerName: playerName,
-                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${skillName}`,
+                roll: `${skillName}: d20[${d20Roll}], ${modifier}`,
                 sum: total
             };
 
@@ -3295,7 +3295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rollData = {
                 characterName: characterName,
                 playerName: playerName,
-                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${rollName}`,
+                roll: `${rollName}: d20[${d20Roll}], ${modifier}`,
                 sum: total,
                 characterPortrait: characterPortrait,
                 characterInitials: characterInitials
@@ -3762,6 +3762,7 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                         break;
                     case 'open-action-log':
                         if (diceDialogueRecord) {
+                            clearTimeout(diceDialogueTimeout); // Clear any pending timeout
                             diceDialogueRecord.classList.add('persistent-log');
                             diceDialogueRecord.style.display = 'flex';
                             if (!document.getElementById('action-log-minimize-button')) {
