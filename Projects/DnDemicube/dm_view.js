@@ -3489,7 +3489,9 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         if (!diceDialogueRecord.classList.contains('persistent-log')) {
             clearTimeout(diceDialogueTimeout);
             diceDialogueTimeout = setTimeout(() => {
-                diceDialogueRecord.style.display = 'none';
+                if (!diceDialogueRecord.classList.contains('persistent-log')) {
+                    diceDialogueRecord.style.display = 'none';
+                }
             }, 10000);
         }
     }

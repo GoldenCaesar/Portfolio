@@ -149,6 +149,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const modifier = modifiers[attr].textContent;
 
+                if (!modifier || isNaN(parseInt(modifier))) {
+                    return; // Don't roll if modifier is not set or is invalid
+                }
+
                 // Post a message to the parent window (dm_view.html) to perform the roll
                 window.parent.postMessage({
                     type: 'statRoll',
