@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const initiativeTimers = document.getElementById('initiative-timers');
     const realTimeTimer = document.getElementById('real-time-timer');
     const gameTimeTimer = document.getElementById('game-time-timer');
+    const mapIconSizeSlider = document.getElementById('map-icon-size-slider');
+    const mapIconSizeValue = document.getElementById('map-icon-size-value');
 
 
     // Notes Tab Elements
@@ -127,6 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let realTimeInterval = null;
     let gameTime = 0;
     let initiativeRound = 0;
+    let initiativeTokens = [];
+    let mapIconSize = 40;
+    let isDraggingToken = false;
+    let draggedToken = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
@@ -281,11 +289,84 @@ document.addEventListener('DOMContentLoaded', () => {
         img.src = mapData.url;
     }
 
+    function drawToken(ctx, token) {
+        const canvasX = (token.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+        const canvasY = (token.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+        const size = token.size * currentMapDisplayData.ratio;
+
+        // Highlight for active turn
+        if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'; // Golden glow
+            ctx.fill();
+        }
+
+        ctx.save();
+
+        // Draw circle
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fillStyle = '#4a5f7a'; // Default background
+        ctx.fill();
+
+        // Clip to circle
+        ctx.clip();
+
+        // Draw portrait or initials
+        if (token.portrait) {
+            const img = new Image();
+            img.src = token.portrait;
+            if (img.complete) {
+                ctx.drawImage(img, canvasX - size / 2, canvasY - size / 2, size, size);
+            } else {
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = `${size * 0.4}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(token.initials, canvasX, canvasY);
+                img.onload = () => {
+                    if(selectedMapFileName) displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        } else {
+            ctx.fillStyle = '#e0e0e0';
+            ctx.font = `${size * 0.4}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(token.initials, canvasX, canvasY);
+        }
+
+        ctx.restore();
+
+        // Draw border
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 * currentMapDisplayData.ratio;
+        ctx.stroke();
+
+        // Draw name and player name
+        ctx.fillStyle = 'white';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 2;
+        ctx.font = `bold ${12 * currentMapDisplayData.ratio}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * currentMapDisplayData.ratio));
+        ctx.font = `${10 * currentMapDisplayData.ratio}px sans-serif`;
+        ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * currentMapDisplayData.ratio));
+        ctx.shadowBlur = 0;
+    }
+
     function drawOverlays(overlays, isPlayerViewContext = false) {
-        if (!overlays || overlays.length === 0 || !currentMapDisplayData.img) return;
+        if ((!overlays || overlays.length === 0) && initiativeTokens.length === 0) {
+             if (!currentMapDisplayData.img) return;
+        }
         const ctx = dmCanvas.getContext('2d');
 
-        overlays.forEach(overlay => {
+        if(overlays){
+            overlays.forEach(overlay => {
             if (overlay.type === 'childMapLink' && overlay.polygon) {
                 if (isPlayerViewContext && (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible)) {
                     return;
@@ -423,8 +504,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     img.src = character.sheetData.character_portrait;
                 }
             }
+            });
+        }
 
-        });
+        // Draw initiative tokens
+        if (initiativeTokens.length > 0) {
+            initiativeTokens.forEach(token => {
+                drawToken(ctx, token);
+            });
+        }
     }
 
     const characterPreviewClose = document.getElementById('character-preview-close');
@@ -706,6 +794,14 @@ document.addEventListener('DOMContentLoaded', () => {
                point.y >= charPos.y - iconSize / 2 && point.y <= charPos.y + iconSize / 2;
     }
 
+    function isPointInToken(point, token) {
+        const tokenRadius = (token.size / 2) / currentMapDisplayData.ratio; // Convert pixel radius to image coordinate radius
+        const dx = point.x - token.x;
+        const dy = point.y - token.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance <= tokenRadius;
+    }
+
     function handleMouseMoveOnCanvas(event) {
         if (!currentMapDisplayData.img || !hoverLabel) return;
 
@@ -913,6 +1009,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
         if (!imageCoords) return;
 
+        for (let i = initiativeTokens.length - 1; i >= 0; i--) {
+            const token = initiativeTokens[i];
+            if (isPointInToken(imageCoords, token)) {
+                isDraggingToken = true;
+                draggedToken = token;
+                dragStartX = imageCoords.x;
+                dragStartY = imageCoords.y;
+                event.preventDefault();
+                return;
+            }
+        }
+
         if (isMovingPolygon && polygonBeingMoved) {
             if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
                 x: p.x + currentDragOffsets.x,
@@ -944,7 +1052,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     dmCanvas.addEventListener('mousemove', (event) => {
-        if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
+        if (isDraggingToken && draggedToken) {
+            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+            if (imageCoords) {
+                const dx = imageCoords.x - dragStartX;
+                const dy = imageCoords.y - dragStartY;
+
+                draggedToken.x += dx;
+                draggedToken.y += dy;
+
+                dragStartX = imageCoords.x;
+                dragStartY = imageCoords.y;
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        } else if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
             const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
             if (imageCoords) {
                 currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
@@ -976,6 +1100,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
+
+        if (isDraggingToken) {
+            isDraggingToken = false;
+            draggedToken = null;
+        }
 
         if (isMovingPolygon && polygonBeingMoved && moveStartPoint) {
             const finalDeltaX = currentDragOffsets.x;
@@ -1426,6 +1555,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await Promise.all(imagePromises);
 
+            if (activeInitiative.length > 0) {
+                activeInitiative.forEach(activeChar => {
+                    const mainChar = charactersData.find(c => c.id === activeChar.id);
+                    if (mainChar) {
+                        if (!mainChar.sheetData) mainChar.sheetData = {};
+                        mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
+                    }
+                });
+            }
+
             const charactersToSave = JSON.parse(JSON.stringify(charactersData));
             charactersToSave.forEach(character => {
                 const originalCharacter = charactersData.find(c => c.id === character.id);
@@ -1454,7 +1593,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 diceRollHistory: diceRollHistory,
                 savedRolls: savedRolls,
                 savedInitiatives: savedInitiatives,
-                combatLog: diceDialogueRecord.innerHTML
+                combatLog: diceDialogueRecord.innerHTML,
+                initiativeTokens: initiativeTokens,
+                mapIconSize: mapIconSize
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1558,6 +1699,10 @@ document.addEventListener('DOMContentLoaded', () => {
         diceDialogueRecord.style.display = 'none';
         savedRolls = [];
         renderSavedRolls();
+        initiativeTokens = [];
+        mapIconSize = 40;
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
     }
 
     function renderAllLists() {
@@ -1586,6 +1731,11 @@ document.addEventListener('DOMContentLoaded', () => {
         diceRollHistory = campaignData.diceRollHistory || [];
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
+        initiativeTokens = campaignData.initiativeTokens || [];
+        mapIconSize = campaignData.mapIconSize || 40;
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
+
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
             diceDialogueRecord.style.display = 'flex';
@@ -1674,6 +1824,10 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedCharacterId = campaignData.selectedCharacterId || null;
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
+        initiativeTokens = campaignData.initiativeTokens || [];
+        mapIconSize = campaignData.mapIconSize || 40;
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}px`;
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
@@ -4190,8 +4344,36 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                 startInitiativeButton.textContent = 'Stop Initiative';
                 nextTurnButton.style.display = 'inline-block';
                 prevTurnButton.style.display = 'inline-block';
+
+                initiativeTokens = [];
+                let tokenX = 50;
+                let tokenY = 50;
+                activeInitiative.forEach(character => {
+                    const token = {
+                        characterId: character.id,
+                        uniqueId: character.uniqueId,
+                        x: tokenX,
+                        y: tokenY,
+                        size: mapIconSize,
+                        name: character.name,
+                        playerName: character.sheetData.player_name,
+                        portrait: character.sheetData.character_portrait,
+                        initials: getInitials(character.name)
+                    };
+                    initiativeTokens.push(token);
+                    tokenX += mapIconSize + 10;
+                });
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+
                 highlightActiveTurn();
             } else { // Stopping initiative
+                initiativeTokens = [];
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
                 clearInterval(realTimeInterval);
                 const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
                 const elapsedFormatted = new Date(elapsedSeconds * 1000).toISOString().substr(11, 8);
@@ -4284,4 +4466,19 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     document.body.addEventListener('dragover', e => {
         e.preventDefault();
     });
+
+    if (mapIconSizeSlider && mapIconSizeValue) {
+        mapIconSizeSlider.addEventListener('input', (e) => {
+            mapIconSize = parseInt(e.target.value, 10);
+            mapIconSizeValue.textContent = `${mapIconSize}px`;
+            if (initiativeTokens.length > 0) {
+                initiativeTokens.forEach(token => {
+                    token.size = mapIconSize;
+                });
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        });
+    }
 });
