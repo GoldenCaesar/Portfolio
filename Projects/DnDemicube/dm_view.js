@@ -3763,12 +3763,31 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                     case 'open-initiative-tracker':
                         if (initiativeTrackerOverlay) {
                             initiativeTrackerOverlay.style.display = 'flex';
+                            if (!initiativeTrackerOverlay.querySelector('.overlay-minimize-button')) {
+                                const minimizeButton = document.createElement('button');
+                                minimizeButton.className = 'overlay-minimize-button';
+                                minimizeButton.textContent = '—';
+                                minimizeButton.onclick = () => {
+                                    initiativeTrackerOverlay.style.display = 'none';
+                                };
+                                initiativeTrackerOverlay.querySelector('.overlay-content').prepend(minimizeButton);
+                            }
                             renderInitiativeMasterList();
                         }
                         break;
                     case 'open-dice-roller':
                         if (diceRollerOverlay) {
                             diceRollerOverlay.style.display = 'flex';
+                             if (!diceRollerOverlay.querySelector('.overlay-minimize-button')) {
+                                const minimizeButton = document.createElement('button');
+                                minimizeButton.className = 'overlay-minimize-button';
+                                minimizeButton.textContent = '—';
+                                minimizeButton.onclick = () => {
+                                    diceRollerOverlay.style.display = 'none';
+                                    sendDiceMenuStateToPlayerView(false);
+                                };
+                                diceRollerOverlay.querySelector('.overlay-content').prepend(minimizeButton);
+                            }
                             sendDiceMenuStateToPlayerView(true);
                         }
                         break;
@@ -3791,15 +3810,6 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
                         }
                         break;
                 }
-            }
-        });
-    }
-
-    if (diceRollerCloseButton) {
-        diceRollerCloseButton.addEventListener('click', () => {
-            if (diceRollerOverlay) {
-                diceRollerOverlay.style.display = 'none';
-                sendDiceMenuStateToPlayerView(false);
             }
         });
     }
@@ -3967,9 +3977,11 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         });
     }
 
-    if(initiativeTrackerCloseButton) {
-        initiativeTrackerCloseButton.addEventListener('click', () => {
-            initiativeTrackerOverlay.style.display = 'none';
+    if(initiativeTrackerOverlay) {
+        initiativeTrackerOverlay.addEventListener('click', (event) => {
+            if (event.target === initiativeTrackerOverlay) {
+                initiativeTrackerOverlay.style.display = 'none';
+            }
         });
     }
 
