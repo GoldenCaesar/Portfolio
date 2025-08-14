@@ -1918,7 +1918,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
-            diceDialogueRecord.style.display = 'flex';
         } else {
             diceDialogueRecord.innerHTML = '';
             diceRollHistory.forEach(historyMessage => {
@@ -2018,7 +2017,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (campaignData.combatLog) {
             diceDialogueRecord.innerHTML = campaignData.combatLog;
-            diceDialogueRecord.style.display = 'flex';
         }
 
         if (campaignData.mapDefinitions) {
