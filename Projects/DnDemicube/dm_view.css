@@ -277,6 +277,70 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+.token-stat-block {
+    background-color: #2a3138;
+    border: 1px solid #3f4c5a;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    z-index: 1002;
+    color: #e0e0e0;
+    padding: 10px;
+    width: 250px;
+}
+
+.token-stat-block-content h4, .token-stat-block-content p {
+    margin: 0 0 5px 0;
+    text-align: center;
+}
+
+.token-stat-block-content .stat-block-health {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.token-stat-block-content .token-stat-block-hp-input {
+    width: 50px;
+    margin: 0 5px;
+    background-color: #15191e;
+    color: #e0e0e0;
+    border: 1px solid #3f4c5a;
+}
+
+.token-stat-block-content .stat-block-rolls {
+    border-top: 1px solid #3f4c5a;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+.token-stat-block-content .stat-block-rolls h5 {
+    margin: 0 0 5px 0;
+}
+
+.token-stat-block-content #token-stat-block-rolls-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px 0;
+}
+
+.token-stat-block-content #token-stat-block-rolls-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+}
+
+.token-stat-block-content .add-roll-form {
+    display: flex;
+    gap: 5px;
+}
+
+.token-stat-block-content .add-roll-form input {
+    flex-grow: 1;
+    background-color: #15191e;
+    color: #e0e0e0;
+    border: 1px solid #3f4c5a;
+}
+
 /* Toast Notification Styles */
 #toast-container {
     position: fixed;
