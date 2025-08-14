@@ -277,6 +277,20 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+.dice-button-compact {
+    padding: 5px;
+    font-size: 12px;
+    background-color: #3a4f6a;
+    color: #e0e0e0;
+    border: 1px solid #5f6a7a;
+}
+
+.dice-button-compact .dice-count {
+    font-weight: bold;
+    margin-left: 4px;
+    color: #b6cae1;
+}
+
 .token-stat-block {
     background-color: #2a3138;
     border: 1px solid #3f4c5a;
