@@ -325,6 +325,56 @@
     <div id="dice-dialogue-record" class="dice-dialogue"></div>
     <div id="toast-container"></div>
 
+    <div id="save-campaign-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="save-campaign-modal-close-button">&times;</span>
+            <h3>Select Campaign Data to Save</h3>
+            <div id="save-options-container">
+                <div class="save-option">
+                    <input type="checkbox" id="save-maps-checkbox" name="maps" value="maps" checked>
+                    <label for="save-maps-checkbox">Maps & Map Links</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-characters-checkbox" name="characters" value="characters" checked>
+                    <label for="save-characters-checkbox">Characters</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-notes-checkbox" name="notes" value="notes" checked>
+                    <label for="save-notes-checkbox">Notes</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-initiative-checkbox" name="initiative" value="initiative" checked>
+                    <label for="save-initiative-checkbox">Initiative</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-rolls-checkbox" name="rolls" value="rolls" checked>
+                    <label for="save-rolls-checkbox">Dice Rolls & History</label>
+                </div>
+            </div>
+            <div id="save-conflict-warnings" style="color: yellow; margin-top: 10px;"></div>
+            <div style="margin-top: 20px;">
+                <button id="confirm-save-button">Save</button>
+                <button id="cancel-save-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="load-campaign-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="load-campaign-modal-close-button">&times;</span>
+            <h3>Select Campaign Data to Load</h3>
+            <p>The following data was found in the campaign file. Select the items you wish to load.</p>
+            <div id="load-options-container">
+                <!-- Checkboxes will be dynamically populated by Javascript -->
+            </div>
+            <div id="load-conflict-warnings" style="color: yellow; margin-top: 10px;"></div>
+            <div style="margin-top: 20px;">
+                <button id="confirm-load-button">Load Selected</button>
+                <button id="cancel-load-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="token-stat-block" class="token-stat-block" style="display: none; position: absolute; z-index: 1003;">
         <div class="token-stat-block-content">
             <h4 id="token-stat-block-char-name"></h4>
