@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveInitiativeButton = document.getElementById('save-initiative-button');
     const loadInitiativeButton = document.getElementById('load-initiative-button');
     const startInitiativeButton = document.getElementById('start-initiative-button');
+    const wanderButton = document.getElementById('wander-button');
     const prevTurnButton = document.getElementById('prev-turn-button');
     const nextTurnButton = document.getElementById('next-turn-button');
     const initiativeTimers = document.getElementById('initiative-timers');
@@ -141,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
     let activeInitiative = []; // Array of character objects in the current initiative
     let initiativeTurn = -1; // Index of the current turn in activeInitiative
+    let isWandering = false;
     let initiativeStartTime = null;
     let realTimeInterval = null;
     let gameTime = 0;
@@ -1777,7 +1779,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 initiativeTurn: initiativeTurn,
                 initiativeRound: initiativeRound,
                 gameTime: gameTime,
-                initiativeStartTime: initiativeStartTime ? Date.now() - initiativeStartTime : null
+                initiativeStartTime: initiativeStartTime ? Date.now() - initiativeStartTime : null,
+                isWandering: isWandering
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1806,6 +1809,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function restoreInitiativeState(campaignData) {
+        isWandering = campaignData.isWandering || false;
+        if (isWandering) {
+            wanderButton.textContent = 'Stop Wandering';
+        }
+
         activeInitiative = campaignData.activeInitiative || [];
         initiativeTurn = campaignData.initiativeTurn ?? -1;
         initiativeRound = campaignData.initiativeRound || 0;
@@ -4778,6 +4786,11 @@ function displayToast(messageElement) {
                 return;
             }
             if (initiativeTurn === -1) { // Starting initiative
+                if (isWandering) {
+                    isWandering = false;
+                    wanderButton.textContent = 'Wander';
+                }
+
                 initiativeTurn = 0;
                 initiativeRound = 1;
                 gameTime = 0;
@@ -4848,6 +4861,74 @@ function displayToast(messageElement) {
                 nextTurnButton.style.display = 'none';
                 prevTurnButton.style.display = 'none';
                 clearTurnHighlight();
+                sendInitiativeDataToPlayerView();
+            }
+        });
+    }
+
+    if (wanderButton) {
+        wanderButton.addEventListener('click', () => {
+            if (isWandering) {
+                // Stop Wandering
+                isWandering = false;
+                wanderButton.textContent = 'Wander';
+                initiativeTokens = [];
+                const stopWanderEvent = createLogEntry("Stopped Wandering");
+                diceDialogueRecord.prepend(stopWanderEvent);
+                displayToast(stopWanderEvent);
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+                sendInitiativeDataToPlayerView();
+            } else {
+                // Start Wandering
+                if (activeInitiative.length === 0) {
+                    alert("Please add characters to the initiative list before starting to wander.");
+                    return;
+                }
+                // Stop initiative if it's running
+                if (initiativeTurn !== -1) {
+                    clearInterval(realTimeInterval);
+                    initiativeTurn = -1;
+                    initiativeStartTime = null;
+                    initiativeTimers.style.display = 'none';
+                    startInitiativeButton.textContent = 'Start Initiative';
+                    nextTurnButton.style.display = 'none';
+                    prevTurnButton.style.display = 'none';
+                    clearTurnHighlight();
+                }
+
+                isWandering = true;
+                wanderButton.textContent = 'Stop Wandering';
+
+                initiativeTokens = [];
+                let tokenX = 50;
+                let tokenY = 50;
+                let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
+
+                activeInitiative.forEach(character => {
+                    const token = {
+                        characterId: character.id,
+                        uniqueId: character.uniqueId,
+                        x: tokenX,
+                        y: tokenY,
+                        size: mapIconSize,
+                        name: character.name,
+                        playerName: character.sheetData.player_name,
+                        portrait: character.sheetData.character_portrait,
+                        initials: getInitials(character.name)
+                    };
+                    initiativeTokens.push(token);
+                    tokenX += tokenPixelSize + 10;
+                });
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+
+                const startWanderEvent = createLogEntry("Characters are Wandering");
+                diceDialogueRecord.prepend(startWanderEvent);
+                displayToast(startWanderEvent);
                 sendInitiativeDataToPlayerView();
             }
         });
