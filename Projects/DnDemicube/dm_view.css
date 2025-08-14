@@ -300,6 +300,8 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #e0e0e0;
     padding: 10px;
     width: 250px;
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .token-stat-block-content h4, .token-stat-block-content p {
@@ -345,14 +347,56 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 
 .token-stat-block-content .add-roll-form {
     display: flex;
+    flex-direction: column;
     gap: 5px;
 }
 
-.token-stat-block-content .add-roll-form input {
+#token-stat-block-add-roll-name, #token-stat-block-save-roll-btn {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#token-stat-block-dice-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+    gap: 3px;
+}
+
+.dice-button-compact {
+    padding: 3px;
+    font-size: 11px;
+}
+
+.modifier-form {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modifier-form input {
+    width: 50px;
+}
+
+.token-stat-block-content #token-stat-block-rolls-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+    margin-bottom: 2px;
+}
+
+.token-stat-block-content #token-stat-block-rolls-list .roll-name {
     flex-grow: 1;
-    background-color: #15191e;
-    color: #e0e0e0;
-    border: 1px solid #3f4c5a;
+    margin-right: 5px;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.token-stat-block-content #token-stat-block-rolls-list .roll-actions button {
+    padding: 2px 5px;
+    font-size: 11px;
 }
 
 /* Toast Notification Styles */
