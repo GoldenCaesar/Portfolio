@@ -582,7 +582,7 @@ function drawToken(ctx, token) {
         if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
             const healthPercentage = Math.max(0, currentHp / maxHp);
             const ringRadius = (size / 2) + (8 * currentMapDisplayData.ratio);
-            const ringWidth = 3 * currentMapDisplayData.ratio;
+            const ringWidth = 6 * currentMapDisplayData.ratio;
 
             ctx.beginPath();
             ctx.arc(canvasX, canvasY, ringRadius, 0, Math.PI * 2, false);
