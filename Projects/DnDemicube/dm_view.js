@@ -1768,7 +1768,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 savedInitiatives: savedInitiatives,
                 combatLog: diceDialogueRecord.innerHTML,
                 initiativeTokens: initiativeTokens,
-                mapIconSize: mapIconSize
+                mapIconSize: mapIconSize,
+                activeInitiative: activeInitiative,
+                initiativeTurn: initiativeTurn,
+                initiativeRound: initiativeRound,
+                gameTime: gameTime,
+                initiativeStartTime: initiativeStartTime ? Date.now() - initiativeStartTime : null
             };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -1793,6 +1798,23 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             saveCampaignButton.textContent = 'Save Campaign';
             saveCampaignButton.disabled = false;
+        }
+    }
+
+    function restoreInitiativeState(campaignData) {
+        activeInitiative = campaignData.activeInitiative || [];
+        initiativeTurn = campaignData.initiativeTurn ?? -1;
+        initiativeRound = campaignData.initiativeRound || 0;
+        gameTime = campaignData.gameTime || 0;
+
+        if (initiativeTurn > -1 && campaignData.initiativeStartTime) {
+            initiativeStartTime = Date.now() - campaignData.initiativeStartTime;
+            realTimeInterval = setInterval(updateRealTimeTimer, 1000);
+            initiativeTimers.style.display = 'flex';
+            updateGameTimeTimer();
+            startInitiativeButton.textContent = 'Stop Initiative';
+            nextTurnButton.style.display = 'inline-block';
+            prevTurnButton.style.display = 'inline-block';
         }
     }
 
@@ -1905,6 +1927,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
+        restoreInitiativeState(campaignData);
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
         if (loadedMapIconSize > 20) { // Likely old pixel value
@@ -2004,6 +2027,7 @@ document.addEventListener('DOMContentLoaded', () => {
         savedRolls = campaignData.savedRolls || [];
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
+        restoreInitiativeState(campaignData);
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
         if (loadedMapIconSize > 20) { // Likely old pixel value
