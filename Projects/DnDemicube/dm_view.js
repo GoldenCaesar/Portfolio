@@ -501,6 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tokenStatBlock.style.left = `${left}px`;
         tokenStatBlock.style.top = `${top}px`;
+        sendTokenStatBlockStateToPlayerView(true, token, { left: left, top: top });
     }
 
     function drawOverlays(overlays, isPlayerViewContext = false) {
@@ -805,6 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
                         tokenStatBlock.style.display = 'none';
                         selectedTokenForStatBlock = null;
+                        sendTokenStatBlockStateToPlayerView(false);
                     } else {
                         selectedTokenForStatBlock = token;
                         populateAndShowStatBlock(token, event.pageX, event.pageY);
@@ -832,6 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedTokenForStatBlock) {
             tokenStatBlock.style.display = 'none';
             selectedTokenForStatBlock = null;
+            sendTokenStatBlockStateToPlayerView(false);
         }
 
         const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -1276,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDraggingToken) {
             isDraggingToken = false;
             draggedToken = null;
+            sendInitiativeDataToPlayerView();
         }
 
         if (isMovingPolygon && polygonBeingMoved && moveStartPoint) {
@@ -2161,6 +2165,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function sendDiceIconMenuStateToPlayerView(isOpen) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'diceIconMenuState', isOpen: isOpen }, '*');
+        }
+    }
+
+    function sendInitiativeTrackerStateToPlayerView(isOpen) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'initiativeTrackerState', isOpen: isOpen }, '*');
+        }
+    }
+
+    function sendActionLogStateToPlayerView(isOpen, content) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'actionLogState', isOpen: isOpen, content: content }, '*');
+        }
+    }
+
+    function sendToastToPlayerView(rollData) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'toast', rollData: rollData }, '*');
+        }
+    }
+
+    function sendInitiativeDataToPlayerView() {
+        if (playerWindow && !playerWindow.closed) {
+            // Cloning the character objects to avoid issues with circular references if any
+            const clonedActiveInitiative = JSON.parse(JSON.stringify(activeInitiative));
+            const clonedInitiativeTokens = JSON.parse(JSON.stringify(initiativeTokens));
+
+            playerWindow.postMessage({
+                type: 'initiativeDataUpdate',
+                activeInitiative: clonedActiveInitiative,
+                initiativeTurn: initiativeTurn,
+                initiativeRound: initiativeRound,
+                gameTime: gameTime,
+                initiativeTokens: clonedInitiativeTokens
+            }, '*');
+        }
+    }
+
+    function sendTokenStatBlockStateToPlayerView(show, token, position) {
+        if (playerWindow && !playerWindow.closed) {
+            const character = token ? activeInitiative.find(c => c.uniqueId === token.uniqueId) : null;
+            const clonedCharacter = character ? JSON.parse(JSON.stringify(character)) : null;
+            playerWindow.postMessage({ type: 'tokenStatBlockState', show: show, character: clonedCharacter, position: position }, '*');
+        }
+    }
+
     if (openPlayerViewButton) {
         openPlayerViewButton.addEventListener('click', () => {
             const playerViewUrl = 'player_view.html';
@@ -2202,6 +2255,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
+                sendInitiativeDataToPlayerView();
             }
         });
     }
@@ -4050,7 +4104,11 @@ function displayToast(messageElement) {
             diceDialogueRecord.prepend(messageElement);
         }
 
-    displayToast(messageElement);
+        displayToast(messageElement);
+        sendToastToPlayerView(rollData);
+        if (diceDialogueRecord.classList.contains('persistent-log')) {
+            sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+        }
     }
 
     function sendDiceMenuStateToPlayerView(isOpen) {
@@ -4306,7 +4364,9 @@ function displayToast(messageElement) {
             event.stopPropagation();
             if (diceIconMenu) {
                 const isVisible = diceIconMenu.style.display === 'block';
-                diceIconMenu.style.display = isVisible ? 'none' : 'block';
+                const newVisibility = !isVisible;
+                diceIconMenu.style.display = newVisibility ? 'block' : 'none';
+                sendDiceIconMenuStateToPlayerView(newVisibility);
             }
         });
     }
@@ -4316,6 +4376,8 @@ function displayToast(messageElement) {
             const action = event.target.dataset.action;
             if (action) {
                 diceIconMenu.style.display = 'none';
+                sendDiceIconMenuStateToPlayerView(false);
+
                 switch (action) {
                     case 'open-initiative-tracker':
                         if (initiativeTrackerOverlay) {
@@ -4326,10 +4388,13 @@ function displayToast(messageElement) {
                                 minimizeButton.textContent = '—';
                                 minimizeButton.onclick = () => {
                                     initiativeTrackerOverlay.style.display = 'none';
+                                    sendInitiativeTrackerStateToPlayerView(false);
                                 };
                                 initiativeTrackerOverlay.querySelector('.overlay-content').prepend(minimizeButton);
                             }
                             renderInitiativeMasterList();
+                            sendInitiativeTrackerStateToPlayerView(true);
+                            sendInitiativeDataToPlayerView();
                         }
                         break;
                     case 'open-dice-roller':
@@ -4350,7 +4415,7 @@ function displayToast(messageElement) {
                         break;
                     case 'open-action-log':
                         if (diceDialogueRecord) {
-                            clearToasts(); // Clear any active toasts
+                            clearToasts();
                             diceDialogueRecord.classList.add('persistent-log');
                             diceDialogueRecord.style.display = 'flex';
                             if (!document.getElementById('action-log-minimize-button')) {
@@ -4362,9 +4427,11 @@ function displayToast(messageElement) {
                                     diceDialogueRecord.style.display = 'none';
                                     const btn = document.getElementById('action-log-minimize-button');
                                     if(btn) btn.remove();
+                                    sendActionLogStateToPlayerView(false);
                                 };
                                 diceDialogueRecord.prepend(minimizeButton);
                             }
+                            sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
                         }
                         break;
                 }
@@ -4561,6 +4628,7 @@ function displayToast(messageElement) {
                 const char = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
                 if(char) {
                     char.sheetData.hp_current = e.target.value;
+                    sendInitiativeDataToPlayerView();
                 }
             });
 
@@ -4582,6 +4650,7 @@ function displayToast(messageElement) {
 
             activeInitiativeList.appendChild(card);
         });
+        sendInitiativeDataToPlayerView();
     }
 
     function sortActiveInitiative() {
@@ -4757,6 +4826,7 @@ function displayToast(messageElement) {
                 }
 
                 highlightActiveTurn();
+                sendInitiativeDataToPlayerView();
             } else { // Stopping initiative
                 initiativeTokens = [];
                 if (selectedMapFileName) {
@@ -4778,6 +4848,7 @@ function displayToast(messageElement) {
                 nextTurnButton.style.display = 'none';
                 prevTurnButton.style.display = 'none';
                 clearTurnHighlight();
+                sendInitiativeDataToPlayerView();
             }
         });
     }
@@ -4795,6 +4866,7 @@ function displayToast(messageElement) {
                     displayToast(roundEvent);
                 }
                 highlightActiveTurn();
+                sendInitiativeDataToPlayerView();
             }
         });
     }
@@ -4804,6 +4876,7 @@ function displayToast(messageElement) {
             if(initiativeTurn !== -1) {
                 initiativeTurn = (initiativeTurn - 1 + activeInitiative.length) % activeInitiative.length;
                 highlightActiveTurn();
+                sendInitiativeDataToPlayerView();
             }
         });
     }
