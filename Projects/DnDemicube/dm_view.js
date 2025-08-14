@@ -1709,78 +1709,99 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveCampaignButton = document.getElementById('save-campaign-button');
     const loadCampaignInput = document.getElementById('load-campaign-input');
 
+    const loadCampaignModal = document.getElementById('load-campaign-modal');
+    const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
+    const loadOptionsContainer = document.getElementById('load-options-container');
+    const confirmLoadButton = document.getElementById('confirm-load-button');
+    const cancelLoadButton = document.getElementById('cancel-load-button');
+
+
     async function saveCampaign() {
-        saveCampaignButton.textContent = 'Saving...';
-        saveCampaignButton.disabled = true;
+        confirmSaveButton.textContent = 'Saving...';
+        confirmSaveButton.disabled = true;
 
         try {
             const zip = new JSZip();
-            const imagesFolder = zip.folder("images");
-            const charactersFolder = zip.folder("characters");
+            const campaignData = {};
 
-            const imagePromises = [];
-            for (const [name, data] of detailedMapData.entries()) {
-                if (data.url) {
-                    const promise = fetch(data.url)
-                        .then(response => response.blob())
-                        .then(blob => {
-                            imagesFolder.file(name, blob);
-                            console.log(`Added map image to zip: ${name}`);
-                        })
-                        .catch(err => console.error(`Failed to fetch and zip map ${name}:`, err));
-                    imagePromises.push(promise);
+            // 1. Handle Maps & Map Links
+            if (saveMapsCheckbox.checked) {
+                const imagesFolder = zip.folder("images");
+                const imagePromises = [];
+                for (const [name, data] of detailedMapData.entries()) {
+                    if (data.url) {
+                        const promise = fetch(data.url)
+                            .then(response => response.blob())
+                            .then(blob => {
+                                imagesFolder.file(name, blob);
+                            })
+                            .catch(err => console.error(`Failed to fetch and zip map ${name}:`, err));
+                        imagePromises.push(promise);
+                    }
                 }
-            }
-            await Promise.all(imagePromises);
+                await Promise.all(imagePromises);
 
-            if (activeInitiative.length > 0) {
-                activeInitiative.forEach(activeChar => {
-                    const mainChar = charactersData.find(c => c.id === activeChar.id);
-                    if (mainChar) {
-                        if (!mainChar.sheetData) mainChar.sheetData = {};
-                        mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
-                        mainChar.savedRolls = activeChar.savedRolls;
+                const serializableDetailedMapData = {};
+                for (const [name, data] of detailedMapData) {
+                    serializableDetailedMapData[name] = {
+                        name: data.name,
+                        overlays: data.overlays,
+                        mode: data.mode
+                    };
+                }
+                campaignData.mapDefinitions = serializableDetailedMapData;
+            }
+
+            // 2. Handle Characters
+            if (saveCharactersCheckbox.checked) {
+                const charactersFolder = zip.folder("characters");
+                if (activeInitiative.length > 0) {
+                    activeInitiative.forEach(activeChar => {
+                        const mainChar = charactersData.find(c => c.id === activeChar.id);
+                        if (mainChar) {
+                            if (!mainChar.sheetData) mainChar.sheetData = {};
+                            mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
+                            mainChar.savedRolls = activeChar.savedRolls;
+                        }
+                    });
+                }
+
+                const charactersToSave = JSON.parse(JSON.stringify(charactersData));
+                charactersToSave.forEach(character => {
+                    const originalCharacter = charactersData.find(c => c.id === character.id);
+                    if (originalCharacter && originalCharacter.pdfData && originalCharacter.pdfFileName) {
+                        charactersFolder.file(originalCharacter.pdfFileName, originalCharacter.pdfData);
+                        delete character.pdfData;
                     }
                 });
+                campaignData.characters = charactersToSave;
+                campaignData.selectedCharacterId = selectedCharacterId;
             }
 
-            const charactersToSave = JSON.parse(JSON.stringify(charactersData));
-            charactersToSave.forEach(character => {
-                const originalCharacter = charactersData.find(c => c.id === character.id);
-                if (originalCharacter && originalCharacter.pdfData && originalCharacter.pdfFileName) {
-                    charactersFolder.file(originalCharacter.pdfFileName, originalCharacter.pdfData);
-                    console.log(`Added character PDF to zip: ${originalCharacter.pdfFileName}`);
-                    delete character.pdfData;
-                }
-            });
-
-            const serializableDetailedMapData = {};
-            for (const [name, data] of detailedMapData) {
-                serializableDetailedMapData[name] = {
-                    name: data.name,
-                    overlays: data.overlays,
-                    mode: data.mode
-                };
+            // 3. Handle Notes
+            if (saveNotesCheckbox.checked) {
+                campaignData.notes = notesData;
+                campaignData.selectedNoteId = selectedNoteId;
             }
 
-            const campaignData = {
-                mapDefinitions: serializableDetailedMapData,
-                notes: notesData,
-                selectedNoteId: selectedNoteId,
-                characters: charactersToSave,
-                selectedCharacterId: selectedCharacterId,
-                diceRollHistory: diceRollHistory,
-                savedRolls: savedRolls,
-                savedInitiatives: savedInitiatives,
-                initiativeTokens: initiativeTokens,
-                mapIconSize: mapIconSize,
-                activeInitiative: activeInitiative,
-                initiativeTurn: initiativeTurn,
-                initiativeRound: initiativeRound,
-                gameTime: gameTime,
-                initiativeStartTime: initiativeStartTime ? Date.now() - initiativeStartTime : null,
-                isWandering: isWandering
-            };
+            // 4. Handle Initiative
+            if (saveInitiativeCheckbox.checked) {
+                campaignData.savedInitiatives = savedInitiatives;
+                campaignData.initiativeTokens = initiativeTokens;
+                campaignData.mapIconSize = mapIconSize;
+                campaignData.activeInitiative = activeInitiative;
+                campaignData.initiativeTurn = initiativeTurn;
+                campaignData.initiativeRound = initiativeRound;
+                campaignData.gameTime = gameTime;
+                campaignData.initiativeStartTime = initiativeStartTime ? Date.now() - initiativeStartTime : null;
+                campaignData.isWandering = isWandering;
+            }
+
+            // 5. Handle Rolls & History
+            if (saveRollsCheckbox.checked) {
+                campaignData.diceRollHistory = diceRollHistory;
+                campaignData.savedRolls = savedRolls;
+            }
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
             zip.file("campaign.json", campaignJSON);
@@ -1789,7 +1810,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = URL.createObjectURL(zipBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'dndemicube-campaign.zip';
+
+            const date = new Date();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = String(date.getFullYear()).slice(-2);
+            a.download = `DnDemicube_campaign_${month}-${day}-${year}.zip`;
+
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1802,8 +1829,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Error saving campaign to zip:", error);
             alert("An error occurred while saving the campaign. Please check the console for details.");
         } finally {
-            saveCampaignButton.textContent = 'Save Campaign';
-            saveCampaignButton.disabled = false;
+            confirmSaveButton.textContent = 'Save';
+            confirmSaveButton.disabled = false;
         }
     }
 
@@ -1829,6 +1856,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function isDeepEqual(obj1, obj2) {
+        if (obj1 === obj2) return true;
+        if (obj1 === null || obj1 === undefined || obj2 === null || obj2 === undefined) {
+            return obj1 === obj2;
+        }
+        if (obj1.constructor !== obj2.constructor) return false;
+
+        if (Array.isArray(obj1)) {
+            if (obj1.length !== obj2.length) return false;
+            for (let i = 0; i < obj1.length; i++) {
+                if (!isDeepEqual(obj1[i], obj2[i])) return false;
+            }
+            return true;
+        }
+
+        if (obj1 instanceof Object) {
+            const keys1 = Object.keys(obj1);
+            const keys2 = Object.keys(obj2);
+            if (keys1.length !== keys2.length) return false;
+            for (const key of keys1) {
+                if (!keys2.includes(key) || !isDeepEqual(obj1[key], obj2[key])) return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+
     async function loadCampaign(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -1838,18 +1894,195 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCampaignInput.disabled = true;
 
         try {
-            resetApplicationState();
+            const zip = await JSZip.loadAsync(file);
+            const campaignFile = zip.file("campaign.json");
+            if (!campaignFile) throw new Error("campaign.json not found in the zip file.");
 
-            if (file.name.endsWith('.zip')) {
-                await loadFromZip(file);
-            } else if (file.name.endsWith('.json')) {
-                await loadFromJson(file);
-            } else {
-                throw new Error("Unsupported file type. Please select a .zip or .json file.");
+            const campaignJSON = await campaignFile.async("string");
+            const campaignData = JSON.parse(campaignJSON);
+
+            await showLoadOptionsModal(zip, campaignData);
+
+        } catch (error) {
+            console.error("Error preparing campaign load:", error);
+            alert(`Failed to prepare campaign for loading: ${error.message}`);
+        } finally {
+            loadButtonLabel.textContent = 'Load Campaign';
+            loadCampaignInput.disabled = false;
+            loadCampaignInput.value = null;
+        }
+    }
+
+    async function showLoadOptionsModal(zip, campaignData) {
+        loadOptionsContainer.innerHTML = ''; // Clear previous options
+        const availableData = {};
+
+        const dataTypeMapping = {
+            mapDefinitions: "Maps & Map Links",
+            characters: "Characters",
+            notes: "Notes",
+            savedInitiatives: "Initiative",
+            diceRollHistory: "Dice Rolls & History"
+        };
+
+        for (const key in dataTypeMapping) {
+            if (campaignData.hasOwnProperty(key) && campaignData[key] !== null && (!Array.isArray(campaignData[key]) || campaignData[key].length > 0)) {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `load-${key}-checkbox`;
+                checkbox.name = key;
+                checkbox.value = key;
+                checkbox.checked = true;
+
+                const label = document.createElement('label');
+                label.htmlFor = `load-${key}-checkbox`;
+                label.textContent = ` ${dataTypeMapping[key]}`;
+
+                const div = document.createElement('div');
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                loadOptionsContainer.appendChild(div);
+                availableData[key] = true;
+            }
+        }
+
+        if (Object.keys(availableData).length === 0) {
+            alert("The selected campaign file appears to be empty.");
+            return;
+        }
+
+        loadCampaignModal.style.display = 'block';
+
+        const handleConfirm = async () => {
+            const selectedOptions = {};
+            loadOptionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                selectedOptions[checkbox.name] = checkbox.checked;
+            });
+
+            await mergeCampaignData(zip, campaignData, selectedOptions);
+            loadCampaignModal.style.display = 'none';
+            confirmLoadButton.removeEventListener('click', handleConfirm);
+            cancelLoadButton.removeEventListener('click', handleCancel);
+        };
+
+        const handleCancel = () => {
+            loadCampaignModal.style.display = 'none';
+            confirmLoadButton.removeEventListener('click', handleConfirm);
+            cancelLoadButton.removeEventListener('click', handleCancel);
+        };
+
+        confirmLoadButton.addEventListener('click', handleConfirm);
+        cancelLoadButton.addEventListener('click', handleCancel);
+        loadCampaignModalCloseButton.addEventListener('click', handleCancel);
+    }
+
+
+    async function mergeCampaignData(zip, campaignData, selectedOptions) {
+        try {
+            // Merge Characters
+            if (selectedOptions.characters && campaignData.characters) {
+                const characterPromises = [];
+                const charactersFolder = zip.folder("characters");
+
+                for (const incomingChar of campaignData.characters) {
+                    const existingChar = charactersData.find(c => c.id === incomingChar.id);
+                    if (!existingChar) {
+                        if (incomingChar.pdfFileName && charactersFolder) {
+                            const pdfFile = charactersFolder.file(incomingChar.pdfFileName);
+                            if (pdfFile) {
+                                const promise = pdfFile.async("uint8array").then(pdfData => {
+                                    incomingChar.pdfData = pdfData;
+                                });
+                                characterPromises.push(promise);
+                            }
+                        }
+                        charactersData.push(incomingChar);
+                    } else {
+                        console.log(`Skipping character "${incomingChar.name}" (ID: ${incomingChar.id}) as it already exists.`);
+                    }
+                }
+                await Promise.all(characterPromises);
             }
 
+            // Merge Notes
+            if (selectedOptions.notes && campaignData.notes) {
+                for (const incomingNote of campaignData.notes) {
+                    const existingNote = notesData.find(n => n.id === incomingNote.id);
+                    if (!existingNote) {
+                        notesData.push(incomingNote);
+                    } else {
+                         console.log(`Skipping note "${incomingNote.title}" (ID: ${incomingNote.id}) as it already exists.`);
+                    }
+                }
+            }
+
+            // Merge Maps
+            if (selectedOptions.mapDefinitions && campaignData.mapDefinitions) {
+                const imagePromises = [];
+                const imagesFolder = zip.folder("images");
+
+                for (const mapName in campaignData.mapDefinitions) {
+                    if (!detailedMapData.has(mapName)) {
+                        const definition = campaignData.mapDefinitions[mapName];
+                        const imageFile = imagesFolder ? imagesFolder.file(mapName) : null;
+                        if (imageFile) {
+                            const promise = imageFile.async("blob").then(blob => {
+                                const url = URL.createObjectURL(blob);
+                                detailedMapData.set(mapName, {
+                                    name: definition.name,
+                                    url: url,
+                                    overlays: definition.overlays || [],
+                                    mode: definition.mode || 'edit'
+                                });
+                                displayedFileNames.add(mapName);
+                            });
+                            imagePromises.push(promise);
+                        }
+                    } else {
+                        console.log(`Skipping map "${mapName}" as it already exists.`);
+                    }
+                }
+                await Promise.all(imagePromises);
+            }
+
+            // Merge Initiative
+            if (selectedOptions.savedInitiatives && campaignData.savedInitiatives) {
+                // Overwrite existing initiatives with the same name
+                Object.assign(savedInitiatives, campaignData.savedInitiatives);
+            }
+
+            // For active initiative, it's better to replace than merge if loaded.
+            if (selectedOptions.savedInitiatives && campaignData.activeInitiative) {
+                activeInitiative = campaignData.activeInitiative || [];
+                initiativeTurn = campaignData.initiativeTurn ?? -1;
+                initiativeRound = campaignData.initiativeRound || 0;
+                gameTime = campaignData.gameTime || 0;
+                initiativeStartTime = campaignData.initiativeStartTime ? Date.now() - campaignData.initiativeStartTime : null;
+                isWandering = campaignData.isWandering || false;
+                initiativeTokens = campaignData.initiativeTokens || [];
+                mapIconSize = campaignData.mapIconSize || 5;
+                if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+                if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
+            }
+
+
+            // Merge Rolls & History
+            if (selectedOptions.diceRollHistory && campaignData.diceRollHistory) {
+                const existingHistory = new Set(diceRollHistory.map(h => JSON.stringify(h)));
+                const newHistory = campaignData.diceRollHistory.filter(h => !existingHistory.has(JSON.stringify(h)));
+                diceRollHistory.push(...newHistory);
+            }
+            if (selectedOptions.diceRollHistory && campaignData.savedRolls) {
+                 const existingRolls = new Set(savedRolls.map(r => r.name));
+                 const newRolls = campaignData.savedRolls.filter(r => !existingRolls.has(r.name));
+                 savedRolls.push(...newRolls);
+            }
+
+
+            // Final UI updates
             renderAllLists();
             renderSavedInitiativesList();
+            renderSavedRolls();
             updateButtonStates();
 
             if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
@@ -1861,54 +2094,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
             }
 
-            alert("Campaign loaded successfully!");
+            alert("Campaign data merged successfully!");
 
         } catch (error) {
-            console.error("Error loading campaign:", error);
-            alert(`Failed to load campaign: ${error.message}`);
-            resetApplicationState();
-            renderAllLists();
-        } finally {
-            loadButtonLabel.textContent = 'Load Campaign';
-            loadCampaignInput.disabled = false;
-            loadCampaignInput.value = null;
+            console.error("Error merging campaign data:", error);
+            alert(`An error occurred while merging campaign data: ${error.message}`);
         }
-    }
-
-    function resetApplicationState() {
-        activeMapsData = [];
-        notesData = [];
-        charactersData = [];
-
-        for (const mapData of detailedMapData.values()) {
-            if (mapData.url) {
-                URL.revokeObjectURL(mapData.url);
-            }
-        }
-        detailedMapData.clear();
-        displayedFileNames.clear();
-
-        selectedMapFileName = null;
-        selectedNoteId = null;
-        selectedCharacterId = null;
-
-        if (modeToggleSwitch) modeToggleSwitch.disabled = true;
-        mapsList.innerHTML = '';
-        notesList.innerHTML = '';
-        charactersList.innerHTML = '';
-        clearNoteEditor();
-        clearCharacterEditor();
-        const ctx = dmCanvas.getContext('2d');
-        ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-        diceRollHistory = [];
-        diceDialogueRecord.innerHTML = '';
-        diceDialogueRecord.style.display = 'none';
-        savedRolls = [];
-        renderSavedRolls();
-        initiativeTokens = [];
-        mapIconSize = 5;
-        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
     }
 
     function renderAllLists() {
@@ -2126,8 +2317,99 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (saveCampaignButton) {
-        saveCampaignButton.addEventListener('click', saveCampaign);
+        saveCampaignButton.addEventListener('click', () => {
+            updateSaveOptionsDependencies();
+            saveCampaignModal.style.display = 'block';
+        });
     }
+
+    if (saveCampaignModalCloseButton) {
+        saveCampaignModalCloseButton.addEventListener('click', () => {
+            saveCampaignModal.style.display = 'none';
+        });
+    }
+
+    if (cancelSaveButton) {
+        cancelSaveButton.addEventListener('click', () => {
+            saveCampaignModal.style.display = 'none';
+        });
+    }
+
+    if (confirmSaveButton) {
+        confirmSaveButton.addEventListener('click', () => {
+            saveCampaign();
+            saveCampaignModal.style.display = 'none';
+        });
+    }
+
+    if (saveOptionsContainer) {
+        saveOptionsContainer.addEventListener('change', updateSaveOptionsDependencies);
+    }
+
+    function updateSaveOptionsDependencies() {
+        let warnings = [];
+        let mapsNeedNotes = false;
+        let mapsNeedCharacters = false;
+        let initiativeNeedsCharacters = false;
+
+        // Reset disabled states to re-evaluate
+        saveNotesCheckbox.disabled = false;
+        saveCharactersCheckbox.disabled = false;
+
+        // Check for dependencies if Maps is selected
+        if (saveMapsCheckbox.checked) {
+            for (const mapData of detailedMapData.values()) {
+                if (mapData.overlays) {
+                    for (const overlay of mapData.overlays) {
+                        if (overlay.type === 'noteLink' && overlay.linkedNoteId) {
+                            mapsNeedNotes = true;
+                        }
+                        if (overlay.type === 'characterLink' && overlay.linkedCharacterId) {
+                            mapsNeedCharacters = true;
+                        }
+                        if(mapsNeedNotes && mapsNeedCharacters) break;
+                    }
+                }
+                if(mapsNeedNotes && mapsNeedCharacters) break;
+            }
+        }
+
+        // Check for dependencies if Initiative is selected
+        if (saveInitiativeCheckbox.checked) {
+            if (activeInitiative.length > 0 || Object.keys(savedInitiatives).length > 0 || initiativeTokens.length > 0) {
+                initiativeNeedsCharacters = true;
+            }
+        }
+
+        // Enforce dependencies
+        if (mapsNeedNotes) {
+            if (!saveNotesCheckbox.checked) {
+                warnings.push("Notes must be saved because one or more maps have note links.");
+            }
+            saveNotesCheckbox.checked = true;
+            saveNotesCheckbox.disabled = true;
+        }
+
+        if (mapsNeedCharacters) {
+            if (!saveCharactersCheckbox.checked) {
+                warnings.push("Characters must be saved because one or more maps have character links.");
+            }
+            saveCharactersCheckbox.checked = true;
+            saveCharactersCheckbox.disabled = true;
+        }
+
+        if (initiativeNeedsCharacters) {
+            if (!saveCharactersCheckbox.checked) {
+                warnings.push("Characters must be saved because you have initiative data.");
+            }
+            saveCharactersCheckbox.checked = true;
+            saveCharactersCheckbox.disabled = true;
+        }
+
+        // Display warnings
+        saveConflictWarnings.innerHTML = warnings.join('<br>');
+    }
+
     if (loadCampaignInput) {
         loadCampaignInput.addEventListener('change', loadCampaign);
     }
