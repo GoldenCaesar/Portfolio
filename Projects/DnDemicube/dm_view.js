@@ -2568,6 +2568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
             tokenStatBlock.style.display = 'none';
             selectedTokenForStatBlock = null;
+        sendTokenStatBlockStateToPlayerView(false);
         }
     });
 
