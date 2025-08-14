@@ -1772,7 +1772,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 diceRollHistory: diceRollHistory,
                 savedRolls: savedRolls,
                 savedInitiatives: savedInitiatives,
-                combatLog: diceDialogueRecord.innerHTML,
                 initiativeTokens: initiativeTokens,
                 mapIconSize: mapIconSize,
                 activeInitiative: activeInitiative,
@@ -1951,25 +1950,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
         if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
 
-        if (campaignData.combatLog) {
-            diceDialogueRecord.innerHTML = campaignData.combatLog;
-        } else {
-            diceDialogueRecord.innerHTML = '';
-            diceRollHistory.forEach(historyMessage => {
-                const parts = historyMessage.split(': ');
-                const sum = parts[0];
-                const roll = parts.length > 1 ? parts.slice(1).join(': ') : '';
-
-                const rollData = {
-                    sum: sum,
-                    roll: roll,
-                    characterName: 'Dice Roller',
-                    playerName: 'DM'
-                };
-
-                const messageElement = createDiceRollCard(rollData);
+        diceDialogueRecord.innerHTML = ''; // Clear the log first
+        if (diceRollHistory && diceRollHistory.length > 0) {
+            diceRollHistory.forEach(historyItem => {
+                let rollData;
+                if (typeof historyItem === 'string') {
+                    // Handle old format for backward compatibility
+                    const parts = historyItem.split(': ');
+                    rollData = {
+                        type: 'roll', // Assume old entries are rolls
+                        sum: parts[0],
+                        roll: parts.length > 1 ? parts.slice(1).join(': ') : '',
+                        characterName: 'Dice Roller',
+                        playerName: 'DM',
+                        id: Date.now() + Math.random(), // Assign a temporary ID
+                        timestamp: '... old entry ...'
+                    };
+                } else {
+                    // Handle new object format
+                    rollData = historyItem;
+                }
+                const messageElement = createLogCard(rollData);
                 diceDialogueRecord.prepend(messageElement);
             });
+        } else if (campaignData.combatLog) { // Fallback for very old saves
+            diceDialogueRecord.innerHTML = campaignData.combatLog;
         }
 
         const imagePromises = [];
@@ -2051,7 +2056,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
         if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
 
-        if (campaignData.combatLog) {
+        diceDialogueRecord.innerHTML = ''; // Clear the log first
+        if (diceRollHistory && diceRollHistory.length > 0) {
+            diceRollHistory.forEach(historyItem => {
+                let rollData;
+                if (typeof historyItem === 'string') {
+                    const parts = historyItem.split(': ');
+                    rollData = {
+                        type: 'roll',
+                        sum: parts[0],
+                        roll: parts.length > 1 ? parts.slice(1).join(': ') : '',
+                        characterName: 'Dice Roller',
+                        playerName: 'DM',
+                        id: Date.now() + Math.random(),
+                        timestamp: '... old entry ...'
+                    };
+                } else {
+                    rollData = historyItem;
+                }
+                const messageElement = createLogCard(rollData);
+                diceDialogueRecord.prepend(messageElement);
+            });
+        } else if (campaignData.combatLog) { // Fallback for very old saves
             diceDialogueRecord.innerHTML = campaignData.combatLog;
         }
 
@@ -3870,7 +3896,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sum: total
             };
 
-            showDiceDialogue(rollData);
+            addLogEntry(rollData);
             sendDiceRollToPlayerView([d20Roll], total);
         } else if (event.data.type === 'statRoll') {
             const { rollName, modifier } = event.data;
@@ -3892,7 +3918,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 characterInitials: characterInitials
             };
 
-            showDiceDialogue(rollData);
+            addLogEntry(rollData);
             sendDiceRollToPlayerView([d20Roll], total);
         }
     });
@@ -4063,57 +4089,107 @@ function displayToast(messageElement) {
     activeToastTimers.push(timerId);
 }
 
-    function createDiceRollCard(rollData) {
+    function createLogCard(data) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('dice-dialogue-message');
+        messageElement.dataset.id = data.id;
 
         const cardContent = document.createElement('div');
-        cardContent.classList.add('dice-roll-card-content');
+        cardContent.classList.add('dice-roll-card-content'); // Reuse styles
         messageElement.appendChild(cardContent);
 
-        const profilePic = document.createElement('div');
-        profilePic.classList.add('dice-roll-profile-pic');
-        if (rollData.characterPortrait) {
-            profilePic.style.backgroundImage = `url('${rollData.characterPortrait}')`;
-        } else {
-            profilePic.textContent = rollData.characterInitials || '??';
+        let detailsPara;
+
+        if (data.type === 'roll') {
+            const profilePic = document.createElement('div');
+            profilePic.classList.add('dice-roll-profile-pic');
+            if (data.characterPortrait) {
+                profilePic.style.backgroundImage = `url('${data.characterPortrait}')`;
+            } else {
+                profilePic.textContent = data.characterInitials || '??';
+            }
+            cardContent.appendChild(profilePic);
+
+            const textContainer = document.createElement('div');
+            textContainer.classList.add('dice-roll-text-container');
+            cardContent.appendChild(textContainer);
+
+            const namePara = document.createElement('p');
+            namePara.classList.add('dice-roll-name');
+            namePara.innerHTML = `<strong>${data.characterName}</strong> played by <strong>${data.playerName}</strong>`;
+            textContainer.appendChild(namePara);
+
+            detailsPara = document.createElement('p');
+            detailsPara.classList.add('dice-roll-details');
+            detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${data.sum}</strong> | ${data.roll}`;
+            textContainer.appendChild(detailsPara);
+
+            const timestampPara = document.createElement('p');
+            timestampPara.classList.add('dice-roll-timestamp');
+            timestampPara.textContent = data.timestamp;
+            textContainer.appendChild(timestampPara);
+
+        } else { // System or Note
+            detailsPara = document.createElement('p');
+            detailsPara.classList.add('dice-roll-details');
+            detailsPara.innerHTML = data.message;
+            cardContent.appendChild(detailsPara);
+
+            const timestampPara = document.createElement('p');
+            timestampPara.classList.add('dice-roll-timestamp');
+            timestampPara.textContent = data.timestamp;
+            cardContent.appendChild(timestampPara);
         }
-        cardContent.appendChild(profilePic);
 
-        const textContainer = document.createElement('div');
-        textContainer.classList.add('dice-roll-text-container');
-        cardContent.appendChild(textContainer);
-
-        const namePara = document.createElement('p');
-        namePara.classList.add('dice-roll-name');
-        namePara.innerHTML = `<strong>${rollData.characterName}</strong> played by <strong>${rollData.playerName}</strong>`;
-        textContainer.appendChild(namePara);
-
-        const detailsPara = document.createElement('p');
-        detailsPara.classList.add('dice-roll-details');
-        detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${rollData.sum}</strong> | ${rollData.roll}`;
-        textContainer.appendChild(detailsPara);
+        const actionContainer = document.createElement('div');
+        actionContainer.classList.add('dice-roll-actions');
+        actionContainer.innerHTML = `
+            <span class="action-icon edit-log" title="Edit Entry">✏️</span>
+            <span class="action-icon save-log" title="Save Entry" style="display: none;">💾</span>
+            <span class="action-icon delete-log" title="Delete Entry">🗑️</span>
+        `;
+        cardContent.appendChild(actionContainer);
 
         return messageElement;
     }
 
-    function showDiceDialogue(rollData) {
+    function addLogEntry(data) {
         if (!diceDialogueRecord) return;
 
-        const historyMessage = `${rollData.sum}: ${rollData.roll}`;
-        diceRollHistory.push(historyMessage);
+        // Add timestamp and ID
+        const timestamp = new Date();
+        const hours = timestamp.getHours();
+        const minutes = timestamp.getMinutes();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        const formattedHours = hours % 12 || 12;
+        const formattedMinutes = minutes.toString().padStart(2, '0');
+        data.timestamp = `${(timestamp.getMonth() + 1).toString().padStart(2, '0')}.${timestamp.getDate().toString().padStart(2, '0')}.${timestamp.getFullYear().toString().slice(-2)} | ${formattedHours}:${formattedMinutes}${ampm}`;
+        data.id = timestamp.getTime() + Math.random();
 
-        const messageElement = createDiceRollCard(rollData);
-
-        const minimizeButton = document.getElementById('action-log-minimize-button');
-        if (minimizeButton) {
-            minimizeButton.after(messageElement);
-        } else {
-            diceDialogueRecord.prepend(messageElement);
+        // Set type if not present
+        if (!data.type) {
+            data.type = 'roll';
         }
 
-        displayToast(messageElement);
-        sendToastToPlayerView(rollData);
+        diceRollHistory.push(data);
+
+        const messageElement = createLogCard(data);
+
+        const logContentContainer = document.getElementById('action-log-content');
+        const targetContainer = logContentContainer || diceDialogueRecord;
+
+        const minimizeButton = document.getElementById('action-log-minimize-button');
+        if (minimizeButton && targetContainer === diceDialogueRecord) {
+             minimizeButton.after(messageElement);
+        } else {
+            targetContainer.prepend(messageElement);
+        }
+
+        if (data.type === 'roll') {
+            displayToast(messageElement);
+            sendToastToPlayerView(data);
+        }
+
         if (diceDialogueRecord.classList.contains('persistent-log')) {
             sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
         }
@@ -4248,7 +4324,7 @@ function displayToast(messageElement) {
 
                 diceResultSum.textContent = totalSum;
                 diceResultDetails.textContent = detailsMessage;
-                showDiceDialogue({
+                addLogEntry({
                     characterName: 'Dice Roller',
                     playerName: 'DM',
                     roll: detailsMessage,
@@ -4351,7 +4427,7 @@ function displayToast(messageElement) {
             }
             diceResultDetails.textContent = detailsMessage;
 
-            showDiceDialogue({
+            addLogEntry({
                 characterName: 'Dice Roller',
                 playerName: 'DM',
                 roll: detailsMessage,
@@ -4426,18 +4502,54 @@ function displayToast(messageElement) {
                             clearToasts();
                             diceDialogueRecord.classList.add('persistent-log');
                             diceDialogueRecord.style.display = 'flex';
-                            if (!document.getElementById('action-log-minimize-button')) {
+
+                            // Ensure the structured layout exists
+                            if (!document.getElementById('action-log-header')) {
+                                diceDialogueRecord.innerHTML = ''; // Clear before structuring
+
+                                // Header
+                                const header = document.createElement('div');
+                                header.id = 'action-log-header';
+
+                                const noteInput = document.createElement('input');
+                                noteInput.type = 'text';
+                                noteInput.id = 'action-log-note-input';
+                                noteInput.placeholder = 'Add a quick note...';
+                                header.appendChild(noteInput);
+
+                                const addNoteBtn = document.createElement('button');
+                                addNoteBtn.id = 'action-log-add-note-btn';
+                                addNoteBtn.textContent = 'Add';
+                                addNoteBtn.addEventListener('click', () => {
+                                    if (noteInput.value.trim()) {
+                                        createLogEntry(noteInput.value.trim(), 'note');
+                                        noteInput.value = '';
+                                    }
+                                });
+                                header.appendChild(addNoteBtn);
+
                                 const minimizeButton = document.createElement('button');
                                 minimizeButton.id = 'action-log-minimize-button';
                                 minimizeButton.textContent = '—';
                                 minimizeButton.onclick = () => {
                                     diceDialogueRecord.classList.remove('persistent-log');
                                     diceDialogueRecord.style.display = 'none';
-                                    const btn = document.getElementById('action-log-minimize-button');
-                                    if(btn) btn.remove();
                                     sendActionLogStateToPlayerView(false);
                                 };
-                                diceDialogueRecord.prepend(minimizeButton);
+                                header.appendChild(minimizeButton);
+
+                                // Content
+                                const content = document.createElement('div');
+                                content.id = 'action-log-content';
+
+                                diceDialogueRecord.appendChild(header);
+                                diceDialogueRecord.appendChild(content);
+
+                                // Re-populate content from history
+                                diceRollHistory.forEach(item => {
+                                    const messageElement = createLogCard(item);
+                                    content.prepend(messageElement);
+                                });
                             }
                             sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
                         }
@@ -4485,7 +4597,7 @@ function displayToast(messageElement) {
             characterInitials: characterInitials
         };
 
-        showDiceDialogue(rollData);
+        addLogEntry(rollData);
         sendDiceRollToPlayerView([roll], total);
         return total;
     }
@@ -4769,25 +4881,20 @@ function displayToast(messageElement) {
         gameTimeTimer.textContent = `${gameTime}s`;
     }
 
-    function createLogEntry(message) {
-        const entry = document.createElement('div');
-        entry.classList.add('dice-dialogue-message');
-        entry.innerHTML = `<div class="dice-roll-card-content"><p class="dice-roll-details">${message}</p></div>`;
-        return entry;
+    function createLogEntry(message, type = 'system') {
+        addLogEntry({
+            type: type,
+            message: message
+        });
     }
 
     function createSurvivorStatus() {
-        const container = document.createElement('div');
-        container.classList.add('dice-dialogue-message');
-
-        let html = '<div class="dice-roll-card-content"><p class="dice-roll-details"><strong>Survivor Status:</strong></p><ul>';
+        let message = '<strong>Survivor Status:</strong><ul>';
         activeInitiative.forEach(char => {
-            html += `<li>${char.name}: HP ${char.startingHP} -> ${char.sheetData.hp_current}, Damage Dealt: ${char.damageDealt}</li>`;
+            message += `<li>${char.name}: HP ${char.startingHP} -> ${char.sheetData.hp_current}, Damage Dealt: ${char.damageDealt}</li>`;
         });
-        html += '</ul></div>';
-
-        container.innerHTML = html;
-        return container;
+        message += '</ul>';
+        createLogEntry(message);
     }
 
     if(startInitiativeButton) {
@@ -4816,9 +4923,7 @@ function displayToast(messageElement) {
                 initiativeTimers.style.display = 'flex';
                 updateGameTimeTimer();
 
-                const startEvent = createLogEntry("Combat Started");
-                diceDialogueRecord.prepend(startEvent);
-                displayToast(startEvent);
+                createLogEntry("Combat Started");
 
                 startInitiativeButton.textContent = 'Stop Initiative';
                 nextTurnButton.style.display = 'inline-block';
@@ -4859,11 +4964,8 @@ function displayToast(messageElement) {
                 clearInterval(realTimeInterval);
                 const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
                 const elapsedFormatted = new Date(elapsedSeconds * 1000).toISOString().substr(11, 8);
-
-                const endEvent = createLogEntry(`Combat Ended. Real Time: ${elapsedFormatted}, Game Time: ${gameTime}s`);
-                const survivorStatus = createSurvivorStatus();
-                diceDialogueRecord.prepend(survivorStatus);
-                diceDialogueRecord.prepend(endEvent);
+                createLogEntry(`Combat Ended. Real Time: ${elapsedFormatted}, Game Time: ${gameTime}s`);
+                createSurvivorStatus();
 
                 initiativeTurn = -1;
                 initiativeStartTime = null;
@@ -4884,9 +4986,7 @@ function displayToast(messageElement) {
                 isWandering = false;
                 wanderButton.textContent = 'Wander';
                 initiativeTokens = [];
-                const stopWanderEvent = createLogEntry("Stopped Wandering");
-                diceDialogueRecord.prepend(stopWanderEvent);
-                displayToast(stopWanderEvent);
+                createLogEntry("Stopped Wandering");
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
@@ -4937,9 +5037,7 @@ function displayToast(messageElement) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
 
-                const startWanderEvent = createLogEntry("Characters are Wandering");
-                diceDialogueRecord.prepend(startWanderEvent);
-                displayToast(startWanderEvent);
+                createLogEntry("Characters are Wandering");
                 sendInitiativeDataToPlayerView();
             }
         });
@@ -4953,9 +5051,7 @@ function displayToast(messageElement) {
                     initiativeRound++;
                     gameTime += 6;
                     updateGameTimeTimer();
-                    const roundEvent = createLogEntry(`Round ${initiativeRound} Started`);
-                    diceDialogueRecord.prepend(roundEvent);
-                    displayToast(roundEvent);
+                    createLogEntry(`Round ${initiativeRound} Started`);
                 }
                 highlightActiveTurn();
                 sendInitiativeDataToPlayerView();
@@ -5034,6 +5130,68 @@ function displayToast(messageElement) {
                 });
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        });
+    }
+
+    if (diceDialogueRecord) {
+        diceDialogueRecord.addEventListener('click', (event) => {
+            const target = event.target;
+            const messageElement = target.closest('.dice-dialogue-message');
+            if (!messageElement) return;
+
+            const logId = messageElement.dataset.id;
+            const historyIndex = diceRollHistory.findIndex(item => String(item.id) === String(logId));
+            if (historyIndex === -1) return;
+
+            const detailsPara = messageElement.querySelector('.dice-roll-details');
+            const editIcon = messageElement.querySelector('.edit-log');
+            const saveIcon = messageElement.querySelector('.save-log');
+
+            if (target.classList.contains('delete-log')) {
+                // Handle Delete
+                if (confirm('Are you sure you want to delete this log entry?')) {
+                    diceRollHistory.splice(historyIndex, 1);
+                    messageElement.remove();
+                    if (diceDialogueRecord.classList.contains('persistent-log')) {
+                       sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                    }
+                }
+            } else if (target.classList.contains('edit-log')) {
+                // Handle Edit
+                detailsPara.contentEditable = true;
+                detailsPara.focus();
+                editIcon.style.display = 'none';
+                saveIcon.style.display = 'inline';
+            } else if (target.classList.contains('save-log')) {
+                // Handle Save
+                detailsPara.contentEditable = false;
+                editIcon.style.display = 'inline';
+                saveIcon.style.display = 'none';
+
+                const newText = detailsPara.innerText;
+
+                if (diceRollHistory[historyIndex].type === 'roll') {
+                    const separatorIndex = newText.indexOf('|');
+                    let newSum, newRoll;
+                    if (separatorIndex !== -1) {
+                        newSum = newText.substring(0, separatorIndex).trim();
+                        newRoll = newText.substring(separatorIndex + 1).trim();
+                    } else {
+                        newSum = '';
+                        newRoll = newText;
+                    }
+                    diceRollHistory[historyIndex].sum = newSum;
+                    diceRollHistory[historyIndex].roll = newRoll;
+                    detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${newSum}</strong> | ${newRoll}`;
+                } else {
+                    diceRollHistory[historyIndex].message = newText;
+                    detailsPara.innerHTML = newText;
+                }
+
+                if (diceDialogueRecord.classList.contains('persistent-log')) {
+                   sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
                 }
             }
         });
