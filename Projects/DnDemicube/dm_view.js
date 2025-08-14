@@ -5010,6 +5010,14 @@ function displayToast(messageElement) {
                 wanderButton.textContent = 'Wander';
                 initiativeTokens = [];
                 createLogEntry("Stopped Wandering");
+
+                // Hide token stat block on both DM and player views when wandering ends
+                if (selectedTokenForStatBlock) {
+                    tokenStatBlock.style.display = 'none';
+                    selectedTokenForStatBlock = null;
+                    sendTokenStatBlockStateToPlayerView(false);
+                }
+
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
