@@ -1,4 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const saveCampaignModal = document.getElementById('save-campaign-modal');
+    const saveCampaignModalCloseButton = document.getElementById('save-campaign-modal-close-button');
+    const confirmSaveButton = document.getElementById('confirm-save-button');
+    const cancelSaveButton = document.getElementById('cancel-save-button');
+    const saveOptionsContainer = document.getElementById('save-options-container');
+    const saveConflictWarnings = document.getElementById('save-conflict-warnings');
+    const saveMapsCheckbox = document.getElementById('save-maps-checkbox');
+    const saveCharactersCheckbox = document.getElementById('save-characters-checkbox');
+    const saveNotesCheckbox = document.getElementById('save-notes-checkbox');
+    const saveInitiativeCheckbox = document.getElementById('save-initiative-checkbox');
+    const saveRollsCheckbox = document.getElementById('save-rolls-checkbox');
+
+    const loadCampaignModal = document.getElementById('load-campaign-modal');
+    const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
+    const loadOptionsContainer = document.getElementById('load-options-container');
+    const confirmLoadButton = document.getElementById('confirm-load-button');
+    const cancelLoadButton = document.getElementById('cancel-load-button');
+
     const uploadMapsInput = document.getElementById('upload-maps-input');
     const mapsList = document.getElementById('maps-list');
     const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
