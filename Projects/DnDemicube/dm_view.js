@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
                 const healthPercentage = Math.max(0, currentHp / maxHp);
                 const ringRadius = (size / 2) + (8 * currentMapDisplayData.ratio);
-                const ringWidth = 3 * currentMapDisplayData.ratio;
+                const ringWidth = 6 * currentMapDisplayData.ratio;
 
                 // Red background ring
                 ctx.beginPath();
