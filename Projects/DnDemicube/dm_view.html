@@ -337,10 +337,22 @@
             <div class="stat-block-rolls">
                 <h5>Rolls</h5>
                 <ul id="token-stat-block-rolls-list"></ul>
-                <div class="add-roll-form">
-                    <input type="text" id="token-stat-block-add-roll-name" placeholder="Roll Name">
-                    <input type="text" id="token-stat-block-add-roll-dice" placeholder="e.g. 1d20+5">
-                    <button id="token-stat-block-add-roll-btn">Add</button>
+                <div id="token-stat-block-add-roll-form" class="add-roll-form">
+                    <input type="text" id="token-stat-block-add-roll-name" placeholder="Roll Name" style="width: 100%; margin-bottom: 5px;">
+                    <div id="token-stat-block-dice-buttons" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 5px;">
+                        <button class="dice-button-compact" data-die="d4">d4 <span class="dice-count"></span></button>
+                        <button class="dice-button-compact" data-die="d6">d6 <span class="dice-count"></span></button>
+                        <button class="dice-button-compact" data-die="d8">d8 <span class="dice-count"></span></button>
+                        <button class="dice-button-compact" data-die="d10">d10 <span class="dice-count"></span></button>
+                        <button class="dice-button-compact" data-die="d12">d12 <span class="dice-count"></span></button>
+                        <button class="dice-button-compact" data-die="d20">d20 <span class="dice-count"></span></button>
+                        <button class="dice-button-compact" data-die="d100">d100 <span class="dice-count"></span></button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label for="token-stat-block-add-roll-modifier">Modifier:</label>
+                        <input type="number" id="token-stat-block-add-roll-modifier" value="0" style="width: 60px;">
+                    </div>
+                    <button id="token-stat-block-save-roll-btn" style="width: 100%;">Save</button>
                 </div>
             </div>
         </div>

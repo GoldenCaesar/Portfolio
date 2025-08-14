@@ -22,8 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const tokenStatBlockSetTargets = document.getElementById('token-stat-block-set-targets');
     const tokenStatBlockRollsList = document.getElementById('token-stat-block-rolls-list');
     const tokenStatBlockAddRollName = document.getElementById('token-stat-block-add-roll-name');
-    const tokenStatBlockAddRollDice = document.getElementById('token-stat-block-add-roll-dice');
-    const tokenStatBlockAddRollBtn = document.getElementById('token-stat-block-add-roll-btn');
+    // const tokenStatBlockAddRollDice = document.getElementById('token-stat-block-add-roll-dice'); // REPLACED
+    // const tokenStatBlockAddRollBtn = document.getElementById('token-stat-block-add-roll-btn'); // REPLACED
+    const tokenStatBlockDiceButtons = document.getElementById('token-stat-block-dice-buttons');
+    const tokenStatBlockAddRollModifier = document.getElementById('token-stat-block-add-roll-modifier');
+    const tokenStatBlockSaveRollBtn = document.getElementById('token-stat-block-save-roll-btn');
+    let tokenStatBlockDiceCounts = {};
 
     // Dice Roller Elements
     const diceRollerIcon = document.getElementById('dice-roller-icon');
@@ -419,9 +423,44 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.shadowBlur = 0;
     }
 
+    function updateCompactDiceDisplay() {
+        const buttons = tokenStatBlockDiceButtons.querySelectorAll('.dice-button-compact');
+        buttons.forEach(button => {
+            const die = button.dataset.die;
+            const count = tokenStatBlockDiceCounts[die] || 0;
+            const countSpan = button.querySelector('.dice-count');
+            if (countSpan) {
+                countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    function formatDiceString(dice, modifier) {
+        let parts = [];
+        for (const die in dice) {
+            if (dice[die] > 0) {
+                parts.push(`${dice[die]}${die}`);
+            }
+        }
+        let str = parts.join(' + ');
+        if (modifier > 0) {
+            str += ` + ${modifier}`;
+        } else if (modifier < 0) {
+            str += ` - ${Math.abs(modifier)}`;
+        }
+        return str;
+    }
+
     function populateAndShowStatBlock(token, pageX, pageY) {
         const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
         if (!character) return;
+
+        // Reset compact roller state
+        tokenStatBlockDiceCounts = {};
+        updateCompactDiceDisplay();
+        tokenStatBlockAddRollName.value = '';
+        tokenStatBlockAddRollModifier.value = '0';
+
 
         tokenStatBlockCharName.textContent = character.name;
         tokenStatBlockPlayerName.textContent = `(${character.sheetData.player_name || 'N/A'})`;
@@ -433,7 +472,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (character.savedRolls && character.savedRolls.length > 0) {
             character.savedRolls.forEach((roll, index) => {
                 const li = document.createElement('li');
-                li.innerHTML = `<span>${roll.name} (${roll.dice})</span> <button class="delete-roll-btn" data-index="${index}">Del</button>`;
+                const diceString = formatDiceString(roll.dice, roll.modifier);
+                li.innerHTML = `
+                    <span class="roll-name">${roll.name} (${diceString})</span>
+                    <div class="roll-actions">
+                        <button class="roll-btn" data-action="roll" data-index="${index}">Roll</button>
+                        <button class="delete-roll-btn" data-action="delete" data-index="${index}">Del</button>
+                    </div>
+                `;
                 tokenStatBlockRollsList.appendChild(li);
             });
         }
@@ -2138,36 +2184,121 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (tokenStatBlockAddRollBtn) {
-        tokenStatBlockAddRollBtn.addEventListener('click', () => {
+    if (tokenStatBlockDiceButtons) {
+        tokenStatBlockDiceButtons.addEventListener('click', (event) => {
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die) {
+                tokenStatBlockDiceCounts[die] = (tokenStatBlockDiceCounts[die] || 0) + 1;
+                updateCompactDiceDisplay();
+            }
+        });
+
+        tokenStatBlockDiceButtons.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die && tokenStatBlockDiceCounts[die] > 0) {
+                tokenStatBlockDiceCounts[die]--;
+                updateCompactDiceDisplay();
+            }
+        });
+    }
+
+    if (tokenStatBlockSaveRollBtn) {
+        tokenStatBlockSaveRollBtn.addEventListener('click', () => {
             if (!selectedTokenForStatBlock) return;
             const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
             if (!character) return;
+
             const rollName = tokenStatBlockAddRollName.value.trim();
-            const rollDice = tokenStatBlockAddRollDice.value.trim();
-            if (rollName && rollDice) {
-                if (!character.savedRolls) {
-                    character.savedRolls = [];
-                }
-                character.savedRolls.push({ name: rollName, dice: rollDice });
-                populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
-                tokenStatBlockAddRollName.value = '';
-                tokenStatBlockAddRollDice.value = '';
+            if (!rollName) {
+                alert('Please enter a name for the roll.');
+                return;
             }
+
+            const hasDice = Object.values(tokenStatBlockDiceCounts).some(count => count > 0);
+            if (!hasDice) {
+                alert('Please select at least one die to save.');
+                return;
+            }
+
+            const modifier = parseInt(tokenStatBlockAddRollModifier.value, 10) || 0;
+
+            if (!character.savedRolls) {
+                character.savedRolls = [];
+            }
+
+            character.savedRolls.push({
+                name: rollName,
+                dice: { ...tokenStatBlockDiceCounts },
+                modifier: modifier
+            });
+
+            populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
         });
     }
 
     if (tokenStatBlockRollsList) {
         tokenStatBlockRollsList.addEventListener('click', (event) => {
-            if (event.target.classList.contains('delete-roll-btn')) {
-                if (!selectedTokenForStatBlock) return;
-                const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
-                if (!character || !character.savedRolls) return;
-                const rollIndex = parseInt(event.target.dataset.index, 10);
-                if (!isNaN(rollIndex)) {
-                    character.savedRolls.splice(rollIndex, 1);
-                    populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+            const button = event.target;
+            const action = button.dataset.action;
+            const index = parseInt(button.dataset.index, 10);
+
+            if (!action || isNaN(index)) return;
+
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character || !character.savedRolls || !character.savedRolls[index]) return;
+
+            if (action === 'delete') {
+                character.savedRolls.splice(index, 1);
+                populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+            } else if (action === 'roll') {
+                const savedRoll = character.savedRolls[index];
+                let allRolls = [];
+                let totalSum = 0;
+                const rollsByDie = {};
+                const modifier = savedRoll.modifier || 0;
+
+                for (const die in savedRoll.dice) {
+                    const count = savedRoll.dice[die];
+                    if (count === 0) continue;
+
+                    const sides = parseInt(die.substring(1), 10);
+                    if (isNaN(sides)) continue;
+
+                    if (!rollsByDie[die]) rollsByDie[die] = [];
+                    for (let i = 0; i < count; i++) {
+                        const roll = Math.floor(Math.random() * sides) + 1;
+                        allRolls.push(roll);
+                        totalSum += roll;
+                        rollsByDie[die].push(roll);
+                    }
                 }
+
+                totalSum += modifier;
+
+                const detailsParts = [];
+                for (const dieName in rollsByDie) {
+                    detailsParts.push(`${rollsByDie[dieName].length}${dieName}[${rollsByDie[dieName].join(',')}]`);
+                }
+                let detailsMessage = `${savedRoll.name}: ${detailsParts.join(', ')}`;
+                if (modifier !== 0) {
+                    detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+                }
+
+                showDiceDialogue({
+                    characterName: character.name,
+                    playerName: character.sheetData.player_name || 'DM',
+                    roll: detailsMessage,
+                    sum: totalSum,
+                    characterPortrait: character.sheetData.character_portrait,
+                    characterInitials: getInitials(character.name)
+                });
+                sendDiceRollToPlayerView(allRolls, totalSum);
             }
         });
     }
