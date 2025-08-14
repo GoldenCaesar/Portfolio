@@ -1727,12 +1727,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveCampaignButton = document.getElementById('save-campaign-button');
     const loadCampaignInput = document.getElementById('load-campaign-input');
 
-    const loadCampaignModal = document.getElementById('load-campaign-modal');
-    const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
-    const loadOptionsContainer = document.getElementById('load-options-container');
-    const confirmLoadButton = document.getElementById('confirm-load-button');
-    const cancelLoadButton = document.getElementById('cancel-load-button');
-
 
     async function saveCampaign() {
         confirmSaveButton.textContent = 'Saving...';
