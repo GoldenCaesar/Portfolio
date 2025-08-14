@@ -143,6 +143,7 @@ function animateSlideshow() {
 
 let currentMapImage = null;
 let currentOverlays = [];
+let initiativeTokens = [];
 let currentMapDisplayData = {
     img: null,
     ratio: 1,
@@ -153,6 +154,8 @@ let currentMapDisplayData = {
     scaledWidth: 0,
     scaledHeight: 0
 };
+let activeInitiative = [];
+let initiativeTurn = -1;
 
 function drawMapAndOverlays() {
     if (!playerCanvas || !pCtx) {
@@ -218,10 +221,11 @@ function drawMapAndOverlays() {
 }
 
 function drawOverlays_PlayerView(overlays) {
-    if (!pCtx || !overlays || overlays.length === 0 || !currentMapDisplayData.img) return;
+    if (!pCtx || (!overlays || overlays.length === 0) && initiativeTokens.length === 0 || !currentMapDisplayData.img) return;
 
-    overlays.forEach(overlay => {
-        if (overlay.type === 'childMapLink' && overlay.polygon) {
+    if(overlays) {
+        overlays.forEach(overlay => {
+            if (overlay.type === 'childMapLink' && overlay.polygon) {
             pCtx.beginPath();
             pCtx.strokeStyle = 'rgba(100, 100, 255, 0.4)';
             pCtx.lineWidth = 2;
@@ -288,7 +292,14 @@ function drawOverlays_PlayerView(overlays) {
                 img.src = overlay.character_portrait;
             }
         }
-    });
+        });
+    }
+
+    if (initiativeTokens.length > 0) {
+        initiativeTokens.forEach(token => {
+            drawToken(pCtx, token);
+        });
+    }
 }
 
 window.addEventListener('message', (event) => {
@@ -410,6 +421,66 @@ window.addEventListener('message', (event) => {
                     diceResultDetails.textContent = `Rolls: [${data.results.join(', ')}]`;
                 }
                 break;
+            case 'diceIconMenuState':
+                const diceIconMenu = document.getElementById('dice-icon-menu');
+                if (diceIconMenu) {
+                    diceIconMenu.style.display = data.isOpen ? 'block' : 'none';
+                }
+                break;
+            case 'initiativeTrackerState':
+                const initiativeTrackerOverlay = document.getElementById('initiative-tracker-overlay');
+                if (initiativeTrackerOverlay) {
+                    initiativeTrackerOverlay.style.display = data.isOpen ? 'flex' : 'none';
+                }
+                break;
+            case 'actionLogState':
+                const diceDialogueRecord = document.getElementById('dice-dialogue-record');
+                if (diceDialogueRecord) {
+                    diceDialogueRecord.style.display = data.isOpen ? 'flex' : 'none';
+                    if(data.isOpen) {
+                        diceDialogueRecord.classList.add('persistent-log');
+                        diceDialogueRecord.innerHTML = data.content;
+                         if (!document.getElementById('action-log-minimize-button')) {
+                            const minimizeButton = document.createElement('button');
+                            minimizeButton.id = 'action-log-minimize-button';
+                            minimizeButton.textContent = '—';
+                            minimizeButton.onclick = () => {
+                                diceDialogueRecord.classList.remove('persistent-log');
+                                diceDialogueRecord.style.display = 'none';
+                                const btn = document.getElementById('action-log-minimize-button');
+                                if(btn) btn.remove();
+                            };
+                            diceDialogueRecord.prepend(minimizeButton);
+                        }
+                    } else {
+                        diceDialogueRecord.classList.remove('persistent-log');
+                    }
+                }
+                break;
+            case 'toast':
+                displayToast(createDiceRollCard(data.rollData));
+                break;
+            case 'initiativeDataUpdate':
+                activeInitiative = data.activeInitiative || [];
+                initiativeTurn = data.initiativeTurn ?? -1;
+                initiativeTokens = data.initiativeTokens || [];
+
+                const gameTimeTimer = document.getElementById('game-time-timer');
+                if(gameTimeTimer) gameTimeTimer.textContent = `${data.gameTime || 0}s`;
+
+                renderInitiativeList();
+                drawMapAndOverlays();
+                break;
+            case 'tokenStatBlockState':
+                if (data.show) {
+                    populateAndShowStatBlock_Player(data.character, data.position);
+                } else {
+                    const tokenStatBlock = document.getElementById('token-stat-block');
+                    if (tokenStatBlock) {
+                        tokenStatBlock.style.display = 'none';
+                    }
+                }
+                break;
             default:
                 console.log("Player view received unhandled message type:", data.type);
                 break;
@@ -418,6 +489,237 @@ window.addEventListener('message', (event) => {
         console.log("Player view received non-standard message:", data);
     }
 });
+
+function getInitials(name) {
+    if (!name) return '??';
+    const parts = name.split(' ');
+    if (parts.length > 1) {
+        return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
+    }
+    return name.substring(0, 2);
+}
+
+function createDiceRollCard(rollData) {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('dice-dialogue-message');
+
+    const cardContent = document.createElement('div');
+    cardContent.classList.add('dice-roll-card-content');
+    messageElement.appendChild(cardContent);
+
+    const profilePic = document.createElement('div');
+    profilePic.classList.add('dice-roll-profile-pic');
+    if (rollData.characterPortrait) {
+        profilePic.style.backgroundImage = `url('${rollData.characterPortrait}')`;
+    } else {
+        profilePic.textContent = rollData.characterInitials || getInitials(rollData.characterName);
+    }
+    cardContent.appendChild(profilePic);
+
+    const textContainer = document.createElement('div');
+    textContainer.classList.add('dice-roll-text-container');
+    cardContent.appendChild(textContainer);
+
+    const namePara = document.createElement('p');
+    namePara.classList.add('dice-roll-name');
+    namePara.innerHTML = `<strong>${rollData.characterName}</strong> played by <strong>${rollData.playerName}</strong>`;
+    textContainer.appendChild(namePara);
+
+    const detailsPara = document.createElement('p');
+    detailsPara.classList.add('dice-roll-details');
+    detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${rollData.sum}</strong> | ${rollData.roll}`;
+    textContainer.appendChild(detailsPara);
+
+    return messageElement;
+}
+
+let activeToastTimers = [];
+function displayToast(messageElement) {
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer || document.querySelector('.dice-dialogue.persistent-log')) {
+        return;
+    }
+
+    const toastNode = messageElement.cloneNode(true);
+    toastNode.classList.add('toast-message');
+    toastContainer.appendChild(toastNode);
+
+    const timerId = setTimeout(() => {
+        toastNode.style.animation = 'toast-fade-out 0.5s ease-out forwards';
+        toastNode.addEventListener('animationend', () => {
+            toastNode.remove();
+            const index = activeToastTimers.indexOf(timerId);
+            if (index > -1) {
+                activeToastTimers.splice(index, 1);
+            }
+        });
+    }, 4500);
+
+    activeToastTimers.push(timerId);
+}
+
+function drawToken(ctx, token) {
+    const canvasX = (token.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
+    const canvasY = (token.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+
+    const percentage = token.size / 100;
+    const baseDimension = currentMapDisplayData.imgWidth;
+    const pixelSizeOnImage = percentage * baseDimension;
+    const size = pixelSizeOnImage * currentMapDisplayData.ratio;
+
+    if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.7)';
+        ctx.fill();
+    }
+
+    const characterInInitiative = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+    if (characterInInitiative && characterInInitiative.sheetData) {
+        const maxHp = parseInt(characterInInitiative.sheetData.hp_max, 10);
+        const currentHp = parseInt(characterInInitiative.sheetData.hp_current, 10);
+
+        if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
+            const healthPercentage = Math.max(0, currentHp / maxHp);
+            const ringRadius = (size / 2) + (8 * currentMapDisplayData.ratio);
+            const ringWidth = 3 * currentMapDisplayData.ratio;
+
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, ringRadius, 0, Math.PI * 2, false);
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = ringWidth;
+            ctx.stroke();
+
+            if (healthPercentage > 0) {
+                ctx.beginPath();
+                ctx.arc(canvasX, canvasY, ringRadius, -Math.PI / 2, (-Math.PI / 2) + (healthPercentage * Math.PI * 2), false);
+                ctx.strokeStyle = 'green';
+                ctx.lineWidth = ringWidth;
+                ctx.stroke();
+            }
+        }
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.fillStyle = '#4a5f7a';
+    ctx.fill();
+    ctx.clip();
+
+    if (token.portrait) {
+        const img = new Image();
+        img.src = token.portrait;
+        if (img.complete) {
+            ctx.drawImage(img, canvasX - size / 2, canvasY - size / 2, size, size);
+        } else {
+            ctx.fillStyle = '#e0e0e0';
+            ctx.font = `${size * 0.4}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(token.initials, canvasX, canvasY);
+            img.onload = () => drawMapAndOverlays();
+        }
+    } else {
+        ctx.fillStyle = '#e0e0e0';
+        ctx.font = `${size * 0.4}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(token.initials, canvasX, canvasY);
+    }
+
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2 * currentMapDisplayData.ratio;
+    ctx.stroke();
+
+    ctx.fillStyle = 'white';
+    ctx.shadowColor = 'black';
+    ctx.shadowBlur = 2;
+    ctx.font = `bold ${12 * currentMapDisplayData.ratio}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * currentMapDisplayData.ratio));
+    ctx.font = `${10 * currentMapDisplayData.ratio}px sans-serif`;
+    ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * currentMapDisplayData.ratio));
+    ctx.shadowBlur = 0;
+}
+
+
+function createInitiativeCharacterCard(character) {
+    const li = document.createElement('li');
+    li.className = 'initiative-character-card';
+
+    if (character.sheetData?.character_portrait) {
+        const portrait = document.createElement('img');
+        portrait.src = character.sheetData.character_portrait;
+        li.appendChild(portrait);
+    } else {
+        const initials = document.createElement('div');
+        initials.className = 'initiative-character-initials';
+        initials.textContent = getInitials(character.name);
+        li.appendChild(initials);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'initiative-character-info';
+
+    const name = document.createElement('h4');
+    name.textContent = character.name;
+    info.appendChild(name);
+
+    const details = document.createElement('p');
+    details.textContent = `${character.sheetData?.class_level || 'N/A'} ${character.sheetData?.race || ''}`;
+    info.appendChild(details);
+
+    li.appendChild(info);
+
+    const hp = document.createElement('div');
+    hp.className = 'initiative-character-hp';
+    hp.innerHTML = `HP: <span>${character.sheetData?.hp_current || ''} / ${character.sheetData?.hp_max || 'N/A'}</span>`;
+    li.appendChild(hp);
+
+    const initiativeValue = document.createElement('div');
+    initiativeValue.className = 'initiative-value';
+    initiativeValue.textContent = character.initiative ?? '-';
+    li.appendChild(initiativeValue);
+
+    return li;
+}
+
+function renderInitiativeList() {
+    const activeInitiativeList = document.getElementById('initiative-active-list');
+    if (!activeInitiativeList) return;
+
+    activeInitiativeList.innerHTML = '';
+    activeInitiative.forEach((character, index) => {
+        const card = createInitiativeCharacterCard(character);
+        if (index === initiativeTurn) {
+            card.classList.add('active-turn');
+        }
+        activeInitiativeList.appendChild(card);
+    });
+}
+
+function populateAndShowStatBlock_Player(character, position) {
+    const tokenStatBlock = document.getElementById('token-stat-block');
+    if (!tokenStatBlock || !character) {
+        if(tokenStatBlock) tokenStatBlock.style.display = 'none';
+        return;
+    }
+
+    document.getElementById('token-stat-block-char-name').textContent = character.name;
+    document.getElementById('token-stat-block-player-name').textContent = `(${character.sheetData.player_name || 'N/A'})`;
+    document.getElementById('token-stat-block-hp').textContent = character.sheetData.hp_current || 0;
+    document.getElementById('token-stat-block-max-hp').textContent = `/ ${character.sheetData.hp_max || 'N/A'}`;
+
+    tokenStatBlock.style.left = `${position.left}px`;
+    tokenStatBlock.style.top = `${position.top}px`;
+    tokenStatBlock.style.display = 'block';
+}
+
 
 function resizeAndRedraw() {
     if (currentMapImage && currentMapImage.complete) {
