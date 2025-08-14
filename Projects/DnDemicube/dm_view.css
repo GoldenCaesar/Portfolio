@@ -989,20 +989,49 @@ input:checked + .slider:before {
     height: 400px;
     max-height: 80vh;
     flex-direction: column;
-    overflow-y: auto;
-    /* The rest of the styling is inherited from .dice-dialogue */
+    overflow-y: hidden; /* Main container does not scroll */
+    border-radius: 10px; /* Re-apply border-radius from .dice-dialogue */
+    border: 1px solid #4a5f7a; /* Re-apply border */
+    background-color: rgba(40, 50, 60, 0.9); /* Re-apply bg */
+}
+
+#action-log-header {
+    padding: 5px;
+    display: flex;
+    gap: 5px;
+    background-color: #20262d;
+    border-bottom: 1px solid #3f4c5a;
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+#action-log-note-input {
+    flex-grow: 1;
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    color: #e0e0e0;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+#action-log-add-note-btn {
+    padding: 5px 10px;
+    flex-shrink: 0;
+}
+
+#action-log-content {
+    flex-grow: 1; /* Allows content to fill space */
+    overflow-y: auto; /* Content area is scrollable */
+    padding: 5px;
 }
 
 #action-log-minimize-button {
-    position: absolute;
-    top: 5px;
-    right: 5px;
     background: none;
     border: none;
     color: #e0e0e0;
     font-size: 20px;
     cursor: pointer;
     padding: 0 5px;
+    margin-left: auto; /* Push to the right */
 }
 
 /* Dice Roll Card */
