@@ -4633,9 +4633,20 @@ function displayToast(messageElement) {
 
             const hpInput = card.querySelector('[data-hp-input]');
             hpInput.addEventListener('change', (e) => {
-                const char = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
-                if(char) {
-                    char.sheetData.hp_current = e.target.value;
+                const charInInitiative = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
+                if (charInInitiative) {
+                    const newHp = e.target.value;
+                    // Update the character in the active initiative list
+                    charInInitiative.sheetData.hp_current = newHp;
+
+                    // Find and update the corresponding character in the master list
+                    const mainCharacter = charactersData.find(c => c.id === charInInitiative.id);
+                    if (mainCharacter) {
+                        if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                        mainCharacter.sheetData.hp_current = newHp;
+                    }
+
+                    // Let the player view know about the change
                     sendInitiativeDataToPlayerView();
                 }
             });
