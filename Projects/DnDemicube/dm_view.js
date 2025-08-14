@@ -320,6 +320,35 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fill();
         }
 
+        // Health Ring
+        const characterInInitiative = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (characterInInitiative && characterInInitiative.sheetData) {
+            const maxHp = parseInt(characterInInitiative.sheetData.hp_max, 10);
+            const currentHp = parseInt(characterInInitiative.sheetData.hp_current, 10);
+
+            if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
+                const healthPercentage = Math.max(0, currentHp / maxHp);
+                const ringRadius = (size / 2) + (8 * currentMapDisplayData.ratio);
+                const ringWidth = 3 * currentMapDisplayData.ratio;
+
+                // Red background ring
+                ctx.beginPath();
+                ctx.arc(canvasX, canvasY, ringRadius, 0, Math.PI * 2, false);
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = ringWidth;
+                ctx.stroke();
+
+                // Green foreground ring
+                if (healthPercentage > 0) {
+                    ctx.beginPath();
+                    ctx.arc(canvasX, canvasY, ringRadius, -Math.PI / 2, (-Math.PI / 2) + (healthPercentage * Math.PI * 2), false);
+                    ctx.strokeStyle = 'green';
+                    ctx.lineWidth = ringWidth;
+                    ctx.stroke();
+                }
+            }
+        }
+
         ctx.save();
 
         // Draw circle
