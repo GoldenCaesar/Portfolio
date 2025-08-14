@@ -3849,6 +3849,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.sheetData = event.data.data;
+
+                    // Propagate changes to any instance of this character in the active initiative
+                    activeInitiative.forEach(activeChar => {
+                        if (activeChar.id === selectedCharacterId) {
+                            activeChar.sheetData = character.sheetData;
+                        }
+                    });
+
+                    // Rerender lists and tokens to show updated info
+                    renderActiveInitiativeList();
+                    if (selectedMapFileName) {
+                        displayMapOnCanvas(selectedMapFileName);
+                    }
+                    sendInitiativeDataToPlayerView();
                 }
             }
         } else if (event.data.type === 'characterSheetReady') {
@@ -4796,6 +4810,7 @@ function displayToast(messageElement) {
         initiativeTrackerOverlay.addEventListener('click', (event) => {
             if (event.target === initiativeTrackerOverlay) {
                 initiativeTrackerOverlay.style.display = 'none';
+                sendInitiativeTrackerStateToPlayerView(false);
             }
         });
     }
@@ -4974,6 +4989,14 @@ function displayToast(messageElement) {
                 nextTurnButton.style.display = 'none';
                 prevTurnButton.style.display = 'none';
                 clearTurnHighlight();
+
+                // Hide token stat block on both DM and player views when initiative ends
+                if (selectedTokenForStatBlock) {
+                    tokenStatBlock.style.display = 'none';
+                    selectedTokenForStatBlock = null;
+                    sendTokenStatBlockStateToPlayerView(false);
+                }
+
                 sendInitiativeDataToPlayerView();
             }
         });
