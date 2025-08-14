@@ -719,40 +719,15 @@ function populateAndShowStatBlock_Player(character, position) {
 
     const canvasRect = playerCanvas.getBoundingClientRect();
     const statBlockRect = tokenStatBlock.getBoundingClientRect();
-
-    // position is from the DM, likely viewport-relative click coordinates.
-    // We need to make it relative to the player-map-container, which is the offset parent.
     const containerRect = playerMapContainer.getBoundingClientRect();
 
-    let left = position.left - containerRect.left + 15; // position relative to container, with some offset
-    let top = position.top - containerRect.top;
-
-    // Now, ensure this position doesn't push the stat block outside the canvas boundaries.
-    // The canvas is also inside the container.
-    const canvasLeftInContainer = canvasRect.left - containerRect.left;
+    // The canvas is also inside the container. We need its position relative to the container.
     const canvasTopInContainer = canvasRect.top - containerRect.top;
-    const canvasRightInContainer = canvasLeftInContainer + canvasRect.width;
-    const canvasBottomInContainer = canvasTopInContainer + canvasRect.height;
+    const canvasRightInContainer = (canvasRect.left - containerRect.left) + canvasRect.width;
 
-    // Adjust right boundary
-    if (left + statBlockRect.width > canvasRightInContainer) {
-        left = canvasRightInContainer - statBlockRect.width;
-    }
-
-    // Adjust left boundary
-    if (left < canvasLeftInContainer) {
-        left = canvasLeftInContainer;
-    }
-
-    // Adjust bottom boundary
-    if (top + statBlockRect.height > canvasBottomInContainer) {
-        top = canvasBottomInContainer - statBlockRect.height;
-    }
-
-    // Adjust top boundary
-    if (top < canvasTopInContainer) {
-        top = canvasTopInContainer;
-    }
+    // Position at the top right of the canvas, with a 10px margin
+    const top = canvasTopInContainer + 10;
+    const left = canvasRightInContainer - statBlockRect.width - 10;
 
     tokenStatBlock.style.left = `${left}px`;
     tokenStatBlock.style.top = `${top}px`;
