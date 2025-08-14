@@ -715,9 +715,47 @@ function populateAndShowStatBlock_Player(character, position) {
     document.getElementById('token-stat-block-hp').textContent = character.sheetData.hp_current || 0;
     document.getElementById('token-stat-block-max-hp').textContent = `/ ${character.sheetData.hp_max || 'N/A'}`;
 
-    tokenStatBlock.style.left = `${position.left}px`;
-    tokenStatBlock.style.top = `${position.top}px`;
-    tokenStatBlock.style.display = 'block';
+    tokenStatBlock.style.display = 'block'; // Make it visible to measure it
+
+    const canvasRect = playerCanvas.getBoundingClientRect();
+    const statBlockRect = tokenStatBlock.getBoundingClientRect();
+
+    // position is from the DM, likely viewport-relative click coordinates.
+    // We need to make it relative to the player-map-container, which is the offset parent.
+    const containerRect = playerMapContainer.getBoundingClientRect();
+
+    let left = position.left - containerRect.left + 15; // position relative to container, with some offset
+    let top = position.top - containerRect.top;
+
+    // Now, ensure this position doesn't push the stat block outside the canvas boundaries.
+    // The canvas is also inside the container.
+    const canvasLeftInContainer = canvasRect.left - containerRect.left;
+    const canvasTopInContainer = canvasRect.top - containerRect.top;
+    const canvasRightInContainer = canvasLeftInContainer + canvasRect.width;
+    const canvasBottomInContainer = canvasTopInContainer + canvasRect.height;
+
+    // Adjust right boundary
+    if (left + statBlockRect.width > canvasRightInContainer) {
+        left = canvasRightInContainer - statBlockRect.width;
+    }
+
+    // Adjust left boundary
+    if (left < canvasLeftInContainer) {
+        left = canvasLeftInContainer;
+    }
+
+    // Adjust bottom boundary
+    if (top + statBlockRect.height > canvasBottomInContainer) {
+        top = canvasBottomInContainer - statBlockRect.height;
+    }
+
+    // Adjust top boundary
+    if (top < canvasTopInContainer) {
+        top = canvasTopInContainer;
+    }
+
+    tokenStatBlock.style.left = `${left}px`;
+    tokenStatBlock.style.top = `${top}px`;
 }
 
 
