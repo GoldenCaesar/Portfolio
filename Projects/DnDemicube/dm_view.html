@@ -323,5 +323,27 @@
     </div>
     <div id="dice-dialogue-record" class="dice-dialogue"></div>
     <div id="toast-container"></div>
+
+    <div id="token-stat-block" class="token-stat-block" style="display: none; position: absolute; z-index: 1003;">
+        <div class="token-stat-block-content">
+            <h4 id="token-stat-block-char-name"></h4>
+            <p id="token-stat-block-player-name"></p>
+            <div class="stat-block-health">
+                <label for="token-stat-block-hp">HP:</label>
+                <input type="number" id="token-stat-block-hp" class="token-stat-block-hp-input">
+                <span id="token-stat-block-max-hp"></span>
+            </div>
+            <button id="token-stat-block-set-targets">Set Targets</button>
+            <div class="stat-block-rolls">
+                <h5>Rolls</h5>
+                <ul id="token-stat-block-rolls-list"></ul>
+                <div class="add-roll-form">
+                    <input type="text" id="token-stat-block-add-roll-name" placeholder="Roll Name">
+                    <input type="text" id="token-stat-block-add-roll-dice" placeholder="e.g. 1d20+5">
+                    <button id="token-stat-block-add-roll-btn">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

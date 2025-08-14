@@ -13,6 +13,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterContextMenu = document.getElementById('character-context-menu');
     const displayedFileNames = new Set();
 
+    // Token Stat Block Elements
+    const tokenStatBlock = document.getElementById('token-stat-block');
+    const tokenStatBlockCharName = document.getElementById('token-stat-block-char-name');
+    const tokenStatBlockPlayerName = document.getElementById('token-stat-block-player-name');
+    const tokenStatBlockHp = document.getElementById('token-stat-block-hp');
+    const tokenStatBlockMaxHp = document.getElementById('token-stat-block-max-hp');
+    const tokenStatBlockSetTargets = document.getElementById('token-stat-block-set-targets');
+    const tokenStatBlockRollsList = document.getElementById('token-stat-block-rolls-list');
+    const tokenStatBlockAddRollName = document.getElementById('token-stat-block-add-roll-name');
+    const tokenStatBlockAddRollDice = document.getElementById('token-stat-block-add-roll-dice');
+    const tokenStatBlockAddRollBtn = document.getElementById('token-stat-block-add-roll-btn');
+
     // Dice Roller Elements
     const diceRollerIcon = document.getElementById('dice-roller-icon');
     const diceIconMenu = document.getElementById('dice-icon-menu');
@@ -135,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let draggedToken = null;
     let dragStartX = 0;
     let dragStartY = 0;
+    let selectedTokenForStatBlock = null;
 
     // State for 'Link to Child Map' tool
     let isLinkingChildMap = false;
@@ -404,6 +417,44 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.font = `${10 * currentMapDisplayData.ratio}px sans-serif`;
         ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * currentMapDisplayData.ratio));
         ctx.shadowBlur = 0;
+    }
+
+    function populateAndShowStatBlock(token, pageX, pageY) {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (!character) return;
+
+        tokenStatBlockCharName.textContent = character.name;
+        tokenStatBlockPlayerName.textContent = `(${character.sheetData.player_name || 'N/A'})`;
+        tokenStatBlockHp.value = character.sheetData.hp_current || 0;
+        tokenStatBlockMaxHp.textContent = `/ ${character.sheetData.hp_max || 'N/A'}`;
+
+        // Render saved rolls
+        tokenStatBlockRollsList.innerHTML = '';
+        if (character.savedRolls && character.savedRolls.length > 0) {
+            character.savedRolls.forEach((roll, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${roll.name} (${roll.dice})</span> <button class="delete-roll-btn" data-index="${index}">Del</button>`;
+                tokenStatBlockRollsList.appendChild(li);
+            });
+        }
+
+        // Position the stat block, ensuring it doesn't go off-screen
+        tokenStatBlock.style.display = 'block';
+        const statBlockRect = tokenStatBlock.getBoundingClientRect();
+        const bodyRect = document.body.getBoundingClientRect();
+
+        let left = pageX;
+        let top = pageY;
+
+        if (pageX + statBlockRect.width > bodyRect.width) {
+            left = pageX - statBlockRect.width;
+        }
+        if (pageY + statBlockRect.height > bodyRect.height) {
+            top = pageY - statBlockRect.height;
+        }
+
+        tokenStatBlock.style.left = `${left}px`;
+        tokenStatBlock.style.top = `${top}px`;
     }
 
     function drawOverlays(overlays, isPlayerViewContext = false) {
@@ -696,6 +747,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     dmCanvas.addEventListener('click', (event) => {
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (imageCoords && initiativeTokens.length > 0) {
+            let tokenClicked = false;
+            for (const token of initiativeTokens) {
+                if (isPointInToken(imageCoords, token)) {
+                    tokenClicked = true;
+                    if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
+                        tokenStatBlock.style.display = 'none';
+                        selectedTokenForStatBlock = null;
+                    } else {
+                        selectedTokenForStatBlock = token;
+                        populateAndShowStatBlock(token, event.pageX, event.pageY);
+                    }
+                    break;
+                }
+            }
+            if (tokenClicked) {
+                return;
+            }
+        }
+
         if (isMovingPolygon) {
             if (!moveStartPoint) {
                 console.log("In move mode, click occurred but not on polygon to start drag. No action.");
@@ -704,12 +779,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const canvasX = event.offsetX;
-        const canvasY = event.offsetY;
-        const imageCoords = getRelativeCoords(canvasX, canvasY);
-
         if (!imageCoords) {
             return;
+        }
+
+        if (selectedTokenForStatBlock) {
+            tokenStatBlock.style.display = 'none';
+            selectedTokenForStatBlock = null;
         }
 
         const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -1611,6 +1687,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (mainChar) {
                         if (!mainChar.sheetData) mainChar.sheetData = {};
                         mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
+                        mainChar.savedRolls = activeChar.savedRolls;
                     }
                 });
             }
@@ -2037,6 +2114,64 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (tokenStatBlockHp) {
+        tokenStatBlockHp.addEventListener('change', (event) => {
+            if (!selectedTokenForStatBlock) return;
+
+            const newHp = parseInt(event.target.value, 10);
+            if (isNaN(newHp)) return;
+
+            const characterInInitiative = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (characterInInitiative) {
+                characterInInitiative.sheetData.hp_current = newHp;
+
+                const mainCharacter = charactersData.find(c => c.id === characterInInitiative.id);
+                if (mainCharacter) {
+                    if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                    mainCharacter.sheetData.hp_current = newHp;
+                }
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        });
+    }
+
+    if (tokenStatBlockAddRollBtn) {
+        tokenStatBlockAddRollBtn.addEventListener('click', () => {
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character) return;
+            const rollName = tokenStatBlockAddRollName.value.trim();
+            const rollDice = tokenStatBlockAddRollDice.value.trim();
+            if (rollName && rollDice) {
+                if (!character.savedRolls) {
+                    character.savedRolls = [];
+                }
+                character.savedRolls.push({ name: rollName, dice: rollDice });
+                populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+                tokenStatBlockAddRollName.value = '';
+                tokenStatBlockAddRollDice.value = '';
+            }
+        });
+    }
+
+    if (tokenStatBlockRollsList) {
+        tokenStatBlockRollsList.addEventListener('click', (event) => {
+            if (event.target.classList.contains('delete-roll-btn')) {
+                if (!selectedTokenForStatBlock) return;
+                const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+                if (!character || !character.savedRolls) return;
+                const rollIndex = parseInt(event.target.dataset.index, 10);
+                if (!isNaN(rollIndex)) {
+                    character.savedRolls.splice(rollIndex, 1);
+                    populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+                }
+            }
+        });
+    }
+
     dmCanvas.addEventListener('contextmenu', (event) => {
         event.preventDefault();
 
@@ -2187,6 +2322,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 characterContextMenu.style.display = 'none';
                 selectedCharacterForContextMenu = null;
             }
+        }
+
+        if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
+            tokenStatBlock.style.display = 'none';
+            selectedTokenForStatBlock = null;
         }
     });
 
