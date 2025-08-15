@@ -277,25 +277,61 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
-/* Footer Styles */
-#dm-footer {
+/* New Floating Footer Styles */
+#dm-floating-footer {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
     background-color: #20262d;
     border-top: 1px solid #3f4c5a;
-    padding: 8px 15px;
+    box-sizing: border-box;
+    z-index: 1002;
+    transition: transform 0.3s ease-in-out;
+    transform: translateY(100%); /* Initially hidden */
+}
+
+#dm-floating-footer.visible {
+    transform: translateY(0);
+}
+
+#footer-content-wrapper {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    box-sizing: border-box;
-    z-index: 1002; /* Ensure it's above map but below modals */
+    align-items: flex-start;
+    padding: 15px;
+}
+
+#footer-left, #footer-right {
+    flex-basis: 25%;
+}
+
+#footer-center {
+    flex-basis: 45%;
+}
+
+#dm-tools-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#dm-tools-list li {
+    padding: 8px 12px;
+    background-color: #3a4f6a;
+    color: #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    text-align: center;
+}
+
+#dm-tools-list li:hover {
+    background-color: #4a5f7a;
 }
 
 #footer-notes-area {
-    flex-grow: 1;
-    margin-right: 20px;
+    width: 100%;
 }
 
 #dm-notes-input {
@@ -305,6 +341,13 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     border: 1px solid #3f4c5a;
     color: #e0e0e0;
     border-radius: 4px;
+    box-sizing: border-box;
+}
+
+#footer-timer-audio-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 #footer-timer-area {
@@ -903,19 +946,18 @@ input:checked + .slider:before {
 
 /* For the floating d20 icon */
 .floating-icon {
-    position: absolute;
+    position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 50px;
-    height: 50px;
-    /* background-color: #333; */
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    z-index: 1000;
-    /* box-shadow: 0 2px 5px rgba(0,0,0,0.2); */
+    z-index: 1003; /* Higher than the footer */
+    transition: transform 0.3s ease-in-out;
 }
 
 /* .floating-icon:hover {
@@ -1020,28 +1062,6 @@ input:checked + .slider:before {
     border-left: 3px solid #76a9d7;
 }
 
-/* Dice Icon Menu */
-.dice-icon-menu {
-    position: absolute;
-    bottom: 80px; /* Position above the d20 icon */
-    right: 20px;
-    background-color: #2a3138;
-    border: 1px solid #3f4c5a;
-    border-radius: 5px;
-    z-index: 1001;
-    width: 200px;
-}
-
-.dice-menu-item {
-    padding: 10px 15px;
-    cursor: pointer;
-    color: #e0e0e0;
-}
-
-.dice-menu-item:hover {
-    background-color: #3f4c5a;
-    color: #b6cae1;
-}
 
 /* Persistent Action Log */
 .dice-dialogue.persistent-log {
