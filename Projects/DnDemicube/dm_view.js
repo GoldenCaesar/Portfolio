@@ -2739,7 +2739,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const tags = tokenStatBlockAddRollTags.value.split(',').map(tag => tag.trim()).filter(tag => tag);
+            const tags = [tokenStatBlockAddRollTags.value];
 
             const hasDice = Object.values(tokenStatBlockDiceCounts).some(count => count > 0);
             if (!hasDice) {
@@ -2870,8 +2870,76 @@ document.addEventListener('DOMContentLoaded', () => {
                             sendInitiativeDataToPlayerView();
                         }
                     });
+                } else if (savedRoll.tags && savedRoll.tags.includes('Healing')) {
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a 'Healing' roll but has no targets.`
+                        });
+                        return;
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const currentHp = parseInt(targetCharacter.sheetData.hp_current, 10) || 0;
+                            const newHp = currentHp + totalSum;
+                            targetCharacter.sheetData.hp_current = newHp;
+
+                            const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
+                            if (mainCharacter) {
+                                if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                                mainCharacter.sheetData.hp_current = newHp;
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `${character.name} heals ${targetCharacter.name} for ${totalSum}! Their HP is now ${newHp}.`
+                            });
+
+                            if (selectedMapFileName) {
+                                displayMapOnCanvas(selectedMapFileName);
+                            }
+                            sendInitiativeDataToPlayerView();
+                        }
+                    });
+                } else if (savedRoll.tags && (savedRoll.tags.includes('Strength') || savedRoll.tags.includes('Dexterity') || savedRoll.tags.includes('Constitution') || savedRoll.tags.includes('Intelligence') || savedRoll.tags.includes('Wisdom') || savedRoll.tags.includes('Charisma'))) {
+                    const skillName = savedRoll.tags.find(t => ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'].includes(t));
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a '${skillName}' roll but has no targets.`
+                        });
+                        return;
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const attackerTotal = totalSum;
+
+                            const targetAttr = skillName.toLowerCase();
+                            const targetModifier = calculateModifier(parseInt(targetCharacter.sheetData[`${targetAttr}_score`], 10) || 10);
+                            const defenderRoll = Math.floor(Math.random() * 20) + 1;
+                            const defenderTotal = defenderRoll + parseInt(targetModifier);
+
+                            let resultMessage;
+                            if (attackerTotal > defenderTotal) {
+                                resultMessage = `${character.name} wins the contested ${skillName} check against ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                            } else if (defenderTotal > attackerTotal) {
+                                resultMessage = `${targetCharacter.name} wins the contested ${skillName} check against ${character.name}! (${defenderTotal} to ${attackerTotal})`;
+                            } else {
+                                resultMessage = `It's a tie for the contested ${skillName} check between ${character.name} and ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: resultMessage
+                            });
+                        }
+                    });
                 } else {
-                    showDiceDialogue({
+                    addLogEntry({
                         characterName: character.name,
                         playerName: character.sheetData.player_name || 'DM',
                         roll: detailsMessage,
