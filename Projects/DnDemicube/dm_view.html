@@ -60,6 +60,17 @@
                     </div>
                 </div>
             </div>
+            <div class="sidebar-section">
+                <h3>Audio Controls</h3>
+                <div id="audio-controls" style="display: flex; flex-direction: column; gap: 10px;">
+                    <select id="audio-input-select" style="width: 100%; padding: 8px; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0; border-radius: 4px;"></select>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="record-button" style="flex-grow: 1;">Record</button>
+                        <button id="test-audio-button" style="flex-grow: 1;">Test Audio</button>
+                    </div>
+                    <audio id="test-audio-playback" controls style="display: none; width: 100%;"></audio>
+                </div>
+            </div>
              <div class="sidebar-section">
                 <h3>Player View</h3>
                 <button id="open-player-view-button">Open Player View</button>
@@ -353,6 +364,10 @@
                 <div class="save-option">
                     <input type="checkbox" id="save-timer-checkbox" name="timer" value="timer" checked>
                     <label for="save-timer-checkbox">Campaign Timer</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-audio-checkbox" name="audio" value="audio" checked>
+                    <label for="save-audio-checkbox">Audio Recordings</label>
                 </div>
             </div>
             <div id="save-conflict-warnings" style="color: yellow; margin-top: 10px;"></div>

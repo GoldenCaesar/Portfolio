@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveInitiativeCheckbox = document.getElementById('save-initiative-checkbox');
     const saveRollsCheckbox = document.getElementById('save-rolls-checkbox');
     const saveTimerCheckbox = document.getElementById('save-timer-checkbox');
+    const saveAudioCheckbox = document.getElementById('save-audio-checkbox');
 
     const loadCampaignModal = document.getElementById('load-campaign-modal');
     const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
@@ -1947,6 +1948,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 campaignData.campaignTime = campaignTime;
             }
 
+            // 7. Handle Audio Recordings
+            if (saveAudioCheckbox.checked && audioBlobs.length > 0) {
+                const audioFolder = zip.folder("audio");
+                audioBlobs.forEach(audio => {
+                    audioFolder.file(audio.name, audio.blob);
+                });
+            }
+
             const campaignJSON = JSON.stringify(campaignData, null, 2);
             zip.file("campaign.json", campaignJSON);
 
@@ -2067,11 +2076,20 @@ document.addEventListener('DOMContentLoaded', () => {
             notes: "Notes",
             savedInitiatives: "Initiative",
             diceRollHistory: "Dice Rolls & History",
-            campaignTime: "Campaign Timer"
+            campaignTime: "Campaign Timer",
+            audio: "Audio Recordings"
         };
 
         for (const key in dataTypeMapping) {
-            if (campaignData.hasOwnProperty(key) && campaignData[key] !== null && (!Array.isArray(campaignData[key]) || campaignData[key].length > 0)) {
+            let dataExists = false;
+            if (key === 'audio') {
+                const audioFolder = zip.folder("audio");
+                dataExists = audioFolder && audioFolder.filter((_, file) => !file.dir).length > 0;
+            } else {
+                dataExists = campaignData.hasOwnProperty(key) && campaignData[key] !== null && (!Array.isArray(campaignData[key]) || campaignData[key].length > 0);
+            }
+
+            if (dataExists) {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.id = `load-${key}-checkbox`;
@@ -2233,6 +2251,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
 
+            // Merge Audio
+            if (selectedOptions.audio && zip.folder("audio")) {
+                const audioFolder = zip.folder("audio");
+                const audioPromises = [];
+                audioFolder.forEach((relativePath, file) => {
+                    if (!file.dir) {
+                        const promise = file.async("blob").then(blob => {
+                            if (!audioBlobs.some(ab => ab.name === relativePath)) {
+                                audioBlobs.push({ name: relativePath, blob: blob });
+                            }
+                        });
+                        audioPromises.push(promise);
+                    }
+                });
+                await Promise.all(audioPromises);
+            }
+
             // Final UI updates
             renderAllLists();
             renderSavedInitiativesList();
@@ -2356,6 +2391,22 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         await Promise.all(imagePromises);
+
+        const audioFolder = zip.folder("audio");
+        if (audioFolder) {
+            audioBlobs = []; // Clear existing audio blobs
+            const audioPromises = [];
+            audioFolder.forEach((relativePath, file) => {
+                if (!file.dir) {
+                    const promise = file.async("blob").then(blob => {
+                        audioBlobs.push({ name: relativePath, blob: blob });
+                    });
+                    audioPromises.push(promise);
+                }
+            });
+            await Promise.all(audioPromises);
+            console.log(`${audioBlobs.length} audio files loaded.`);
+        }
 
         const characterPromises = [];
         const charactersFolder = zip.folder("characters");
@@ -5869,10 +5920,12 @@ function displayToast(messageElement) {
                 campaignTime++;
                 updateCampaignTimerDisplay();
             }, 1000);
+            startRecording();
         } else {
             campaignTimerToggle.textContent = 'Resume Campaign';
             addLogEntry({ type: 'system', message: 'Campaign timer has been paused.' });
             clearInterval(campaignTimerInterval);
+            stopRecording();
         }
     }
 
@@ -5894,4 +5947,155 @@ function displayToast(messageElement) {
             }
         });
     }
+
+    // --- Audio Recording Logic ---
+    const recordButton = document.getElementById('record-button');
+    const testAudioButton = document.getElementById('test-audio-button');
+    const audioInputSelect = document.getElementById('audio-input-select');
+    const testAudioPlayback = document.getElementById('test-audio-playback');
+    let mediaRecorder;
+    let recordedChunks = [];
+    let audioBlobs = []; // To store multiple recordings
+
+    async function getAudioDevices() {
+        try {
+            await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioDevices = devices.filter(device => device.kind === 'audioinput');
+            audioInputSelect.innerHTML = '';
+            if (audioDevices.length === 0) {
+                audioInputSelect.innerHTML = '<option>No audio input devices found</option>';
+                recordButton.disabled = true;
+                testAudioButton.disabled = true;
+                return;
+            }
+            audioDevices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Microphone ${audioInputSelect.options.length + 1}`;
+                audioInputSelect.appendChild(option);
+            });
+            recordButton.disabled = false;
+            testAudioButton.disabled = false;
+        } catch (error) {
+            console.error('Error enumerating audio devices:', error);
+            audioInputSelect.innerHTML = '<option>Audio permission denied</option>';
+            recordButton.disabled = true;
+            testAudioButton.disabled = true;
+        }
+    }
+
+    async function startRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            console.log("Already recording.");
+            return;
+        }
+
+        const selectedDeviceId = audioInputSelect.value;
+        if (!selectedDeviceId) {
+            alert("No audio device selected.");
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedDeviceId } } });
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); // Use webm for better compression
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                const campaignName = "MyCampaign"; // Placeholder - should be dynamic later
+                const sessionDate = new Date().toISOString().slice(0, 19).replace(/T/g, '_').replace(/:/g, "-");
+                const fileName = `${campaignName}_Session_${sessionDate}.webm`;
+                audioBlobs.push({ name: fileName, blob: blob });
+                console.log(`Recording saved: ${fileName}`);
+                // Stop all tracks on the stream to release the device
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            recordButton.textContent = 'Stop';
+            recordButton.style.backgroundColor = '#ff4d4d'; // Indicate recording
+            console.log("Recording started.");
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert("Could not start recording. Check console for errors.");
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            recordButton.textContent = 'Record';
+            recordButton.style.backgroundColor = ''; // Revert to default style
+            console.log("Recording stopped.");
+        }
+    }
+
+    if (recordButton) {
+        recordButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+    }
+
+    if (testAudioButton) {
+        testAudioButton.addEventListener('click', async () => {
+            const selectedDeviceId = audioInputSelect.value;
+            if (!selectedDeviceId) {
+                alert("No audio device selected for testing.");
+                return;
+            }
+            testAudioButton.disabled = true;
+            testAudioButton.textContent = 'Testing...';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedDeviceId } } });
+                const testRecorder = new MediaRecorder(stream);
+                const testChunks = [];
+
+                testRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        testChunks.push(event.data);
+                    }
+                };
+
+                testRecorder.onstop = () => {
+                    const blob = new Blob(testChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(blob);
+                    testAudioPlayback.src = audioUrl;
+                    testAudioPlayback.style.display = 'block';
+                    testAudioPlayback.play();
+                    // Stop all tracks on the stream to release the device
+                    stream.getTracks().forEach(track => track.stop());
+                    testAudioButton.disabled = false;
+                    testAudioButton.textContent = 'Test Audio';
+                };
+
+                testRecorder.start();
+                setTimeout(() => {
+                    if (testRecorder.state === 'recording') {
+                        testRecorder.stop();
+                    }
+                }, 5000); // 5-second test recording
+            } catch (error) {
+                console.error('Error during audio test:', error);
+                alert("Could not perform audio test. Check console for errors.");
+                testAudioButton.disabled = false;
+                testAudioButton.textContent = 'Test Audio';
+            }
+        });
+    }
+
+    // Initialize audio devices on load
+    getAudioDevices();
 });
