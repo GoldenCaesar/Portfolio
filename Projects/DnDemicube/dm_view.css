@@ -300,14 +300,16 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     justify-content: space-between;
     align-items: flex-start;
     padding: 15px;
+    padding-right: 100px; /* Space for the floating d20 icon */
+    box-sizing: border-box;
 }
 
-#footer-left, #footer-right {
-    flex-basis: 25%;
+#footer-left {
+    flex-basis: 50%;
 }
 
 #footer-center {
-    flex-basis: 45%;
+    flex-basis: 50%;
 }
 
 #dm-tools-list {
