@@ -64,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tokenStatBlockHp = document.getElementById('token-stat-block-hp');
     const tokenStatBlockMaxHp = document.getElementById('token-stat-block-max-hp');
     const tokenStatBlockSetTargets = document.getElementById('token-stat-block-set-targets');
+    const tokenStatBlockTargetsContainer = document.getElementById('token-stat-block-targets-container');
+    const tokenStatBlockTargetsList = document.getElementById('token-stat-block-targets-list');
     const tokenStatBlockRollsList = document.getElementById('token-stat-block-rolls-list');
     const tokenStatBlockAddRollName = document.getElementById('token-stat-block-add-roll-name');
     const tokenStatBlockAddRollTags = document.getElementById('token-stat-block-add-roll-tags');
@@ -390,10 +392,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Highlight for targeting
         if (targetingCharacter && targetingCharacter.targets && targetingCharacter.targets.includes(token.uniqueId)) {
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, (size / 2) + (10 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-            ctx.lineWidth = 3 * currentMapDisplayData.ratio;
-            ctx.stroke();
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'; // Red glow
+            ctx.fill();
         }
 
         // Health Ring
@@ -508,11 +509,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.classList.add('targeting');
                 tokenStatBlockSetTargets.textContent = 'Finish Targeting';
                 tokenStatBlockSetTargets.classList.add('active');
-
+                tokenStatBlock.style.display = 'none';
             } else {
                 document.body.classList.remove('targeting');
                 tokenStatBlockSetTargets.textContent = 'Set Targets';
                 tokenStatBlockSetTargets.classList.remove('active');
+
+                const token = selectedTokenForStatBlock;
+                if (token) {
+                    populateAndShowStatBlock(token, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+                }
+
                 targetingCharacter = null;
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
@@ -568,6 +575,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 tokenStatBlockRollsList.appendChild(li);
             });
+        }
+
+        // Render target list
+        if (character.targets && character.targets.length > 0) {
+            tokenStatBlockTargetsContainer.style.display = 'block';
+            tokenStatBlockTargetsList.innerHTML = '';
+            character.targets.forEach(targetId => {
+                const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                if (targetCharacter) {
+                    const li = document.createElement('li');
+                    li.textContent = targetCharacter.name;
+                    tokenStatBlockTargetsList.appendChild(li);
+                }
+            });
+        } else {
+            tokenStatBlockTargetsContainer.style.display = 'none';
         }
 
         // Position the stat block, ensuring it doesn't go off-screen
@@ -889,34 +912,36 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const token of initiativeTokens) {
                 if (isPointInToken(imageCoords, token)) {
                     tokenClicked = true;
-                    if (isTargeting && targetingCharacter && targetingCharacter.uniqueId !== token.uniqueId) {
-                        const targetCharacter = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-                        if (targetCharacter) {
-                            const targetIndex = targetingCharacter.targets.indexOf(targetCharacter.uniqueId);
-                            if (targetIndex > -1) {
-                                targetingCharacter.targets.splice(targetIndex, 1);
-                            } else {
-                                targetingCharacter.targets.push(targetCharacter.uniqueId);
-                            }
-                            if (selectedMapFileName) {
-                                displayMapOnCanvas(selectedMapFileName);
-                            }
-                        }
-                    } else {
-                        if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
-                            tokenStatBlock.style.display = 'none';
-                            selectedTokenForStatBlock = null;
-                            sendTokenStatBlockStateToPlayerView(false);
-                            if (isTargeting) {
-                                isTargeting = false;
-                                document.body.classList.remove('targeting');
-                                tokenStatBlockSetTargets.textContent = 'Set Targets';
-                                tokenStatBlockSetTargets.classList.remove('active');
-                                targetingCharacter = null;
+                    if (isTargeting) {
+                        if (targetingCharacter && token.uniqueId === targetingCharacter.uniqueId) {
+                            // Finish targeting by clicking the originating token
+                            isTargeting = false;
+                            document.body.classList.remove('targeting');
+                            tokenStatBlockSetTargets.textContent = 'Set Targets';
+                            tokenStatBlockSetTargets.classList.remove('active');
+                            populateAndShowStatBlock(token, event.pageX, event.pageY);
+                            targetingCharacter = null;
+                        } else {
+                            // Add/remove a target from the list
+                            const targetCharacter = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+                            if (targetCharacter) {
+                                const targetIndex = targetingCharacter.targets.indexOf(targetCharacter.uniqueId);
+                                if (targetIndex > -1) {
+                                    targetingCharacter.targets.splice(targetIndex, 1);
+                                } else {
+                                    targetingCharacter.targets.push(targetCharacter.uniqueId);
+                                }
                                 if (selectedMapFileName) {
                                     displayMapOnCanvas(selectedMapFileName);
                                 }
                             }
+                        }
+                    } else {
+                        // Not targeting, just open/close stat block
+                        if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
+                            tokenStatBlock.style.display = 'none';
+                            selectedTokenForStatBlock = null;
+                            sendTokenStatBlockStateToPlayerView(false);
                         } else {
                             selectedTokenForStatBlock = token;
                             populateAndShowStatBlock(token, event.pageX, event.pageY);
@@ -4693,10 +4718,8 @@ function displayToast(messageElement) {
             targetContainer.prepend(messageElement);
         }
 
-        if (data.type === 'roll') {
-            displayToast(messageElement);
-            sendToastToPlayerView(data);
-        }
+    displayToast(messageElement);
+    sendToastToPlayerView(data);
 
         if (diceDialogueRecord.classList.contains('persistent-log')) {
             sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);

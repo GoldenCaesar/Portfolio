@@ -458,7 +458,7 @@ window.addEventListener('message', (event) => {
                 }
                 break;
             case 'toast':
-                displayToast(createDiceRollCard(data.rollData));
+                displayToast(createLogCard(data.rollData));
                 break;
             case 'initiativeDataUpdate':
                 activeInitiative = data.activeInitiative || [];
@@ -499,36 +499,43 @@ function getInitials(name) {
     return name.substring(0, 2);
 }
 
-function createDiceRollCard(rollData) {
+function createLogCard(data) {
     const messageElement = document.createElement('div');
     messageElement.classList.add('dice-dialogue-message');
 
     const cardContent = document.createElement('div');
-    cardContent.classList.add('dice-roll-card-content');
+    cardContent.classList.add('dice-roll-card-content'); // Reuse styles
     messageElement.appendChild(cardContent);
 
-    const profilePic = document.createElement('div');
-    profilePic.classList.add('dice-roll-profile-pic');
-    if (rollData.characterPortrait) {
-        profilePic.style.backgroundImage = `url('${rollData.characterPortrait}')`;
-    } else {
-        profilePic.textContent = rollData.characterInitials || getInitials(rollData.characterName);
+    if (data.type === 'roll') {
+        const profilePic = document.createElement('div');
+        profilePic.classList.add('dice-roll-profile-pic');
+        if (data.characterPortrait) {
+            profilePic.style.backgroundImage = `url('${data.characterPortrait}')`;
+        } else {
+            profilePic.textContent = data.characterInitials || getInitials(data.characterName);
+        }
+        cardContent.appendChild(profilePic);
+
+        const textContainer = document.createElement('div');
+        textContainer.classList.add('dice-roll-text-container');
+        cardContent.appendChild(textContainer);
+
+        const namePara = document.createElement('p');
+        namePara.classList.add('dice-roll-name');
+        namePara.innerHTML = `<strong>${data.characterName}</strong> played by <strong>${data.playerName}</strong>`;
+        textContainer.appendChild(namePara);
+
+        const detailsPara = document.createElement('p');
+        detailsPara.classList.add('dice-roll-details');
+        detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${data.sum}</strong> | ${data.roll}`;
+        textContainer.appendChild(detailsPara);
+    } else { // System or Note
+        const detailsPara = document.createElement('p');
+        detailsPara.classList.add('dice-roll-details');
+        detailsPara.innerHTML = data.message;
+        cardContent.appendChild(detailsPara);
     }
-    cardContent.appendChild(profilePic);
-
-    const textContainer = document.createElement('div');
-    textContainer.classList.add('dice-roll-text-container');
-    cardContent.appendChild(textContainer);
-
-    const namePara = document.createElement('p');
-    namePara.classList.add('dice-roll-name');
-    namePara.innerHTML = `<strong>${rollData.characterName}</strong> played by <strong>${rollData.playerName}</strong>`;
-    textContainer.appendChild(namePara);
-
-    const detailsPara = document.createElement('p');
-    detailsPara.classList.add('dice-roll-details');
-    detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${rollData.sum}</strong> | ${rollData.roll}`;
-    textContainer.appendChild(detailsPara);
 
     return messageElement;
 }
