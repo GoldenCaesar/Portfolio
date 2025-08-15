@@ -80,7 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Dice Roller Elements
     const diceRollerIcon = document.getElementById('dice-roller-icon');
-    const diceIconMenu = document.getElementById('dice-icon-menu');
+    const dmFloatingFooter = document.getElementById('dm-floating-footer');
+    const dmToolsList = document.getElementById('dm-tools-list');
     const diceRollerOverlay = document.getElementById('dice-roller-overlay');
     const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
     const diceDialogueRecord = document.getElementById('dice-dialogue-record');
@@ -3158,9 +3159,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('click', (event) => {
-        if (diceIconMenu && diceIconMenu.style.display === 'block') {
-            if (!diceRollerIcon.contains(event.target) && !diceIconMenu.contains(event.target)) {
-                diceIconMenu.style.display = 'none';
+        if (dmFloatingFooter && dmFloatingFooter.classList.contains('visible')) {
+            if (!diceRollerIcon.contains(event.target) && !dmFloatingFooter.contains(event.target)) {
+                dmFloatingFooter.classList.remove('visible');
             }
         }
         if (polygonContextMenu.style.display === 'block') {
@@ -5126,21 +5127,25 @@ function displayToast(messageElement) {
     if (diceRollerIcon) {
         diceRollerIcon.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (diceIconMenu) {
-                const isVisible = diceIconMenu.style.display === 'block';
-                const newVisibility = !isVisible;
-                diceIconMenu.style.display = newVisibility ? 'block' : 'none';
-                sendDiceIconMenuStateToPlayerView(newVisibility);
+            if (dmFloatingFooter) {
+                dmFloatingFooter.classList.toggle('visible');
+                // Optional: send state to player view if footer visibility should be synced
+                // sendDiceIconMenuStateToPlayerView(dmFloatingFooter.classList.contains('visible'));
             }
         });
     }
 
-    if (diceIconMenu) {
-        diceIconMenu.addEventListener('click', (event) => {
-            const action = event.target.dataset.action;
+    if (dmToolsList) {
+        dmToolsList.addEventListener('click', (event) => {
+            const target = event.target.closest('li');
+            if (!target) return;
+
+            const action = target.dataset.action;
             if (action) {
-                diceIconMenu.style.display = 'none';
-                sendDiceIconMenuStateToPlayerView(false);
+                if (dmFloatingFooter) {
+                    dmFloatingFooter.classList.remove('visible');
+                }
+                // sendDiceIconMenuStateToPlayerView(false);
 
                 switch (action) {
                     case 'open-initiative-tracker':
