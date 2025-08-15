@@ -1,4 +1,30 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const skills = {
+        'Acrobatics': 'dexterity',
+        'Animal Handling': 'wisdom',
+        'Arcana': 'intelligence',
+        'Athletics': 'strength',
+        'Deception': 'charisma',
+        'History': 'intelligence',
+        'Insight': 'wisdom',
+        'Intimidation': 'charisma',
+        'Investigation': 'intelligence',
+        'Medicine': 'wisdom',
+        'Nature': 'intelligence',
+        'Perception': 'wisdom',
+        'Performance': 'charisma',
+        'Persuasion': 'charisma',
+        'Religion': 'intelligence',
+        'Sleight of Hand': 'dexterity',
+        'Stealth': 'dexterity',
+        'Survival': 'wisdom'
+    };
+
+    function calculateModifier(score) {
+        let mod = Math.floor((score - 10) / 2);
+        return mod >= 0 ? '+' + mod : mod;
+    }
+
     const saveCampaignModal = document.getElementById('save-campaign-modal');
     const saveCampaignModalCloseButton = document.getElementById('save-campaign-modal-close-button');
     const confirmSaveButton = document.getElementById('confirm-save-button');
@@ -40,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tokenStatBlockSetTargets = document.getElementById('token-stat-block-set-targets');
     const tokenStatBlockRollsList = document.getElementById('token-stat-block-rolls-list');
     const tokenStatBlockAddRollName = document.getElementById('token-stat-block-add-roll-name');
+    const tokenStatBlockAddRollTags = document.getElementById('token-stat-block-add-roll-tags');
     // const tokenStatBlockAddRollDice = document.getElementById('token-stat-block-add-roll-dice'); // REPLACED
     // const tokenStatBlockAddRollBtn = document.getElementById('token-stat-block-add-roll-btn'); // REPLACED
     const tokenStatBlockDiceButtons = document.getElementById('token-stat-block-dice-buttons');
@@ -198,6 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
     let currentDragOffsets = {x: 0, y: 0};
 
+    let isTargeting = false;
+    let targetingCharacter = null;
+
     let currentMapDisplayData = { // To store details of the currently displayed map for coordinate conversion
         img: null,
         ratio: 1,
@@ -352,9 +382,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Highlight for active turn
         if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapD/Projects/DnDemicube/dm_view.jsisplayData.ratio), 0, Math.PI * 2, true);
             ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'; // Golden glow
             ctx.fill();
+        }
+
+        // Highlight for targeting
+        if (targetingCharacter && targetingCharacter.targets && targetingCharacter.targets.includes(token.uniqueId)) {
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, (size / 2) + (10 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.lineWidth = 3 * currentMapDisplayData.ratio;
+            ctx.stroke();
         }
 
         // Health Ring
@@ -451,6 +490,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const countSpan = button.querySelector('.dice-count');
             if (countSpan) {
                 countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    if (tokenStatBlockSetTargets) {
+        tokenStatBlockSetTargets.addEventListener('click', () => {
+            if (!selectedTokenForStatBlock) return;
+
+            isTargeting = !isTargeting;
+
+            if (isTargeting) {
+                targetingCharacter = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+                if (!targetingCharacter.targets) {
+                    targetingCharacter.targets = [];
+                }
+                document.body.classList.add('targeting');
+                tokenStatBlockSetTargets.textContent = 'Finish Targeting';
+                tokenStatBlockSetTargets.classList.add('active');
+
+            } else {
+                document.body.classList.remove('targeting');
+                tokenStatBlockSetTargets.textContent = 'Set Targets';
+                tokenStatBlockSetTargets.classList.remove('active');
+                targetingCharacter = null;
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
             }
         });
     }
@@ -823,13 +889,38 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const token of initiativeTokens) {
                 if (isPointInToken(imageCoords, token)) {
                     tokenClicked = true;
-                    if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
-                        tokenStatBlock.style.display = 'none';
-                        selectedTokenForStatBlock = null;
-                        sendTokenStatBlockStateToPlayerView(false);
+                    if (isTargeting && targetingCharacter && targetingCharacter.uniqueId !== token.uniqueId) {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+                        if (targetCharacter) {
+                            const targetIndex = targetingCharacter.targets.indexOf(targetCharacter.uniqueId);
+                            if (targetIndex > -1) {
+                                targetingCharacter.targets.splice(targetIndex, 1);
+                            } else {
+                                targetingCharacter.targets.push(targetCharacter.uniqueId);
+                            }
+                            if (selectedMapFileName) {
+                                displayMapOnCanvas(selectedMapFileName);
+                            }
+                        }
                     } else {
-                        selectedTokenForStatBlock = token;
-                        populateAndShowStatBlock(token, event.pageX, event.pageY);
+                        if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
+                            tokenStatBlock.style.display = 'none';
+                            selectedTokenForStatBlock = null;
+                            sendTokenStatBlockStateToPlayerView(false);
+                            if (isTargeting) {
+                                isTargeting = false;
+                                document.body.classList.remove('targeting');
+                                tokenStatBlockSetTargets.textContent = 'Set Targets';
+                                tokenStatBlockSetTargets.classList.remove('active');
+                                targetingCharacter = null;
+                                if (selectedMapFileName) {
+                                    displayMapOnCanvas(selectedMapFileName);
+                                }
+                            }
+                        } else {
+                            selectedTokenForStatBlock = token;
+                            populateAndShowStatBlock(token, event.pageX, event.pageY);
+                        }
                     }
                     break;
                 }
@@ -2623,6 +2714,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const tags = tokenStatBlockAddRollTags.value.split(',').map(tag => tag.trim()).filter(tag => tag);
+
             const hasDice = Object.values(tokenStatBlockDiceCounts).some(count => count > 0);
             if (!hasDice) {
                 alert('Please select at least one die to save.');
@@ -2638,7 +2731,8 @@ document.addEventListener('DOMContentLoaded', () => {
             character.savedRolls.push({
                 name: rollName,
                 dice: { ...tokenStatBlockDiceCounts },
-                modifier: modifier
+                modifier: modifier,
+                tags: tags
             });
 
             populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
@@ -2694,15 +2788,74 @@ document.addEventListener('DOMContentLoaded', () => {
                     detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
                 }
 
-                showDiceDialogue({
-                    characterName: character.name,
-                    playerName: character.sheetData.player_name || 'DM',
-                    roll: detailsMessage,
-                    sum: totalSum,
-                    characterPortrait: character.sheetData.character_portrait,
-                    characterInitials: getInitials(character.name)
-                });
-                sendDiceRollToPlayerView(allRolls, totalSum);
+                if (savedRoll.tags && savedRoll.tags.includes('Hit')) {
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a 'Hit' roll but has no targets.`
+                        });
+                        return; // Stop here if no targets
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const targetAC = parseInt(targetCharacter.sheetData.ac, 10) || 10;
+                            let hitResult = 'miss';
+                            if (totalSum >= targetAC) {
+                                hitResult = 'hit';
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `${character.name} attacks ${targetCharacter.name}! Roll: ${totalSum} vs AC: ${targetAC}. It's a ${hitResult.toUpperCase()}!`
+                            });
+                        }
+                    });
+                } else if (savedRoll.tags && savedRoll.tags.includes('Damage')) {
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a 'Damage' roll but has no targets.`
+                        });
+                        return; // Stop here if no targets
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const currentHp = parseInt(targetCharacter.sheetData.hp_current, 10) || 0;
+                            const newHp = currentHp - totalSum;
+                            targetCharacter.sheetData.hp_current = newHp;
+
+                            const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
+                            if (mainCharacter) {
+                                if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                                mainCharacter.sheetData.hp_current = newHp;
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `${character.name} deals ${totalSum} damage to ${targetCharacter.name}! Their HP is now ${newHp}.`
+                            });
+
+                            if (selectedMapFileName) {
+                                displayMapOnCanvas(selectedMapFileName);
+                            }
+                            sendInitiativeDataToPlayerView();
+                        }
+                    });
+                } else {
+                    showDiceDialogue({
+                        characterName: character.name,
+                        playerName: character.sheetData.player_name || 'DM',
+                        roll: detailsMessage,
+                        sum: totalSum,
+                        characterPortrait: character.sheetData.character_portrait,
+                        characterInitials: getInitials(character.name)
+                    });
+                    sendDiceRollToPlayerView(allRolls, totalSum);
+                }
             }
         });
     }
@@ -2862,7 +3015,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
             tokenStatBlock.style.display = 'none';
             selectedTokenForStatBlock = null;
-        sendTokenStatBlockStateToPlayerView(false);
+            sendTokenStatBlockStateToPlayerView(false);
+            if (isTargeting) {
+                isTargeting = false;
+                document.body.classList.remove('targeting');
+                tokenStatBlockSetTargets.textContent = 'Set Targets';
+                tokenStatBlockSetTargets.classList.remove('active');
+                targetingCharacter = null;
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
         }
     });
 
@@ -4195,18 +4358,54 @@ document.addEventListener('DOMContentLoaded', () => {
             const characterName = character ? character.name : 'Unknown';
             const playerName = character && character.sheetData ? character.sheetData.player_name : 'DM';
 
-            const d20Roll = Math.floor(Math.random() * 20) + 1;
-            const total = d20Roll + parseInt(modifier);
+            const activeCharacter = activeInitiative.find(c => c.id === selectedCharacterId);
 
-            const rollData = {
-                characterName: characterName,
-                playerName: playerName,
-                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${skillName}`,
-                sum: total
-            };
+            if (activeCharacter && activeCharacter.targets && activeCharacter.targets.length > 0) {
+                // Contested roll
+                activeCharacter.targets.forEach(targetId => {
+                    const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                    if (targetCharacter) {
+                        // Attacker's roll
+                        const attackerRoll = Math.floor(Math.random() * 20) + 1;
+                        const attackerTotal = attackerRoll + parseInt(modifier);
 
-            addLogEntry(rollData);
-            sendDiceRollToPlayerView([d20Roll], total);
+                        // Target's roll
+                        const targetSkill = Object.keys(skills).find(key => key.toLowerCase() === skillName.toLowerCase());
+                        const targetAttr = skills[targetSkill];
+                        const targetModifier = calculateModifier(parseInt(targetCharacter.sheetData[`${targetAttr}_score`], 10) || 10);
+                        const defenderRoll = Math.floor(Math.random() * 20) + 1;
+                        const defenderTotal = defenderRoll + parseInt(targetModifier);
+
+                        let resultMessage;
+                        if (attackerTotal > defenderTotal) {
+                            resultMessage = `${characterName} wins the contested ${skillName} check against ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                        } else if (defenderTotal > attackerTotal) {
+                            resultMessage = `${targetCharacter.name} wins the contested ${skillName} check against ${characterName}! (${defenderTotal} to ${attackerTotal})`;
+                        } else {
+                            resultMessage = `It's a tie for the contested ${skillName} check between ${characterName} and ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                        }
+
+                        addLogEntry({
+                            type: 'system',
+                            message: resultMessage
+                        });
+                    }
+                });
+            } else {
+                // Standard roll
+                const d20Roll = Math.floor(Math.random() * 20) + 1;
+                const total = d20Roll + parseInt(modifier);
+
+                const rollData = {
+                    characterName: characterName,
+                    playerName: playerName,
+                    roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${skillName}`,
+                    sum: total
+                };
+
+                addLogEntry(rollData);
+                sendDiceRollToPlayerView([d20Roll], total);
+            }
         } else if (event.data.type === 'statRoll') {
             const { rollName, modifier } = event.data;
             const character = charactersData.find(c => c.id === selectedCharacterId);

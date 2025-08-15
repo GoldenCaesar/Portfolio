@@ -277,6 +277,15 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+body.targeting {
+    cursor: crosshair;
+}
+
+#token-stat-block-set-targets.active {
+    background-color: #ff4d4d;
+    color: white;
+}
+
 .dice-button-compact {
     padding: 5px;
     font-size: 12px;
@@ -351,9 +360,17 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     gap: 5px;
 }
 
-#token-stat-block-add-roll-name, #token-stat-block-save-roll-btn {
+#token-stat-block-add-roll-name, #token-stat-block-add-roll-tags, #token-stat-block-save-roll-btn {
     width: 100%;
     box-sizing: border-box;
+}
+
+#token-stat-block-add-roll-tags {
+    margin-bottom: 5px;
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    color: #e0e0e0;
+    padding: 5px;
 }
 
 #token-stat-block-dice-buttons {
