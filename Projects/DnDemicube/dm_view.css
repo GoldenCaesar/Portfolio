@@ -61,6 +61,10 @@ button:hover, input[type="file"]:hover {
     background-color: #a0b4c9;
 }
 
+#map-tools-section {
+    display: none;
+}
+
 /* Styling for buttons in the map tools section */
 #map-tools-section .map-tools-buttons button {
     display: block; /* Stack buttons vertically */
@@ -994,6 +998,10 @@ input:checked + .slider:before {
     text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Shadow for all text */
     display: flex;
     flex-direction: column;
+}
+
+#dice-roller-overlay {
+    z-index: 1003;
 }
 
 #dice-roller-overlay .overlay-content,

@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const polygonContextMenu = document.getElementById('polygon-context-menu');
     const noteContextMenu = document.getElementById('note-context-menu');
     const characterContextMenu = document.getElementById('character-context-menu');
+    const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const displayedFileNames = new Set();
 
     // Token Stat Block Elements
@@ -943,16 +944,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                     displayMapOnCanvas(selectedMapFileName);
                                 }
                             }
-                        }
-                    } else {
-                        // Not targeting, just open/close stat block
-                        if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
-                            tokenStatBlock.style.display = 'none';
-                            selectedTokenForStatBlock = null;
-                            sendTokenStatBlockStateToPlayerView(false);
-                        } else {
-                            selectedTokenForStatBlock = token;
-                            populateAndShowStatBlock(token, event.pageX, event.pageY);
                         }
                     }
                     break;
@@ -3043,6 +3034,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         polygonContextMenu.style.display = 'none';
         noteContextMenu.style.display = 'none';
+        characterContextMenu.style.display = 'none';
+        mapToolsContextMenu.style.display = 'none';
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
 
@@ -3056,44 +3049,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!imageCoords) return;
 
-        const selectedMapData = detailedMapData.get(selectedMapFileName);
-        if (!selectedMapData || !selectedMapData.overlays) return;
-
-        for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
-            const overlay = selectedMapData.overlays[i];
-            if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
-                selectedPolygonForContextMenu = {
-                    overlay: overlay,
-                    index: i,
-                    parentMapName: selectedMapData.name,
-                    source: selectedMapData.mode
-                };
-
-                const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
-                const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
-                const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
-                const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
-                const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
-
-                if (selectedMapData.mode === 'view') {
-                    if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
-                    if (changeChildMapItem) changeChildMapItem.style.display = 'none';
-                    if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
-                    if (movePolygonItem) movePolygonItem.style.display = 'none';
-                    if (deleteLinkItem) deleteLinkItem.style.display = 'none';
-                } else { // edit mode
-                    if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
-                    if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
-                    if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
-                    if (movePolygonItem) movePolygonItem.style.display = 'list-item';
-                    if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+        if (initiativeTokens.length > 0) {
+            for (const token of initiativeTokens) {
+                if (isPointInToken(imageCoords, token)) {
+                    if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
+                        tokenStatBlock.style.display = 'none';
+                        selectedTokenForStatBlock = null;
+                        sendTokenStatBlockStateToPlayerView(false);
+                    } else {
+                        selectedTokenForStatBlock = token;
+                        populateAndShowStatBlock(token, event.pageX, event.pageY);
+                    }
+                    return; // Token was clicked, don't show other context menus
                 }
+            }
+        }
 
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+
+        let overlayClicked = false;
+        if (selectedMapData.overlays) {
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    selectedPolygonForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: selectedMapData.name,
+                        source: selectedMapData.mode
+                    };
+                    const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
+                    const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
+                    const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
+                    const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
+                    if (selectedMapData.mode === 'view') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (changeChildMapItem) changeChildMapItem.style.display = 'none';
+                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
+                        if (movePolygonItem) movePolygonItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // edit mode
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
+                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
+                        if (movePolygonItem) movePolygonItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
                     polygonContextMenu.style.left = `${event.pageX}px`;
                     polygonContextMenu.style.top = `${event.pageY}px`;
                     polygonContextMenu.style.display = 'block';
                     console.log('Right-clicked on polygon:', selectedPolygonForContextMenu);
-                    return;
+                    overlayClicked = true;
+                    break;
                 } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
                     selectedNoteForContextMenu = {
                         overlay: overlay,
@@ -3101,12 +3110,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         parentMapName: selectedMapData.name,
                         source: selectedMapData.mode
                     };
-
                     const toggleVisibilityItem = noteContextMenu.querySelector('[data-action="toggle-player-visibility"]');
                     const linkToNewNoteItem = noteContextMenu.querySelector('[data-action="link-to-new-note"]');
                     const moveNoteItem = noteContextMenu.querySelector('[data-action="move-note"]');
                     const deleteLinkItem = noteContextMenu.querySelector('[data-action="delete-link"]');
-
                     if (selectedMapData.mode === 'view') {
                         if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
                         if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'none';
@@ -3118,12 +3125,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (moveNoteItem) moveNoteItem.style.display = 'list-item';
                         if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
                     }
-
                     noteContextMenu.style.left = `${event.pageX}px`;
                     noteContextMenu.style.top = `${event.pageY}px`;
                     noteContextMenu.style.display = 'block';
                     console.log('Right-clicked on note icon:', selectedNoteForContextMenu);
-                    return;
+                    overlayClicked = true;
+                    break;
                 } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
                     selectedCharacterForContextMenu = {
                         overlay: overlay,
@@ -3131,12 +3138,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         parentMapName: selectedMapData.name,
                         source: selectedMapData.mode
                     };
-
                     const toggleVisibilityItem = characterContextMenu.querySelector('[data-action="toggle-player-visibility"]');
                     const linkToCharacterItem = characterContextMenu.querySelector('[data-action="link-to-character"]');
                     const moveCharacterItem = characterContextMenu.querySelector('[data-action="move-character"]');
                     const deleteLinkItem = characterContextMenu.querySelector('[data-action="delete-link"]');
-
                     if (selectedMapData.mode === 'view') {
                         if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
                         if (linkToCharacterItem) linkToCharacterItem.style.display = 'none';
@@ -3148,14 +3153,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (moveCharacterItem) moveCharacterItem.style.display = 'list-item';
                         if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
                     }
-
                     characterContextMenu.style.left = `${event.pageX}px`;
                     characterContextMenu.style.top = `${event.pageY}px`;
                     characterContextMenu.style.display = 'block';
                     console.log('Right-clicked on character icon:', selectedCharacterForContextMenu);
-                    return;
+                    overlayClicked = true;
+                    break;
                 }
             }
+        }
+
+        if (!overlayClicked && selectedMapData.mode === 'edit') {
+            mapToolsContextMenu.style.left = `${event.pageX}px`;
+            mapToolsContextMenu.style.top = `${event.pageY}px`;
+            mapToolsContextMenu.style.display = 'block';
+        }
     });
 
     document.addEventListener('click', (event) => {
@@ -3182,6 +3194,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedCharacterForContextMenu = null;
             }
         }
+        if (mapToolsContextMenu.style.display === 'block') {
+            if (!mapToolsContextMenu.contains(event.target)) {
+                mapToolsContextMenu.style.display = 'none';
+            }
+        }
 
         if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
             tokenStatBlock.style.display = 'none';
@@ -3198,6 +3215,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+    });
+
+    mapToolsContextMenu.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const action = event.target.dataset.action;
+
+        if (action) {
+            const button = document.getElementById(`btn-${action.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
+            if (button) {
+                button.click();
+            } else if (action === 'link-child-map') {
+                // Special case for the first button's ID
+                document.getElementById('btn-link-child-map').click();
+            }
+        }
+        mapToolsContextMenu.style.display = 'none';
     });
 
     polygonContextMenu.addEventListener('click', (event) => {
