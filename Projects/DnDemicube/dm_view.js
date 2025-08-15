@@ -382,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Highlight for active turn
         if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapD/Projects/DnDemicube/dm_view.jsisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
             ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'; // Golden glow
             ctx.fill();
         }
