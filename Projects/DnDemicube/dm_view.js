@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveNotesCheckbox = document.getElementById('save-notes-checkbox');
     const saveInitiativeCheckbox = document.getElementById('save-initiative-checkbox');
     const saveRollsCheckbox = document.getElementById('save-rolls-checkbox');
+    const saveTimerCheckbox = document.getElementById('save-timer-checkbox');
 
     const loadCampaignModal = document.getElementById('load-campaign-modal');
     const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
@@ -226,6 +227,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let characterBeingMoved = null;
     let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
     let currentDragOffsets = {x: 0, y: 0};
+
+    // Campaign Timer State
+    let campaignTimerInterval = null;
+    let campaignTime = 0; // Total elapsed seconds
+    let isCampaignTimerPaused = true;
 
     let isTargeting = false;
     let targetingCharacter = null;
@@ -1845,6 +1851,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     async function saveCampaign() {
+        if (!isCampaignTimerPaused) {
+            toggleCampaignTimer(); // Pause the timer
+            alert("Campaign timer has been automatically paused for the save operation.");
+        }
+
         confirmSaveButton.textContent = 'Saving...';
         confirmSaveButton.disabled = true;
 
@@ -1929,6 +1940,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (saveRollsCheckbox.checked) {
                 campaignData.diceRollHistory = diceRollHistory;
                 campaignData.savedRolls = savedRolls;
+            }
+
+            // 6. Handle Campaign Timer
+            if (saveTimerCheckbox.checked) {
+                campaignData.campaignTime = campaignTime;
             }
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -2050,7 +2066,8 @@ document.addEventListener('DOMContentLoaded', () => {
             characters: "Characters",
             notes: "Notes",
             savedInitiatives: "Initiative",
-            diceRollHistory: "Dice Rolls & History"
+            diceRollHistory: "Dice Rolls & History",
+            campaignTime: "Campaign Timer"
         };
 
         for (const key in dataTypeMapping) {
@@ -2204,6 +2221,15 @@ document.addEventListener('DOMContentLoaded', () => {
                  const existingRolls = new Set(savedRolls.map(r => r.name));
                  const newRolls = campaignData.savedRolls.filter(r => !existingRolls.has(r.name));
                  savedRolls.push(...newRolls);
+            }
+
+            // Merge Campaign Timer
+            if (selectedOptions.campaignTime && typeof campaignData.campaignTime === 'number') {
+                campaignTime = campaignData.campaignTime;
+                isCampaignTimerPaused = true;
+                clearInterval(campaignTimerInterval);
+                campaignTimerToggle.textContent = 'Resume Campaign';
+                updateCampaignTimerDisplay();
             }
 
 
@@ -4733,7 +4759,11 @@ function displayToast(messageElement) {
         } else { // System or Note
             detailsPara = document.createElement('p');
             detailsPara.classList.add('dice-roll-details');
-            detailsPara.innerHTML = data.message;
+             if (data.type === 'dm-note') {
+                detailsPara.innerHTML = `<strong>DM Note:</strong> ${data.message}`;
+            } else {
+                detailsPara.innerHTML = data.message;
+            }
             cardContent.appendChild(detailsPara);
 
             const timestampPara = document.createElement('p');
@@ -5809,6 +5839,58 @@ function displayToast(messageElement) {
                 if (diceDialogueRecord.classList.contains('persistent-log')) {
                    sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
                 }
+            }
+        });
+    }
+
+    // --- Campaign Timer Logic ---
+    const campaignTimerDisplay = document.getElementById('campaign-timer-display');
+    const campaignTimerToggle = document.getElementById('campaign-timer-toggle');
+
+    function formatTime(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function updateCampaignTimerDisplay() {
+        if (campaignTimerDisplay) {
+            campaignTimerDisplay.textContent = formatTime(campaignTime);
+        }
+    }
+
+    function toggleCampaignTimer() {
+        isCampaignTimerPaused = !isCampaignTimerPaused;
+        if (!isCampaignTimerPaused) {
+            campaignTimerToggle.textContent = 'Pause Campaign';
+            addLogEntry({ type: 'system', message: 'Campaign timer has been resumed.' });
+            campaignTimerInterval = setInterval(() => {
+                campaignTime++;
+                updateCampaignTimerDisplay();
+            }, 1000);
+        } else {
+            campaignTimerToggle.textContent = 'Resume Campaign';
+            addLogEntry({ type: 'system', message: 'Campaign timer has been paused.' });
+            clearInterval(campaignTimerInterval);
+        }
+    }
+
+    if (campaignTimerToggle) {
+        campaignTimerToggle.addEventListener('click', toggleCampaignTimer);
+    }
+    // --- End Campaign Timer Logic ---
+
+    const dmNotesInput = document.getElementById('dm-notes-input');
+    if (dmNotesInput) {
+        dmNotesInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && dmNotesInput.value.trim() !== '') {
+                event.preventDefault();
+                addLogEntry({
+                    type: 'dm-note',
+                    message: dmNotesInput.value.trim()
+                });
+                dmNotesInput.value = '';
             }
         });
     }

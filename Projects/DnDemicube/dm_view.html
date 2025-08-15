@@ -350,6 +350,10 @@
                     <input type="checkbox" id="save-rolls-checkbox" name="rolls" value="rolls" checked>
                     <label for="save-rolls-checkbox">Dice Rolls & History</label>
                 </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-timer-checkbox" name="timer" value="timer" checked>
+                    <label for="save-timer-checkbox">Campaign Timer</label>
+                </div>
             </div>
             <div id="save-conflict-warnings" style="color: yellow; margin-top: 10px;"></div>
             <div style="margin-top: 20px;">
@@ -424,5 +428,14 @@
             </div>
         </div>
     </div>
+    <footer id="dm-footer">
+        <div id="footer-notes-area">
+            <input type="text" id="dm-notes-input" placeholder="Type a note and press Enter...">
+        </div>
+        <div id="footer-timer-area">
+            <span id="campaign-timer-display">00:00:00</span>
+            <button id="campaign-timer-toggle">Resume Campaign</button>
+        </div>
+    </footer>
 </body>
 </html>
