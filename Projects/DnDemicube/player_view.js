@@ -17,13 +17,28 @@ const authorText = document.getElementById('author-text');
 let slideshowActive = false;
 let currentSlideIndex = 0;
 let shuffledCharacters = [];
-let quoteMap = null;
-
-fetch('quote_map.json')
-    .then(response => response.json())
-    .then(data => {
-        quoteMap = data;
+const quoteMapPromise = fetch('quote_map.json')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .catch(e => {
+        console.error("Failed to load quote_map.json:", e);
+        // Return a default/empty quote map to prevent further errors
+        return {
+            "ability_scores": {},
+            "character_details": {},
+            "combat_stats": {},
+            "roleplaying_details": {}
+        };
     });
+
+let quoteMap = null;
+quoteMapPromise.then(data => {
+    quoteMap = data;
+});
 
 function getRandomStat(character) {
     if (!quoteMap) return null;
@@ -369,16 +384,18 @@ window.addEventListener('message', (event) => {
                 break;
             case 'clearMap':
                 console.log("Player view received clearMap message.");
-                currentMapImage = null;
-                currentOverlays = [];
+                quoteMapPromise.then(() => {
+                    currentMapImage = null;
+                    currentOverlays = [];
 
-                shuffledCharacters = data.characters.sort(() => 0.5 - Math.random());
-                currentSlideIndex = 0;
+                    shuffledCharacters = data.characters.sort(() => 0.5 - Math.random());
+                    currentSlideIndex = 0;
 
-                playerMapContainer.style.display = 'none';
-                slideshowContainer.style.display = 'flex';
-                slideshowActive = true;
-                animateSlideshow();
+                    playerMapContainer.style.display = 'none';
+                    slideshowContainer.style.display = 'flex';
+                    slideshowActive = true;
+                    animateSlideshow();
+                });
                 break;
             case 'showNotePreview':
                 const notePreviewOverlay = document.getElementById('note-preview-overlay');
