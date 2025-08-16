@@ -319,6 +319,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = dmCanvas.getContext('2d');
         const img = new Image();
         img.onload = () => {
+            if (fileName !== selectedMapFileName) {
+                console.log(`Map draw for ${fileName} cancelled; ${selectedMapFileName} is now selected.`);
+                return;
+            }
             ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
 
             const hRatio = dmCanvas.width / img.width;
@@ -3821,6 +3825,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 sendMapToPlayerView(parentMapName);
                             }
                         }
+                        selectedNoteForContextMenu = null;
                         break;
                 }
             }
@@ -4494,6 +4499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 sendMapToPlayerView(parentMapName);
                             }
                         }
+                        selectedCharacterForContextMenu = null;
                         break;
                 }
             }
