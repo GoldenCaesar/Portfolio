@@ -66,6 +66,7 @@ function getRandomStat(character) {
 }
 
 function getQuote(stat, character) {
+    console.log(`Getting quote for stat: ${stat.statName}`);
     if (!quoteMap) {
         return "Loading quotes...";
     }
@@ -117,6 +118,7 @@ function updateSlide() {
         return;
     }
     const character = shuffledCharacters[currentSlideIndex];
+    console.log(`Updating slide for character: ${character.name}`);
     const randomStat = getRandomStat(character);
 
     if (character.isDetailsVisible) {
@@ -135,6 +137,7 @@ function updateSlide() {
 }
 
 function animateSlideshow() {
+    console.log('Animating slide...');
     if (!slideshowActive) return;
 
     contentContainer.classList.remove("animate-out");
@@ -385,6 +388,7 @@ window.addEventListener('message', (event) => {
             case 'clearMap':
                 console.log("Player view received clearMap message.");
                 quoteMapPromise.then(() => {
+                    console.log('Quote map loaded, starting slideshow...');
                     currentMapImage = null;
                     currentOverlays = [];
 
