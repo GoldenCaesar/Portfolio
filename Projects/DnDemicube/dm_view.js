@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveTimerCheckbox = document.getElementById('save-timer-checkbox');
     const saveAudioCheckbox = document.getElementById('save-audio-checkbox');
     const saveStoryBeatsCheckbox = document.getElementById('save-story-beats-checkbox');
+    const saveQuotesCheckbox = document.getElementById('save-quotes-checkbox');
 
     const loadCampaignModal = document.getElementById('load-campaign-modal');
     const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
@@ -166,6 +167,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyBeatCardOverlay = document.getElementById('story-beat-card-overlay');
     const storyBeatCardCloseButton = document.getElementById('story-beat-card-close-button');
     const storyBeatCardBody = document.getElementById('story-beat-card-body');
+    const quoteEditorContainer = document.getElementById('quote-editor-container');
+    const saveQuotesButton = document.getElementById('save-quotes-button');
+    const quoteJsonEditor = document.getElementById('quote-json-editor');
 
 
     // Map Tools Elements
@@ -210,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let storyTreeScale = 1.0;
     let storyTreeOriginX = 0;
     let storyTreeOriginY = 0;
+    let storyTreeInitialized = false;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -680,7 +685,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (storyBeatCardBody) {
         storyBeatCardBody.addEventListener('click', (e) => {
-            if (e.target.classList.contains('status-tab')) {
+            if (e.target.classList.contains('quest-link')) {
+                e.preventDefault();
+                const questId = parseInt(e.target.dataset.questId, 10);
+                const quest = quests.find(q => q.id === questId);
+                if (quest) {
+                    populateAndShowStoryBeatCard(quest);
+                }
+            } else if (e.target.classList.contains('status-tab')) {
                 const newStatus = e.target.dataset.status;
                 const quest = quests.find(q => q.id === selectedQuestId);
                 if (quest) {
@@ -2144,6 +2156,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             }
 
+            // 9. Handle Custom Quotes
+            if (saveQuotesCheckbox.checked && quoteMap) {
+                campaignData.quoteMap = quoteMap;
+            }
+
             const campaignJSON = JSON.stringify(campaignData, null, 2);
             zip.file("campaign.json", campaignJSON);
 
@@ -2266,7 +2283,8 @@ document.addEventListener('DOMContentLoaded', () => {
             diceRollHistory: "Dice Rolls & History",
             campaignTime: "Campaign Timer",
             audio: "Audio Recordings",
-            storyTree: "Story Beats"
+            storyTree: "Story Beats",
+            quoteMap: "Character Quotes"
         };
 
         for (const key in dataTypeMapping) {
@@ -2494,6 +2512,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     nextQuestId = 2;
                     selectedQuestId = 1;
                 }
+            }
+
+            // Merge Custom Quotes
+            if (selectedOptions.quoteMap && campaignData.quoteMap) {
+                quoteMap = campaignData.quoteMap;
+                console.log("Custom character quotes loaded from campaign file.");
             }
 
             // Final UI updates
@@ -4016,11 +4040,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyTreeContainer.style.flexGrow = '1';
                 initStoryTree();
             }
+            if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
         } else {
             if (mapContainer) mapContainer.classList.remove('hidden');
             if (noteEditorContainer) noteEditorContainer.classList.remove('active');
             if (characterSheetContainer) characterSheetContainer.classList.remove('active');
             if (storyTreeContainer) storyTreeContainer.style.display = 'none';
+            if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
         }
     }
 
@@ -6437,19 +6463,60 @@ function displayToast(messageElement) {
 
     if (modifyQuotesButton) {
         modifyQuotesButton.addEventListener('click', () => {
-            console.log('Modify Custom Character Quotes button clicked.');
+            mapContainer.style.display = 'none';
+            noteEditorContainer.style.display = 'none';
+            characterSheetContainer.style.display = 'none';
+            storyTreeContainer.style.display = 'none';
+
+            quoteEditorContainer.style.display = 'flex';
+
+            if (quoteMap) {
+                quoteJsonEditor.value = JSON.stringify(quoteMap, null, 2);
+            } else {
+                quoteJsonEditor.value = "Loading quotes...";
+                quoteMapPromise.then(data => {
+                    if (data) {
+                        quoteJsonEditor.value = JSON.stringify(data, null, 2);
+                    } else {
+                        quoteJsonEditor.value = "Failed to load quote_map.json. Check the console for errors.";
+                    }
+                });
+            }
+        });
+    }
+
+    if (saveQuotesButton) {
+        saveQuotesButton.addEventListener('click', () => {
+            try {
+                const updatedQuotes = JSON.parse(quoteJsonEditor.value);
+                quoteMap = updatedQuotes;
+                alert("Quotes updated in memory for this session. They will be saved with the campaign.");
+            } catch (e) {
+                alert("Invalid JSON format. Please correct the errors before saving.");
+                console.error("Error parsing quote JSON:", e);
+            }
         });
     }
 
     if (viewStoryTreeButton) {
         viewStoryTreeButton.addEventListener('click', () => {
             switchTab('tab-story-beats');
+            setTimeout(() => {
+                const finalQuest = quests.find(q => q.id === 1);
+                if (finalQuest && storyTreeCanvas.width > 0) {
+                    storyTreeOriginX = (storyTreeCanvas.width / 2) - (finalQuest.x * storyTreeScale);
+                    storyTreeOriginY = (storyTreeCanvas.height / 2) - (finalQuest.y * storyTreeScale);
+                    initStoryTree();
+                }
+            }, 10);
         });
     }
 
     function initStoryTree() {
         // --- Core Functions ---
         const ctx = storyTreeCanvas.getContext('2d');
+        let isLinkingQuest = false;
+        let sourceQuestIdForLinking = null;
 
         const layoutTree = () => {
             const roots = quests.filter(q => q.parentId === null);
@@ -6540,20 +6607,40 @@ function displayToast(messageElement) {
                 card.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const questId = parseInt(card.dataset.id, 10);
-                    const currentlySelected = document.querySelector('.card.selected');
 
-                    if (storyBeatCardOverlay.style.display === 'flex' && currentlySelected && parseInt(currentlySelected.dataset.id, 10) === questId) {
-                        storyBeatCardOverlay.style.display = 'none';
-                        if (currentlySelected) {
-                            currentlySelected.classList.remove('selected');
+                    if (isLinkingQuest) {
+                        if (questId === sourceQuestIdForLinking) {
+                            isLinkingQuest = false;
+                            storyTreeContainer.style.cursor = 'grab';
+                            const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
+                            if (sourceCard) sourceCard.style.boxShadow = '';
+                            sourceQuestIdForLinking = null;
+                            return;
                         }
+
+                        createLinkTypeContextMenu(e, sourceQuestIdForLinking, questId);
+
+                        isLinkingQuest = false;
+                        storyTreeContainer.style.cursor = 'grab';
+                        const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
+                        if (sourceCard) sourceCard.style.boxShadow = '';
+                        sourceQuestIdForLinking = null;
                     } else {
-                        selectedQuestId = quest.id;
-                        if (currentlySelected) {
-                            currentlySelected.classList.remove('selected');
+                        const currentlySelected = document.querySelector('.card.selected');
+
+                        if (storyBeatCardOverlay.style.display === 'flex' && currentlySelected && parseInt(currentlySelected.dataset.id, 10) === questId) {
+                            storyBeatCardOverlay.style.display = 'none';
+                            if (currentlySelected) {
+                                currentlySelected.classList.remove('selected');
+                            }
+                        } else {
+                            selectedQuestId = quest.id;
+                            if (currentlySelected) {
+                                currentlySelected.classList.remove('selected');
+                            }
+                            card.classList.add('selected');
+                            populateAndShowStoryBeatCard(quest);
                         }
-                        card.classList.add('selected');
-                        populateAndShowStoryBeatCard(quest);
                     }
                 });
 
@@ -6623,8 +6710,50 @@ function displayToast(messageElement) {
             createContextMenu(e, options);
         };
 
-        const createCardContextMenu = (e, questId) => {
+        const createLinkTypeContextMenu = (e, sourceId, targetId) => {
+            const sourceQuest = quests.find(q => q.id === sourceId);
+            const targetQuest = quests.find(q => q.id === targetId);
+            if (!sourceQuest || !targetQuest) return;
+
             const options = [
+                {
+                    label: 'Parent', // Target is the parent of Source
+                    action: () => {
+                        if (sourceQuest.parentId === targetId) {
+                            sourceQuest.parentId = null;
+                        } else {
+                            if (targetQuest.parentId === sourceId) {
+                                targetQuest.parentId = null;
+                            }
+                            sourceQuest.parentId = targetId;
+                        }
+                        layoutTree();
+                        drawConnections();
+                        renderCards();
+                    }
+                },
+                {
+                    label: 'Child', // Target is the child of Source
+                    action: () => {
+                        if (targetQuest.parentId === sourceId) {
+                            targetQuest.parentId = null;
+                        } else {
+                            if (sourceQuest.parentId === targetId) {
+                                sourceQuest.parentId = null;
+                            }
+                            targetQuest.parentId = sourceId;
+                        }
+                        layoutTree();
+                        drawConnections();
+                        renderCards();
+                    }
+                }
+            ];
+            createContextMenu(e, options);
+        };
+
+        const createCardContextMenu = (e, questId) => {
+            let options = [
                 {
                     label: 'Rename',
                     action: () => {
@@ -6665,18 +6794,33 @@ function displayToast(messageElement) {
                         moveStartX = e.clientX - rect.x;
                         moveStartY = e.clientY - rect.y;
                     }
+                },
+                {
+                    label: 'Link',
+                    action: () => {
+                        isLinkingQuest = true;
+                        sourceQuestIdForLinking = questId;
+                        storyTreeContainer.style.cursor = 'crosshair';
+                        document.querySelectorAll('.card').forEach(c => c.style.boxShadow = '');
+                        const sourceCard = document.querySelector(`.card[data-id="${questId}"]`);
+                        if (sourceCard) {
+                            sourceCard.style.boxShadow = '0 0 15px yellow';
+                        }
+                    }
                 }
             ];
+
+            if (questId === 1) {
+                options = options.filter(opt => opt.label !== 'Delete');
+            }
+
+            options = options.sort((a, b) => {
+                const order = { 'Rename': 1, 'Link': 2, 'Move': 3, 'Delete': 4 };
+                return (order[a.label] || 99) - (order[b.label] || 99);
+            });
+
             createContextMenu(e, options);
         };
-
-        // --- Event Listeners and Main Logic ---
-        let isPanning = false;
-        let isMoving = false;
-        let startX = 0;
-        let startY = 0;
-        let moveStartX = 0;
-        let moveStartY = 0;
 
         const resizeCanvas = () => {
             storyTreeCanvas.width = storyTreeContainer.offsetWidth;
@@ -6684,81 +6828,103 @@ function displayToast(messageElement) {
             drawConnections();
             renderCards();
         };
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
 
-        storyTreeContainer.addEventListener('mousedown', (e) => {
-            if (e.button === 2) {
-                return;
-            }
-            if (isMoving) {
-                const questToMove = quests.find(q => q.id === selectedQuestId);
-                if (questToMove) {
-                    moveStartX = e.clientX - ((questToMove.x * storyTreeScale) + storyTreeOriginX);
-                    moveStartY = e.clientY - ((questToMove.y * storyTreeScale) + storyTreeOriginY);
+        // --- Event Listeners and Main Logic ---
+        if (!storyTreeInitialized) {
+            storyTreeInitialized = true;
+            let isPanning = false;
+            let isMoving = false;
+            let startX = 0;
+            let startY = 0;
+            let moveStartX = 0;
+            let moveStartY = 0;
+
+            window.addEventListener('resize', resizeCanvas);
+
+            storyTreeContainer.addEventListener('mousedown', (e) => {
+                if (e.button === 2) {
+                    // Also cancel linking on right-click
+                    if (isLinkingQuest) {
+                        isLinkingQuest = false;
+                        storyTreeContainer.style.cursor = 'grab';
+                        const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
+                        if (sourceCard) sourceCard.style.boxShadow = '';
+                        sourceQuestIdForLinking = null;
+                    }
+                    return;
                 }
-                return;
-            }
-            isPanning = true;
-            startX = e.clientX - storyTreeOriginX;
-            startY = e.clientY - storyTreeOriginY;
-            storyTreeContainer.style.cursor = 'grabbing';
-        });
+                if (isMoving) {
+                    const questToMove = quests.find(q => q.id === selectedQuestId);
+                    if (questToMove) {
+                        moveStartX = e.clientX - ((questToMove.x * storyTreeScale) + storyTreeOriginX);
+                        moveStartY = e.clientY - ((questToMove.y * storyTreeScale) + storyTreeOriginY);
+                    }
+                    return;
+                }
+                isPanning = true;
+                startX = e.clientX - storyTreeOriginX;
+                startY = e.clientY - storyTreeOriginY;
+                storyTreeContainer.style.cursor = 'grabbing';
+            });
 
-        storyTreeContainer.addEventListener('mouseup', () => {
-            isPanning = false;
-            isMoving = false;
-            document.body.classList.remove('moving-mode');
-            storyTreeContainer.style.cursor = 'grab';
-        });
+            storyTreeContainer.addEventListener('mouseup', () => {
+                isPanning = false;
+                isMoving = false;
+                document.body.classList.remove('moving-mode');
+                storyTreeContainer.style.cursor = 'grab';
+            });
 
-        storyTreeContainer.addEventListener('mousemove', (e) => {
-            if (isMoving) {
-                const questToMove = quests.find(q => q.id === selectedQuestId);
-                if (questToMove) {
-                    const newX = (e.clientX - moveStartX - storyTreeOriginX) / storyTreeScale;
-                    const newY = (e.clientY - moveStartY - storyTreeOriginY) / storyTreeScale;
-                    questToMove.x = newX;
-                    questToMove.y = newY;
+            storyTreeContainer.addEventListener('mousemove', (e) => {
+                if (isMoving) {
+                    const questToMove = quests.find(q => q.id === selectedQuestId);
+                    if (questToMove) {
+                        const newX = (e.clientX - moveStartX - storyTreeOriginX) / storyTreeScale;
+                        const newY = (e.clientY - moveStartY - storyTreeOriginY) / storyTreeScale;
+                        questToMove.x = newX;
+                        questToMove.y = newY;
+                        drawConnections();
+                        renderCards();
+                    }
+                } else if (isPanning) {
+                    storyTreeOriginX = e.clientX - startX;
+                    storyTreeOriginY = e.clientY - startY;
                     drawConnections();
                     renderCards();
                 }
-            } else if (isPanning) {
-                storyTreeOriginX = e.clientX - startX;
-                storyTreeOriginY = e.clientY - startY;
+            });
+
+            storyTreeContainer.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomAmount = -e.deltaY * 0.001;
+                const newScale = Math.min(Math.max(0.2, storyTreeScale + zoomAmount), 2.0);
+
+                const mouseX = e.clientX - storyTreeContainer.getBoundingClientRect().left;
+                const mouseY = e.clientY - storyTreeContainer.getBoundingClientRect().top;
+
+                storyTreeOriginX = storyTreeOriginX - (mouseX - storyTreeOriginX) * (newScale / storyTreeScale - 1);
+                storyTreeOriginY = storyTreeOriginY - (mouseY - storyTreeOriginY) * (newScale / storyTreeScale - 1);
+
+                storyTreeScale = newScale;
                 drawConnections();
                 renderCards();
-            }
-        });
+            });
 
-        storyTreeContainer.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const zoomAmount = -e.deltaY * 0.001;
-            const newScale = Math.min(Math.max(0.2, storyTreeScale + zoomAmount), 2.0);
+            storyTreeContainer.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (!e.target.closest('.card')) {
+                    createCanvasContextMenu(e);
+                }
+            });
 
-            const mouseX = e.clientX - storyTreeContainer.getBoundingClientRect().left;
-            const mouseY = e.clientY - storyTreeContainer.getBoundingClientRect().top;
+            window.addEventListener('click', (e) => {
+                const menu = document.querySelector('.context-menu');
+                if (menu && !menu.contains(e.target)) {
+                    menu.remove();
+                }
+            });
+        }
 
-            storyTreeOriginX = storyTreeOriginX - (mouseX - storyTreeOriginX) * (newScale / storyTreeScale - 1);
-            storyTreeOriginY = storyTreeOriginY - (mouseY - storyTreeOriginY) * (newScale / storyTreeScale - 1);
-
-            storyTreeScale = newScale;
-            drawConnections();
-            renderCards();
-        });
-
-        storyTreeContainer.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            createCanvasContextMenu(e);
-        });
-
-        window.addEventListener('click', (e) => {
-            const menu = document.querySelector('.context-menu');
-            if (menu && !menu.contains(e.target)) {
-                menu.remove();
-            }
-        });
-
+        resizeCanvas();
         layoutTree();
         drawConnections();
         renderCards();
@@ -6766,6 +6932,24 @@ function displayToast(messageElement) {
 
     function populateAndShowStoryBeatCard(quest) {
         if (!quest) return;
+
+        let finalQuestNote = '';
+        if (quest.id === 1) {
+            finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is designed to be the final Campaign ending quest, and as such cannot be removed.</p>`;
+        }
+
+        const parentQuest = quests.find(q => q.id === quest.parentId);
+        const childrenQuests = quests.filter(q => q.parentId === quest.id);
+
+        let parentHTML = 'None';
+        if (parentQuest) {
+            parentHTML = `<a href="#" class="quest-link" data-quest-id="${parentQuest.id}">${parentQuest.name}</a>`;
+        }
+
+        let childrenHTML = 'None';
+        if (childrenQuests.length > 0) {
+            childrenHTML = childrenQuests.map(q => `<a href="#" class="quest-link" data-quest-id="${q.id}">${q.name}</a>`).join('<br>');
+        }
 
         let prerequisitesHTML = quest.prerequisites.map((p, index) => `
             <label class="flex gap-x-3 py-3 flex-row">
@@ -6788,6 +6972,7 @@ function displayToast(messageElement) {
 
         storyBeatCardBody.innerHTML = `
             <h1>${quest.name}</h1>
+            ${finalQuestNote}
             <div class="status-tabs">
                 <div class="status-tab ${quest.status === 'active' ? 'active' : ''}" data-status="active">Active</div>
                 <div class="status-tab ${quest.status === 'abandon' ? 'active' : ''}" data-status="abandon">Abandon</div>
@@ -6795,6 +6980,10 @@ function displayToast(messageElement) {
             </div>
             <h3>Description</h3>
             <p>${quest.description || 'No description yet.'}</p>
+            <h3>Parent Quest</h3>
+            <div>${parentHTML}</div>
+            <h3>Child Quests</h3>
+            <div>${childrenHTML}</div>
             <h3>Prerequisites</h3>
             <div>${prerequisitesHTML || 'None'}</div>
             <h3>Rewards</h3>
