@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveRollsCheckbox = document.getElementById('save-rolls-checkbox');
     const saveTimerCheckbox = document.getElementById('save-timer-checkbox');
     const saveAudioCheckbox = document.getElementById('save-audio-checkbox');
+    const saveStoryBeatsCheckbox = document.getElementById('save-story-beats-checkbox');
 
     const loadCampaignModal = document.getElementById('load-campaign-modal');
     const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
@@ -155,6 +156,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfViewerContainer = document.getElementById('pdf-viewer-container');
     const pdfViewerIframe = document.getElementById('pdf-viewer-iframe');
 
+    // Story Beats Tab Elements
+    const storyBeatsTab = document.getElementById('tab-story-beats');
+    const modifyQuotesButton = document.getElementById('modify-quotes-button');
+    const viewStoryTreeButton = document.getElementById('view-story-tree-button');
+    const storyTreeContainer = document.getElementById('story-tree-container');
+    const storyTreeCanvas = document.getElementById('story-tree-canvas');
+
 
     // Map Tools Elements
     const mapToolsSection = document.getElementById('map-tools-section');
@@ -188,6 +196,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedCharacterId = null;
     let isCharactersEditMode = false;
     let characterEasyMDE = null;
+
+    // Story Beats State Variables
+    let storyTreeData = {};
+    let storyTreeCanvasObj = null;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -2100,6 +2112,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
+            // 8. Handle Story Beats
+            if (saveStoryBeatsCheckbox.checked) {
+                campaignData.storyTree = storyTreeCanvasObj ? storyTreeCanvasObj.toDatalessJSON() : {};
+            }
+
             const campaignJSON = JSON.stringify(campaignData, null, 2);
             zip.file("campaign.json", campaignJSON);
 
@@ -2221,7 +2238,8 @@ document.addEventListener('DOMContentLoaded', () => {
             savedInitiatives: "Initiative",
             diceRollHistory: "Dice Rolls & History",
             campaignTime: "Campaign Timer",
-            audio: "Audio Recordings"
+            audio: "Audio Recordings",
+            storyTree: "Story Beats"
         };
 
         for (const key in dataTypeMapping) {
@@ -2412,6 +2430,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 await Promise.all(audioPromises);
             }
 
+            // Merge Story Beats
+            if (selectedOptions.storyTree && campaignData.storyTree) {
+                if (storyTreeCanvasObj) {
+                    storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+                } else {
+                    initStoryTree();
+                    storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+                }
+            }
+
             // Final UI updates
             renderAllLists();
             renderSavedInitiativesList();
@@ -2463,6 +2491,15 @@ document.addEventListener('DOMContentLoaded', () => {
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
         restoreInitiativeState(campaignData);
+
+        if (campaignData.storyTree) {
+            if (storyTreeCanvasObj) {
+                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+            } else {
+                initStoryTree();
+                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+            }
+        }
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
         if (loadedMapIconSize > 20) { // Likely old pixel value
@@ -2585,6 +2622,15 @@ document.addEventListener('DOMContentLoaded', () => {
         savedInitiatives = campaignData.savedInitiatives || {};
         initiativeTokens = campaignData.initiativeTokens || [];
         restoreInitiativeState(campaignData);
+
+        if (campaignData.storyTree) {
+            if (storyTreeCanvasObj) {
+                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+            } else {
+                initStoryTree();
+                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+            }
+        }
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
         if (loadedMapIconSize > 20) { // Likely old pixel value
@@ -3905,10 +3951,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderCharactersList();
                 }
             }
+        } else if (tabId === 'tab-story-beats') {
+            if (mapContainer) mapContainer.classList.add('hidden');
+            if (noteEditorContainer) noteEditorContainer.classList.remove('active');
+            if (characterSheetContainer) characterSheetContainer.classList.remove('active');
+            if (storyTreeContainer) storyTreeContainer.style.display = 'block';
+            initStoryTree();
         } else {
             if (mapContainer) mapContainer.classList.remove('hidden');
             if (noteEditorContainer) noteEditorContainer.classList.remove('active');
             if (characterSheetContainer) characterSheetContainer.classList.remove('active');
+            if (storyTreeContainer) storyTreeContainer.style.display = 'none';
         }
     }
 
@@ -6322,4 +6375,73 @@ function displayToast(messageElement) {
             triggerSlideshow(); // This will generate and send a new playlist
         }
     });
+
+    if (modifyQuotesButton) {
+        modifyQuotesButton.addEventListener('click', () => {
+            console.log('Modify Custom Character Quotes button clicked.');
+        });
+    }
+
+    if (viewStoryTreeButton) {
+        viewStoryTreeButton.addEventListener('click', () => {
+            switchTab('tab-story-beats');
+        });
+    }
+
+    function initStoryTree() {
+        if (storyTreeCanvasObj) {
+            return;
+        }
+
+        storyTreeCanvasObj = new fabric.Canvas(storyTreeCanvas);
+
+        const startNode = new fabric.Rect({
+            left: 100,
+            top: 100,
+            fill: 'blue',
+            width: 100,
+            height: 50,
+            label: 'Start'
+        });
+
+        storyTreeCanvasObj.add(startNode);
+
+        storyTreeCanvasObj.on('mouse:wheel', function(opt) {
+            var delta = opt.e.deltaY;
+            var zoom = storyTreeCanvasObj.getZoom();
+            zoom *= 0.999 ** delta;
+            if (zoom > 20) zoom = 20;
+            if (zoom < 0.01) zoom = 0.01;
+            storyTreeCanvasObj.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+            opt.e.preventDefault();
+            opt.e.stopPropagation();
+        });
+
+        storyTreeCanvasObj.on('mouse:down', function(opt) {
+            var evt = opt.e;
+            if (evt.altKey === true) {
+                this.isDragging = true;
+                this.selection = false;
+                this.lastPosX = evt.clientX;
+                this.lastPosY = evt.clientY;
+            }
+        });
+
+        storyTreeCanvasObj.on('mouse:move', function(opt) {
+            if (this.isDragging) {
+                var e = opt.e;
+                var vpt = this.viewportTransform;
+                vpt[4] += e.clientX - this.lastPosX;
+                vpt[5] += e.clientY - this.lastPosY;
+                this.requestRenderAll();
+                this.lastPosX = e.clientX;
+                this.lastPosY = e.clientY;
+            }
+        });
+
+        storyTreeCanvasObj.on('mouse:up', function(opt) {
+            this.isDragging = false;
+            this.selection = true;
+        });
+    }
 });

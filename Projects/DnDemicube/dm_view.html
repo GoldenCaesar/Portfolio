@@ -13,6 +13,7 @@
             <button class="tab-button active" data-tab="tab-dm-controls">DM Controls</button>
             <button class="tab-button" data-tab="tab-notes">Notes</button>
             <button class="tab-button" data-tab="tab-characters">Characters</button>
+            <button class="tab-button" data-tab="tab-story-beats">Story Beats</button>
         </div>
 
         <div id="tab-dm-controls" class="tab-content active">
@@ -89,10 +90,21 @@
                 </ul>
             </div>
         </div>
+
+        <div id="tab-story-beats" class="tab-content">
+            <div class="sidebar-section">
+                <h3>Story Beats</h3>
+                <button id="modify-quotes-button">Modify Custom Character Quotes</button>
+                <button id="view-story-tree-button">View Story Tree</button>
+            </div>
+        </div>
     </div>
     <div id="map-container">
         <canvas id="dm-canvas"></canvas>
         <canvas id="drawing-canvas"></canvas>
+    </div>
+    <div id="story-tree-container" style="display: none; flex-grow: 1; padding: 10px;">
+        <canvas id="story-tree-canvas"></canvas>
     </div>
     <div id="note-editor-container" style="display: none; flex-grow: 1; padding: 10px;">
         <div id="note-editor-area" style="display: flex; flex-direction: column; height: 100%;">
@@ -135,6 +147,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="dm_view.js"></script>
     <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
 
@@ -360,6 +373,10 @@
                 <div class="save-option">
                     <input type="checkbox" id="save-audio-checkbox" name="audio" value="audio" checked>
                     <label for="save-audio-checkbox">Audio Recordings</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-story-beats-checkbox" name="story-beats" value="story-beats" checked>
+                    <label for="save-story-beats-checkbox">Story Beats</label>
                 </div>
             </div>
             <div id="save-conflict-warnings" style="color: yellow; margin-top: 10px;"></div>
