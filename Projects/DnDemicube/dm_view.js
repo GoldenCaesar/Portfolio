@@ -160,8 +160,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyBeatsTab = document.getElementById('tab-story-beats');
     const modifyQuotesButton = document.getElementById('modify-quotes-button');
     const viewStoryTreeButton = document.getElementById('view-story-tree-button');
-    const storyTreeContainer = document.getElementById('story-tree-container');
-    const storyTreeCanvas = document.getElementById('story-tree-canvas');
+    const storyTreeContainer = document.getElementById('canvas-container');
+    const storyTreeCanvas = document.getElementById('quest-canvas');
+    const storyTreeCardContainer = document.getElementById('card-container');
 
 
     // Map Tools Elements
@@ -198,8 +199,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let characterEasyMDE = null;
 
     // Story Beats State Variables
-    let storyTreeData = {};
-    let storyTreeCanvasObj = null;
+    let quests = [
+        { id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0 }
+    ];
+    let nextQuestId = 2;
+    let selectedQuestId = 1;
+    let storyTreeScale = 1.0;
+    let storyTreeOriginX = 0;
+    let storyTreeOriginY = 0;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -2114,7 +2121,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 8. Handle Story Beats
             if (saveStoryBeatsCheckbox.checked) {
-                campaignData.storyTree = storyTreeCanvasObj ? storyTreeCanvasObj.toDatalessJSON() : {};
+                campaignData.storyTree = {
+                    quests: quests,
+                    nextQuestId: nextQuestId,
+                    selectedQuestId: selectedQuestId
+                };
             }
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
@@ -2432,11 +2443,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Merge Story Beats
             if (selectedOptions.storyTree && campaignData.storyTree) {
-                if (storyTreeCanvasObj) {
-                    storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
-                } else {
-                    initStoryTree();
-                    storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+                if (campaignData.storyTree.quests) { // New format
+                    quests = campaignData.storyTree.quests;
+                    nextQuestId = campaignData.storyTree.nextQuestId;
+                    selectedQuestId = campaignData.storyTree.selectedQuestId;
+                } else if (Object.keys(campaignData.storyTree).length > 0) { // Old fabric.js format
+                    // Attempt to convert old data or notify user
+                    console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
+                    alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
+                    // Reset to default state
+                    quests = [{ id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0 }];
+                    nextQuestId = 2;
+                    selectedQuestId = 1;
                 }
             }
 
@@ -3955,8 +3973,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mapContainer) mapContainer.classList.add('hidden');
             if (noteEditorContainer) noteEditorContainer.classList.remove('active');
             if (characterSheetContainer) characterSheetContainer.classList.remove('active');
-            if (storyTreeContainer) storyTreeContainer.style.display = 'block';
-            initStoryTree();
+            if (storyTreeContainer) {
+                storyTreeContainer.style.display = 'flex'; // Use flex to match container style
+                storyTreeContainer.style.flexGrow = '1';
+                initStoryTree();
+            }
         } else {
             if (mapContainer) mapContainer.classList.remove('hidden');
             if (noteEditorContainer) noteEditorContainer.classList.remove('active');
@@ -6389,64 +6410,300 @@ function displayToast(messageElement) {
     }
 
     function initStoryTree() {
-        if (storyTreeCanvasObj) {
-            return;
-        }
+        // --- Core Functions ---
+        const ctx = storyTreeCanvas.getContext('2d');
 
-        const container = storyTreeContainer;
-        const canvas = storyTreeCanvas;
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
+        const layoutTree = () => {
+            const roots = quests.filter(q => q.parentId === null);
+            if (roots.length === 0) return;
 
-        storyTreeCanvasObj = new fabric.Canvas(storyTreeCanvas);
+            let treeOffsetY = 0;
 
-        const startNode = new fabric.Rect({
-            left: 100,
-            top: 100,
-            fill: 'blue',
-            width: 100,
-            height: 50,
-            label: 'Start'
+            roots.forEach(root => {
+                const queue = [{ id: root.id, x: 0, y: treeOffsetY }];
+                const processed = new Set();
+                processed.add(root.id);
+
+                root.x = 0;
+                root.y = treeOffsetY;
+
+                let head = 0;
+                while(head < queue.length) {
+                    const parent = quests.find(q => q.id === queue[head].id);
+                    if (!parent) {
+                        head++;
+                        continue;
+                    }
+
+                    const children = quests.filter(q => q.parentId === parent.id);
+                    const totalWidth = children.length * 400;
+                    let currentX = parent.x - totalWidth / 2 + 200;
+
+                    children.forEach(child => {
+                        child.x = currentX;
+                        child.y = parent.y + 250;
+                        queue.push({ id: child.id, x: child.x, y: child.y });
+                        currentX += 400;
+                    });
+                    head++;
+                }
+
+                const maxDepth = Math.max(...quests.map(q => q.y));
+                treeOffsetY = maxDepth + 250;
+            });
+        };
+
+        const drawConnections = () => {
+            ctx.clearRect(0, 0, storyTreeCanvas.width, storyTreeCanvas.height);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            quests.forEach(quest => {
+                if (quest.parentId !== null) {
+                    const parentQuest = quests.find(q => q.id === quest.parentId);
+                    if (parentQuest) {
+                        const startX = (parentQuest.x * storyTreeScale) + storyTreeOriginX;
+                        const startY = (parentQuest.y * storyTreeScale) + storyTreeOriginY;
+                        const endX = (quest.x * storyTreeScale) + storyTreeOriginX;
+                        const endY = (quest.y * storyTreeScale) + storyTreeOriginY;
+
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                    }
+                }
+            });
+        };
+
+        const renderCards = () => {
+            storyTreeCardContainer.innerHTML = '';
+
+            quests.forEach(quest => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                if (quest.id === selectedQuestId) {
+                    card.classList.add('selected');
+                }
+                card.dataset.id = quest.id;
+
+                const nameElement = document.createElement('h3');
+                nameElement.textContent = quest.name;
+                card.appendChild(nameElement);
+
+                const x = (quest.x * storyTreeScale) + storyTreeOriginX;
+                const y = (quest.y * storyTreeScale) + storyTreeOriginY;
+                card.style.left = `${x}px`;
+                card.style.top = `${y}px`;
+                card.style.transform = `translate(-50%, -50%) scale(${storyTreeScale})`;
+
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedQuestId = quest.id;
+                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                });
+
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectedQuestId = quest.id;
+                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    createCardContextMenu(e, quest.id);
+                });
+
+                storyTreeCardContainer.appendChild(card);
+            });
+        };
+
+        // --- Context Menu Logic ---
+        const createContextMenu = (e, options) => {
+            const existingMenu = document.querySelector('.context-menu');
+            if (existingMenu) existingMenu.remove();
+
+            const menu = document.createElement('ul');
+            menu.classList.add('context-menu');
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+
+            options.forEach(option => {
+                const item = document.createElement('li');
+                item.textContent = option.label;
+                item.addEventListener('click', () => {
+                    option.action();
+                    menu.remove();
+                });
+                menu.appendChild(item);
+            });
+
+            document.body.appendChild(menu);
+        };
+
+        const createCanvasContextMenu = (e) => {
+            const options = [{
+                label: 'Add Quest',
+                action: () => {
+                    const canvasBounds = storyTreeContainer.getBoundingClientRect();
+                    const newX = (e.clientX - canvasBounds.left - storyTreeOriginX) / storyTreeScale;
+                    const newY = (e.clientY - canvasBounds.top - storyTreeOriginY) / storyTreeScale;
+
+                    const newQuest = {
+                        id: nextQuestId++,
+                        name: `New Quest ${nextQuestId - 1}`,
+                        parentId: null,
+                        x: newX,
+                        y: newY,
+                    };
+                    quests.push(newQuest);
+                    selectedQuestId = newQuest.id;
+                    drawConnections();
+                    renderCards();
+                }
+            }];
+            createContextMenu(e, options);
+        };
+
+        const createCardContextMenu = (e, questId) => {
+            const options = [
+                {
+                    label: 'Rename',
+                    action: () => {
+                        const quest = quests.find(q => q.id === questId);
+                        const newName = prompt('Enter a new name for the quest:', quest.name);
+                        if (newName !== null && newName.trim() !== '') {
+                            quest.name = newName;
+                            renderCards();
+                        }
+                    }
+                },
+                {
+                    label: 'Delete',
+                    action: () => {
+                        const questToDelete = quests.find(q => q.id === questId);
+                        if (!questToDelete) return;
+
+                        const deleteChildren = (id) => {
+                            const children = quests.filter(q => q.parentId === id);
+                            children.forEach(child => deleteChildren(child.id));
+                            quests = quests.filter(q => q.id !== id);
+                        };
+
+                        deleteChildren(questId);
+                        selectedQuestId = null;
+                        drawConnections();
+                        renderCards();
+                    }
+                },
+                {
+                    label: 'Move',
+                    action: () => {
+                        isMoving = true;
+                        document.body.classList.add('moving-mode');
+                        const quest = quests.find(q => q.id === questId);
+                        const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
+                        const rect = cardElement.getBoundingClientRect();
+                        moveStartX = e.clientX - rect.x;
+                        moveStartY = e.clientY - rect.y;
+                    }
+                }
+            ];
+            createContextMenu(e, options);
+        };
+
+        // --- Event Listeners and Main Logic ---
+        let isPanning = false;
+        let isMoving = false;
+        let startX = 0;
+        let startY = 0;
+        let moveStartX = 0;
+        let moveStartY = 0;
+
+        const resizeCanvas = () => {
+            storyTreeCanvas.width = storyTreeContainer.offsetWidth;
+            storyTreeCanvas.height = storyTreeContainer.offsetHeight;
+            drawConnections();
+            renderCards();
+        };
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        storyTreeContainer.addEventListener('mousedown', (e) => {
+            if (e.button === 2) {
+                return;
+            }
+            if (isMoving) {
+                const questToMove = quests.find(q => q.id === selectedQuestId);
+                if (questToMove) {
+                    moveStartX = e.clientX - ((questToMove.x * storyTreeScale) + storyTreeOriginX);
+                    moveStartY = e.clientY - ((questToMove.y * storyTreeScale) + storyTreeOriginY);
+                }
+                return;
+            }
+            isPanning = true;
+            startX = e.clientX - storyTreeOriginX;
+            startY = e.clientY - storyTreeOriginY;
+            storyTreeContainer.style.cursor = 'grabbing';
         });
 
-        storyTreeCanvasObj.add(startNode);
-
-        storyTreeCanvasObj.on('mouse:wheel', function(opt) {
-            var delta = opt.e.deltaY;
-            var zoom = storyTreeCanvasObj.getZoom();
-            zoom *= 0.999 ** delta;
-            if (zoom > 20) zoom = 20;
-            if (zoom < 0.01) zoom = 0.01;
-            storyTreeCanvasObj.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-            opt.e.preventDefault();
-            opt.e.stopPropagation();
+        storyTreeContainer.addEventListener('mouseup', () => {
+            isPanning = false;
+            isMoving = false;
+            document.body.classList.remove('moving-mode');
+            storyTreeContainer.style.cursor = 'grab';
         });
 
-        storyTreeCanvasObj.on('mouse:down', function(opt) {
-            var evt = opt.e;
-            if (evt.altKey === true) {
-                this.isDragging = true;
-                this.selection = false;
-                this.lastPosX = evt.clientX;
-                this.lastPosY = evt.clientY;
+        storyTreeContainer.addEventListener('mousemove', (e) => {
+            if (isMoving) {
+                const questToMove = quests.find(q => q.id === selectedQuestId);
+                if (questToMove) {
+                    const newX = (e.clientX - moveStartX - storyTreeOriginX) / storyTreeScale;
+                    const newY = (e.clientY - moveStartY - storyTreeOriginY) / storyTreeScale;
+                    questToMove.x = newX;
+                    questToMove.y = newY;
+                    drawConnections();
+                    renderCards();
+                }
+            } else if (isPanning) {
+                storyTreeOriginX = e.clientX - startX;
+                storyTreeOriginY = e.clientY - startY;
+                drawConnections();
+                renderCards();
             }
         });
 
-        storyTreeCanvasObj.on('mouse:move', function(opt) {
-            if (this.isDragging) {
-                var e = opt.e;
-                var vpt = this.viewportTransform;
-                vpt[4] += e.clientX - this.lastPosX;
-                vpt[5] += e.clientY - this.lastPosY;
-                this.requestRenderAll();
-                this.lastPosX = e.clientX;
-                this.lastPosY = e.clientY;
+        storyTreeContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomAmount = -e.deltaY * 0.001;
+            const newScale = Math.min(Math.max(0.2, storyTreeScale + zoomAmount), 2.0);
+
+            const mouseX = e.clientX - storyTreeContainer.getBoundingClientRect().left;
+            const mouseY = e.clientY - storyTreeContainer.getBoundingClientRect().top;
+
+            storyTreeOriginX = storyTreeOriginX - (mouseX - storyTreeOriginX) * (newScale / storyTreeScale - 1);
+            storyTreeOriginY = storyTreeOriginY - (mouseY - storyTreeOriginY) * (newScale / storyTreeScale - 1);
+
+            storyTreeScale = newScale;
+            drawConnections();
+            renderCards();
+        });
+
+        storyTreeContainer.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            createCanvasContextMenu(e);
+        });
+
+        window.addEventListener('click', (e) => {
+            const menu = document.querySelector('.context-menu');
+            if (menu && !menu.contains(e.target)) {
+                menu.remove();
             }
         });
 
-        storyTreeCanvasObj.on('mouse:up', function(opt) {
-            this.isDragging = false;
-            this.selection = true;
-        });
+        layoutTree();
+        drawConnections();
+        renderCards();
     }
 });
