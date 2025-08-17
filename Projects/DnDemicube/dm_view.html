@@ -144,6 +144,14 @@
             </div>
         </div>
     </div>
+    <div id="quote-editor-container" style="display: none; flex-grow: 1; padding: 10px;">
+        <div id="quote-editor-area" style="display: flex; flex-direction: column; height: 100%;">
+            <h3>Modify Character Quotes (quote_map.json)</h3>
+            <p>Edit the JSON content below. Be careful with the syntax. Your changes will be saved with the campaign.</p>
+            <button id="save-quotes-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Save Quotes to Memory</button>
+            <textarea id="quote-json-editor" style="width: 100%; flex-grow: 1; font-family: monospace; background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #3f4c5a;"></textarea>
+        </div>
+    </div>
     <div id="hover-label" class="hover-label" style="display: none;"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
@@ -389,6 +397,10 @@
                 <div class="save-option">
                     <input type="checkbox" id="save-story-beats-checkbox" name="story-beats" value="story-beats" checked>
                     <label for="save-story-beats-checkbox">Story Beats</label>
+                </div>
+                <div class="save-option">
+                    <input type="checkbox" id="save-quotes-checkbox" name="quotes" value="quotes" checked>
+                    <label for="save-quotes-checkbox">Character Quotes</label>
                 </div>
             </div>
             <div id="save-conflict-warnings" style="color: yellow; margin-top: 10px;"></div>
