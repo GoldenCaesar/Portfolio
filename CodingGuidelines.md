@@ -19,7 +19,7 @@ Above every major section or element in your code, you must add a single-line co
 
   * **Format**: The header comment has three parts, always in this order: `// [TOC ID] [Link(s)] Description`
   * **TOC ID**: This is the location number from your Table of Contents (e.g., `[1.2.1.2]`). It tells you exactly where this element lives in the project.
-  * **Link(s)**: This part shows if the code is connected to another document. Use the format `[{number} {file_name:TOC_ID}]`.
+  * **Link(s)**: This part shows if the code is connected to another document(s) (e.g., is it a click handler connected to a button somewhere? then there are links. is it a css class that you thought had a connection but really has not been used yet? then no links). Use the format `[{number of connections} {TOC_ID}{file_name1:TOC_ID}{file_name2:TOC_ID}]`. links in the same document as the code does not need a file name preceding the link.
   * **Description**: This is a simple, clear sentence that describes what the code does.
 
 -----
@@ -155,3 +155,4 @@ this should go in the master project directory markdown, but also the relevent e
 // [3 {3.1.3}{index.html:1.2.3}{style.css:7}] This section demonstrates how we change an element's appearance using JavaScript. It finds the `settings_overlay` element in the HTML and directly changes its `display` style property from its default hidden state to 'block', making it visible on the page.
 
 ```
+
