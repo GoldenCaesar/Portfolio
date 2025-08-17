@@ -42,7 +42,7 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
     display: block;
     width: 100%;
     height: 100%;
-    background-color: #f9f9f9;
+    background-color: #2a3138;
 }
 
 .card-container {
@@ -96,8 +96,8 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
 
 .context-menu {
     position: absolute;
-    background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    background-color: #2a3138;
+    border: 1px solid #3f4c5a;
     border-radius: 8px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
     list-style: none;
@@ -111,12 +111,12 @@ body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; backgro
 .context-menu li {
     padding: 10px 15px;
     font-size: 0.9rem;
-    color: #1f2937;
+    color: #e0e0e0;
     transition: background-color 0.1s ease;
 }
 
 .context-menu li:hover {
-    background-color: #f1f5f9;
+    background-color: #3f4c5a;
 }
 
 /* Mode-specific cursors */
