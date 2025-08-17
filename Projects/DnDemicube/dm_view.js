@@ -163,6 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyTreeContainer = document.getElementById('canvas-container');
     const storyTreeCanvas = document.getElementById('quest-canvas');
     const storyTreeCardContainer = document.getElementById('card-container');
+    const storyBeatCardOverlay = document.getElementById('story-beat-card-overlay');
+    const storyBeatCardCloseButton = document.getElementById('story-beat-card-close-button');
+    const storyBeatCardBody = document.getElementById('story-beat-card-body');
 
 
     // Map Tools Elements
@@ -200,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Story Beats State Variables
     let quests = [
-        { id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0 }
+        { id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }
     ];
     let nextQuestId = 2;
     let selectedQuestId = 1;
@@ -671,6 +674,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const countSpan = button.querySelector('.dice-count');
             if (countSpan) {
                 countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    if (storyBeatCardBody) {
+        storyBeatCardBody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('status-tab')) {
+                const newStatus = e.target.dataset.status;
+                const quest = quests.find(q => q.id === selectedQuestId);
+                if (quest) {
+                    quest.status = newStatus;
+                    populateAndShowStoryBeatCard(quest);
+                }
             }
         });
     }
@@ -2447,12 +2463,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     quests = campaignData.storyTree.quests;
                     nextQuestId = campaignData.storyTree.nextQuestId;
                     selectedQuestId = campaignData.storyTree.selectedQuestId;
+
+                    // Backward compatibility for quests missing new fields
+                    quests.forEach(quest => {
+                        if (quest.description === undefined) {
+                            quest.description = '';
+                        }
+                        if (quest.status === undefined) {
+                            quest.status = 'active';
+                        }
+                        if (quest.prerequisites === undefined) {
+                            quest.prerequisites = [];
+                        }
+                        if (quest.rewards === undefined) {
+                            quest.rewards = [];
+                        }
+                        if (quest.recommendations === undefined) {
+                            quest.recommendations = [];
+                        }
+                        if (quest.completionSteps === undefined) {
+                            quest.completionSteps = [];
+                        }
+                    });
                 } else if (Object.keys(campaignData.storyTree).length > 0) { // Old fabric.js format
                     // Attempt to convert old data or notify user
                     console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
                     alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
                     // Reset to default state
-                    quests = [{ id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0 }];
+                    quests = [{ id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }];
                     nextQuestId = 2;
                     selectedQuestId = 1;
                 }
@@ -6501,9 +6539,22 @@ function displayToast(messageElement) {
 
                 card.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    selectedQuestId = quest.id;
-                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
+                    const questId = parseInt(card.dataset.id, 10);
+                    const currentlySelected = document.querySelector('.card.selected');
+
+                    if (storyBeatCardOverlay.style.display === 'flex' && currentlySelected && parseInt(currentlySelected.dataset.id, 10) === questId) {
+                        storyBeatCardOverlay.style.display = 'none';
+                        if (currentlySelected) {
+                            currentlySelected.classList.remove('selected');
+                        }
+                    } else {
+                        selectedQuestId = quest.id;
+                        if (currentlySelected) {
+                            currentlySelected.classList.remove('selected');
+                        }
+                        card.classList.add('selected');
+                        populateAndShowStoryBeatCard(quest);
+                    }
                 });
 
                 card.addEventListener('contextmenu', (e) => {
@@ -6556,6 +6607,12 @@ function displayToast(messageElement) {
                         parentId: null,
                         x: newX,
                         y: newY,
+                        description: '',
+                        status: 'active',
+                        prerequisites: [],
+                        rewards: [],
+                        recommendations: [],
+                        completionSteps: []
                     };
                     quests.push(newQuest);
                     selectedQuestId = newQuest.id;
@@ -6705,5 +6762,81 @@ function displayToast(messageElement) {
         layoutTree();
         drawConnections();
         renderCards();
+    }
+
+    function populateAndShowStoryBeatCard(quest) {
+        if (!quest) return;
+
+        let prerequisitesHTML = quest.prerequisites.map((p, index) => `
+            <label class="flex gap-x-3 py-3 flex-row">
+                <input type="checkbox" class="h-5 w-5 rounded border-[#e9e8ce] border-2 bg-transparent text-[#f9f506] checked:bg-[#f9f506] checked:border-[#f9f506] focus:ring-0 focus:ring-offset-0" data-prerequisite-index="${index}" />
+                <p class="text-[#1c1c0d] text-base font-normal leading-normal">${p.text}</p>
+            </label>
+        `).join('');
+
+        let rewardsHTML = quest.rewards.map(r => `
+            <div class="flex items-center gap-4 bg-[#fcfcf8] px-4 min-h-[72px] py-2">
+                <div class="flex flex-col justify-center">
+                    <p class="text-[#1c1c0d] text-base font-medium leading-normal line-clamp-1">${r.name}</p>
+                    <p class="text-[#9e9d47] text-sm font-normal leading-normal line-clamp-2">${r.description}</p>
+                </div>
+            </div>
+        `).join('');
+
+        let recommendationsHTML = quest.recommendations.map(rec => `<li>${rec.text}</li>`).join('');
+        let completionStepsHTML = quest.completionSteps.map(step => `<li>${step.text}</li>`).join('');
+
+        storyBeatCardBody.innerHTML = `
+            <h1>${quest.name}</h1>
+            <div class="status-tabs">
+                <div class="status-tab ${quest.status === 'active' ? 'active' : ''}" data-status="active">Active</div>
+                <div class="status-tab ${quest.status === 'abandon' ? 'active' : ''}" data-status="abandon">Abandon</div>
+                <div class="status-tab ${quest.status === 'completed' ? 'active' : ''}" data-status="completed">Completed</div>
+            </div>
+            <h3>Description</h3>
+            <p>${quest.description || 'No description yet.'}</p>
+            <h3>Prerequisites</h3>
+            <div>${prerequisitesHTML || 'None'}</div>
+            <h3>Rewards</h3>
+            <div>${rewardsHTML || 'None'}</div>
+            <h3>Recommendations</h3>
+            <ul>${recommendationsHTML || 'None'}</ul>
+            <h3>Completion Steps</h3>
+            <ul>${completionStepsHTML || 'None'}</ul>
+        `;
+        storyBeatCardOverlay.style.display = 'flex';
+    }
+
+    if (storyBeatCardCloseButton) {
+        storyBeatCardCloseButton.addEventListener('click', () => {
+            storyBeatCardOverlay.style.display = 'none';
+            const currentlySelected = document.querySelector('.card.selected');
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+        });
+    }
+
+    const storyBeatCardBackButton = document.getElementById('story-beat-card-back-button');
+    if (storyBeatCardBackButton) {
+        storyBeatCardBackButton.addEventListener('click', () => {
+            storyBeatCardOverlay.style.display = 'none';
+            const currentlySelected = document.querySelector('.card.selected');
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+        });
+    }
+
+    if (storyBeatCardOverlay) {
+        storyBeatCardOverlay.addEventListener('click', (e) => {
+            if (e.target === storyBeatCardOverlay) {
+                storyBeatCardOverlay.style.display = 'none';
+                const currentlySelected = document.querySelector('.card.selected');
+                if (currentlySelected) {
+                    currentlySelected.classList.remove('selected');
+                }
+            }
+        });
     }
 });
