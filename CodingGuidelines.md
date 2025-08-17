@@ -1,6 +1,6 @@
 ## Structured Code Narrative Formula 📖
 
-This formula provides a set of rules for making code as easy to read as a story. You can use these rules as a checklist when writing code or when you encounter a new project.
+This formula provides a set of rules for making code as easy to read as a story. You can use these rules as a checklist when writing code or when you encounter a new project. The table of contents and glossary should be in it's own markdown document saved in the project directory, however the relevant parts of the table of contents and glossary should also be in a header and footer comment on each relevent file. When writing new code or applying this format to existing code you should start with Rule 4 & Rule 5 first, your code should be first and foremost contextually appropriate and legible. Next when you write a new section of code that can fit into it's own group you should add it as a group TOC ID comment at the start of the section and add it to the Table of Contents. Finally as you write new sections or subsections should recieve their labels and determine if they need glossary entries. Finally while the concept is fresh in your mind you should write the glossary entry, otherwise at the end write an entry for every label that has a glossary ID. This formatting will break down even the most complex code to be readable and standardized.
 
 -----
 
@@ -155,4 +155,5 @@ this should go in the master project directory markdown, but also the relevent e
 // [3 {3.1.3}{index.html:1.2.3}{style.css:7}] This section demonstrates how we change an element's appearance using JavaScript. It finds the `settings_overlay` element in the HTML and directly changes its `display` style property from its default hidden state to 'block', making it visible on the page.
 
 ```
+
 
