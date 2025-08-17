@@ -333,18 +333,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return [];
         }
 
-        const allQuoteStats = [
+        const prioritizedStats = [
             ...Object.keys(quoteMap.ability_scores),
+            ...Object.keys(quoteMap.combat_stats)
+        ];
+        const otherStats = [
             ...Object.keys(quoteMap.character_details),
-            ...Object.keys(quoteMap.combat_stats),
             ...Object.keys(quoteMap.roleplaying_details)
         ];
 
-        const commonStats = allQuoteStats.filter(stat => {
-            return charactersData.every(character => {
-                return character.sheetData && character.sheetData[stat];
-            });
-        });
+        let commonStats = prioritizedStats.filter(stat =>
+            charactersData.every(character => character.sheetData && character.sheetData[stat])
+        );
+
+        if (commonStats.length === 0) {
+            console.log("No common prioritized stats found. Checking other stats.");
+            commonStats = otherStats.filter(stat =>
+                charactersData.every(character => character.sheetData && character.sheetData[stat])
+            );
+        }
 
         if (commonStats.length === 0) {
             console.warn("No common stats found for all characters to generate a themed slideshow.");
