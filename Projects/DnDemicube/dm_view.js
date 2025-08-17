@@ -6393,6 +6393,11 @@ function displayToast(messageElement) {
             return;
         }
 
+        const container = storyTreeContainer;
+        const canvas = storyTreeCanvas;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+
         storyTreeCanvasObj = new fabric.Canvas(storyTreeCanvas);
 
         const startNode = new fabric.Rect({
