@@ -345,16 +345,14 @@ document.addEventListener('DOMContentLoaded', () => {
             'hit_points': ['hp_current', 'hp_max']
         };
 
-        const prioritizedStats = [
+        const allStats = [
             ...Object.keys(quoteMap.ability_scores),
-            ...Object.keys(quoteMap.combat_stats)
-        ];
-        const otherStats = [
+            ...Object.keys(quoteMap.combat_stats),
             ...Object.keys(quoteMap.character_details).filter(stat => stat !== 'alignment'),
             ...Object.keys(quoteMap.roleplaying_details)
         ];
 
-        let commonStats = prioritizedStats.filter(stat => {
+        let commonStats = allStats.filter(stat => {
             return charactersData.every(character => {
                 if (!character.sheetData) return false;
                 const key = statKeyMap[stat] || stat;
@@ -364,13 +362,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return character.sheetData[key] !== undefined && character.sheetData[key] !== '';
             });
         });
-
-        if (commonStats.length === 0) {
-            console.log("No common prioritized stats found. Checking other stats.");
-            commonStats = otherStats.filter(stat =>
-                charactersData.every(character => character.sheetData && (character.sheetData[stat] !== undefined && character.sheetData[stat] !== ''))
-            );
-        }
 
         if (commonStats.length === 0) {
             console.warn("No common stats found for all characters to generate a themed slideshow.");
