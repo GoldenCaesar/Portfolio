@@ -231,6 +231,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
+
+            for (const attr in modifiers) {
+                sheetData[`${attr}_modifier`] = modifiers[attr].textContent;
+            }
+
             if (portraitPreview.style.display !== 'none') {
                 sheetData['character_portrait'] = portraitPreview.src;
             }
