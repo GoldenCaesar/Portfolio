@@ -205,7 +205,11 @@
 </head>
 <body>
     <div id="slideshow-container" class="relative w-full h-screen flex items-center justify-center overflow-hidden bg-black" style="display: none;">
-        <!-- ... slideshow content ... -->
+    <div id="content-container" class="text-center text-white p-8">
+        <img id="portrait-img" src="" alt="Character Portrait" class="mx-auto mb-4 w-48 h-48 rounded-full object-cover border-4 border-gray-700">
+        <p id="quote-text" class="text-3xl italic quote-font mb-4">"</p>
+        <p id="author-text" class="text-xl font-bold"></p>
+    </div>
     </div>
     <div id="player-map-container">
         <canvas id="player-canvas"></canvas>
