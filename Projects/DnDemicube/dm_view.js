@@ -308,6 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const level = stat.statValue.match(/\d+/);
                     const className = stat.statValue.replace(/\d+/,'').trim();
                     quote = quote.replace('{{level}}', level ? level[0] : '').replace('{{class}}', className);
+                } else if (stat.statName === 'alignment' && stat.statValue && typeof stat.statValue === 'object') {
+                    quote = quote.replace('{{alignment}}', stat.statValue.name || '');
                 } else {
                     quote = quote.replace('{{race}}', stat.statValue);
                 }
@@ -338,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ...Object.keys(quoteMap.combat_stats)
         ];
         const otherStats = [
-            ...Object.keys(quoteMap.character_details),
+            ...Object.keys(quoteMap.character_details).filter(stat => stat !== 'alignment'),
             ...Object.keys(quoteMap.roleplaying_details)
         ];
 
