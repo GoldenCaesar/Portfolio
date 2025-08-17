@@ -248,6 +248,26 @@ document.addEventListener('DOMContentLoaded', () => {
         imgHeight: 0
     };
 
+    // Slideshow state
+    let slideshowPlaylist = [];
+    let slideshowCurrentIndex = 0;
+    let quoteMap = null;
+    const quoteMapPromise = fetch('quote_map.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            quoteMap = data;
+            return data;
+        })
+        .catch(e => {
+            console.error("Failed to load quote_map.json for DM view:", e);
+            return null;
+        });
+
 
     // Debounce utility function
     function debounce(func, delay) {
@@ -258,6 +278,98 @@ document.addEventListener('DOMContentLoaded', () => {
                 func.apply(this, args);
             }, delay);
         };
+    }
+
+    function getQuote(stat, character) {
+        if (!quoteMap) {
+            return "Loading quotes...";
+        }
+
+        const visibility = character.isDetailsVisible ? 'visible' : 'notVisible';
+
+        if (quoteMap.ability_scores[stat.statName]) {
+            const score = parseInt(stat.statValue.score, 10);
+            const tiers = quoteMap.ability_scores[stat.statName];
+            for (const tier of tiers) {
+                if (score >= tier.condition.min && score <= tier.condition.max) {
+                    const quotes = tier[visibility];
+                    let quote = quotes[Math.floor(Math.random() * quotes.length)];
+                    if (visibility === 'visible') {
+                        quote = quote.replace('{{score}}', stat.statValue.score).replace('{{modifier}}', stat.statValue.modifier);
+                    }
+                    return quote;
+                }
+            }
+        } else if (quoteMap.character_details[stat.statName]) {
+            const quotes = quoteMap.character_details[stat.statName][visibility];
+            let quote = quotes[Math.floor(Math.random() * quotes.length)];
+            if (visibility === 'visible') {
+                if (stat.statName === 'class_and_level') {
+                    const level = stat.statValue.match(/\d+/);
+                    const className = stat.statValue.replace(/\d+/,'').trim();
+                    quote = quote.replace('{{level}}', level ? level[0] : '').replace('{{class}}', className);
+                } else {
+                    quote = quote.replace('{{race}}', stat.statValue);
+                }
+            }
+            return quote;
+        } else if (quoteMap.roleplaying_details[stat.statName]) {
+            const hasValue = stat.statValue ? 'has_value' : 'no_value';
+            const quotes = quoteMap.roleplaying_details[stat.statName][hasValue][visibility];
+            let quote = quotes[Math.floor(Math.random() * quotes.length)];
+            if (visibility === 'visible' && hasValue === 'has_value') {
+                quote = quote.replace('{{value}}', stat.statValue);
+            }
+            return quote;
+        }
+
+        return "No quote found.";
+    }
+
+    async function generateSlideshowPlaylist() {
+        await quoteMapPromise;
+
+        if (!quoteMap || charactersData.length === 0) {
+            return [];
+        }
+
+        const allQuoteStats = [
+            ...Object.keys(quoteMap.ability_scores),
+            ...Object.keys(quoteMap.character_details),
+            ...Object.keys(quoteMap.combat_stats),
+            ...Object.keys(quoteMap.roleplaying_details)
+        ];
+
+        const commonStats = allQuoteStats.filter(stat => {
+            return charactersData.every(character => {
+                return character.sheetData && character.sheetData[stat];
+            });
+        });
+
+        if (commonStats.length === 0) {
+            console.warn("No common stats found for all characters to generate a themed slideshow.");
+            return [];
+        }
+
+        const chosenStatName = commonStats[Math.floor(Math.random() * commonStats.length)];
+        console.log(`Generating slideshow playlist with common stat: ${chosenStatName}`);
+
+        const shuffledCharacters = [...charactersData].sort(() => 0.5 - Math.random());
+
+        const playlist = shuffledCharacters.map(character => {
+            const stat = {
+                statName: chosenStatName,
+                statValue: character.sheetData[chosenStatName]
+            };
+            const quote = getQuote(stat, character);
+
+            return {
+                character: character,
+                quote: quote
+            };
+        });
+
+        return playlist;
     }
 
     function filterPlayerContent(content) {
@@ -1788,7 +1900,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (selectedMapData.mode === 'view') {
                     sendMapToPlayerView(selectedMapFileName);
                 } else {
-                    sendClearMessageToPlayerView();
+                    triggerSlideshow();
                 }
             }
         });
@@ -2675,10 +2787,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function sendClearMessageToPlayerView() {
+    async function triggerSlideshow() {
         if (playerWindow && !playerWindow.closed) {
-            playerWindow.postMessage({ type: 'clearMap', characters: charactersData }, '*');
-            console.log("Sent clearMap message to player view with characters data.");
+            if (slideshowPlaylist.length === 0 || slideshowCurrentIndex >= slideshowPlaylist.length) {
+                console.log("Generating new slideshow playlist...");
+                slideshowPlaylist = await generateSlideshowPlaylist();
+                slideshowCurrentIndex = 0;
+            }
+
+            if (slideshowPlaylist.length > 0) {
+                playerWindow.postMessage({
+                    type: 'startSlideshow',
+                    playlist: slideshowPlaylist,
+                    startIndex: slideshowCurrentIndex
+                }, '*');
+                console.log(`Sent startSlideshow message to player view with playlist of ${slideshowPlaylist.length} items, starting at index ${slideshowCurrentIndex}.`);
+            } else {
+                console.warn("Could not generate a slideshow playlist. No common stats or no characters.");
+            }
         }
     }
 
@@ -6142,4 +6268,22 @@ function displayToast(messageElement) {
 
     // Initialize audio devices on load
     getAudioDevices();
+
+    window.addEventListener('message', (event) => {
+        // We are only interested in messages from the player window, not iframes
+        if (event.source !== playerWindow) {
+            return;
+        }
+
+        const data = event.data;
+        if (data.type === 'slideshowPaused') {
+            slideshowCurrentIndex = data.index;
+            console.log(`Slideshow paused by player view at index: ${slideshowCurrentIndex}`);
+        } else if (data.type === 'slideshowFinished') {
+            console.log('Player view finished playlist. Generating a new one for seamless playback.');
+            slideshowPlaylist = []; // Clear old playlist
+            slideshowCurrentIndex = 0;
+            triggerSlideshow(); // This will generate and send a new playlist
+        }
+    });
 });

@@ -11,148 +11,73 @@ const diceRollerCloseButton = document.getElementById('dice-roller-close-button'
 const slideshowContainer = document.getElementById('slideshow-container');
 const contentContainer = document.getElementById('content-container');
 const portraitImg = document.getElementById('portrait-img');
+const portraitInitials = document.getElementById('portrait-initials');
 const quoteText = document.getElementById('quote-text');
 const authorText = document.getElementById('author-text');
 
 let slideshowActive = false;
+let slideshowPlaylist = [];
 let currentSlideIndex = 0;
-let shuffledCharacters = [];
-const quoteMapPromise = fetch('quote_map.json')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .catch(e => {
-        console.error("Failed to load quote_map.json:", e);
-        // Return a default/empty quote map to prevent further errors
-        return {
-            "ability_scores": {},
-            "character_details": {},
-            "combat_stats": {},
-            "roleplaying_details": {}
-        };
-    });
-
-let quoteMap = null;
-quoteMapPromise.then(data => {
-    quoteMap = data;
-});
-
-function getRandomStat(character) {
-    if (!quoteMap) return null;
-
-    const characterStats = Object.keys(character.sheetData);
-    const availableQuoteStats = [
-        ...Object.keys(quoteMap.ability_scores),
-        ...Object.keys(quoteMap.character_details),
-        ...Object.keys(quoteMap.combat_stats),
-        ...Object.keys(quoteMap.roleplaying_details)
-    ];
-
-    const validStats = characterStats.filter(stat => availableQuoteStats.includes(stat) && character.sheetData[stat]);
-
-    if (validStats.length === 0) {
-        return null;
-    }
-
-    const randomStatName = validStats[Math.floor(Math.random() * validStats.length)];
-
-    return {
-        statName: randomStatName,
-        statValue: character.sheetData[randomStatName]
-    };
-}
-
-function getQuote(stat, character) {
-    console.log(`Getting quote for stat: ${stat.statName}`);
-    if (!quoteMap) {
-        return "Loading quotes...";
-    }
-
-    const visibility = character.isDetailsVisible ? 'visible' : 'notVisible';
-
-    if (quoteMap.ability_scores[stat.statName]) {
-        const score = parseInt(stat.statValue.score, 10);
-        const tiers = quoteMap.ability_scores[stat.statName];
-        for (const tier of tiers) {
-            if (score >= tier.condition.min && score <= tier.condition.max) {
-                const quotes = tier[visibility];
-                let quote = quotes[Math.floor(Math.random() * quotes.length)];
-                if (visibility === 'visible') {
-                    quote = quote.replace('{{score}}', stat.statValue.score).replace('{{modifier}}', stat.statValue.modifier);
-                }
-                return quote;
-            }
-        }
-    } else if (quoteMap.character_details[stat.statName]) {
-        const quotes = quoteMap.character_details[stat.statName][visibility];
-        let quote = quotes[Math.floor(Math.random() * quotes.length)];
-        if (visibility === 'visible') {
-            if (stat.statName === 'class_and_level') {
-                const level = stat.statValue.match(/\d+/);
-                const className = stat.statValue.replace(/\d+/,'').trim();
-                quote = quote.replace('{{level}}', level ? level[0] : '').replace('{{class}}', className);
-            } else {
-                quote = quote.replace('{{race}}', stat.statValue);
-            }
-        }
-        return quote;
-    } else if (quoteMap.roleplaying_details[stat.statName]) {
-        const hasValue = stat.statValue ? 'has_value' : 'no_value';
-        const quotes = quoteMap.roleplaying_details[stat.statName][hasValue][visibility];
-        let quote = quotes[Math.floor(Math.random() * quotes.length)];
-        if (visibility === 'visible' && hasValue === 'has_value') {
-            quote = quote.replace('{{value}}', stat.statValue);
-        }
-        return quote;
-    }
-
-    return "No quote found.";
-}
-
+let slideshowTimeout = null;
 
 function updateSlide() {
-    if (shuffledCharacters.length === 0) {
+    if (slideshowPlaylist.length === 0 || currentSlideIndex >= slideshowPlaylist.length) {
         return;
     }
-    const character = shuffledCharacters[currentSlideIndex];
+
+    const slideData = slideshowPlaylist[currentSlideIndex];
+    const character = slideData.character;
+
     console.log(`Updating slide for character: ${character.name}`);
-    const randomStat = getRandomStat(character);
 
     if (character.isDetailsVisible) {
-        portraitImg.src = character.sheetData.character_portrait || 'https://images.unsplash.com/photo-1549417235-a6e5b5655b3d?w=800';
+        if (character.sheetData.character_portrait) {
+            portraitImg.src = character.sheetData.character_portrait;
+            portraitImg.style.display = 'block';
+            portraitInitials.style.display = 'none';
+        } else {
+            portraitImg.style.display = 'none';
+            portraitInitials.textContent = getInitials(character.name);
+            portraitInitials.style.display = 'flex';
+        }
         authorText.textContent = `${character.name} (${character.sheetData.player_name || 'N/A'})`;
     } else {
-        portraitImg.src = 'https://images.unsplash.com/photo-1549417235-a6e5b5655b3d?w=800';
+        portraitImg.style.display = 'none';
+        portraitInitials.textContent = '??';
+        portraitInitials.style.display = 'flex';
         authorText.textContent = '???';
     }
 
-    if (randomStat) {
-        quoteText.textContent = `"${getQuote(randomStat, character)}"`;
-    } else {
-        quoteText.textContent = '"..."';
-    }
+    quoteText.textContent = `"${slideData.quote}"`;
 }
 
 function animateSlideshow() {
-    console.log('Animating slide...');
     if (!slideshowActive) return;
+
+    if (currentSlideIndex >= slideshowPlaylist.length) {
+        console.log("Slideshow playlist finished.");
+        slideshowActive = false;
+        if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'slideshowFinished' }, '*');
+        }
+        return;
+    }
+
+    console.log(`Animating slide ${currentSlideIndex + 1}/${slideshowPlaylist.length}`);
 
     contentContainer.classList.remove("animate-out");
     contentContainer.classList.add("animate-in");
 
     updateSlide();
 
-    setTimeout(() => {
+    slideshowTimeout = setTimeout(() => {
         if (!slideshowActive) return;
         contentContainer.classList.remove("animate-in");
         contentContainer.classList.add("animate-out");
 
-        setTimeout(() => {
+        slideshowTimeout = setTimeout(() => {
             if (!slideshowActive) return;
-            currentSlideIndex = (currentSlideIndex + 1) % shuffledCharacters.length;
+            currentSlideIndex++;
             animateSlideshow();
         }, 1000);
     }, 6000);
@@ -328,8 +253,29 @@ window.addEventListener('message', (event) => {
 
     if (data && data.type) {
         switch (data.type) {
+            case 'startSlideshow':
+                console.log("Player view received startSlideshow message.");
+                slideshowPlaylist = data.playlist;
+                currentSlideIndex = data.startIndex || 0;
+
+                if (slideshowPlaylist && slideshowPlaylist.length > 0) {
+                    slideshowActive = true;
+                    playerMapContainer.style.display = 'none';
+                    slideshowContainer.style.display = 'flex';
+                    animateSlideshow();
+                }
+                break;
             case 'loadMap':
-                slideshowActive = false;
+                if (slideshowActive) {
+                    slideshowActive = false;
+                    if (slideshowTimeout) {
+                        clearTimeout(slideshowTimeout);
+                    }
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.postMessage({ type: 'slideshowPaused', index: currentSlideIndex }, '*');
+                    }
+                }
+
                 slideshowContainer.style.display = 'none';
                 playerMapContainer.style.display = 'flex';
 
@@ -384,22 +330,6 @@ window.addEventListener('message', (event) => {
                 } else {
                      console.warn("Player view: Received polygonVisibilityUpdate for a non-matching/non-loaded map.");
                 }
-                break;
-            case 'clearMap':
-                console.log("Player view received clearMap message.");
-                quoteMapPromise.then(() => {
-                    console.log('Quote map loaded, starting slideshow...');
-                    currentMapImage = null;
-                    currentOverlays = [];
-
-                    shuffledCharacters = data.characters.sort(() => 0.5 - Math.random());
-                    currentSlideIndex = 0;
-
-                    playerMapContainer.style.display = 'none';
-                    slideshowContainer.style.display = 'flex';
-                    slideshowActive = true;
-                    animateSlideshow();
-                });
                 break;
             case 'showNotePreview':
                 const notePreviewOverlay = document.getElementById('note-preview-overlay');
