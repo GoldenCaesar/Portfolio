@@ -57,27 +57,65 @@ Let's use an example: a button that opens a complex settings overlay with many o
 
 #### **Step 1: Table of Contents**
 
-The Table of Contents and glossary for the entire directory will live in their own text document. Each file in the directory is given a number starting with 1. While this file will be the master directory, each file will also have a header and footer comment containing the relevant table of contents and glossary items for that file.
+The Table of Contents and glossary for the entire directory will live in their own md document. Each file in the directory is given a number starting with 1. While this file will be the master directory, each file will also have a header and footer comment containing the relevant table of contents and glossary items for that file.
 
-```html
+```markdown
+[TABLE OF CONTENTS]
+**0. users/personal/ProjectDirectory.md**
+**1. users/personal/index.html**
+	1. Settings
+		1.2 Settings Overlay Menu
+			1.2.2 Interactive Button
+			1.2.3 Settings Overlay
+**2. users/personal/script.js**
+	1. Log In Splash
+	2. Server Establishment
+	3. Main Page
+		1. Settings
+			3.1.3 Event Listener
+			3.1.4 Functionality
+
+[GLOSSARY]
+**[1.2.3 settings-overlay]**
+[2 {script.js:3.1.4}{style.css:7}] This is a special `div` element that is hidden by default. It contains a collection of complex form elements, input fields, and other interactive components for the user to change their settings. The unique ID allows our JavaScript code to find it and make it visible when the "Settings" button is clicked. Because it has many nested elements, the details of its functionality are explained here rather than in the code itself.
+
+**[3.1.3 Listener]**
+[2 {3.1.4}{index.html:1.2.2}] This line of code is an "event listener." It is constantly watching the `main_settings_button` to see if a specific event, in this case, a 'click', happens. When it does, it immediately calls the `show_settings_overlay` function, triggering its actions.
+
+**[3.1.4 visibility-overlay]**
+[3 {3.1.3}{index.html:1.2.3}{style.css:7}] This section demonstrates how we change an element's appearance using JavaScript. It finds the `settings_overlay` element in the HTML and directly changes its `display` style property from its default hidden state to 'block', making it visible on the page.
 ```
 
 #### **Step 2: HTML**
-
 ```html
+<--!
+[TABLE OF CONTENTS]
+1. users/personal/index.html
+	1. Settings
+		1.2 Settings Overlay Menu
+			1.2.2 Interactive Button
+			1.2.3 Settings Overlay
+-->
+
 <button id="main-settings-button">
     Settings
 </button>
 
 <div id="settings-overlay">
     </div>
+
+<!--
+[GLOSSARY]
+[1.2.3 settings-overlay]
+[2 {script.js:3.1.4}{style.css:7}] This is a special `div` element that is hidden by default. It contains a collection of complex form elements, input fields, and other interactive components for the user to change their settings. The unique ID allows our JavaScript code to find it and make it visible when the "Settings" button is clicked. Because it has many nested elements, the details of its functionality are explained here rather than in the code itself.
+-->
 ```
 
 #### **Step 3: JavaScript**
 
 ```javascript
 /*
-Table of Contents:
+[TABLE OF CONTENTS]
 2. users/personal/script.js
 	1. Log In Splash
 	2. Server Establishment
@@ -94,10 +132,18 @@ const show_settings_overlay = () => {
     const settings_overlay = document.getElementById('settings-overlay');
     settings_overlay.style.display = 'block';
 };
+/* [GLOSSARY]
+[3.1.3 Listener]
+[2 {3.1.4}{index.html:1.2.2}] This line of code is an "event listener." It is constantly watching the `main_settings_button` to see if a specific event, in this case, a 'click', happens. When it does, it immediately calls the `show_settings_overlay` function, triggering its actions.
+
+[3.1.4 visibility-overlay]
+[3 {3.1.3}{index.html:1.2.3}{style.css:7}] This section demonstrates how we change an element's appearance using JavaScript. It finds the `settings_overlay` element in the HTML and directly changes its `display` style property from its default hidden state to 'block', making it visible on the page.
+*/
+
 ```
 
 #### **Step 4: Glossary**
-
+this should go in the master project directory markdown, but also the relevent entries should be added to the glossary footer of the matching document. i.e. [1.2.3] should go to the 1 document, in this case index.html
 ```text
 // [1.2.3 settings-overlay]
 // [2 {script.js:3.1.4}{style.css:7}] This is a special `div` element that is hidden by default. It contains a collection of complex form elements, input fields, and other interactive components for the user to change their settings. The unique ID allows our JavaScript code to find it and make it visible when the "Settings" button is clicked. Because it has many nested elements, the details of its functionality are explained here rather than in the code itself.
@@ -107,4 +153,5 @@ const show_settings_overlay = () => {
 
 // [3.1.4 visibility-overlay]
 // [3 {3.1.3}{index.html:1.2.3}{style.css:7}] This section demonstrates how we change an element's appearance using JavaScript. It finds the `settings_overlay` element in the HTML and directly changes its `display` style property from its default hidden state to 'block', making it visible on the page.
+
 ```
