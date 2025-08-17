@@ -335,6 +335,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return [];
         }
 
+        const statKeyMap = {
+            'strength': 'strength_score',
+            'dexterity': 'dexterity_score',
+            'constitution': 'constitution_score',
+            'intelligence': 'intelligence_score',
+            'wisdom': 'wisdom_score',
+            'charisma': 'charisma_score',
+            'hit_points': ['hp_current', 'hp_max']
+        };
+
         const prioritizedStats = [
             ...Object.keys(quoteMap.ability_scores),
             ...Object.keys(quoteMap.combat_stats)
@@ -344,14 +354,21 @@ document.addEventListener('DOMContentLoaded', () => {
             ...Object.keys(quoteMap.roleplaying_details)
         ];
 
-        let commonStats = prioritizedStats.filter(stat =>
-            charactersData.every(character => character.sheetData && character.sheetData[stat])
-        );
+        let commonStats = prioritizedStats.filter(stat => {
+            return charactersData.every(character => {
+                if (!character.sheetData) return false;
+                const key = statKeyMap[stat] || stat;
+                if (Array.isArray(key)) {
+                    return key.every(k => character.sheetData[k] !== undefined && character.sheetData[k] !== '');
+                }
+                return character.sheetData[key] !== undefined && character.sheetData[key] !== '';
+            });
+        });
 
         if (commonStats.length === 0) {
             console.log("No common prioritized stats found. Checking other stats.");
             commonStats = otherStats.filter(stat =>
-                charactersData.every(character => character.sheetData && character.sheetData[stat])
+                charactersData.every(character => character.sheetData && (character.sheetData[stat] !== undefined && character.sheetData[stat] !== ''))
             );
         }
 
@@ -366,9 +383,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const shuffledCharacters = [...charactersData].sort(() => 0.5 - Math.random());
 
         const playlist = shuffledCharacters.map(character => {
+            let statValue;
+            const key = statKeyMap[chosenStatName] || chosenStatName;
+
+            if (quoteMap.ability_scores[chosenStatName]) {
+                const scoreKey = statKeyMap[chosenStatName]; // e.g., 'strength_score'
+                const modifierKey = scoreKey.replace('_score', '_modifier');
+                statValue = {
+                    score: character.sheetData[scoreKey],
+                    modifier: character.sheetData[modifierKey]
+                };
+            } else if (chosenStatName === 'hit_points') {
+                statValue = {
+                    current: character.sheetData['hp_current'],
+                    maximum: character.sheetData['hp_max']
+                };
+            } else {
+                statValue = character.sheetData[key];
+            }
+
             const stat = {
                 statName: chosenStatName,
-                statValue: character.sheetData[chosenStatName]
+                statValue: statValue
             };
             const quote = getQuote(stat, character);
 
