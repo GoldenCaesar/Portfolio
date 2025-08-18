@@ -6379,215 +6379,213 @@ function displayToast(messageElement) {
     }
 
     function initStoryTree() {
-        const canvas = storyTreeCanvas;
+    // UI Elements
+    const canvas = document.getElementById('quest-canvas');
+    if (!canvas) return; // Don't run if the element is not there
         const ctx = canvas.getContext('2d');
-        const cardContainer = storyTreeCardContainer;
+    const cardContainer = document.getElementById('card-container');
+    const container = document.getElementById('canvas-container');
+    const overlay = document.getElementById('story-beat-card-overlay');
+    const storyBeatCardBody = document.getElementById('story-beat-card-body');
+    const storyBeatCardCloseButton = document.getElementById('story-beat-card-close-button');
+
+
+    // Pan, Zoom, and Mode state
         let scale = 1.0;
-        let originX = canvas.width / 2;
-        let originY = canvas.height / 2;
+    let originX = container.offsetWidth / 2;
+    let originY = container.offsetHeight / 2;
         let isPanning = false;
+    let isLinking = false;
+    let isMoving = false;
         let panStartX = 0;
         let panStartY = 0;
+    let moveStartX = 0;
+    let moveStartY = 0;
+    let activeOverlayCardId = null;
+    let linkSourceId = null;
 
-        function draw() {
+    // --- Core Functions ---
+
+    /**
+     * Draws the lines between parent and child quest cards.
+     */
+    const drawConnections = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.translate(originX, originY);
             ctx.scale(scale, scale);
 
-            // Draw connections
-            ctx.strokeStyle = '#4a5f7a';
-            ctx.lineWidth = 2;
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
             quests.forEach(quest => {
-                if (quest.parentIds) {
+            if (quest.parentIds && quest.parentIds.length > 0) {
                     quest.parentIds.forEach(parentId => {
-                        const parent = quests.find(p => p.id === parentId);
-                        if (parent) {
+                    const parentQuest = quests.find(q => q.id === parentId);
+                    if (parentQuest) {
                             ctx.beginPath();
-                            ctx.moveTo(parent.x, parent.y);
+                        ctx.moveTo(parentQuest.x, parentQuest.y);
                             ctx.lineTo(quest.x, quest.y);
                             ctx.stroke();
                         }
                     });
                 }
             });
-
             ctx.restore();
-            renderQuestCards();
-        }
+    };
 
-        function renderQuestCards() {
+    /**
+     * Renders the HTML cards for each quest.
+     */
+    const renderCards = () => {
             cardContainer.innerHTML = '';
+
             quests.forEach(quest => {
                 const card = document.createElement('div');
-                card.className = 'story-beat-card';
-                card.textContent = quest.name;
-                card.dataset.id = quest.id;
-                if (quest.id === 1) {
-                    card.classList.add('final-quest');
+            card.classList.add('card');
+            if (quest.id === selectedQuestId) {
+                card.classList.add('selected');
                 }
+            card.dataset.id = quest.id;
 
-                const cardX = originX + quest.x * scale;
-                const cardY = originY + quest.y * scale;
+            const nameElement = document.createElement('h3');
+            nameElement.textContent = quest.name;
+            card.appendChild(nameElement);
 
-                card.style.left = `${cardX}px`;
-                card.style.top = `${cardY}px`;
+            const x = originX + (quest.x * scale);
+            const y = originY + (quest.y * scale);
+            card.style.left = `${x}px`;
+            card.style.top = `${y}px`;
                 card.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                if (isLinking) {
+                    handleLink(quest.id);
+                } else {
+                    if (activeOverlayCardId === quest.id) {
+                        hideOverlay();
+                    } else {
+                        showOverlay(quest);
+                    }
+                    selectedQuestId = quest.id;
+                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                }
+            });
 
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                selectedQuestId = quest.id;
+                document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
                     createCardContextMenu(e, quest);
-                });
-
-                card.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    populateAndShowStoryBeatCard(quest);
                 });
 
                 cardContainer.appendChild(card);
             });
-        }
+    };
 
-        function handleMouseDown(e) {
-            if (e.button === 0) {
-                isPanning = true;
-                panStartX = e.clientX - originX;
-                panStartY = e.clientY - originY;
-                canvas.style.cursor = 'grabbing';
+    /**
+     * Shows the quest details overlay.
+     * @param {object} quest The quest object to display.
+     */
+    const showOverlay = (quest) => {
+        if (!quest) return;
+
+        let finalQuestNote = '';
+        if (quest.id === 1) {
+            finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is the final Campaign quest and cannot be deleted.</p>`;
             }
-        }
 
-        function handleMouseUp(e) {
-            if (e.button === 0) {
-                isPanning = false;
-                canvas.style.cursor = 'grab';
-            }
-        }
+        let parentLinks = quest.parentIds.map(pid => {
+            const parent = quests.find(q => q.id === pid);
+            return parent ? `<a href="#" class="quest-link" data-quest-id="${pid}">${parent.name}</a>` : 'Unknown';
+        }).join('<br>');
+        if (!parentLinks) parentLinks = 'None';
 
-        function handleMouseMove(e) {
-            if (isPanning) {
-                originX = e.clientX - panStartX;
-                originY = e.clientY - panStartY;
-                draw();
-            }
-        }
+        let childrenLinks = quests.filter(q => q.parentIds.includes(quest.id)).map(child => {
+            return `<a href="#" class="quest-link" data-quest-id="${child.id}">${child.name}</a>`;
+        }).join('<br>');
+        if (!childrenLinks) childrenLinks = 'None';
 
-        function handleWheel(e) {
-            e.preventDefault();
-            const zoomIntensity = 0.1;
-            const wheel = e.deltaY < 0 ? 1 : -1;
-            const zoom = Math.exp(wheel * zoomIntensity);
+        storyBeatCardBody.innerHTML = `
+            <h1>${quest.name}</h1>
+            ${finalQuestNote}
+            <h3>Description</h3>
+            <p contenteditable="true" id="overlay-quest-description">${quest.description || 'No description yet.'}</p>
+            <h3>Parent Quests</h3>
+            <div>${parentLinks}</div>
+            <h3>Child Quests</h3>
+            <div>${childrenLinks}</div>
+            <button id="save-description-btn" style="margin-top: 10px;">Save Description</button>
+        `;
+        overlay.style.display = 'flex';
+        activeOverlayCardId = quest.id;
 
-            const mouseX = e.clientX - canvas.getBoundingClientRect().left;
-            const mouseY = e.clientY - canvas.getBoundingClientRect().top;
+        document.getElementById('save-description-btn').addEventListener('click', () => {
+            const newDesc = document.getElementById('overlay-quest-description').innerText;
+            quest.description = newDesc;
+            alert('Description saved!');
+        });
+    };
 
-            originX = mouseX - (mouseX - originX) * zoom;
-            originY = mouseY - (mouseY - originY) * zoom;
+    /**
+     * Hides the quest details overlay.
+     */
+    const hideOverlay = () => {
+        overlay.style.display = 'none';
+        activeOverlayCardId = null;
+    };
 
-            scale *= zoom;
-            draw();
-        }
+    // --- Context Menu Logic ---
 
-        function createCardContextMenu(e, quest) {
-            e.preventDefault();
-            const existingMenu = document.querySelector('.story-tree-context-menu');
-            if (existingMenu) {
-                existingMenu.remove();
-            }
+    const createContextMenu = (e, options) => {
+        const existingMenu = document.querySelector('.context-menu');
+        if (existingMenu) existingMenu.remove();
 
             const menu = document.createElement('ul');
-            menu.className = 'context-menu story-tree-context-menu';
+        menu.classList.add('context-menu');
             menu.style.left = `${e.clientX}px`;
             menu.style.top = `${e.clientY}px`;
 
-            const renameItem = document.createElement('li');
-            renameItem.textContent = 'Rename';
-            renameItem.addEventListener('click', () => {
-                const newName = prompt('Enter new name for the quest:', quest.name);
-                if (newName && newName.trim() !== '') {
-                    quest.name = newName.trim();
-                    draw();
-                }
-                menu.remove();
-            });
-
-            const deleteItem = document.createElement('li');
-            deleteItem.textContent = 'Delete';
-            if (quest.id === 1) {
-                deleteItem.classList.add('disabled');
+        options.forEach(option => {
+            const item = document.createElement('li');
+            item.textContent = option.label;
+            if (option.disabled) {
+                item.style.opacity = 0.5;
+                item.style.cursor = 'not-allowed';
             } else {
-                deleteItem.addEventListener('click', () => {
-                    quests = quests.filter(q => q.id !== quest.id);
-                    // Also remove this quest from any parentIds arrays
-                    quests.forEach(q => {
-                        if (q.parentIds) {
-                            q.parentIds = q.parentIds.filter(id => id !== quest.id);
-                        }
-                    });
-                    draw();
+                item.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    option.action();
                     menu.remove();
                 });
-            }
-
-            const linkItem = document.createElement('li');
-            linkItem.textContent = 'Link';
-            linkItem.addEventListener('click', () => {
-                alert('Click on another quest to link to it.');
-                canvas.addEventListener('click', function linkClickHandler(event) {
-                    const rect = canvas.getBoundingClientRect();
-                    const clickX = (event.clientX - rect.left - originX) / scale;
-                    const clickY = (event.clientY - rect.top - originY) / scale;
-
-                    const targetQuest = quests.find(q => {
-                        const distance = Math.sqrt(Math.pow(q.x - clickX, 2) + Math.pow(q.y - clickY, 2));
-                        return distance < 50; // 50px click radius
-                    });
-
-                    if (targetQuest && targetQuest.id !== quest.id) {
-                        if (!targetQuest.parentIds) {
-                            targetQuest.parentIds = [];
-                        }
-                        targetQuest.parentIds.push(quest.id);
-                        draw();
-                    }
-                    canvas.removeEventListener('click', linkClickHandler);
-                }, { once: true });
-                menu.remove();
+                }
+            menu.appendChild(item);
             });
 
-            menu.appendChild(renameItem);
-            menu.appendChild(deleteItem);
-            menu.appendChild(linkItem);
-            document.body.appendChild(menu);
+        document.body.appendChild(menu);
+    };
 
-            document.addEventListener('click', () => menu.remove(), { once: true });
-        }
+    const createCanvasContextMenu = (e) => {
+        const options = [{
+            label: 'Add Quest',
+            action: () => {
+                const rect = container.getBoundingClientRect();
+                const newX = (e.clientX - rect.left - originX) / scale;
+                const newY = (e.clientY - rect.top - originY) / scale;
 
-        function handleContextMenu(e) {
-            e.preventDefault();
-            const existingMenu = document.querySelector('.story-tree-context-menu');
-            if (existingMenu) {
-                existingMenu.remove();
-            }
-
-            const menu = document.createElement('div');
-            menu.className = 'context-menu story-tree-context-menu';
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
-
-            const addQuestItem = document.createElement('li');
-            addQuestItem.textContent = 'Add Quest';
-            addQuestItem.addEventListener('click', () => {
-                const rect = canvas.getBoundingClientRect();
-                const x = (e.clientX - rect.left - originX) / scale;
-                const y = (e.clientY - rect.top - originY) / scale;
                 const newQuest = {
                     id: nextQuestId++,
                     name: `New Quest ${nextQuestId - 1}`,
                     parentIds: [],
-                    x: x,
-                    y: y,
+                    x: newX,
+                    y: newY,
                     description: '',
                     status: 'active',
                     prerequisites: [],
@@ -6596,97 +6594,210 @@ function displayToast(messageElement) {
                     completionSteps: []
                 };
                 quests.push(newQuest);
-                draw();
-                menu.remove();
-            });
+                selectedQuestId = newQuest.id;
+                drawConnections();
+                renderCards();
+            }
+        }];
+        createContextMenu(e, options);
+    };
 
-            menu.appendChild(addQuestItem);
-            document.body.appendChild(menu);
+    const createCardContextMenu = (e, quest) => {
+        const options = [
+            {
+                label: 'Rename',
+                action: () => {
+                    const newName = prompt('Enter a new name for the quest:', quest.name);
+                    if (newName !== null && newName.trim() !== '') {
+                        quest.name = newName.trim();
+                        renderCards();
+                        }
+                    }
+            },
+            {
+                label: 'Delete',
+                disabled: quest.id === 1,
+                action: () => {
+                    if (quest.id === 1) return;
 
-            document.addEventListener('click', () => menu.remove(), { once: true });
+                    quests = quests.filter(q => q.id !== quest.id);
+                    // Remove from parentIds of other quests
+                    quests.forEach(q => {
+                        if (q.parentIds) {
+                            q.parentIds = q.parentIds.filter(pid => pid !== quest.id);
+                        }
+                    });
+
+                    selectedQuestId = null;
+                    drawConnections();
+                    renderCards();
+                }
+            },
+            {
+                label: 'Link',
+                action: () => {
+                    isLinking = true;
+                    linkSourceId = quest.id;
+                    document.body.classList.add('linking-mode');
+                }
+            },
+            {
+                label: 'Move',
+                action: () => {
+                    isMoving = true;
+                    document.body.classList.add('moving-mode');
+                    selectedQuestId = quest.id;
+                }
+            }
+        ];
+        createContextMenu(e, options);
+    };
+
+    const handleLink = (targetId) => {
+        const sourceQuest = quests.find(q => q.id === linkSourceId);
+        const targetQuest = quests.find(q => q.id === targetId);
+
+        if (!sourceQuest || !targetQuest || sourceQuest.id === targetQuest.id) {
+            isLinking = false;
+            document.body.classList.remove('linking-mode');
+            return;
+            }
+
+        // Unlink if already linked
+        if (sourceQuest.parentIds.includes(targetId)) {
+            sourceQuest.parentIds = sourceQuest.parentIds.filter(id => id !== targetId);
+        } else {
+            // Check for circular dependencies
+            const isCircular = (source, target) => {
+                let toVisit = [...target.parentIds];
+                const visited = new Set();
+                while(toVisit.length > 0) {
+                    const currentId = toVisit.pop();
+                    if (currentId === source.id) return true;
+                    if (!visited.has(currentId)) {
+                        visited.add(currentId);
+                        const currentQuest = quests.find(q => q.id === currentId);
+                        if (currentQuest) {
+                            toVisit.push(...currentQuest.parentIds);
+                        }
+                    }
+                }
+                return false;
+                };
+
+            if (!isCircular(sourceQuest, targetQuest)) {
+                 if (!sourceQuest.parentIds.includes(targetId)) {
+                    sourceQuest.parentIds.push(targetId);
+                }
+            } else {
+                alert("Cannot create a circular dependency.");
+            }
         }
 
-        // Set initial position for the final quest
-        const finalQuest = quests.find(q => q.id === 1);
-        if (finalQuest) {
-            finalQuest.x = 0;
-            finalQuest.y = 0;
+        isLinking = false;
+        linkSourceId = null;
+        document.body.classList.remove('linking-mode');
+
+        drawConnections();
+        renderCards();
+    };
+
+    // --- Event Listeners and Main Logic ---
+
+    const resizeCanvas = () => {
+        canvas.width = container.offsetWidth;
+        canvas.height = container.offsetHeight;
+        drawConnections();
+        renderCards();
+    };
+    window.addEventListener('resize', resizeCanvas);
+
+    container.addEventListener('mousedown', (e) => {
+        if (e.button === 0) { // Left click
+            if (isMoving) {
+                const questToMove = quests.find(q => q.id === selectedQuestId);
+                if (questToMove) {
+                    // No setup needed here as mousemove will handle it
+                }
+            } else {
+                isPanning = true;
+                panStartX = e.clientX - originX;
+                panStartY = e.clientY - originY;
+                container.style.cursor = 'grabbing';
+            }
         }
+    });
 
-
-        canvas.addEventListener('mousedown', handleMouseDown);
-        canvas.addEventListener('mouseup', handleMouseUp);
-        canvas.addEventListener('mousemove', handleMouseMove);
-        canvas.addEventListener('wheel', handleWheel);
-        canvas.addEventListener('contextmenu', handleContextMenu);
-
-        draw();
-    }
-
-    function populateAndShowStoryBeatCard(quest) {
-        if (!quest) return;
-
-        let finalQuestNote = '';
-        if (quest.id === 1) {
-            finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is designed to be the final Campaign ending quest, and as such cannot be removed.</p>`;
+    container.addEventListener('mouseup', (e) => {
+        if (e.button === 0) {
+            isPanning = false;
+            if (isMoving) {
+                isMoving = false;
+                document.body.classList.remove('moving-mode');
+            }
+            container.style.cursor = 'grab';
         }
+    });
 
-        const parentQuest = quests.find(q => q.id === quest.parentId);
-        const childrenQuests = quests.filter(q => q.parentId === quest.id);
-
-        let parentHTML = 'None';
-        if (parentQuest) {
-            parentHTML = `<a href="#" class="quest-link" data-quest-id="${parentQuest.id}">${parentQuest.name}</a>`;
+    container.addEventListener('mousemove', (e) => {
+        if (isMoving) {
+            const questToMove = quests.find(q => q.id === selectedQuestId);
+            if (questToMove) {
+                const rect = container.getBoundingClientRect();
+                const newX = (e.clientX - rect.left - originX) / scale;
+                const newY = (e.clientY - rect.top - originY) / scale;
+                questToMove.x = newX;
+                questToMove.y = newY;
+                drawConnections();
+                renderCards();
+            }
+        } else if (isPanning) {
+            originX = e.clientX - panStartX;
+            originY = e.clientY - panStartY;
+            drawConnections();
+            renderCards();
         }
+    });
 
-        let childrenHTML = 'None';
-        if (childrenQuests.length > 0) {
-            childrenHTML = childrenQuests.map(q => `<a href="#" class="quest-link" data-quest-id="${q.id}">${q.name}</a>`).join('<br>');
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomAmount = -e.deltaY * 0.001;
+        const newScale = Math.min(Math.max(0.2, scale + zoomAmount), 2.0);
+
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        originX = originX - (mouseX - originX) * (newScale / scale - 1);
+        originY = originY - (mouseY - originY) * (newScale / scale - 1);
+
+        scale = newScale;
+        drawConnections();
+        renderCards();
+    });
+
+    container.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        createCanvasContextMenu(e);
+    });
+
+    // Remove context menu on window click
+    window.addEventListener('click', (e) => {
+        const menu = document.querySelector('.context-menu');
+        if (menu) {
+            menu.remove();
         }
+        if (isLinking) {
+            isLinking = false;
+            linkSourceId = null;
+            document.body.classList.remove('linking-mode');
+        }
+    });
 
-        let prerequisitesHTML = quest.prerequisites.map((p, index) => `
-            <label class="flex gap-x-3 py-3 flex-row">
-                <input type="checkbox" class="h-5 w-5 rounded border-[#e9e8ce] border-2 bg-transparent text-[#f9f506] checked:bg-[#f9f506] checked:border-[#f9f506] focus:ring-0 focus:ring-offset-0" data-prerequisite-index="${index}" />
-                <p class="text-[#1c1c0d] text-base font-normal leading-normal">${p.text}</p>
-            </label>
-        `).join('');
-
-        let rewardsHTML = quest.rewards.map(r => `
-            <div class="flex items-center gap-4 bg-[#fcfcf8] px-4 min-h-[72px] py-2">
-                <div class="flex flex-col justify-center">
-                    <p class="text-[#1c1c0d] text-base font-medium leading-normal line-clamp-1">${r.name}</p>
-                    <p class="text-[#9e9d47] text-sm font-normal leading-normal line-clamp-2">${r.description}</p>
-                </div>
-            </div>
-        `).join('');
-
-        let recommendationsHTML = quest.recommendations.map(rec => `<li>${rec.text}</li>`).join('');
-        let completionStepsHTML = quest.completionSteps.map(step => `<li>${step.text}</li>`).join('');
-
-        storyBeatCardBody.innerHTML = `
-            <h1>${quest.name}</h1>
-            ${finalQuestNote}
-            <div class="status-tabs">
-                <div class="status-tab ${quest.status === 'active' ? 'active' : ''}" data-status="active">Active</div>
-                <div class="status-tab ${quest.status === 'abandon' ? 'active' : ''}" data-status="abandon">Abandon</div>
-                <div class="status-tab ${quest.status === 'completed' ? 'active' : ''}" data-status="completed">Completed</div>
-            </div>
-            <h3>Description</h3>
-            <p>${quest.description || 'No description yet.'}</p>
-            <h3>Parent Quest</h3>
-            <div>${parentHTML}</div>
-            <h3>Child Quests</h3>
-            <div>${childrenHTML}</div>
-            <h3>Prerequisites</h3>
-            <div>${prerequisitesHTML || 'None'}</div>
-            <h3>Rewards</h3>
-            <div>${rewardsHTML || 'None'}</div>
-            <h3>Recommendations</h3>
-            <ul>${recommendationsHTML || 'None'}</ul>
-            <h3>Completion Steps</h3>
-            <ul>${completionStepsHTML || 'None'}</ul>
-        `;
-        storyBeatCardOverlay.style.display = 'flex';
+    // Initial setup
+    resizeCanvas(); // Set initial canvas size
+    drawConnections();
+    renderCards();
     }
 
     if (storyBeatCardCloseButton) {
