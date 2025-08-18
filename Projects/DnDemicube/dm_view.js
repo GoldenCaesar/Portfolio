@@ -6510,25 +6510,128 @@ function displayToast(messageElement) {
      * Renders the HTML cards for each quest.
      */
     const renderCards = () => {
-            cardContainer.innerHTML = '';
+        cardContainer.innerHTML = '';
 
-            quests.forEach(quest => {
-                const card = document.createElement('div');
+        quests.forEach(quest => {
+            const card = document.createElement('div');
             card.classList.add('card');
             if (quest.id === selectedQuestId) {
                 card.classList.add('selected');
-                }
+            }
             card.dataset.id = quest.id;
 
+            // Bottom layer (map background)
+            const background = document.createElement('div');
+            background.classList.add('card-background');
+
+            if (quest.associatedMaps && quest.associatedMaps.length > 0) {
+                if (quest.associatedMaps.length === 1) {
+                    const mapData = detailedMapData.get(quest.associatedMaps[0]);
+                    if (mapData && mapData.url) {
+                        background.style.backgroundImage = `url('${mapData.url}')`;
+                    }
+                } else {
+                    background.style.display = 'grid';
+                    background.style.gridTemplateColumns = `repeat(${Math.ceil(Math.sqrt(quest.associatedMaps.length))}, 1fr)`;
+                    quest.associatedMaps.forEach(mapName => {
+                        const mapData = detailedMapData.get(mapName);
+                        if (mapData && mapData.url) {
+                            const mapCell = document.createElement('div');
+                            mapCell.style.backgroundImage = `url('${mapData.url}')`;
+                            mapCell.style.backgroundSize = 'cover';
+                            mapCell.style.backgroundPosition = 'center';
+                            background.appendChild(mapCell);
+                        }
+                    });
+                }
+            }
+            card.appendChild(background);
+
+            // Top layer (text overlay)
+            const overlay = document.createElement('div');
+            overlay.classList.add('card-overlay');
+
+            // Title
             const nameElement = document.createElement('h3');
             nameElement.textContent = quest.name;
-            card.appendChild(nameElement);
+            overlay.appendChild(nameElement);
+
+            // Subtitle (duration and rating)
+            const subtitle = document.createElement('div');
+            subtitle.classList.add('card-subtitle');
+
+            const duration = document.createElement('span');
+            duration.textContent = quest.storyDuration || '';
+            subtitle.appendChild(duration);
+
+            const rating = document.createElement('span');
+            rating.classList.add('card-rating');
+            let stars = '';
+            for (let i = 0; i < 5; i++) {
+                stars += i < quest.difficulty ? '★' : '☆';
+            }
+            rating.textContent = stars;
+            subtitle.appendChild(rating);
+
+            overlay.appendChild(subtitle);
+
+            // Linked Characters and Description
+            const content = document.createElement('div');
+            content.classList.add('card-content');
+
+            const charactersContainer = document.createElement('div');
+            charactersContainer.classList.add('card-characters');
+            if (quest.associatedNPCs && quest.associatedNPCs.length > 0) {
+                quest.associatedNPCs.forEach(npc => {
+                    const character = charactersData.find(c => c.id === npc.id);
+                    if (character) {
+                        const profile = document.createElement('div');
+                        profile.classList.add('card-character-profile');
+                        if (character.sheetData && character.sheetData.character_portrait) {
+                            profile.style.backgroundImage = `url('${character.sheetData.character_portrait}')`;
+                        } else {
+                            profile.textContent = getInitials(character.name);
+                        }
+                        charactersContainer.appendChild(profile);
+                    }
+                });
+            }
+            content.appendChild(charactersContainer);
+
+            const description = document.createElement('p');
+            description.classList.add('card-description');
+            let descText = quest.description || '';
+            const firstSentence = descText.split('.')[0];
+            if (firstSentence) {
+                description.textContent = firstSentence + '.';
+            } else {
+                description.textContent = descText.split(' ').slice(0, 15).join(' ') + (descText.split(' ').length > 15 ? '...' : '');
+            }
+            content.appendChild(description);
+
+            overlay.appendChild(content);
+
+            // Rewards
+            const rewardsContainer = document.createElement('div');
+            rewardsContainer.classList.add('card-rewards');
+            if (quest.detailedRewards) {
+                const rewards = [];
+                if (quest.detailedRewards.xp) rewards.push(`XP: ${quest.detailedRewards.xp}`);
+                if (quest.detailedRewards.loot) rewards.push(`Loot: ${quest.detailedRewards.loot}`);
+                if (quest.detailedRewards.magicItems) rewards.push(`Magic Items: ${quest.detailedRewards.magicItems}`);
+                if (quest.detailedRewards.information) rewards.push(`Info: ${quest.detailedRewards.information}`);
+                rewardsContainer.textContent = rewards.join(', ');
+            }
+            overlay.appendChild(rewardsContainer);
+
+            card.appendChild(overlay);
+
 
             const x = originX + (quest.x * scale);
             const y = originY + (quest.y * scale);
             card.style.left = `${x}px`;
             card.style.top = `${y}px`;
-                card.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            card.style.transform = `translate(-50%, -50%) scale(${scale})`;
 
             card.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -6547,17 +6650,17 @@ function displayToast(messageElement) {
                 }
             });
 
-                card.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+            card.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 selectedQuestId = quest.id;
                 document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
-                    createCardContextMenu(e, quest);
-                });
-
-                cardContainer.appendChild(card);
+                createCardContextMenu(e, quest);
             });
+
+            cardContainer.appendChild(card);
+        });
     };
 
     /**

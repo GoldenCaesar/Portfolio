@@ -59,20 +59,45 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
     background-color: #3a4f6a; /* Dark card background */
     border: 2px solid #5f6a7a; /* Border color */
     border-radius: 10px;
-    padding: 1.25rem 1.5rem;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
     position: absolute;
-    width: 250px;
-    text-align: center;
+    width: 300px; /* New width */
+    height: 300px; /* New height */
     pointer-events: auto; /* Re-enable pointer events for the cards */
     cursor: pointer;
     transition: all 0.2s ease-in-out;
     transform-origin: center center;
+    color: #e0e0e0; /* Light text */
+    overflow: hidden; /* Hide anything that goes outside the card */
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #e0e0e0; /* Light text */
+}
+
+.card-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+}
+
+.card-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(80, 80, 80, 0.5); /* 50% grey transparent */
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    box-sizing: border-box;
+    text-align: center;
 }
 
 .card:hover {
@@ -90,10 +115,70 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
 
 .card h3 {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: 1.5rem; /* Existing font size */
     font-weight: 600;
-    color: #e0e0e0; /* Light text for heading */
-    word-break: break-all;
+    color: #e0e0e0;
+    text-align: center;
+    width: 100%;
+}
+
+.card-subtitle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.card-rating {
+    font-size: 1.2rem;
+    color: #f5b32d;
+}
+
+.card-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.card-characters {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 0.5rem;
+}
+
+.card-character-profile {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    border: 2px solid white;
+    background-color: #5f6a7a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+}
+
+.card-description {
+    font-size: 0.9rem;
+    margin: 0;
+    width: 100%;
+    /* The font size will be adjusted by JS if needed */
+}
+
+.card-rewards {
+    font-size: 0.8rem;
+    font-style: italic;
+    margin-top: auto; /* Pushes it to the bottom */
+    width: 100%;
 }
 
 .context-menu {
