@@ -211,23 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     let nextQuestId = 2;
     let selectedQuestId = 1;
-    let storyTreeScale = 1.0;
-    let storyTreeOriginX = 0;
-    let storyTreeOriginY = 0;
-    let storyTreeInitialized = false;
-
-    // New Story Tree interaction state
-    let storyTreeIsLinkingQuest = false;
-    let storyTreeSourceQuestIdForLinking = null;
-    let storyTreeIsPanning = false;
-    let storyTreeIsMoving = false;
-    let storyTreeMovingQuestId = null;
-    let storyTreeStartX = 0;
-    let storyTreeStartY = 0;
-    let storyTreeMoveStartX = 0;
-    let storyTreeMoveStartY = 0;
-    let storyTreeInitialMoveX = 0;
-    let storyTreeInitialMoveY = 0;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -2575,168 +2558,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCharactersList();
     }
 
-    async function loadFromZip(file) {
-        const zip = await JSZip.loadAsync(file);
-        const campaignFile = zip.file("campaign.json");
-        if (!campaignFile) throw new Error("campaign.json not found in the zip file.");
-
-        const campaignJSON = await campaignFile.async("string");
-        const campaignData = JSON.parse(campaignJSON);
-
-        notesData = campaignData.notes || [];
-        charactersData = campaignData.characters || [];
-        charactersData.forEach(character => {
-            if (typeof character.isDetailsVisible === 'undefined') {
-                character.isDetailsVisible = true;
-            }
-        });
-        selectedNoteId = campaignData.selectedNoteId || null;
-        selectedCharacterId = campaignData.selectedCharacterId || null;
-        diceRollHistory = campaignData.diceRollHistory || [];
-        savedRolls = campaignData.savedRolls || [];
-        savedInitiatives = campaignData.savedInitiatives || {};
-        initiativeTokens = campaignData.initiativeTokens || [];
-        restoreInitiativeState(campaignData);
-
-        if (campaignData.storyTree) {
-            if (campaignData.storyTree.quests) { // Handle new format
-                quests = campaignData.storyTree.quests;
-                nextQuestId = campaignData.storyTree.nextQuestId;
-                selectedQuestId = campaignData.storyTree.selectedQuestId;
-            } else if (typeof campaignData.storyTree === 'object' && campaignData.storyTree.objects) { // Handle old fabric.js format
-                // This is a simplified conversion. A more robust solution might be needed for complex trees.
-                quests = campaignData.storyTree.objects.filter(obj => obj.type === 'group').map(group => {
-                    const nameLabel = group.objects.find(obj => obj.type === 'text');
-                    const questData = JSON.parse(nameLabel.text); // Assumes quest data was stored in the text object
-                    return {
-                        id: questData.id,
-                        name: questData.name,
-                        parentIds: questData.parentId ? [questData.parentId] : [],
-                        x: group.left,
-                        y: group.top,
-                        description: questData.description || '',
-                        status: questData.status || 'active',
-                        prerequisites: questData.prerequisites || [],
-                        rewards: questData.rewards || [],
-                        recommendations: questData.recommendations || [],
-                        completionSteps: questData.completionSteps || []
-                    };
-                });
-            }
-
-            // General backward compatibility check for parentId
-            quests.forEach(quest => {
-                if (quest.parentId !== undefined) {
-                    quest.parentIds = quest.parentId !== null ? [quest.parentId] : [];
-                    delete quest.parentId;
-                }
-            });
-        }
-
-        let loadedMapIconSize = campaignData.mapIconSize || 40;
-        if (loadedMapIconSize > 20) { // Likely old pixel value
-            mapIconSize = 5; // Default to 5%
-        } else {
-            mapIconSize = loadedMapIconSize;
-        }
-
-        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
-        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
-
-        diceDialogueRecord.innerHTML = ''; // Clear the log first
-        if (diceRollHistory && diceRollHistory.length > 0) {
-            diceRollHistory.forEach(historyItem => {
-                let rollData;
-                if (typeof historyItem === 'string') {
-                    // Handle old format for backward compatibility
-                    const parts = historyItem.split(': ');
-                    rollData = {
-                        type: 'roll', // Assume old entries are rolls
-                        sum: parts[0],
-                        roll: parts.length > 1 ? parts.slice(1).join(': ') : '',
-                        characterName: 'Dice Roller',
-                        playerName: 'DM',
-                        id: Date.now() + Math.random(), // Assign a temporary ID
-                        timestamp: '... old entry ...'
-                    };
-                } else {
-                    // Handle new object format
-                    rollData = historyItem;
-                }
-                const messageElement = createLogCard(rollData);
-                diceDialogueRecord.prepend(messageElement);
-            });
-        } else if (campaignData.combatLog) { // Fallback for very old saves
-            diceDialogueRecord.innerHTML = campaignData.combatLog;
-        }
-
-        const imagePromises = [];
-        const imagesFolder = zip.folder("images");
-        for (const mapName in campaignData.mapDefinitions) {
-            const definition = campaignData.mapDefinitions[mapName];
-            const imageFile = imagesFolder.file(mapName);
-            if (imageFile) {
-                const promise = imageFile.async("blob").then(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const overlays = definition.overlays || [];
-                    overlays.forEach(overlay => {
-                        if (typeof overlay.playerVisible === 'undefined') {
-                            overlay.playerVisible = true;
-                        }
-                    });
-                    detailedMapData.set(mapName, {
-                        name: definition.name,
-                        url: url,
-                        overlays: overlays,
-                        mode: definition.mode || 'edit'
-                    });
-                    displayedFileNames.add(mapName);
-                });
-                imagePromises.push(promise);
-            }
-        }
-        if (campaignData.activeMaps) {
-            campaignData.activeMaps.forEach(activeMap => {
-                const mapData = detailedMapData.get(activeMap.fileName);
-                if (mapData) {
-                    mapData.mode = 'view';
-                }
-            });
-        }
-        await Promise.all(imagePromises);
-
-        const audioFolder = zip.folder("audio");
-        if (audioFolder) {
-            audioBlobs = []; // Clear existing audio blobs
-            const audioPromises = [];
-            audioFolder.forEach((relativePath, file) => {
-                if (!file.dir) {
-                    const promise = file.async("blob").then(blob => {
-                        audioBlobs.push({ name: relativePath, blob: blob });
-                    });
-                    audioPromises.push(promise);
-                }
-            });
-            await Promise.all(audioPromises);
-            console.log(`${audioBlobs.length} audio files loaded.`);
-        }
-
-        const characterPromises = [];
-        const charactersFolder = zip.folder("characters");
-        charactersData.forEach(character => {
-            if (character.pdfFileName) {
-                const pdfFile = charactersFolder.file(character.pdfFileName);
-                if (pdfFile) {
-                    const promise = pdfFile.async("uint8array").then(pdfData => {
-                        character.pdfData = pdfData;
-                    });
-                    characterPromises.push(promise);
-                }
-            }
-        });
-        await Promise.all(characterPromises);
-    }
-
     async function loadFromJson(file) {
         const campaignJSON = await file.text();
         const campaignData = JSON.parse(campaignJSON);
@@ -2756,12 +2577,13 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreInitiativeState(campaignData);
 
         if (campaignData.storyTree) {
-            if (storyTreeCanvasObj) {
-                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
-            } else {
-                initStoryTree();
-                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
-            }
+            // Attempt to convert old data or notify user
+            console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
+            alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
+            // Reset to default state
+            quests = [{ id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }];
+            nextQuestId = 2;
+            selectedQuestId = 1;
         }
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
@@ -4090,9 +3912,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (storyTreeContainer) {
                 storyTreeContainer.style.display = 'flex'; // Use flex to match container style
                 storyTreeContainer.style.flexGrow = '1';
-                initStoryTree();
             }
             if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
+            initStoryTree();
         } else {
             if (mapContainer) mapContainer.classList.remove('hidden');
             if (noteEditorContainer) noteEditorContainer.classList.remove('active');
@@ -6553,448 +6375,252 @@ function displayToast(messageElement) {
     if (viewStoryTreeButton) {
         viewStoryTreeButton.addEventListener('click', () => {
             switchTab('tab-story-beats');
-            setTimeout(() => {
-                const finalQuest = quests.find(q => q.id === 1);
-                if (finalQuest && storyTreeCanvas.width > 0) {
-                    storyTreeOriginX = (storyTreeCanvas.width / 2) - (finalQuest.x * storyTreeScale);
-                    storyTreeOriginY = (storyTreeCanvas.height / 2) - (finalQuest.y * storyTreeScale);
-                    initStoryTree();
-                }
-            }, 10);
         });
     }
 
     function initStoryTree() {
-        // --- Core Functions ---
-        const ctx = storyTreeCanvas.getContext('2d');
-        let isLinkingQuest = false;
-        let sourceQuestIdForLinking = null;
+        const canvas = storyTreeCanvas;
+        const ctx = canvas.getContext('2d');
+        const cardContainer = storyTreeCardContainer;
+        let scale = 1.0;
+        let originX = canvas.width / 2;
+        let originY = canvas.height / 2;
         let isPanning = false;
-        let isMoving = false;
-        let startX = 0;
-        let startY = 0;
-        let moveStartX = 0;
-        let moveStartY = 0;
+        let panStartX = 0;
+        let panStartY = 0;
 
-        const layoutTree = () => {
-            const roots = quests.filter(q => !q.parentIds || q.parentIds.length === 0);
-            if (roots.length === 0) return;
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(scale, scale);
 
-            let treeOffsetY = 0;
-
-            roots.forEach(root => {
-                const queue = [{ id: root.id, x: 0, y: treeOffsetY }];
-                const processed = new Set();
-                processed.add(root.id);
-
-                root.x = 0;
-                root.y = treeOffsetY;
-
-                let head = 0;
-                while(head < queue.length) {
-                    const parent = quests.find(q => q.id === queue[head].id);
-                    if (!parent) {
-                        head++;
-                        continue;
-                    }
-
-                    const children = quests.filter(q => q.parentIds && q.parentIds.includes(parent.id));
-                    const totalWidth = children.length * 400;
-                    let currentX = parent.x - totalWidth / 2 + 200;
-
-                    children.forEach(child => {
-                        child.x = currentX;
-                        child.y = parent.y + 250;
-                        queue.push({ id: child.id, x: child.x, y: child.y });
-                        currentX += 400;
-                    });
-                    head++;
-                }
-
-                const maxDepth = Math.max(...quests.map(q => q.y));
-                treeOffsetY = maxDepth + 250;
-            });
-        };
-
-        const drawConnections = () => {
-            ctx.clearRect(0, 0, storyTreeCanvas.width, storyTreeCanvas.height);
-            ctx.strokeStyle = '#94a3b8';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
+            // Draw connections
+            ctx.strokeStyle = '#4a5f7a';
+            ctx.lineWidth = 2;
             quests.forEach(quest => {
-                if (quest.parentIds && quest.parentIds.length > 0) {
+                if (quest.parentIds) {
                     quest.parentIds.forEach(parentId => {
-                        const parentQuest = quests.find(q => q.id === parentId);
-                        if (parentQuest) {
-                            const startX = (parentQuest.x * storyTreeScale) + storyTreeOriginX;
-                            const startY = (parentQuest.y * storyTreeScale) + storyTreeOriginY;
-                            const endX = (quest.x * storyTreeScale) + storyTreeOriginX;
-                            const endY = (quest.y * storyTreeScale) + storyTreeOriginY;
-
+                        const parent = quests.find(p => p.id === parentId);
+                        if (parent) {
                             ctx.beginPath();
-                            ctx.moveTo(startX, startY);
-                            ctx.lineTo(endX, endY);
+                            ctx.moveTo(parent.x, parent.y);
+                            ctx.lineTo(quest.x, quest.y);
                             ctx.stroke();
                         }
                     });
                 }
             });
-        };
 
-        const renderCards = () => {
-            storyTreeCardContainer.innerHTML = '';
+            ctx.restore();
+            renderQuestCards();
+        }
 
+        function renderQuestCards() {
+            cardContainer.innerHTML = '';
             quests.forEach(quest => {
                 const card = document.createElement('div');
-                card.classList.add('card');
-                if (quest.id === selectedQuestId) {
-                    card.classList.add('selected');
-                }
+                card.className = 'story-beat-card';
+                card.textContent = quest.name;
                 card.dataset.id = quest.id;
+                if (quest.id === 1) {
+                    card.classList.add('final-quest');
+                }
 
-                const nameElement = document.createElement('h3');
-                nameElement.textContent = quest.name;
-                card.appendChild(nameElement);
+                const cardX = originX + quest.x * scale;
+                const cardY = originY + quest.y * scale;
 
-                const x = (quest.x * storyTreeScale) + storyTreeOriginX;
-                const y = (quest.y * storyTreeScale) + storyTreeOriginY;
-                card.style.left = `${x}px`;
-                card.style.top = `${y}px`;
-                card.style.transform = `translate(-50%, -50%) scale(${storyTreeScale})`;
-
-                card.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const questId = parseInt(card.dataset.id, 10);
-
-                    if (isLinkingQuest) {
-                        if (questId === sourceQuestIdForLinking) {
-                            isLinkingQuest = false;
-                            storyTreeContainer.style.cursor = 'grab';
-                            const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
-                            if (sourceCard) sourceCard.style.boxShadow = '';
-                            sourceQuestIdForLinking = null;
-                            return;
-                        }
-
-                        createLinkTypeContextMenu(e, sourceQuestIdForLinking, questId);
-
-                        isLinkingQuest = false;
-                        storyTreeContainer.style.cursor = 'grab';
-                        const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
-                        if (sourceCard) sourceCard.style.boxShadow = '';
-                        sourceQuestIdForLinking = null;
-                    } else {
-                        const currentlySelected = document.querySelector('.card.selected');
-
-                        if (storyBeatCardOverlay.style.display === 'flex' && currentlySelected && parseInt(currentlySelected.dataset.id, 10) === questId) {
-                            storyBeatCardOverlay.style.display = 'none';
-                            if (currentlySelected) {
-                                currentlySelected.classList.remove('selected');
-                            }
-                        } else {
-                            selectedQuestId = quest.id;
-                            if (currentlySelected) {
-                                currentlySelected.classList.remove('selected');
-                            }
-                            card.classList.add('selected');
-                            populateAndShowStoryBeatCard(quest);
-                        }
-                    }
-                });
+                card.style.left = `${cardX}px`;
+                card.style.top = `${cardY}px`;
+                card.style.transform = `translate(-50%, -50%) scale(${scale})`;
 
                 card.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    selectedQuestId = quest.id;
-                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    createCardContextMenu(e, quest.id);
+                    createCardContextMenu(e, quest);
                 });
 
-                storyTreeCardContainer.appendChild(card);
-            });
-        };
-
-        // --- Context Menu Logic ---
-        const createContextMenu = (e, options) => {
-            const existingMenu = document.querySelector('.context-menu');
-            if (existingMenu) existingMenu.remove();
-
-            const menu = document.createElement('ul');
-            menu.classList.add('context-menu');
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
-
-            options.forEach(option => {
-                const item = document.createElement('li');
-                item.textContent = option.label;
-                item.addEventListener('click', () => {
-                    option.action();
-                    menu.remove();
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    populateAndShowStoryBeatCard(quest);
                 });
-                menu.appendChild(item);
-            });
 
-            document.body.appendChild(menu);
-        };
-
-        const createCanvasContextMenu = (e) => {
-            const options = [{
-                label: 'Add Quest',
-                action: () => {
-                    const canvasBounds = storyTreeContainer.getBoundingClientRect();
-                    const newX = (e.clientX - canvasBounds.left - storyTreeOriginX) / storyTreeScale;
-                    const newY = (e.clientY - canvasBounds.top - storyTreeOriginY) / storyTreeScale;
-
-                    const newQuest = {
-                        id: nextQuestId++,
-                        name: `New Quest ${nextQuestId - 1}`,
-                        parentIds: [],
-                        x: newX,
-                        y: newY,
-                        description: '',
-                        status: 'active',
-                        prerequisites: [],
-                        rewards: [],
-                        recommendations: [],
-                        completionSteps: []
-                    };
-                    quests.push(newQuest);
-                    selectedQuestId = newQuest.id;
-                    drawConnections();
-                    renderCards();
-                }
-            }];
-            createContextMenu(e, options);
-        };
-
-        const createLinkTypeContextMenu = (e, sourceId, targetId) => {
-            const sourceQuest = quests.find(q => q.id === sourceId);
-            const targetQuest = quests.find(q => q.id === targetId);
-            if (!sourceQuest || !targetQuest) return;
-
-            const options = [
-                {
-                    label: 'Parent', // Target is the parent of Source
-                    action: () => {
-                        if (!sourceQuest.parentIds) sourceQuest.parentIds = [];
-                        const index = sourceQuest.parentIds.indexOf(targetId);
-                        if (index > -1) {
-                            sourceQuest.parentIds.splice(index, 1);
-                        } else {
-                            sourceQuest.parentIds.push(targetId);
-                        }
-                        drawConnections();
-                        renderCards();
-                    }
-                },
-                {
-                    label: 'Child', // Target is the child of Source
-                    action: () => {
-                        if (!targetQuest.parentIds) targetQuest.parentIds = [];
-                        const index = targetQuest.parentIds.indexOf(sourceId);
-                        if (index > -1) {
-                            targetQuest.parentIds.splice(index, 1);
-                        } else {
-                            targetQuest.parentIds.push(sourceId);
-                        }
-                        drawConnections();
-                        renderCards();
-                    }
-                }
-            ];
-            createContextMenu(e, options);
-        };
-
-        const createCardContextMenu = (e, questId) => {
-            let options = [
-                {
-                    label: 'Rename',
-                    action: () => {
-                        const quest = quests.find(q => q.id === questId);
-                        const newName = prompt('Enter a new name for the quest:', quest.name);
-                        if (newName !== null && newName.trim() !== '') {
-                            quest.name = newName;
-                            renderCards();
-                        }
-                    }
-                },
-                {
-                    label: 'Delete',
-                    action: () => {
-                        const questToDelete = quests.find(q => q.id === questId);
-                        if (!questToDelete) return;
-
-                        const deleteChildren = (id) => {
-                            const children = quests.filter(q => q.parentId === id);
-                            children.forEach(child => deleteChildren(child.id));
-                            quests = quests.filter(q => q.id !== id);
-                        };
-
-                        deleteChildren(questId);
-                        selectedQuestId = null;
-                        drawConnections();
-                        renderCards();
-                    }
-                },
-                {
-                    label: 'Move',
-                    action: () => {
-                        isMoving = true;
-                        document.body.classList.add('moving-mode');
-                        const quest = quests.find(q => q.id === questId);
-                        const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
-                    }
-                },
-                {
-                    label: 'Link',
-                    action: () => {
-                        isLinkingQuest = true;
-                        sourceQuestIdForLinking = questId;
-                        storyTreeContainer.style.cursor = 'crosshair';
-                        document.querySelectorAll('.card').forEach(c => c.style.boxShadow = '');
-                        const sourceCard = document.querySelector(`.card[data-id="${questId}"]`);
-                        if (sourceCard) {
-                            sourceCard.style.boxShadow = '0 0 15px yellow';
-                        }
-                    }
-                }
-            ];
-
-            if (questId === 1) {
-                options = options.filter(opt => opt.label !== 'Delete');
-            }
-
-            options = options.sort((a, b) => {
-                const order = { 'Rename': 1, 'Link': 2, 'Move': 3, 'Delete': 4 };
-                return (order[a.label] || 99) - (order[b.label] || 99);
-            });
-
-            createContextMenu(e, options);
-        };
-
-        const resizeCanvas = () => {
-            storyTreeCanvas.width = storyTreeContainer.offsetWidth;
-            storyTreeCanvas.height = storyTreeContainer.offsetHeight;
-            drawConnections();
-            renderCards();
-        };
-
-        // --- Event Listeners and Main Logic ---
-        if (!storyTreeInitialized) {
-            storyTreeInitialized = true;
-
-            let isPanning = false;
-            let isMoving = false;
-            let startX = 0;
-            let startY = 0;
-            let moveStartX = 0;
-            let moveStartY = 0;
-            let initialMoveX = 0;
-            let initialMoveY = 0;
-
-
-            window.addEventListener('resize', resizeCanvas);
-
-            storyTreeContainer.addEventListener('mousedown', (e) => {
-                if (e.button === 2) {
-                    // Also cancel linking on right-click
-                    if (isLinkingQuest) {
-                        isLinkingQuest = false;
-                        storyTreeContainer.style.cursor = 'grab';
-                        const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
-                        if (sourceCard) sourceCard.style.boxShadow = '';
-                        sourceQuestIdForLinking = null;
-                    }
-                    return;
-                }
-                if (isMoving) {
-                    const questToMove = quests.find(q => q.id === selectedQuestId);
-                    if (questToMove) {
-                        const cardElement = document.querySelector(`.card[data-id="${selectedQuestId}"]`);
-                        if (cardElement && e.target.closest('.card') === cardElement) {
-                            moveStartX = e.clientX;
-                            moveStartY = e.clientY;
-                            initialMoveX = questToMove.x;
-                            initialMoveY = questToMove.y;
-                        } else {
-                            isMoving = false;
-                            document.body.classList.remove('moving-mode');
-                            storyTreeContainer.style.cursor = 'grab';
-                        }
-                    }
-                    return;
-                }
-                isPanning = true;
-                startX = e.clientX - storyTreeOriginX;
-                startY = e.clientY - storyTreeOriginY;
-                storyTreeContainer.style.cursor = 'grabbing';
-            });
-
-            storyTreeContainer.addEventListener('mouseup', () => {
-                isPanning = false;
-                isMoving = false;
-                moveStartX = 0; // Reset move start position
-                document.body.classList.remove('moving-mode');
-                storyTreeContainer.style.cursor = 'grab';
-            });
-
-            storyTreeContainer.addEventListener('mousemove', (e) => {
-                if (isMoving && moveStartX !== 0) { // Check if a move has actually started
-                    const questToMove = quests.find(q => q.id === selectedQuestId);
-                    if (questToMove) {
-                        const dx = (e.clientX - moveStartX) / storyTreeScale;
-                        const dy = (e.clientY - moveStartY) / storyTreeScale;
-                        questToMove.x = initialMoveX + dx;
-                        questToMove.y = initialMoveY + dy;
-                        drawConnections();
-                        renderCards();
-                    }
-                } else if (isPanning) {
-                    storyTreeOriginX = e.clientX - startX;
-                    storyTreeOriginY = e.clientY - startY;
-                    drawConnections();
-                    renderCards();
-                }
-            });
-
-            storyTreeContainer.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const zoomAmount = -e.deltaY * 0.001;
-                const newScale = Math.min(Math.max(0.2, storyTreeScale + zoomAmount), 2.0);
-
-                const mouseX = e.clientX - storyTreeContainer.getBoundingClientRect().left;
-                const mouseY = e.clientY - storyTreeContainer.getBoundingClientRect().top;
-
-                storyTreeOriginX = storyTreeOriginX - (mouseX - storyTreeOriginX) * (newScale / storyTreeScale - 1);
-                storyTreeOriginY = storyTreeOriginY - (mouseY - storyTreeOriginY) * (newScale / storyTreeScale - 1);
-
-                storyTreeScale = newScale;
-                drawConnections();
-                renderCards();
-            });
-
-            storyTreeContainer.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                if (!e.target.closest('.card')) {
-                    createCanvasContextMenu(e);
-                }
-            });
-
-            window.addEventListener('click', (e) => {
-                const menu = document.querySelector('.context-menu');
-                if (menu && !menu.contains(e.target)) {
-                    menu.remove();
-                }
+                cardContainer.appendChild(card);
             });
         }
 
-        resizeCanvas();
-        layoutTree();
-        drawConnections();
-        renderCards();
+        function handleMouseDown(e) {
+            if (e.button === 0) {
+                isPanning = true;
+                panStartX = e.clientX - originX;
+                panStartY = e.clientY - originY;
+                canvas.style.cursor = 'grabbing';
+            }
+        }
+
+        function handleMouseUp(e) {
+            if (e.button === 0) {
+                isPanning = false;
+                canvas.style.cursor = 'grab';
+            }
+        }
+
+        function handleMouseMove(e) {
+            if (isPanning) {
+                originX = e.clientX - panStartX;
+                originY = e.clientY - panStartY;
+                draw();
+            }
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            const zoomIntensity = 0.1;
+            const wheel = e.deltaY < 0 ? 1 : -1;
+            const zoom = Math.exp(wheel * zoomIntensity);
+
+            const mouseX = e.clientX - canvas.getBoundingClientRect().left;
+            const mouseY = e.clientY - canvas.getBoundingClientRect().top;
+
+            originX = mouseX - (mouseX - originX) * zoom;
+            originY = mouseY - (mouseY - originY) * zoom;
+
+            scale *= zoom;
+            draw();
+        }
+
+        function createCardContextMenu(e, quest) {
+            e.preventDefault();
+            const existingMenu = document.querySelector('.story-tree-context-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+
+            const menu = document.createElement('ul');
+            menu.className = 'context-menu story-tree-context-menu';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+
+            const renameItem = document.createElement('li');
+            renameItem.textContent = 'Rename';
+            renameItem.addEventListener('click', () => {
+                const newName = prompt('Enter new name for the quest:', quest.name);
+                if (newName && newName.trim() !== '') {
+                    quest.name = newName.trim();
+                    draw();
+                }
+                menu.remove();
+            });
+
+            const deleteItem = document.createElement('li');
+            deleteItem.textContent = 'Delete';
+            if (quest.id === 1) {
+                deleteItem.classList.add('disabled');
+            } else {
+                deleteItem.addEventListener('click', () => {
+                    quests = quests.filter(q => q.id !== quest.id);
+                    // Also remove this quest from any parentIds arrays
+                    quests.forEach(q => {
+                        if (q.parentIds) {
+                            q.parentIds = q.parentIds.filter(id => id !== quest.id);
+                        }
+                    });
+                    draw();
+                    menu.remove();
+                });
+            }
+
+            const linkItem = document.createElement('li');
+            linkItem.textContent = 'Link';
+            linkItem.addEventListener('click', () => {
+                alert('Click on another quest to link to it.');
+                canvas.addEventListener('click', function linkClickHandler(event) {
+                    const rect = canvas.getBoundingClientRect();
+                    const clickX = (event.clientX - rect.left - originX) / scale;
+                    const clickY = (event.clientY - rect.top - originY) / scale;
+
+                    const targetQuest = quests.find(q => {
+                        const distance = Math.sqrt(Math.pow(q.x - clickX, 2) + Math.pow(q.y - clickY, 2));
+                        return distance < 50; // 50px click radius
+                    });
+
+                    if (targetQuest && targetQuest.id !== quest.id) {
+                        if (!targetQuest.parentIds) {
+                            targetQuest.parentIds = [];
+                        }
+                        targetQuest.parentIds.push(quest.id);
+                        draw();
+                    }
+                    canvas.removeEventListener('click', linkClickHandler);
+                }, { once: true });
+                menu.remove();
+            });
+
+            menu.appendChild(renameItem);
+            menu.appendChild(deleteItem);
+            menu.appendChild(linkItem);
+            document.body.appendChild(menu);
+
+            document.addEventListener('click', () => menu.remove(), { once: true });
+        }
+
+        function handleContextMenu(e) {
+            e.preventDefault();
+            const existingMenu = document.querySelector('.story-tree-context-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+
+            const menu = document.createElement('div');
+            menu.className = 'context-menu story-tree-context-menu';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+
+            const addQuestItem = document.createElement('li');
+            addQuestItem.textContent = 'Add Quest';
+            addQuestItem.addEventListener('click', () => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - originX) / scale;
+                const y = (e.clientY - rect.top - originY) / scale;
+                const newQuest = {
+                    id: nextQuestId++,
+                    name: `New Quest ${nextQuestId - 1}`,
+                    parentIds: [],
+                    x: x,
+                    y: y,
+                    description: '',
+                    status: 'active',
+                    prerequisites: [],
+                    rewards: [],
+                    recommendations: [],
+                    completionSteps: []
+                };
+                quests.push(newQuest);
+                draw();
+                menu.remove();
+            });
+
+            menu.appendChild(addQuestItem);
+            document.body.appendChild(menu);
+
+            document.addEventListener('click', () => menu.remove(), { once: true });
+        }
+
+        // Set initial position for the final quest
+        const finalQuest = quests.find(q => q.id === 1);
+        if (finalQuest) {
+            finalQuest.x = 0;
+            finalQuest.y = 0;
+        }
+
+
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('wheel', handleWheel);
+        canvas.addEventListener('contextmenu', handleContextMenu);
+
+        draw();
     }
 
     function populateAndShowStoryBeatCard(quest) {
