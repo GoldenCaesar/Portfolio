@@ -6829,12 +6829,12 @@ function displayToast(messageElement) {
                 {
                     label: 'Move',
                     action: () => {
-                        setTimeout(() => {
-                            isMoving = true;
-                            document.body.classList.add('moving-mode');
-                            const quest = quests.find(q => q.id === questId);
-                            const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
-                        }, 0);
+                        console.log(`[StoryTree] "Move" action clicked for questId: ${questId}`);
+                        isMoving = true;
+                        console.log('[StoryTree] isMoving set to true');
+                        document.body.classList.add('moving-mode');
+                        const quest = quests.find(q => q.id === questId);
+                        const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
                     }
                 },
                 {
@@ -6888,7 +6888,10 @@ function displayToast(messageElement) {
             window.addEventListener('resize', resizeCanvas);
 
             storyTreeContainer.addEventListener('mousedown', (e) => {
+                console.log('[StoryTree] mousedown event');
+                console.log(`[StoryTree] State before mousedown: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}, selectedQuestId=${selectedQuestId}`);
                 if (e.button === 2) {
+                    console.log('[StoryTree] Right-click detected, handling context menu logic.');
                     // Also cancel linking on right-click
                     if (isLinkingQuest) {
                         isLinkingQuest = false;
@@ -6900,15 +6903,18 @@ function displayToast(messageElement) {
                     return;
                 }
                 if (isMoving) {
+                    console.log('[StoryTree] In "isMoving" block.');
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
                         const cardElement = document.querySelector(`.card[data-id="${selectedQuestId}"]`);
                         if (cardElement && e.target.closest('.card') === cardElement) {
+                            console.log(`[StoryTree] Starting move for questId: ${selectedQuestId}`);
                             moveStartX = e.clientX;
                             moveStartY = e.clientY;
                             initialMoveX = questToMove.x;
                             initialMoveY = questToMove.y;
                         } else {
+                            console.log('[StoryTree] Click was not on the selected card, cancelling move mode.');
                             isMoving = false;
                             document.body.classList.remove('moving-mode');
                             storyTreeContainer.style.cursor = 'grab';
@@ -6916,6 +6922,7 @@ function displayToast(messageElement) {
                     }
                     return;
                 }
+                console.log('[StoryTree] Starting pan.');
                 isPanning = true;
                 startX = e.clientX - storyTreeOriginX;
                 startY = e.clientY - storyTreeOriginY;
@@ -6923,15 +6930,19 @@ function displayToast(messageElement) {
             });
 
             storyTreeContainer.addEventListener('mouseup', () => {
+                console.log('[StoryTree] mouseup event');
+                console.log(`[StoryTree] State before mouseup: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}`);
                 isPanning = false;
                 isMoving = false;
                 moveStartX = 0; // Reset move start position
                 document.body.classList.remove('moving-mode');
                 storyTreeContainer.style.cursor = 'grab';
+                console.log(`[StoryTree] State after mouseup: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}`);
             });
 
             storyTreeContainer.addEventListener('mousemove', (e) => {
                 if (isMoving && moveStartX !== 0) { // Check if a move has actually started
+                    console.log(`[StoryTree] mousemove: Moving card ${selectedQuestId}`);
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
                         const dx = (e.clientX - moveStartX) / storyTreeScale;
@@ -6942,6 +6953,7 @@ function displayToast(messageElement) {
                         renderCards();
                     }
                 } else if (isPanning) {
+                    console.log('[StoryTree] mousemove: Panning');
                     storyTreeOriginX = e.clientX - startX;
                     storyTreeOriginY = e.clientY - startY;
                     drawConnections();
