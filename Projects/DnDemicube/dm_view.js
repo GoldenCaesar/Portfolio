@@ -6933,9 +6933,11 @@ function displayToast(messageElement) {
                 console.log('[StoryTree] mouseup event');
                 console.log(`[StoryTree] State before mouseup: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}`);
                 isPanning = false;
-                isMoving = false;
-                moveStartX = 0; // Reset move start position
-                document.body.classList.remove('moving-mode');
+                if (moveStartX !== 0) {
+                    isMoving = false;
+                    document.body.classList.remove('moving-mode');
+                }
+                moveStartX = 0;
                 storyTreeContainer.style.cursor = 'grab';
                 console.log(`[StoryTree] State after mouseup: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}`);
             });
