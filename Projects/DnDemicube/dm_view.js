@@ -228,6 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 magicItems: '',
                 information: ''
             },
+            storyDuration: '1 Session',
+            difficulty: 3,
+            storySteps: [],
             // Old fields that are being replaced or kept for compatibility
             status: 'active', // Will be deprecated in favor of questStatus
             prerequisites: [],
@@ -2556,6 +2559,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (quest.detailedRewards === undefined) {
                             quest.detailedRewards = { xp: 0, loot: '', magicItems: '', information: '' };
                         }
+                        if (quest.storyDuration === undefined) {
+                            quest.storyDuration = '';
+                        }
+                        if (quest.difficulty === undefined) {
+                            quest.difficulty = 0;
+                        }
+                        if (quest.storySteps === undefined) {
+                            quest.storySteps = [];
+                        }
                     });
                 } else if (Object.keys(campaignData.storyTree).length > 0) { // Old fabric.js format
                     // Attempt to convert old data or notify user
@@ -2567,6 +2579,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
                         associatedNPCs: [], failureTriggers: [], successTriggers: [],
                         detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                        storyDuration: '1 Session', difficulty: 3, storySteps: [],
                         status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
                     }];
                     nextQuestId = 2;
@@ -6589,6 +6602,14 @@ function displayToast(messageElement) {
             <h3>Quest Type</h3>
             <input type="text" id="quest-type" value="${quest.questType.join(', ')}" placeholder="e.g., Main Story, Side Quest">
 
+            <h3>Story Duration</h3>
+            <input type="text" id="quest-story-duration" value="${quest.storyDuration || ''}" placeholder="e.g., 1 Session, 3 Hours">
+
+            <h3>Difficulty</h3>
+            <div id="quest-difficulty" class="difficulty-rating">
+                ${[1, 2, 3, 4, 5].map(i => `<span class="star" data-value="${i}">${i <= quest.difficulty ? '★' : '☆'}</span>`).join('')}
+            </div>
+
             <h3>Starting Triggers</h3>
             <textarea id="quest-starting-triggers" class="editable-textarea" rows="3">${quest.startingTriggers.join('\n')}</textarea>
 
@@ -6611,6 +6632,18 @@ function displayToast(messageElement) {
                 `).join('')}
             </div>
             <button id="add-npc-btn">+ Add NPC</button>
+
+            <h3>Story Steps</h3>
+            <div id="quest-story-steps">
+                ${quest.storySteps.map((step, index) => `
+                    <div class="story-step-row" data-index="${index}">
+                        <input type="checkbox" class="story-step-checkbox" ${step.completed ? 'checked' : ''}>
+                        <div contenteditable="true" class="editable-div story-step-text">${step.text}</div>
+                        <button class="remove-step-btn">X</button>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="add-story-step-btn">+ Add Step</button>
 
             <h3>Success Triggers</h3>
             <textarea id="quest-success-triggers" class="editable-textarea" rows="3">${quest.successTriggers.join('\n')}</textarea>
@@ -6652,6 +6685,7 @@ function displayToast(messageElement) {
             quest.description = document.getElementById('quest-description').innerText;
             quest.questStatus = document.getElementById('quest-status').value;
             quest.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
+            quest.storyDuration = document.getElementById('quest-story-duration').value;
             quest.startingTriggers = document.getElementById('quest-starting-triggers').value.split('\n').filter(Boolean);
             quest.failureTriggers = document.getElementById('quest-failure-triggers').value.split('\n').filter(Boolean);
             quest.successTriggers = document.getElementById('quest-success-triggers').value.split('\n').filter(Boolean);
@@ -6664,6 +6698,12 @@ function displayToast(messageElement) {
                 id: parseInt(row.querySelector('.npc-select').value, 10),
                 role: row.querySelector('.npc-role').value
             })).filter(npc => npc.id);
+
+            const stepRows = document.querySelectorAll('.story-step-row');
+            quest.storySteps = Array.from(stepRows).map(row => ({
+                text: row.querySelector('.story-step-text').innerText,
+                completed: row.querySelector('.story-step-checkbox').checked
+            }));
 
             quest.detailedRewards = {
                 xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
@@ -6698,6 +6738,40 @@ function displayToast(messageElement) {
         npcContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('remove-npc-btn')) {
                 e.target.closest('.npc-row').remove();
+            }
+        });
+
+        const difficultyContainer = document.getElementById('quest-difficulty');
+        difficultyContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('star')) {
+                const value = parseInt(e.target.dataset.value, 10);
+                quest.difficulty = value;
+                const stars = difficultyContainer.querySelectorAll('.star');
+                stars.forEach(star => {
+                    star.innerHTML = parseInt(star.dataset.value, 10) <= value ? '★' : '☆';
+                });
+            }
+        });
+
+        const addStoryStepBtn = document.getElementById('add-story-step-btn');
+        addStoryStepBtn.addEventListener('click', () => {
+            const container = document.getElementById('quest-story-steps');
+            const newIndex = container.children.length;
+            const newRow = document.createElement('div');
+            newRow.className = 'story-step-row';
+            newRow.dataset.index = newIndex;
+            newRow.innerHTML = `
+                <input type="checkbox" class="story-step-checkbox">
+                <div contenteditable="true" class="editable-div story-step-text">New Step</div>
+                <button class="remove-step-btn">X</button>
+            `;
+            container.appendChild(newRow);
+        });
+
+        const storyStepsContainer = document.getElementById('quest-story-steps');
+        storyStepsContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-step-btn')) {
+                e.target.closest('.story-step-row').remove();
             }
         });
     };
@@ -6763,6 +6837,9 @@ function displayToast(messageElement) {
                     failureTriggers: [],
                     successTriggers: [],
                     detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                    storyDuration: '',
+                    difficulty: 0,
+                    storySteps: [],
                     status: 'active',
                     prerequisites: [],
                     rewards: [],
@@ -6877,6 +6954,11 @@ function displayToast(messageElement) {
         drawConnections();
         renderCards();
     };
+
+    /**
+     * Shows the quest details overlay, populating it with a specific quest's data.
+     * @param {object} quest The quest object to display.
+     */
 
     // --- Event Listeners and Main Logic ---
 
