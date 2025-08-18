@@ -6575,74 +6575,69 @@ function displayToast(messageElement) {
         if (!childrenLinks) childrenLinks = 'None';
 
         storyBeatCardBody.innerHTML = `
-            <div class="quest-card-grid">
-                <div class="quest-card-column">
-                    <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
-                    ${finalQuestNote}
+            <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
+            ${finalQuestNote}
 
-                    <h3>Description</h3>
-                    <div contenteditable="true" id="quest-description" class="editable-div">${quest.description || ''}</div>
+            <h3>Description</h3>
+            <div contenteditable="true" id="quest-description" class="editable-div">${quest.description || ''}</div>
 
-                    <h3>Quest Status</h3>
-                    <select id="quest-status">
-                        ${statusOptions.map(s => `<option value="${s}" ${quest.questStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
-                    </select>
+            <h3>Quest Status</h3>
+            <select id="quest-status">
+                ${statusOptions.map(s => `<option value="${s}" ${quest.questStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
 
-                    <h3>Quest Type</h3>
-                    <input type="text" id="quest-type" value="${quest.questType.join(', ')}" placeholder="e.g., Main Story, Side Quest">
+            <h3>Quest Type</h3>
+            <input type="text" id="quest-type" value="${quest.questType.join(', ')}" placeholder="e.g., Main Story, Side Quest">
 
-                    <h3>Starting Triggers</h3>
-                    <textarea id="quest-starting-triggers" class="editable-textarea" rows="3">${quest.startingTriggers.join('\n')}</textarea>
+            <h3>Starting Triggers</h3>
+            <textarea id="quest-starting-triggers" class="editable-textarea" rows="3">${quest.startingTriggers.join('\n')}</textarea>
 
-                    <h3>Failure Triggers</h3>
-                    <textarea id="quest-failure-triggers" class="editable-textarea" rows="3">${quest.failureTriggers.join('\n')}</textarea>
+            <h3>Associated Maps</h3>
+            <select id="quest-associated-maps" multiple size="4">
+                ${mapOptions.map(m => `<option value="${m}" ${quest.associatedMaps.includes(m) ? 'selected' : ''}>${m}</option>`).join('')}
+            </select>
 
-                    <h3>Success Triggers</h3>
-                    <textarea id="quest-success-triggers" class="editable-textarea" rows="3">${quest.successTriggers.join('\n')}</textarea>
-                </div>
-
-                <div class="quest-card-column">
-                    <h3>Associated Maps</h3>
-                    <select id="quest-associated-maps" multiple size="4">
-                        ${mapOptions.map(m => `<option value="${m}" ${quest.associatedMaps.includes(m) ? 'selected' : ''}>${m}</option>`).join('')}
-                    </select>
-
-                    <h3>Associated NPCs</h3>
-                    <div id="quest-associated-npcs">
-                        ${quest.associatedNPCs.map((npc, index) => `
-                            <div class="npc-row" data-index="${index}">
-                                <select class="npc-select">
-                                    <option value="">--Select NPC--</option>
-                                    ${characterOptions.map(c => `<option value="${c.id}" ${npc.id === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
-                                </select>
-                                <input type="text" class="npc-role" value="${npc.role}" placeholder="Role (e.g., Quest Giver)">
-                                <button class="remove-npc-btn">X</button>
-                            </div>
-                        `).join('')}
+            <h3>Associated NPCs</h3>
+            <div id="quest-associated-npcs">
+                ${quest.associatedNPCs.map((npc, index) => `
+                    <div class="npc-row" data-index="${index}">
+                        <select class="npc-select">
+                            <option value="">--Select NPC--</option>
+                            ${characterOptions.map(c => `<option value="${c.id}" ${npc.id === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                        </select>
+                        <input type="text" class="npc-role" value="${npc.role}" placeholder="Role (e.g., Quest Giver)">
+                        <button class="remove-npc-btn">X</button>
                     </div>
-                    <button id="add-npc-btn">+ Add NPC</button>
-
-                    <h3>Rewards</h3>
-                    <div class="rewards-grid">
-                        <label for="reward-xp">XP:</label>
-                        <input type="number" id="reward-xp" value="${quest.detailedRewards.xp || 0}">
-
-                        <label for="reward-loot">Loot/Currency:</label>
-                        <textarea id="reward-loot" rows="2">${quest.detailedRewards.loot || ''}</textarea>
-
-                        <label for="reward-magic-items">Magic Items:</label>
-                        <textarea id="reward-magic-items" rows="2">${quest.detailedRewards.magicItems || ''}</textarea>
-
-                        <label for="reward-information">Information/Lore:</label>
-                        <textarea id="reward-information" rows="2">${quest.detailedRewards.information || ''}</textarea>
-                    </div>
-
-                    <h3>Parent Quests</h3>
-                    <div>${parentLinks}</div>
-                    <h3>Child Quests</h3>
-                    <div>${childrenLinks}</div>
-                </div>
+                `).join('')}
             </div>
+            <button id="add-npc-btn">+ Add NPC</button>
+
+            <h3>Success Triggers</h3>
+            <textarea id="quest-success-triggers" class="editable-textarea" rows="3">${quest.successTriggers.join('\n')}</textarea>
+
+            <h3>Failure Triggers</h3>
+            <textarea id="quest-failure-triggers" class="editable-textarea" rows="3">${quest.failureTriggers.join('\n')}</textarea>
+
+            <h3>Rewards</h3>
+            <div class="rewards-grid">
+                <label for="reward-xp">XP:</label>
+                <input type="number" id="reward-xp" value="${quest.detailedRewards.xp || 0}">
+
+                <label for="reward-loot">Loot/Currency:</label>
+                <textarea id="reward-loot" rows="2">${quest.detailedRewards.loot || ''}</textarea>
+
+                <label for="reward-magic-items">Magic Items:</label>
+                <textarea id="reward-magic-items" rows="2">${quest.detailedRewards.magicItems || ''}</textarea>
+
+                <label for="reward-information">Information/Lore:</label>
+                <textarea id="reward-information" rows="2">${quest.detailedRewards.information || ''}</textarea>
+            </div>
+
+            <h3>Parent Quests</h3>
+            <div>${parentLinks}</div>
+            <h3>Child Quests</h3>
+            <div>${childrenLinks}</div>
+
             <button id="save-quest-details-btn">Save All Changes</button>
         `;
 

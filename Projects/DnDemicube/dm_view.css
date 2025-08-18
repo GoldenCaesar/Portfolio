@@ -390,13 +390,7 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 }
 
 /* New Story Beat Card Overlay Styles */
-.quest-card-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-
-.quest-card-column h3 {
+#story-beat-card-body h3 {
     border-bottom: 1px solid #ccc;
     padding-bottom: 5px;
     margin-top: 15px;
@@ -475,7 +469,7 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     position: absolute;
     top: 10px;
     right: 10px;
-    width: 350px;
+    width: 500px;
     max-height: calc(100% - 20px);
     background-color: #fcfcf8;
     border-radius: 8px;
