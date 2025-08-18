@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Story Beats State Variables
     let quests = [
-        { id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }
+        { id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }
     ];
     let nextQuestId = 2;
     let selectedQuestId = 1;
@@ -2252,15 +2252,24 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCampaignInput.disabled = true;
 
         try {
-            const zip = await JSZip.loadAsync(file);
-            const campaignFile = zip.file("campaign.json");
-            if (!campaignFile) throw new Error("campaign.json not found in the zip file.");
+            if (file.name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(file);
+                const campaignFile = zip.file("campaign.json");
+                if (!campaignFile) throw new Error("campaign.json not found in the zip file.");
 
-            const campaignJSON = await campaignFile.async("string");
-            const campaignData = JSON.parse(campaignJSON);
+                const campaignJSON = await campaignFile.async("string");
+                const campaignData = JSON.parse(campaignJSON);
 
-            await showLoadOptionsModal(zip, campaignData);
-
+                await showLoadOptionsModal(zip, campaignData);
+            } else if (file.name.endsWith('.json')) {
+                await loadFromJson(file);
+                alert("Legacy JSON campaign loaded successfully.");
+                renderAllLists();
+                if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
+                if (selectedNoteId) loadNoteIntoEditor(selectedNoteId);
+            } else {
+                throw new Error("Unsupported file type. Please select a .zip or .json file.");
+            }
         } catch (error) {
             console.error("Error preparing campaign load:", error);
             alert(`Failed to prepare campaign for loading: ${error.message}`);
@@ -2484,6 +2493,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Backward compatibility for quests missing new fields
                     quests.forEach(quest => {
+                        if (quest.parentId !== undefined) {
+                            quest.parentIds = quest.parentId !== null ? [quest.parentId] : [];
+                            delete quest.parentId;
+                        }
                         if (quest.description === undefined) {
                             quest.description = '';
                         }
@@ -2508,7 +2521,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
                     alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
                     // Reset to default state
-                    quests = [{ id: 1, name: 'Final Quest', parentId: null, x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }];
+                    quests = [{ id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }];
                     nextQuestId = 2;
                     selectedQuestId = 1;
                 }
@@ -2573,12 +2586,38 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreInitiativeState(campaignData);
 
         if (campaignData.storyTree) {
-            if (storyTreeCanvasObj) {
-                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
-            } else {
-                initStoryTree();
-                storyTreeCanvasObj.loadFromJSON(campaignData.storyTree, storyTreeCanvasObj.renderAll.bind(storyTreeCanvasObj));
+            if (campaignData.storyTree.quests) { // Handle new format
+                quests = campaignData.storyTree.quests;
+                nextQuestId = campaignData.storyTree.nextQuestId;
+                selectedQuestId = campaignData.storyTree.selectedQuestId;
+            } else if (typeof campaignData.storyTree === 'object' && campaignData.storyTree.objects) { // Handle old fabric.js format
+                // This is a simplified conversion. A more robust solution might be needed for complex trees.
+                quests = campaignData.storyTree.objects.filter(obj => obj.type === 'group').map(group => {
+                    const nameLabel = group.objects.find(obj => obj.type === 'text');
+                    const questData = JSON.parse(nameLabel.text); // Assumes quest data was stored in the text object
+                    return {
+                        id: questData.id,
+                        name: questData.name,
+                        parentIds: questData.parentId ? [questData.parentId] : [],
+                        x: group.left,
+                        y: group.top,
+                        description: questData.description || '',
+                        status: questData.status || 'active',
+                        prerequisites: questData.prerequisites || [],
+                        rewards: questData.rewards || [],
+                        recommendations: questData.recommendations || [],
+                        completionSteps: questData.completionSteps || []
+                    };
+                });
             }
+
+            // General backward compatibility check for parentId
+            quests.forEach(quest => {
+                if (quest.parentId !== undefined) {
+                    quest.parentIds = quest.parentId !== null ? [quest.parentId] : [];
+                    delete quest.parentId;
+                }
+            });
         }
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
@@ -6525,7 +6564,7 @@ function displayToast(messageElement) {
         let moveStartY = 0;
 
         const layoutTree = () => {
-            const roots = quests.filter(q => q.parentId === null);
+            const roots = quests.filter(q => !q.parentIds || q.parentIds.length === 0);
             if (roots.length === 0) return;
 
             let treeOffsetY = 0;
@@ -6546,7 +6585,7 @@ function displayToast(messageElement) {
                         continue;
                     }
 
-                    const children = quests.filter(q => q.parentId === parent.id);
+                    const children = quests.filter(q => q.parentIds && q.parentIds.includes(parent.id));
                     const totalWidth = children.length * 400;
                     let currentX = parent.x - totalWidth / 2 + 200;
 
@@ -6572,19 +6611,21 @@ function displayToast(messageElement) {
             ctx.lineJoin = 'round';
 
             quests.forEach(quest => {
-                if (quest.parentId !== null) {
-                    const parentQuest = quests.find(q => q.id === quest.parentId);
-                    if (parentQuest) {
-                        const startX = (parentQuest.x * storyTreeScale) + storyTreeOriginX;
-                        const startY = (parentQuest.y * storyTreeScale) + storyTreeOriginY;
-                        const endX = (quest.x * storyTreeScale) + storyTreeOriginX;
-                        const endY = (quest.y * storyTreeScale) + storyTreeOriginY;
+                if (quest.parentIds && quest.parentIds.length > 0) {
+                    quest.parentIds.forEach(parentId => {
+                        const parentQuest = quests.find(q => q.id === parentId);
+                        if (parentQuest) {
+                            const startX = (parentQuest.x * storyTreeScale) + storyTreeOriginX;
+                            const startY = (parentQuest.y * storyTreeScale) + storyTreeOriginY;
+                            const endX = (quest.x * storyTreeScale) + storyTreeOriginX;
+                            const endY = (quest.y * storyTreeScale) + storyTreeOriginY;
 
-                        ctx.beginPath();
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-                    }
+                            ctx.beginPath();
+                            ctx.moveTo(startX, startY);
+                            ctx.lineTo(endX, endY);
+                            ctx.stroke();
+                        }
+                    });
                 }
             });
         };
@@ -6697,7 +6738,7 @@ function displayToast(messageElement) {
                     const newQuest = {
                         id: nextQuestId++,
                         name: `New Quest ${nextQuestId - 1}`,
-                        parentId: null,
+                        parentIds: [],
                         x: newX,
                         y: newY,
                         description: '',
@@ -6725,15 +6766,13 @@ function displayToast(messageElement) {
                 {
                     label: 'Parent', // Target is the parent of Source
                     action: () => {
-                        if (sourceQuest.parentId === targetId) {
-                            sourceQuest.parentId = null;
+                        if (!sourceQuest.parentIds) sourceQuest.parentIds = [];
+                        const index = sourceQuest.parentIds.indexOf(targetId);
+                        if (index > -1) {
+                            sourceQuest.parentIds.splice(index, 1);
                         } else {
-                            if (targetQuest.parentId === sourceId) {
-                                targetQuest.parentId = null;
-                            }
-                            sourceQuest.parentId = targetId;
+                            sourceQuest.parentIds.push(targetId);
                         }
-                        layoutTree();
                         drawConnections();
                         renderCards();
                     }
@@ -6741,15 +6780,13 @@ function displayToast(messageElement) {
                 {
                     label: 'Child', // Target is the child of Source
                     action: () => {
-                        if (targetQuest.parentId === sourceId) {
-                            targetQuest.parentId = null;
+                        if (!targetQuest.parentIds) targetQuest.parentIds = [];
+                        const index = targetQuest.parentIds.indexOf(sourceId);
+                        if (index > -1) {
+                            targetQuest.parentIds.splice(index, 1);
                         } else {
-                            if (sourceQuest.parentId === targetId) {
-                                sourceQuest.parentId = null;
-                            }
-                            targetQuest.parentId = sourceId;
+                            targetQuest.parentIds.push(sourceId);
                         }
-                        layoutTree();
                         drawConnections();
                         renderCards();
                     }
@@ -6796,9 +6833,6 @@ function displayToast(messageElement) {
                         document.body.classList.add('moving-mode');
                         const quest = quests.find(q => q.id === questId);
                         const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
-                        const rect = cardElement.getBoundingClientRect();
-                        moveStartX = e.clientX - rect.x;
-                        moveStartY = e.clientY - rect.y;
                     }
                 },
                 {
@@ -6839,6 +6873,16 @@ function displayToast(messageElement) {
         if (!storyTreeInitialized) {
             storyTreeInitialized = true;
 
+            let isPanning = false;
+            let isMoving = false;
+            let startX = 0;
+            let startY = 0;
+            let moveStartX = 0;
+            let moveStartY = 0;
+            let initialMoveX = 0;
+            let initialMoveY = 0;
+
+
             window.addEventListener('resize', resizeCanvas);
 
             storyTreeContainer.addEventListener('mousedown', (e) => {
@@ -6856,8 +6900,17 @@ function displayToast(messageElement) {
                 if (isMoving) {
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
-                        moveStartX = e.clientX - ((questToMove.x * storyTreeScale) + storyTreeOriginX);
-                        moveStartY = e.clientY - ((questToMove.y * storyTreeScale) + storyTreeOriginY);
+                        const cardElement = document.querySelector(`.card[data-id="${selectedQuestId}"]`);
+                        if (cardElement && e.target.closest('.card') === cardElement) {
+                            moveStartX = e.clientX;
+                            moveStartY = e.clientY;
+                            initialMoveX = questToMove.x;
+                            initialMoveY = questToMove.y;
+                        } else {
+                            isMoving = false;
+                            document.body.classList.remove('moving-mode');
+                            storyTreeContainer.style.cursor = 'grab';
+                        }
                     }
                     return;
                 }
@@ -6870,18 +6923,19 @@ function displayToast(messageElement) {
             storyTreeContainer.addEventListener('mouseup', () => {
                 isPanning = false;
                 isMoving = false;
+                moveStartX = 0; // Reset move start position
                 document.body.classList.remove('moving-mode');
                 storyTreeContainer.style.cursor = 'grab';
             });
 
             storyTreeContainer.addEventListener('mousemove', (e) => {
-                if (isMoving) {
+                if (isMoving && moveStartX !== 0) { // Check if a move has actually started
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
-                        const newX = (e.clientX - moveStartX - storyTreeOriginX) / storyTreeScale;
-                        const newY = (e.clientY - moveStartY - storyTreeOriginY) / storyTreeScale;
-                        questToMove.x = newX;
-                        questToMove.y = newY;
+                        const dx = (e.clientX - moveStartX) / storyTreeScale;
+                        const dy = (e.clientY - moveStartY) / storyTreeScale;
+                        questToMove.x = initialMoveX + dx;
+                        questToMove.y = initialMoveY + dy;
                         drawConnections();
                         renderCards();
                     }
