@@ -207,7 +207,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Story Beats State Variables
     let quests = [
-        { id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }
+        {
+            id: 1,
+            name: 'Final Quest',
+            parentIds: [],
+            x: 0,
+            y: 0,
+            description: '',
+            // New Fields
+            questStatus: 'Active', // Unavailable, Available, Active, Completed, Failed, Abandoned
+            questType: ['Main Story'], // Taggable field
+            startingTriggers: [], // List of strings
+            associatedMaps: [], // List of map file names
+            associatedNPCs: [], // List of objects: { id: characterId, role: 'Quest Giver' }
+            failureTriggers: [], // List of strings
+            successTriggers: [], // List of strings
+            detailedRewards: {
+                xp: 0,
+                loot: '',
+                magicItems: '',
+                information: ''
+            },
+            // Old fields that are being replaced or kept for compatibility
+            status: 'active', // Will be deprecated in favor of questStatus
+            prerequisites: [],
+            rewards: [],
+            recommendations: [],
+            completionSteps: []
+        }
     ];
     let nextQuestId = 2;
     let selectedQuestId = 1;
@@ -686,13 +713,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const questId = parseInt(e.target.dataset.questId, 10);
                 const quest = quests.find(q => q.id === questId);
                 if (quest) {
-                    populateAndShowStoryBeatCard(quest);
-                }
-            } else if (e.target.classList.contains('status-tab')) {
-                const newStatus = e.target.dataset.status;
-                const quest = quests.find(q => q.id === selectedQuestId);
-                if (quest) {
-                    quest.status = newStatus;
                     populateAndShowStoryBeatCard(quest);
                 }
             }
@@ -2511,13 +2531,44 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (quest.completionSteps === undefined) {
                             quest.completionSteps = [];
                         }
+                        // New fields for backward compatibility
+                        if (quest.questStatus === undefined) {
+                            quest.questStatus = quest.status || 'Active';
+                        }
+                        if (quest.questType === undefined) {
+                            quest.questType = [];
+                        }
+                        if (quest.startingTriggers === undefined) {
+                            quest.startingTriggers = [];
+                        }
+                        if (quest.associatedMaps === undefined) {
+                            quest.associatedMaps = [];
+                        }
+                        if (quest.associatedNPCs === undefined) {
+                            quest.associatedNPCs = [];
+                        }
+                        if (quest.failureTriggers === undefined) {
+                            quest.failureTriggers = [];
+                        }
+                        if (quest.successTriggers === undefined) {
+                            quest.successTriggers = [];
+                        }
+                        if (quest.detailedRewards === undefined) {
+                            quest.detailedRewards = { xp: 0, loot: '', magicItems: '', information: '' };
+                        }
                     });
                 } else if (Object.keys(campaignData.storyTree).length > 0) { // Old fabric.js format
                     // Attempt to convert old data or notify user
                     console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
                     alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
                     // Reset to default state
-                    quests = [{ id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }];
+                    quests = [{
+                        id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
+                        questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
+                        associatedNPCs: [], failureTriggers: [], successTriggers: [],
+                        detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                        status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
+                    }];
                     nextQuestId = 2;
                     selectedQuestId = 1;
                 }
@@ -2581,7 +2632,13 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
             alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
             // Reset to default state
-            quests = [{ id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '', status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: [] }];
+            quests = [{
+                id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
+                questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
+                associatedNPCs: [], failureTriggers: [], successTriggers: [],
+                detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
+            }];
             nextQuestId = 2;
             selectedQuestId = 1;
         }
@@ -6469,7 +6526,7 @@ function displayToast(messageElement) {
                     if (activeOverlayCardId === quest.id) {
                         hideOverlay();
                     } else {
-                        showOverlay(quest);
+                        populateAndShowStoryBeatCard(quest);
                     }
                     selectedQuestId = quest.id;
                     document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
@@ -6494,13 +6551,17 @@ function displayToast(messageElement) {
      * Shows the quest details overlay.
      * @param {object} quest The quest object to display.
      */
-    const showOverlay = (quest) => {
+    const populateAndShowStoryBeatCard = (quest) => {
         if (!quest) return;
+
+        const statusOptions = ['Unavailable', 'Available', 'Active', 'Completed', 'Failed', 'Abandoned'];
+        const mapOptions = Array.from(detailedMapData.keys());
+        const characterOptions = charactersData.map(c => ({ id: c.id, name: c.name }));
 
         let finalQuestNote = '';
         if (quest.id === 1) {
             finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is the final Campaign quest and cannot be deleted.</p>`;
-            }
+        }
 
         let parentLinks = quest.parentIds.map(pid => {
             const parent = quests.find(q => q.id === pid);
@@ -6514,23 +6575,135 @@ function displayToast(messageElement) {
         if (!childrenLinks) childrenLinks = 'None';
 
         storyBeatCardBody.innerHTML = `
-            <h1>${quest.name}</h1>
-            ${finalQuestNote}
-            <h3>Description</h3>
-            <p contenteditable="true" id="overlay-quest-description">${quest.description || 'No description yet.'}</p>
-            <h3>Parent Quests</h3>
-            <div>${parentLinks}</div>
-            <h3>Child Quests</h3>
-            <div>${childrenLinks}</div>
-            <button id="save-description-btn" style="margin-top: 10px;">Save Description</button>
+            <div class="quest-card-grid">
+                <div class="quest-card-column">
+                    <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
+                    ${finalQuestNote}
+
+                    <h3>Description</h3>
+                    <div contenteditable="true" id="quest-description" class="editable-div">${quest.description || ''}</div>
+
+                    <h3>Quest Status</h3>
+                    <select id="quest-status">
+                        ${statusOptions.map(s => `<option value="${s}" ${quest.questStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>
+
+                    <h3>Quest Type</h3>
+                    <input type="text" id="quest-type" value="${quest.questType.join(', ')}" placeholder="e.g., Main Story, Side Quest">
+
+                    <h3>Starting Triggers</h3>
+                    <textarea id="quest-starting-triggers" class="editable-textarea" rows="3">${quest.startingTriggers.join('\n')}</textarea>
+
+                    <h3>Failure Triggers</h3>
+                    <textarea id="quest-failure-triggers" class="editable-textarea" rows="3">${quest.failureTriggers.join('\n')}</textarea>
+
+                    <h3>Success Triggers</h3>
+                    <textarea id="quest-success-triggers" class="editable-textarea" rows="3">${quest.successTriggers.join('\n')}</textarea>
+                </div>
+
+                <div class="quest-card-column">
+                    <h3>Associated Maps</h3>
+                    <select id="quest-associated-maps" multiple size="4">
+                        ${mapOptions.map(m => `<option value="${m}" ${quest.associatedMaps.includes(m) ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+
+                    <h3>Associated NPCs</h3>
+                    <div id="quest-associated-npcs">
+                        ${quest.associatedNPCs.map((npc, index) => `
+                            <div class="npc-row" data-index="${index}">
+                                <select class="npc-select">
+                                    <option value="">--Select NPC--</option>
+                                    ${characterOptions.map(c => `<option value="${c.id}" ${npc.id === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                </select>
+                                <input type="text" class="npc-role" value="${npc.role}" placeholder="Role (e.g., Quest Giver)">
+                                <button class="remove-npc-btn">X</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button id="add-npc-btn">+ Add NPC</button>
+
+                    <h3>Rewards</h3>
+                    <div class="rewards-grid">
+                        <label for="reward-xp">XP:</label>
+                        <input type="number" id="reward-xp" value="${quest.detailedRewards.xp || 0}">
+
+                        <label for="reward-loot">Loot/Currency:</label>
+                        <textarea id="reward-loot" rows="2">${quest.detailedRewards.loot || ''}</textarea>
+
+                        <label for="reward-magic-items">Magic Items:</label>
+                        <textarea id="reward-magic-items" rows="2">${quest.detailedRewards.magicItems || ''}</textarea>
+
+                        <label for="reward-information">Information/Lore:</label>
+                        <textarea id="reward-information" rows="2">${quest.detailedRewards.information || ''}</textarea>
+                    </div>
+
+                    <h3>Parent Quests</h3>
+                    <div>${parentLinks}</div>
+                    <h3>Child Quests</h3>
+                    <div>${childrenLinks}</div>
+                </div>
+            </div>
+            <button id="save-quest-details-btn">Save All Changes</button>
         `;
+
         overlay.style.display = 'flex';
         activeOverlayCardId = quest.id;
 
-        document.getElementById('save-description-btn').addEventListener('click', () => {
-            const newDesc = document.getElementById('overlay-quest-description').innerText;
-            quest.description = newDesc;
-            alert('Description saved!');
+        // --- Event Listeners for editing ---
+        const saveButton = document.getElementById('save-quest-details-btn');
+        saveButton.addEventListener('click', () => {
+            // Save all fields
+            quest.name = document.getElementById('quest-name').innerText;
+            quest.description = document.getElementById('quest-description').innerText;
+            quest.questStatus = document.getElementById('quest-status').value;
+            quest.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
+            quest.startingTriggers = document.getElementById('quest-starting-triggers').value.split('\n').filter(Boolean);
+            quest.failureTriggers = document.getElementById('quest-failure-triggers').value.split('\n').filter(Boolean);
+            quest.successTriggers = document.getElementById('quest-success-triggers').value.split('\n').filter(Boolean);
+
+            const mapsSelect = document.getElementById('quest-associated-maps');
+            quest.associatedMaps = Array.from(mapsSelect.selectedOptions).map(opt => opt.value);
+
+            const npcRows = document.querySelectorAll('.npc-row');
+            quest.associatedNPCs = Array.from(npcRows).map(row => ({
+                id: parseInt(row.querySelector('.npc-select').value, 10),
+                role: row.querySelector('.npc-role').value
+            })).filter(npc => npc.id);
+
+            quest.detailedRewards = {
+                xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
+                loot: document.getElementById('reward-loot').value,
+                magicItems: document.getElementById('reward-magic-items').value,
+                information: document.getElementById('reward-information').value,
+            };
+
+            alert('Quest details saved!');
+            renderCards(); // Re-render cards to reflect name change
+        });
+
+        const addNpcBtn = document.getElementById('add-npc-btn');
+        addNpcBtn.addEventListener('click', () => {
+            const container = document.getElementById('quest-associated-npcs');
+            const newIndex = container.children.length;
+            const newRow = document.createElement('div');
+            newRow.className = 'npc-row';
+            newRow.dataset.index = newIndex;
+            newRow.innerHTML = `
+                <select class="npc-select">
+                    <option value="">--Select NPC--</option>
+                    ${characterOptions.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                </select>
+                <input type="text" class="npc-role" placeholder="Role (e.g., Quest Giver)">
+                <button class="remove-npc-btn">X</button>
+            `;
+            container.appendChild(newRow);
+        });
+
+        const npcContainer = document.getElementById('quest-associated-npcs');
+        npcContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-npc-btn')) {
+                e.target.closest('.npc-row').remove();
+            }
         });
     };
 
@@ -6587,6 +6760,14 @@ function displayToast(messageElement) {
                     x: newX,
                     y: newY,
                     description: '',
+                    questStatus: 'Available',
+                    questType: [],
+                    startingTriggers: [],
+                    associatedMaps: [],
+                    associatedNPCs: [],
+                    failureTriggers: [],
+                    successTriggers: [],
+                    detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
                     status: 'active',
                     prerequisites: [],
                     rewards: [],
