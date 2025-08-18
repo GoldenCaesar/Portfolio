@@ -6829,12 +6829,14 @@ function displayToast(messageElement) {
                 {
                     label: 'Move',
                     action: () => {
-                        console.log(`[StoryTree] "Move" action clicked for questId: ${questId}`);
                         isMoving = true;
-                        console.log('[StoryTree] isMoving set to true');
                         document.body.classList.add('moving-mode');
                         const quest = quests.find(q => q.id === questId);
+                        // Save the starting position relative to the mouse
                         const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
+                        const rect = cardElement.getBoundingClientRect();
+                        moveStartX = e.clientX - rect.x;
+                        moveStartY = e.clientY - rect.y;
                     }
                 },
                 {
@@ -6888,41 +6890,19 @@ function displayToast(messageElement) {
             window.addEventListener('resize', resizeCanvas);
 
             storyTreeContainer.addEventListener('mousedown', (e) => {
-                console.log('[StoryTree] mousedown event');
-                console.log(`[StoryTree] State before mousedown: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}, selectedQuestId=${selectedQuestId}`);
-                if (e.button === 2) {
-                    console.log('[StoryTree] Right-click detected, handling context menu logic.');
-                    // Also cancel linking on right-click
-                    if (isLinkingQuest) {
-                        isLinkingQuest = false;
-                        storyTreeContainer.style.cursor = 'grab';
-                        const sourceCard = document.querySelector(`.card[data-id="${sourceQuestIdForLinking}"]`);
-                        if (sourceCard) sourceCard.style.boxShadow = '';
-                        sourceQuestIdForLinking = null;
-                    }
+                if (e.button === 2) { // Right-click, don't pan
                     return;
                 }
                 if (isMoving) {
-                    console.log('[StoryTree] In "isMoving" block.');
+                    // Moving mode takes precedence
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
-                        const cardElement = document.querySelector(`.card[data-id="${selectedQuestId}"]`);
-                        if (cardElement && e.target.closest('.card') === cardElement) {
-                            console.log(`[StoryTree] Starting move for questId: ${selectedQuestId}`);
-                            moveStartX = e.clientX;
-                            moveStartY = e.clientY;
-                            initialMoveX = questToMove.x;
-                            initialMoveY = questToMove.y;
-                        } else {
-                            console.log('[StoryTree] Click was not on the selected card, cancelling move mode.');
-                            isMoving = false;
-                            document.body.classList.remove('moving-mode');
-                            storyTreeContainer.style.cursor = 'grab';
-                        }
+                        // Update start positions for move
+                        moveStartX = e.clientX - ((questToMove.x * storyTreeScale) + storyTreeOriginX);
+                        moveStartY = e.clientY - ((questToMove.y * storyTreeScale) + storyTreeOriginY);
                     }
                     return;
                 }
-                console.log('[StoryTree] Starting pan.');
                 isPanning = true;
                 startX = e.clientX - storyTreeOriginX;
                 startY = e.clientY - storyTreeOriginY;
@@ -6930,32 +6910,25 @@ function displayToast(messageElement) {
             });
 
             storyTreeContainer.addEventListener('mouseup', () => {
-                console.log('[StoryTree] mouseup event');
-                console.log(`[StoryTree] State before mouseup: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}`);
                 isPanning = false;
-                if (moveStartX !== 0) {
-                    isMoving = false;
-                    document.body.classList.remove('moving-mode');
-                }
-                moveStartX = 0;
+                isMoving = false;
+                document.body.classList.remove('moving-mode');
                 storyTreeContainer.style.cursor = 'grab';
-                console.log(`[StoryTree] State after mouseup: isMoving=${isMoving}, isPanning=${isPanning}, moveStartX=${moveStartX}`);
             });
 
             storyTreeContainer.addEventListener('mousemove', (e) => {
-                if (isMoving && moveStartX !== 0) { // Check if a move has actually started
-                    console.log(`[StoryTree] mousemove: Moving card ${selectedQuestId}`);
+                if (isMoving) {
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
-                        const dx = (e.clientX - moveStartX) / storyTreeScale;
-                        const dy = (e.clientY - moveStartY) / storyTreeScale;
-                        questToMove.x = initialMoveX + dx;
-                        questToMove.y = initialMoveY + dy;
+                        // Calculate new position based on cursor and initial offset
+                        const newX = (e.clientX - moveStartX - storyTreeOriginX) / storyTreeScale;
+                        const newY = (e.clientY - moveStartY - storyTreeOriginY) / storyTreeScale;
+                        questToMove.x = newX;
+                        questToMove.y = newY;
                         drawConnections();
                         renderCards();
                     }
                 } else if (isPanning) {
-                    console.log('[StoryTree] mousemove: Panning');
                     storyTreeOriginX = e.clientX - startX;
                     storyTreeOriginY = e.clientY - startY;
                     drawConnections();
