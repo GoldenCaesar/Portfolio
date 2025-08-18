@@ -451,6 +451,36 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     font-size: 16px;
 }
 
+/* New Story Steps & Difficulty Styles */
+.difficulty-rating {
+    cursor: pointer;
+}
+
+.star {
+    font-size: 24px;
+    color: #f5b32d;
+}
+
+.story-step-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.story-step-checkbox {
+    width: 20px;
+    height: 20px;
+}
+
+.story-step-text {
+    flex-grow: 1;
+}
+
+.remove-step-btn {
+    padding: 5px 10px;
+}
+
 
 .story-beat-card-overlay {
     position: fixed;
