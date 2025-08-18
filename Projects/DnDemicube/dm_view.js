@@ -6517,6 +6517,12 @@ function displayToast(messageElement) {
         const ctx = storyTreeCanvas.getContext('2d');
         let isLinkingQuest = false;
         let sourceQuestIdForLinking = null;
+        let isPanning = false;
+        let isMoving = false;
+        let startX = 0;
+        let startY = 0;
+        let moveStartX = 0;
+        let moveStartY = 0;
 
         const layoutTree = () => {
             const roots = quests.filter(q => q.parentId === null);
@@ -6832,12 +6838,6 @@ function displayToast(messageElement) {
         // --- Event Listeners and Main Logic ---
         if (!storyTreeInitialized) {
             storyTreeInitialized = true;
-            let isPanning = false;
-            let isMoving = false;
-            let startX = 0;
-            let startY = 0;
-            let moveStartX = 0;
-            let moveStartY = 0;
 
             window.addEventListener('resize', resizeCanvas);
 
