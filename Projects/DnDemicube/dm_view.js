@@ -6863,17 +6863,18 @@ function displayToast(messageElement) {
             renderCards();
         };
 
+        let isPanning = false;
+        let isMoving = false;
+        let startX = 0;
+        let startY = 0;
+        let moveStartX = 0;
+        let moveStartY = 0;
+        let initialMoveX = 0;
+        let initialMoveY = 0;
+
         // --- Event Listeners and Main Logic ---
         if (!storyTreeInitialized) {
             storyTreeInitialized = true;
-            let isPanning = false;
-            let isMoving = false;
-            let startX = 0;
-            let startY = 0;
-            let moveStartX = 0;
-            let moveStartY = 0;
-            let initialMoveX = 0;
-            let initialMoveY = 0;
 
             window.addEventListener('resize', resizeCanvas);
 
