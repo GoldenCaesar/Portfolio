@@ -6829,10 +6829,12 @@ function displayToast(messageElement) {
                 {
                     label: 'Move',
                     action: () => {
-                        isMoving = true;
-                        document.body.classList.add('moving-mode');
-                        const quest = quests.find(q => q.id === questId);
-                        const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
+                        setTimeout(() => {
+                            isMoving = true;
+                            document.body.classList.add('moving-mode');
+                            const quest = quests.find(q => q.id === questId);
+                            const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
+                        }, 0);
                     }
                 },
                 {
