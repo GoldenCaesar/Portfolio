@@ -6827,9 +6827,6 @@ function displayToast(messageElement) {
                         document.body.classList.add('moving-mode');
                         const quest = quests.find(q => q.id === questId);
                         const cardElement = document.querySelector(`.card[data-id="${questId}"]`);
-                        const rect = cardElement.getBoundingClientRect();
-                        moveStartX = e.clientX - rect.x;
-                        moveStartY = e.clientY - rect.y;
                     }
                 },
                 {
@@ -6875,6 +6872,8 @@ function displayToast(messageElement) {
             let startY = 0;
             let moveStartX = 0;
             let moveStartY = 0;
+            let initialMoveX = 0;
+            let initialMoveY = 0;
 
             window.addEventListener('resize', resizeCanvas);
 
@@ -6893,8 +6892,17 @@ function displayToast(messageElement) {
                 if (isMoving) {
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
-                        moveStartX = e.clientX - ((questToMove.x * storyTreeScale) + storyTreeOriginX);
-                        moveStartY = e.clientY - ((questToMove.y * storyTreeScale) + storyTreeOriginY);
+                        const cardElement = document.querySelector(`.card[data-id="${selectedQuestId}"]`);
+                        if (cardElement && e.target.closest('.card') === cardElement) {
+                            moveStartX = e.clientX;
+                            moveStartY = e.clientY;
+                            initialMoveX = questToMove.x;
+                            initialMoveY = questToMove.y;
+                        } else {
+                            isMoving = false;
+                            document.body.classList.remove('moving-mode');
+                            storyTreeContainer.style.cursor = 'grab';
+                        }
                     }
                     return;
                 }
@@ -6907,18 +6915,19 @@ function displayToast(messageElement) {
             storyTreeContainer.addEventListener('mouseup', () => {
                 isPanning = false;
                 isMoving = false;
+                moveStartX = 0; // Reset move start position
                 document.body.classList.remove('moving-mode');
                 storyTreeContainer.style.cursor = 'grab';
             });
 
             storyTreeContainer.addEventListener('mousemove', (e) => {
-                if (isMoving) {
+                if (isMoving && moveStartX !== 0) { // Check if a move has actually started
                     const questToMove = quests.find(q => q.id === selectedQuestId);
                     if (questToMove) {
-                        const newX = (e.clientX - moveStartX - storyTreeOriginX) / storyTreeScale;
-                        const newY = (e.clientY - moveStartY - storyTreeOriginY) / storyTreeScale;
-                        questToMove.x = newX;
-                        questToMove.y = newY;
+                        const dx = (e.clientX - moveStartX) / storyTreeScale;
+                        const dy = (e.clientY - moveStartY) / storyTreeScale;
+                        questToMove.x = initialMoveX + dx;
+                        questToMove.y = initialMoveY + dy;
                         drawConnections();
                         renderCards();
                     }
