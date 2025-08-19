@@ -191,9 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // const mapObjectURLs = new Map(); // Old: To store filename -> objectURL mapping for Manage Maps
-    // New structure: fileName -> { url: objectURL, name: fileName, overlays: [] }
+    // New structure: fileName -> { url: objectURL, name: fileName, overlays: [], transform: { scale: 1, originX: 0, originY: 0 } }
     const detailedMapData = new Map();
     let isEditMode = false;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
 
     // Core state variables
     let selectedMapFileName = null;
@@ -529,31 +532,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`Map draw for ${fileName} cancelled; ${selectedMapFileName} is now selected.`);
                 return;
             }
-            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
 
+            const transform = mapData.transform;
+            if (!transform) {
+                console.error(`Transform data not found for map: ${fileName}`);
+                return;
+            }
+
+            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+            ctx.save();
+            ctx.translate(transform.originX, transform.originY);
+            ctx.scale(transform.scale, transform.scale);
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            ctx.restore();
+
+            // The ratio is now simply the scale, and offsets are the origin.
+            // These are canvas-level transforms, not image-specific scaling to fit.
             const hRatio = dmCanvas.width / img.width;
             const vRatio = dmCanvas.height / img.height;
-            const ratio = Math.min(hRatio, vRatio);
-
-            const imgScaledWidth = img.width * ratio;
-            const imgScaledHeight = img.height * ratio;
-
-            const centerShift_x = (dmCanvas.width - imgScaledWidth) / 2;
-            const centerShift_y = (dmCanvas.height - imgScaledHeight) / 2;
-
-            ctx.drawImage(img, 0, 0, img.width, img.height,
-                          centerShift_x, centerShift_y, imgScaledWidth, imgScaledHeight);
+            const fitRatio = Math.min(hRatio, vRatio);
 
             currentMapDisplayData = {
                 img: img,
-                ratio: ratio,
-                offsetX: centerShift_x,
-                offsetY: centerShift_y,
+                ratio: fitRatio, // Keep the original fit ratio for calculations if needed
                 imgWidth: img.width,
                 imgHeight: img.height,
-                scaledWidth: imgScaledWidth,
-                scaledHeight: imgScaledHeight
+                // These are no longer simple values, they depend on the transform
+                scaledWidth: img.width * transform.scale,
+                scaledHeight: img.height * transform.scale,
+                offsetX: transform.originX,
+                offsetY: transform.originY,
+                scale: transform.scale
             };
+
 
             // Clamp initiative tokens to be within the new map's boundaries
             if (initiativeTokens.length > 0) {
@@ -592,18 +603,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawToken(ctx, token) {
-        const canvasX = (token.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-        const canvasY = (token.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+        const { scale, originX, originY } = detailedMapData.get(selectedMapFileName).transform;
+
+        const canvasX = (token.x * scale) + originX;
+        const canvasY = (token.y * scale) + originY;
 
         const percentage = token.size / 100;
         const baseDimension = currentMapDisplayData.imgWidth;
         const pixelSizeOnImage = percentage * baseDimension;
-        const size = pixelSizeOnImage * currentMapDisplayData.ratio;
+        const size = pixelSizeOnImage * scale;
 
         // Highlight for active turn
         if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * scale), 0, Math.PI * 2, true);
             ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'; // Golden glow
             ctx.fill();
         }
@@ -611,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Highlight for targeting
         if (targetingCharacter && targetingCharacter.targets && targetingCharacter.targets.includes(token.uniqueId)) {
             ctx.beginPath();
-            ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * scale), 0, Math.PI * 2, true);
             ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'; // Red glow
             ctx.fill();
         }
@@ -624,8 +637,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
                 const healthPercentage = Math.max(0, currentHp / maxHp);
-                const ringRadius = (size / 2) + (8 * currentMapDisplayData.ratio);
-                const ringWidth = 6 * currentMapDisplayData.ratio;
+                const ringRadius = (size / 2) + (8 * scale);
+                const ringWidth = 6 * scale;
 
                 // Red background ring
                 ctx.beginPath();
@@ -687,18 +700,18 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
         ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2 * currentMapDisplayData.ratio;
+        ctx.lineWidth = 2 * scale;
         ctx.stroke();
 
         // Draw name and player name
         ctx.fillStyle = 'white';
         ctx.shadowColor = 'black';
         ctx.shadowBlur = 2;
-        ctx.font = `bold ${12 * currentMapDisplayData.ratio}px sans-serif`;
+        ctx.font = `bold ${12 * scale}px sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * currentMapDisplayData.ratio));
-        ctx.font = `${10 * currentMapDisplayData.ratio}px sans-serif`;
-        ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * currentMapDisplayData.ratio));
+        ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * scale));
+        ctx.font = `${10 * scale}px sans-serif`;
+        ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * scale));
         ctx.shadowBlur = 0;
     }
 
@@ -849,7 +862,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if ((!overlays || overlays.length === 0) && initiativeTokens.length === 0) {
              if (!currentMapDisplayData.img) return;
         }
-        const ctx = dmCanvas.getContext('2d');
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) return;
+        const { scale, originX, originY } = mapData.transform;
 
         if(overlays){
             overlays.forEach(overlay => {
@@ -858,7 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                ctx.beginPath();
+                drawingCtx.beginPath();
                 let currentPointsToDraw = overlay.polygon;
                 let strokeStyle = 'rgba(0, 0, 255, 0.7)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -877,16 +895,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     }));
                 }
 
-                ctx.strokeStyle = strokeStyle;
-                ctx.lineWidth = 2;
+                drawingCtx.strokeStyle = strokeStyle;
+                drawingCtx.lineWidth = 2;
 
                 currentPointsToDraw.forEach((point, index) => {
-                    const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                    const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                    const canvasX = (point.x * scale) + originX;
+                    const canvasY = (point.y * scale) + originY;
                     if (index === 0) {
-                        ctx.moveTo(canvasX, canvasY);
+                        drawingCtx.moveTo(canvasX, canvasY);
                     } else {
-                        ctx.lineTo(canvasX, canvasY);
+                        drawingCtx.lineTo(canvasX, canvasY);
                     }
                 });
 
@@ -894,12 +912,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const firstPoint = currentPointsToDraw[0];
                     const lastPoint = currentPointsToDraw[currentPointsToDraw.length - 1];
                     if (firstPoint.x !== lastPoint.x || firstPoint.y !== lastPoint.y) {
-                        const firstPointCanvasX = (firstPoint.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                        const firstPointCanvasY = (firstPoint.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
-                        ctx.lineTo(firstPointCanvasX, firstPointCanvasY);
+                        const firstPointCanvasX = (firstPoint.x * scale) + originX;
+                        const firstPointCanvasY = (firstPoint.y * scale) + originY;
+                        drawingCtx.lineTo(firstPointCanvasX, firstPointCanvasY);
                     }
                 }
-                ctx.stroke();
+                drawingCtx.stroke();
             } else if (overlay.type === 'noteLink' && overlay.position) {
                 const iconSize = 20;
                 let position = overlay.position;
@@ -910,8 +928,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                 }
 
-                const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                const canvasX = (position.x * scale) + originX;
+                const canvasY = (position.y * scale) + originY;
 
                 let fillStyle = 'rgba(255, 255, 102, 0.9)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -926,16 +944,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     fillStyle = 'rgba(255, 255, 0, 0.9)';
                 }
 
-                ctx.fillStyle = fillStyle;
-                ctx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
-                ctx.strokeStyle = 'black';
-                ctx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                drawingCtx.fillStyle = fillStyle;
+                drawingCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                drawingCtx.strokeStyle = 'black';
+                drawingCtx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
 
-                ctx.fillStyle = 'black';
-                ctx.font = `${iconSize * 0.8}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('📝', canvasX, canvasY);
+                drawingCtx.fillStyle = 'black';
+                drawingCtx.font = `${iconSize * 0.8}px sans-serif`;
+                drawingCtx.textAlign = 'center';
+                drawingCtx.textBaseline = 'middle';
+                drawingCtx.fillText('📝', canvasX, canvasY);
             } else if (overlay.type === 'characterLink' && overlay.position) {
                 const iconSize = 20;
                 let position = overlay.position;
@@ -946,8 +964,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                 }
 
-                const canvasX = (position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                const canvasY = (position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                const canvasX = (position.x * scale) + originX;
+                const canvasY = (position.y * scale) + originY;
 
                 let fillStyle = 'rgba(135, 206, 250, 0.9)';
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -962,30 +980,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     fillStyle = 'rgba(255, 255, 0, 0.9)';
                 }
 
-                ctx.fillStyle = fillStyle;
-                ctx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
-                ctx.strokeStyle = 'black';
-                ctx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                drawingCtx.fillStyle = fillStyle;
+                drawingCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                drawingCtx.strokeStyle = 'black';
+                drawingCtx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
 
-                ctx.fillStyle = 'black';
-                ctx.font = `${iconSize * 0.8}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('👤', canvasX, canvasY);
+                drawingCtx.fillStyle = 'black';
+                drawingCtx.font = `${iconSize * 0.8}px sans-serif`;
+                drawingCtx.textAlign = 'center';
+                drawingCtx.textBaseline = 'middle';
+                drawingCtx.fillText('👤', canvasX, canvasY);
 
                 const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
                 if (character && character.sheetData && character.sheetData.character_portrait) {
                     const img = new Image();
                     img.onload = function() {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
-                        ctx.closePath();
-                        ctx.clip();
+                        drawingCtx.save();
+                        drawingCtx.beginPath();
+                        drawingCtx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
+                        drawingCtx.closePath();
+                        drawingCtx.clip();
 
-                        ctx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                        drawingCtx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
 
-                        ctx.restore();
+                        drawingCtx.restore();
                     };
                     img.src = character.sheetData.character_portrait;
                 }
@@ -996,7 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Draw initiative tokens
         if (initiativeTokens.length > 0) {
             initiativeTokens.forEach(token => {
-                drawToken(ctx, token);
+                drawToken(drawingCtx, token);
             });
         }
     }
@@ -1023,23 +1041,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getRelativeCoords(canvasX, canvasY) {
-        if (!currentMapDisplayData.img || !currentMapDisplayData.img.complete) {
-            console.warn("getRelativeCoords: currentMapDisplayData.img is null or image not complete. Map not ready for coordinate conversion.");
+        if (!currentMapDisplayData.img || !currentMapDisplayData.img.complete || !selectedMapFileName) {
             return null;
+        }
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) {
+            return null;
+        }
+        const { scale, originX, originY } = mapData.transform;
+
+        const imageX = (canvasX - originX) / scale;
+        const imageY = (canvasY - originY) / scale;
+
+        // Optional: Check if the coords are within the image bounds
+        if (imageX < 0 || imageX > currentMapDisplayData.imgWidth || imageY < 0 || imageY > currentMapDisplayData.imgHeight) {
+            // return null; // This might be too restrictive for panning/zooming outside bounds
         }
 
-        if (typeof currentMapDisplayData.scaledWidth === 'undefined' || typeof currentMapDisplayData.scaledHeight === 'undefined') {
-            console.warn("getRelativeCoords: scaledWidth or scaledHeight is undefined in currentMapDisplayData.");
-            return null;
-        }
-        
-        if (canvasX < currentMapDisplayData.offsetX || canvasX > currentMapDisplayData.offsetX + currentMapDisplayData.scaledWidth ||
-            canvasY < currentMapDisplayData.offsetY || canvasY > currentMapDisplayData.offsetY + currentMapDisplayData.scaledHeight) {
-            return null;
-        }
-
-        const imageX = (canvasX - currentMapDisplayData.offsetX) / currentMapDisplayData.ratio;
-        const imageY = (canvasY - currentMapDisplayData.offsetY) / currentMapDisplayData.ratio;
         return { x: imageX, y: imageY };
     }
 
@@ -1048,7 +1066,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentPolygonPoints.length === 0 || !currentMapDisplayData.img) return;
 
         const ctx = drawingCanvas.getContext('2d');
-        ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        // Don't clear here, as other overlays might be drawn already.
+        // The main drawOverlays function will clear the canvas.
+        // Let's assume this is called within a context where the canvas is ready for drawing.
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) return;
+        const { scale, originX, originY } = mapData.transform;
+
 
         ctx.beginPath();
         ctx.strokeStyle = 'yellow';
@@ -1056,8 +1081,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = 'rgba(255, 255, 0, 0.25)';
 
         currentPolygonPoints.forEach((point, index) => {
-            const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-            const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+            const canvasX = (point.x * scale) + originX;
+            const canvasY = (point.y * scale) + originY;
             if (index === 0) {
                 ctx.moveTo(canvasX, canvasY);
             } else {
@@ -1074,8 +1099,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.fillStyle = 'red';
         currentPolygonPoints.forEach(point => {
-            const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-            const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+            const canvasX = (point.x * scale) + originX;
+            const canvasY = (point.y * scale) + originY;
             ctx.fillRect(canvasX - 3, canvasY - 3, 6, 6);
         });
     }
@@ -1846,7 +1871,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         url: objectURL,
                         name: file.name,
                         overlays: [],
-                        mode: 'edit'
+                        mode: 'edit',
+                        transform: { scale: 1, originX: 0, originY: 0 }
                     });
 
                     if (!isEditMode) {
@@ -2019,9 +2045,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (dmCanvas && mapContainer) {
-        window.addEventListener('resize', debounce(resizeCanvas, 250)); 
+        window.addEventListener('resize', debounce(resizeCanvas, 250));
+
+        mapContainer.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Only left-click
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (!mapData) return;
+
+            isPanning = true;
+            panStartX = e.clientX - mapData.transform.originX;
+            panStartY = e.clientY - mapData.transform.originY;
+            mapContainer.style.cursor = 'grabbing';
+        });
+
+        mapContainer.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            isPanning = false;
+            mapContainer.style.cursor = 'grab';
+        });
+
+        mapContainer.addEventListener('mouseleave', () => {
+            isPanning = false;
+            mapContainer.style.cursor = 'grab';
+        });
+
+        mapContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (!mapData) return;
+
+            const transform = mapData.transform;
+            const zoomAmount = -e.deltaY * 0.001;
+            const newScale = Math.min(Math.max(0.1, transform.scale + zoomAmount), 10.0);
+
+            const rect = mapContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            transform.originX = mouseX - (mouseX - transform.originX) * (newScale / transform.scale);
+            transform.originY = mouseY - (mouseY - transform.originY) * (newScale / transform.scale);
+            transform.scale = newScale;
+
+            displayMapOnCanvas(selectedMapFileName);
+            sendMapTransformToPlayerView(transform);
+        });
         
         dmCanvas.addEventListener('mousemove', handleMouseMoveOnCanvas);
+        drawingCanvas.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                const mapData = detailedMapData.get(selectedMapFileName);
+                if (!mapData) return;
+                mapData.transform.originX = e.clientX - panStartX;
+                mapData.transform.originY = e.clientY - panStartY;
+                displayMapOnCanvas(selectedMapFileName);
+                sendMapTransformToPlayerView(mapData.transform);
+            } else {
+                 handleMouseMoveOnCanvas(e);
+            }
+        });
         dmCanvas.addEventListener('mouseout', () => {
             if (hoverLabel) {
                 hoverLabel.style.display = 'none';
@@ -2101,7 +2182,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     serializableDetailedMapData[name] = {
                         name: data.name,
                         overlays: data.overlays,
-                        mode: data.mode
+                        mode: data.mode,
+                        transform: data.transform
                     };
                 }
                 campaignData.mapDefinitions = serializableDetailedMapData;
@@ -2435,7 +2517,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     name: definition.name,
                                     url: url,
                                     overlays: definition.overlays || [],
-                                    mode: definition.mode || 'edit'
+                                    mode: definition.mode || 'edit',
+                                    transform: definition.transform || { scale: 1, originX: 0, originY: 0 }
                                 });
                                 displayedFileNames.add(mapName);
                             });
@@ -2703,7 +2786,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: definition.name,
                     url: null,
                     overlays: definition.overlays || [],
-                    mode: definition.mode || 'edit'
+                    mode: definition.mode || 'edit',
+                    transform: definition.transform || { scale: 1, originX: 0, originY: 0 }
                 });
                 displayedFileNames.add(mapName);
             }
@@ -2894,6 +2978,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 isVisible: isVisible
             }, '*');
             console.log(`Sent polygon visibility update to player view: Map: ${mapFileName}, Visible: ${isVisible}`);
+        }
+    }
+
+    function sendMapTransformToPlayerView(transform) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({
+                type: 'mapTransformUpdate',
+                transform: transform
+            }, '*');
         }
     }
 
