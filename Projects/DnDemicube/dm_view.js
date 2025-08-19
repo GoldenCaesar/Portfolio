@@ -6834,33 +6834,39 @@ function displayToast(messageElement) {
         // --- Event Listeners for editing ---
         const saveButton = document.getElementById('save-quest-details-btn');
         saveButton.addEventListener('click', () => {
-            // Save all fields
-            quest.name = document.getElementById('quest-name').innerText;
-            quest.description = document.getElementById('quest-description').innerText;
-            quest.questStatus = document.getElementById('quest-status').value;
-            quest.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
-            quest.storyDuration = document.getElementById('quest-story-duration').value;
+            const questToUpdate = quests.find(q => q.id === quest.id);
+            if (!questToUpdate) {
+                alert("Fatal Error: Could not find the quest to update. Your changes cannot be saved.");
+                return;
+            }
 
-            quest.startingTriggers = Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => div.innerText);
-            quest.successTriggers = Array.from(document.querySelectorAll('#quest-success-triggers .trigger-text')).map(div => div.innerText);
-            quest.failureTriggers = Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-text')).map(div => div.innerText);
+            // Save all fields to the object from the main quests array
+            questToUpdate.name = document.getElementById('quest-name').innerText;
+            questToUpdate.description = document.getElementById('quest-description').innerText;
+            questToUpdate.questStatus = document.getElementById('quest-status').value;
+            questToUpdate.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
+            questToUpdate.storyDuration = document.getElementById('quest-story-duration').value;
+
+            questToUpdate.startingTriggers = Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => div.innerText);
+            questToUpdate.successTriggers = Array.from(document.querySelectorAll('#quest-success-triggers .trigger-text')).map(div => div.innerText);
+            questToUpdate.failureTriggers = Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-text')).map(div => div.innerText);
 
             const mapsSelect = document.getElementById('quest-associated-maps');
-            quest.associatedMaps = Array.from(mapsSelect.selectedOptions).map(opt => opt.value);
+            questToUpdate.associatedMaps = Array.from(mapsSelect.selectedOptions).map(opt => opt.value);
 
             const npcRows = document.querySelectorAll('.npc-row');
-            quest.associatedNPCs = Array.from(npcRows).map(row => ({
+            questToUpdate.associatedNPCs = Array.from(npcRows).map(row => ({
                 id: parseInt(row.querySelector('.npc-select').value, 10),
                 role: row.querySelector('.npc-role').value
             })).filter(npc => npc.id);
 
             const stepRows = document.querySelectorAll('.story-step-row');
-            quest.storySteps = Array.from(stepRows).map(row => ({
+            questToUpdate.storySteps = Array.from(stepRows).map(row => ({
                 text: row.querySelector('.story-step-text').innerText,
                 completed: row.querySelector('.story-step-checkbox').checked
             }));
 
-            quest.detailedRewards = {
+            questToUpdate.detailedRewards = {
                 xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
                 loot: document.getElementById('reward-loot').value,
                 magicItems: document.getElementById('reward-magic-items').value,
