@@ -3931,6 +3931,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabContents = document.querySelectorAll('.tab-content');
 
     function switchTab(tabId) {
+        // Hide all main content containers by default
+        if (mapContainer) mapContainer.style.display = 'none';
+        if (noteEditorContainer) noteEditorContainer.style.display = 'none';
+        if (characterSheetContainer) characterSheetContainer.style.display = 'none';
+        if (storyTreeContainer) storyTreeContainer.style.display = 'none';
+        if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
+
+        // Toggle active state for tab buttons and sidebar content
         tabButtons.forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
         });
@@ -3938,18 +3946,15 @@ document.addEventListener('DOMContentLoaded', () => {
             content.classList.toggle('active', content.id === tabId);
         });
 
+        // Show the correct container based on the tabId
         if (tabId === 'tab-notes') {
-            if (mapContainer) mapContainer.classList.add('hidden');
-            if (characterSheetContainer) characterSheetContainer.classList.remove('active');
-            if (noteEditorContainer) noteEditorContainer.classList.add('active');
+            if (noteEditorContainer) noteEditorContainer.style.display = 'flex';
 
             if (!easyMDE && markdownEditorTextarea) {
                 initEasyMDE();
             }
             if (easyMDE && easyMDE.codemirror) {
-                setTimeout(() => {
-                    easyMDE.codemirror.refresh();
-                }, 10);
+                setTimeout(() => easyMDE.codemirror.refresh(), 10);
             }
 
             if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
@@ -3968,9 +3973,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } else if (tabId === 'tab-characters') {
-            if (mapContainer) mapContainer.classList.add('hidden');
-            if (noteEditorContainer) noteEditorContainer.classList.remove('active');
-            if (characterSheetContainer) characterSheetContainer.classList.add('active');
+            if (characterSheetContainer) characterSheetContainer.style.display = 'flex';
 
             if (!selectedCharacterId || !charactersData.some(c => c.id === selectedCharacterId)) {
                 if (charactersData.length > 0) {
@@ -3981,21 +3984,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } else if (tabId === 'tab-story-beats') {
-            if (mapContainer) mapContainer.classList.add('hidden');
-            if (noteEditorContainer) noteEditorContainer.classList.remove('active');
-            if (characterSheetContainer) characterSheetContainer.classList.remove('active');
             if (storyTreeContainer) {
-                storyTreeContainer.style.display = 'flex'; // Use flex to match container style
+                storyTreeContainer.style.display = 'flex';
                 storyTreeContainer.style.flexGrow = '1';
             }
-            if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
             initStoryTree();
-        } else {
-            if (mapContainer) mapContainer.classList.remove('hidden');
-            if (noteEditorContainer) noteEditorContainer.classList.remove('active');
-            if (characterSheetContainer) characterSheetContainer.classList.remove('active');
-            if (storyTreeContainer) storyTreeContainer.style.display = 'none';
-            if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
+        } else { // Default to DM Controls tab
+            if (mapContainer) mapContainer.style.display = 'flex';
+            resizeCanvas(); // Ensure map is resized correctly
         }
     }
 
@@ -4459,6 +4455,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (key === 'proficiencies_tools') newKey = 'tool_proficiencies';
                     else if (key === 'character_name') newKey = 'char_name';
                     else if (key === 'class_and_level') newKey = 'class_level';
+                    else if (key === 'armor_class') newKey = 'ac';
 
                     finalData[newKey] = flattenedData[key];
                 }
@@ -4491,28 +4488,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const reader = new FileReader();
-                reader.onload = async (e) => {
+                reader.onload = (e) => {
                     const pdfData = new Uint8Array(e.target.result);
                     character.pdfData = pdfData;
                     character.pdfFileName = file.name;
 
-                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                    const numPages = pdf.numPages;
-                    let textContent = '';
-
-                    for (let i = 1; i <= numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        const strings = content.items.map(item => item.str);
-                        textContent += strings.join(' ');
-                    }
-
-                    console.log(textContent);
-                    const sheetData = parsePdfText(textContent);
-                    characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
-
                     viewPdfButton.style.display = 'inline-block';
                     deletePdfButton.style.display = 'inline-block';
+                    alert(`PDF "${file.name}" has been attached to the character.`);
                 };
                 reader.readAsArrayBuffer(file);
             } else if (!selectedCharacterId) {
