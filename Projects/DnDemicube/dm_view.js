@@ -7281,7 +7281,6 @@ function displayToast(messageElement) {
     resizeCanvas(); // Set initial canvas size
     drawConnections();
     renderCards();
-    }
 
     if (saveJsonButton) {
         saveJsonButton.addEventListener('click', () => {
@@ -7333,6 +7332,7 @@ function displayToast(messageElement) {
                 alert('Failed to copy JSON.');
             });
         });
+    }
     }
 
     if (storyBeatCardOverlay) {
