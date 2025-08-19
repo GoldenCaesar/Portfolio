@@ -168,10 +168,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyBeatCardExportButton = document.getElementById('story-beat-card-export-button');
     const storyBeatCardBody = document.getElementById('story-beat-card-body');
     const quoteEditorContainer = document.getElementById('quote-editor-container');
-    const jsonExportOverlay = document.getElementById('json-export-overlay');
-    const jsonExportContent = document.getElementById('json-export-content');
-    const jsonExportCloseButton = document.getElementById('json-export-close-button');
+    const jsonEditOverlay = document.getElementById('json-export-overlay'); // Changed name
+    const jsonEditContent = document.getElementById('json-edit-content'); // Changed name
+    const jsonEditCloseButton = document.getElementById('json-export-close-button'); // Changed name
     const copyJsonButton = document.getElementById('copy-json-button');
+    const saveJsonButton = document.getElementById('save-json-button'); // New button
     const saveQuotesButton = document.getElementById('save-quotes-button');
     const quoteJsonEditor = document.getElementById('quote-json-editor');
 
@@ -7268,8 +7269,8 @@ function displayToast(messageElement) {
                     difficulty: quest.difficulty || 0,
                     storySteps: quest.storySteps || [],
                 };
-                jsonExportContent.textContent = JSON.stringify(exportQuest, null, 2);
-                jsonExportOverlay.style.display = 'flex';
+                jsonEditContent.value = JSON.stringify(exportQuest, null, 2); // Use value for textarea
+                jsonEditOverlay.style.display = 'flex';
             } else {
                 alert("Could not find quest data to export. Please reopen the quest card and try again.");
             }
@@ -7282,16 +7283,47 @@ function displayToast(messageElement) {
     renderCards();
     }
 
+    if (saveJsonButton) {
+        saveJsonButton.addEventListener('click', () => {
+            try {
+                const updatedQuestData = JSON.parse(jsonEditContent.value);
+                const questId = updatedQuestData.id;
 
-    if (jsonExportCloseButton) {
-        jsonExportCloseButton.addEventListener('click', () => {
-            jsonExportOverlay.style.display = 'none';
+                if (!questId || !quests.some(q => q.id === questId)) {
+                    alert("JSON must have a valid 'id' matching the current quest.");
+                    return;
+                }
+
+                // This is a temporary object to hold the changes.
+                // It will be used to repopulate the overlay.
+                const tempQuest = {
+                    ...quests.find(q => q.id === questId), // Start with existing data
+                    ...updatedQuestData // Overwrite with new data
+                };
+
+                // Repopulate the story beat card with the new data
+                populateAndShowStoryBeatCard(tempQuest);
+
+                alert("Quest details have been updated on the overlay. Click 'Save All Changes' to apply them to the story tree.");
+                jsonEditOverlay.style.display = 'none';
+
+            } catch (e) {
+                alert("Invalid JSON format. Please check the syntax and try again.");
+                console.error("Error parsing quest JSON:", e);
+            }
+        });
+    }
+
+
+    if (jsonEditCloseButton) {
+        jsonEditCloseButton.addEventListener('click', () => {
+            jsonEditOverlay.style.display = 'none';
         });
     }
 
     if (copyJsonButton) {
         copyJsonButton.addEventListener('click', () => {
-            navigator.clipboard.writeText(jsonExportContent.textContent).then(() => {
+            navigator.clipboard.writeText(jsonEditContent.value).then(() => {
                 copyJsonButton.textContent = 'Copied!';
                 setTimeout(() => {
                     copyJsonButton.textContent = 'Copy to Clipboard';
