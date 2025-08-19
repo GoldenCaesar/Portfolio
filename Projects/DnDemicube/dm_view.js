@@ -165,9 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyTreeCanvas = document.getElementById('quest-canvas');
     const storyTreeCardContainer = document.getElementById('card-container');
     const storyBeatCardOverlay = document.getElementById('story-beat-card-overlay');
-    const storyBeatCardCloseButton = document.getElementById('story-beat-card-close-button');
+    const storyBeatCardExportButton = document.getElementById('story-beat-card-export-button');
     const storyBeatCardBody = document.getElementById('story-beat-card-body');
     const quoteEditorContainer = document.getElementById('quote-editor-container');
+    const jsonExportOverlay = document.getElementById('json-export-overlay');
+    const jsonExportContent = document.getElementById('json-export-content');
+    const jsonExportCloseButton = document.getElementById('json-export-close-button');
+    const copyJsonButton = document.getElementById('copy-json-button');
     const saveQuotesButton = document.getElementById('save-quotes-button');
     const quoteJsonEditor = document.getElementById('quote-json-editor');
 
@@ -6600,13 +6604,7 @@ function displayToast(messageElement) {
 
             const description = document.createElement('p');
             description.classList.add('card-description');
-            let descText = quest.description || '';
-            const firstSentence = descText.split('.')[0];
-            if (firstSentence) {
-                description.textContent = firstSentence + '.';
-            } else {
-                description.textContent = descText.split(' ').slice(0, 15).join(' ') + (descText.split(' ').length > 15 ? '...' : '');
-            }
+            description.textContent = quest.description || ''; // Use full description
             content.appendChild(description);
 
             overlay.appendChild(content);
@@ -6660,6 +6658,34 @@ function displayToast(messageElement) {
             });
 
             cardContainer.appendChild(card);
+
+            // Adjust font size to fit
+            const adjustFontSize = (element) => {
+                if (!element) return;
+                // Reset font size before calculating
+                element.style.fontSize = '';
+                let baseFontSize = parseFloat(window.getComputedStyle(element).fontSize);
+                const minFontSize = 8; // Minimum font size in pixels
+
+                // Use a temporary clone to avoid layout shifts during calculation
+                const clone = element.cloneNode(true);
+                clone.style.visibility = 'hidden';
+                clone.style.position = 'absolute';
+                clone.style.width = element.clientWidth + 'px';
+                clone.style.height = 'auto'; // Let height grow
+                document.body.appendChild(clone);
+
+                while (clone.scrollHeight > element.clientHeight && baseFontSize > minFontSize) {
+                    baseFontSize -= 0.5;
+                    clone.style.fontSize = baseFontSize + 'px';
+                }
+
+                element.style.fontSize = baseFontSize + 'px';
+                document.body.removeChild(clone);
+            };
+
+            adjustFontSize(description);
+            adjustFontSize(rewardsContainer);
         });
     };
 
@@ -6938,6 +6964,10 @@ function displayToast(messageElement) {
     const hideOverlay = () => {
         overlay.style.display = 'none';
         activeOverlayCardId = null;
+        const currentlySelected = document.querySelector('.card.selected');
+        if (currentlySelected) {
+            currentlySelected.classList.remove('selected');
+        }
     };
 
     // --- Context Menu Logic ---
@@ -7208,30 +7238,68 @@ function displayToast(messageElement) {
         }
     });
 
+    const storyBeatCardBackButton = document.getElementById('story-beat-card-back-button');
+    if (storyBeatCardBackButton) {
+        storyBeatCardBackButton.addEventListener('click', () => {
+            hideOverlay();
+        });
+    }
+
     // Initial setup
     resizeCanvas(); // Set initial canvas size
     drawConnections();
     renderCards();
     }
 
-    if (storyBeatCardCloseButton) {
-        storyBeatCardCloseButton.addEventListener('click', () => {
-            storyBeatCardOverlay.style.display = 'none';
-            const currentlySelected = document.querySelector('.card.selected');
-            if (currentlySelected) {
-                currentlySelected.classList.remove('selected');
+    if (storyBeatCardExportButton) {
+        storyBeatCardExportButton.addEventListener('click', () => {
+            // This relies on activeOverlayCardId being set correctly inside the initStoryTree function scope
+            const quest = quests.find(q => q.id === activeOverlayCardId);
+            if (quest) {
+                const exportQuest = {
+                    id: quest.id,
+                    name: quest.name || '',
+                    parentIds: quest.parentIds || [],
+                    x: quest.x || 0,
+                    y: quest.y || 0,
+                    description: quest.description || '',
+                    questStatus: quest.questStatus || 'Unavailable',
+                    questType: quest.questType || [],
+                    startingTriggers: quest.startingTriggers || [],
+                    associatedMaps: quest.associatedMaps || [],
+                    associatedNPCs: quest.associatedNPCs || [],
+                    failureTriggers: quest.failureTriggers || [],
+                    successTriggers: quest.successTriggers || [],
+                    detailedRewards: quest.detailedRewards || { xp: 0, loot: '', magicItems: '', information: '' },
+                    storyDuration: quest.storyDuration || '',
+                    difficulty: quest.difficulty || 0,
+                    storySteps: quest.storySteps || [],
+                };
+                jsonExportContent.textContent = JSON.stringify(exportQuest, null, 2);
+                jsonExportOverlay.style.display = 'flex';
+            } else {
+                alert("Could not find quest data to export. Please reopen the quest card and try again.");
             }
         });
     }
 
-    const storyBeatCardBackButton = document.getElementById('story-beat-card-back-button');
-    if (storyBeatCardBackButton) {
-        storyBeatCardBackButton.addEventListener('click', () => {
-            storyBeatCardOverlay.style.display = 'none';
-            const currentlySelected = document.querySelector('.card.selected');
-            if (currentlySelected) {
-                currentlySelected.classList.remove('selected');
-            }
+    if (jsonExportCloseButton) {
+        jsonExportCloseButton.addEventListener('click', () => {
+            jsonExportOverlay.style.display = 'none';
+        });
+    }
+
+    if (copyJsonButton) {
+        copyJsonButton.addEventListener('click', () => {
+            navigator.clipboard.writeText(jsonExportContent.textContent).then(() => {
+                copyJsonButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyJsonButton.textContent = 'Copy to Clipboard';
+                }, 2000);
+            }, (err) => {
+                console.error('Could not copy text: ', err);
+                alert('Failed to copy JSON.');
+            });
         });
     }
 
