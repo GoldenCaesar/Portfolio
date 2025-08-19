@@ -4455,6 +4455,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (key === 'proficiencies_tools') newKey = 'tool_proficiencies';
                     else if (key === 'character_name') newKey = 'char_name';
                     else if (key === 'class_and_level') newKey = 'class_level';
+                    else if (key === 'armor_class') newKey = 'ac';
 
                     finalData[newKey] = flattenedData[key];
                 }
@@ -4487,28 +4488,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const reader = new FileReader();
-                reader.onload = async (e) => {
+                reader.onload = (e) => {
                     const pdfData = new Uint8Array(e.target.result);
                     character.pdfData = pdfData;
                     character.pdfFileName = file.name;
 
-                    const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                    const numPages = pdf.numPages;
-                    let textContent = '';
-
-                    for (let i = 1; i <= numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        const strings = content.items.map(item => item.str);
-                        textContent += strings.join(' ');
-                    }
-
-                    console.log(textContent);
-                    const sheetData = parsePdfText(textContent);
-                    characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: sheetData }, '*');
-
                     viewPdfButton.style.display = 'inline-block';
                     deletePdfButton.style.display = 'inline-block';
+                    alert(`PDF "${file.name}" has been attached to the character.`);
                 };
                 reader.readAsArrayBuffer(file);
             } else if (!selectedCharacterId) {
