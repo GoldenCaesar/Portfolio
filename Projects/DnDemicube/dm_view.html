@@ -515,9 +515,12 @@
     <div id="json-export-overlay" class="modal" style="display: none;">
         <div class="modal-content">
             <span class="close-button" id="json-export-close-button">&times;</span>
-            <h3>Quest JSON Data</h3>
-            <pre id="json-export-content" style="white-space: pre-wrap; word-wrap: break-word; background-color: #1e1e1e; color: #d4d4d4; padding: 10px; border: 1px solid #3f4c5a;"></pre>
-            <button id="copy-json-button" style="margin-top: 10px;">Copy to Clipboard</button>
+            <h3>View/Edit Quest JSON</h3>
+            <textarea id="json-edit-content" style="width: 95%; height: 400px; font-family: monospace; background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #3f4c5a;"></textarea>
+            <div style="margin-top: 10px;">
+                <button id="save-json-button">Save</button>
+                <button id="copy-json-button">Copy to Clipboard</button>
+            </div>
         </div>
     </div>
 </body>
