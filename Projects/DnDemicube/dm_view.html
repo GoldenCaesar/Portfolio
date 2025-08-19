@@ -216,7 +216,7 @@
             <div class="story-beat-card-header">
                 <button id="story-beat-card-back-button" class="story-beat-card-back-button">←</button>
                 <h2>Quest Details</h2>
-                <button id="story-beat-card-close-button" class="story-beat-card-close-button">&times;</button>
+                <button id="story-beat-card-export-button" class="story-beat-card-close-button" title="Export Quest to JSON">📤</button>
             </div>
             <div id="story-beat-card-body"></div>
         </div>
@@ -511,5 +511,14 @@
             </div>
         </div>
     </footer>
+
+    <div id="json-export-overlay" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="json-export-close-button">&times;</span>
+            <h3>Quest JSON Data</h3>
+            <pre id="json-export-content" style="white-space: pre-wrap; word-wrap: break-word; background-color: #1e1e1e; color: #d4d4d4; padding: 10px; border: 1px solid #3f4c5a;"></pre>
+            <button id="copy-json-button" style="margin-top: 10px;">Copy to Clipboard</button>
+        </div>
+    </div>
 </body>
 </html>
