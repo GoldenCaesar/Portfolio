@@ -6605,7 +6605,15 @@ function displayToast(messageElement) {
             if (quest.detailedRewards) {
                 const rewards = [];
                 if (quest.detailedRewards.xp) rewards.push(`XP: ${quest.detailedRewards.xp}`);
-                if (quest.detailedRewards.information) rewards.push(`${quest.detailedRewards.information}`);
+                if (quest.detailedRewards.information) {
+                    const fullInfo = quest.detailedRewards.information;
+                    const infoWords = fullInfo.split(/\s+/);
+                    if (infoWords.length > 30) {
+                        rewards.push(infoWords.slice(0, 30).join(' ') + '...');
+                    } else {
+                        rewards.push(fullInfo);
+                    }
+                }
                 rewardsContainer.textContent = rewards.join(', ');
             }
             overlay.appendChild(rewardsContainer);
