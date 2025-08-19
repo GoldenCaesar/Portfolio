@@ -24,9 +24,6 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
     overflow: hidden;
     padding: 10px;
 }
-#map-container.hidden, .canvas-container.hidden {
-    display: none !important;
-}
 
 .canvas-container {
     width: 100%;
