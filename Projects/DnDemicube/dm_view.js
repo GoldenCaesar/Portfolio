@@ -6588,7 +6588,13 @@ function displayToast(messageElement) {
 
             const description = document.createElement('p');
             description.classList.add('card-description');
-            description.textContent = quest.description || ''; // Use full description
+            const fullDescription = quest.description || '';
+            const words = fullDescription.split(/\s+/);
+            if (words.length > 15) {
+                description.textContent = words.slice(0, 15).join(' ') + '...';
+            } else {
+                description.textContent = fullDescription;
+            }
             content.appendChild(description);
 
             overlay.appendChild(content);
@@ -6599,9 +6605,7 @@ function displayToast(messageElement) {
             if (quest.detailedRewards) {
                 const rewards = [];
                 if (quest.detailedRewards.xp) rewards.push(`XP: ${quest.detailedRewards.xp}`);
-                if (quest.detailedRewards.loot) rewards.push(`Loot: ${quest.detailedRewards.loot}`);
-                if (quest.detailedRewards.magicItems) rewards.push(`Magic Items: ${quest.detailedRewards.magicItems}`);
-                if (quest.detailedRewards.information) rewards.push(`Info: ${quest.detailedRewards.information}`);
+                if (quest.detailedRewards.information) rewards.push(`${quest.detailedRewards.information}`);
                 rewardsContainer.textContent = rewards.join(', ');
             }
             overlay.appendChild(rewardsContainer);
