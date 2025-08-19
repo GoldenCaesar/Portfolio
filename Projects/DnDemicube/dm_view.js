@@ -6866,6 +6866,7 @@ function displayToast(messageElement) {
                 completed: row.querySelector('.story-step-checkbox').checked
             }));
 
+            questToUpdate.difficulty = quest.difficulty; // Save difficulty from the temporary quest object
             questToUpdate.detailedRewards = {
                 xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
                 loot: document.getElementById('reward-loot').value,
@@ -6875,6 +6876,7 @@ function displayToast(messageElement) {
 
             alert('Quest details saved!');
             renderCards(); // Re-render cards to reflect name change
+            drawConnections(); // Redraw connections to reflect parentId changes
         });
 
         const addNpcBtn = document.getElementById('add-npc-btn');
