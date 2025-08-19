@@ -87,6 +87,7 @@ function animateSlideshow() {
 let currentMapImage = null;
 let currentOverlays = [];
 let initiativeTokens = [];
+let currentMapTransform = { scale: 1, originX: 0, originY: 0 };
 let currentMapDisplayData = {
     img: null,
     ratio: 1,
@@ -107,7 +108,6 @@ function drawMapAndOverlays() {
     }
     if (!currentMapImage || !currentMapImage.complete) {
         drawPlaceholder("Map image not loaded or incomplete.");
-        // console.log("drawMapAndOverlays: currentMapImage not ready or null.");
         return;
     }
     if (!playerMapContainer) {
@@ -115,49 +115,35 @@ function drawMapAndOverlays() {
         return;
     }
 
-    const containerWidth = playerMapContainer.clientWidth;
-    const containerHeight = playerMapContainer.clientHeight;
-
-    // Calculate the aspect ratio of the image
-    const imgAspectRatio = currentMapImage.width / currentMapImage.height;
-
-    // Calculate the dimensions of the canvas to fit the image within the container
-    let canvasWidth = containerWidth;
-    let canvasHeight = canvasWidth / imgAspectRatio;
-
-    if (canvasHeight > containerHeight) {
-        canvasHeight = containerHeight;
-        canvasWidth = canvasHeight * imgAspectRatio;
-    }
-
-    playerCanvas.width = Math.floor(canvasWidth);
-    playerCanvas.height = Math.floor(canvasHeight);
+    playerCanvas.width = playerMapContainer.clientWidth;
+    playerCanvas.height = playerMapContainer.clientHeight;
 
     pCtx.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
+    pCtx.save();
 
-    // Recalculate ratio and offsets for drawing the image centered on the (potentially resized) canvas
-    const hRatioCanvas = playerCanvas.width / currentMapImage.width;
-    const vRatioCanvas = playerCanvas.height / currentMapImage.height;
-    const ratioCanvas = Math.min(hRatioCanvas, vRatioCanvas);
+    pCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+    pCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
 
-    const finalImgScaledWidth = currentMapImage.width * ratioCanvas;
-    const finalImgScaledHeight = currentMapImage.height * ratioCanvas;
+    pCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
 
-    const finalCenterShift_x = (playerCanvas.width - finalImgScaledWidth) / 2;
-    const finalCenterShift_y = (playerCanvas.height - finalImgScaledHeight) / 2;
+    drawOverlays_PlayerView(currentOverlays);
 
-    pCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height,
-                  finalCenterShift_x, finalCenterShift_y, finalImgScaledWidth, finalImgScaledHeight);
+    pCtx.restore();
+
+    const hRatio = playerCanvas.width / currentMapImage.width;
+    const vRatio = playerCanvas.height / currentMapImage.height;
+    const fitRatio = Math.min(hRatio, vRatio);
 
     currentMapDisplayData = {
         img: currentMapImage,
-        ratio: ratioCanvas,
-        offsetX: finalCenterShift_x,
-        offsetY: finalCenterShift_y,
+        ratio: fitRatio,
         imgWidth: currentMapImage.width,
         imgHeight: currentMapImage.height,
-        scaledWidth: finalImgScaledWidth,
-        scaledHeight: finalImgScaledHeight
+        scaledWidth: currentMapImage.width * currentMapTransform.scale,
+        scaledHeight: currentMapImage.height * currentMapTransform.scale,
+        offsetX: currentMapTransform.originX,
+        offsetY: currentMapTransform.originY,
+        scale: currentMapTransform.scale
     };
 
     drawOverlays_PlayerView(currentOverlays);
@@ -171,10 +157,10 @@ function drawOverlays_PlayerView(overlays) {
             if (overlay.type === 'childMapLink' && overlay.polygon) {
             pCtx.beginPath();
             pCtx.strokeStyle = 'rgba(100, 100, 255, 0.4)';
-            pCtx.lineWidth = 2;
+            pCtx.lineWidth = 2 / currentMapTransform.scale; // Keep line width consistent
             overlay.polygon.forEach((point, index) => {
-                const canvasX = (point.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                const canvasY = (point.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                const canvasX = point.x;
+                const canvasY = point.y;
                 if (index === 0) {
                     pCtx.moveTo(canvasX, canvasY);
                 } else {
@@ -183,15 +169,15 @@ function drawOverlays_PlayerView(overlays) {
             });
             if (overlay.polygon.length > 2) {
                 const firstPoint = overlay.polygon[0];
-                const firstPointCanvasX = (firstPoint.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-                const firstPointCanvasY = (firstPoint.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+                const firstPointCanvasX = firstPoint.x;
+                const firstPointCanvasY = firstPoint.y;
                 pCtx.lineTo(firstPointCanvasX, firstPointCanvasY);
             }
             pCtx.stroke();
         } else if (overlay.type === 'noteLink' && overlay.position) {
-            const iconSize = 20;
-            const canvasX = (overlay.position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-            const canvasY = (overlay.position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+            const iconSize = 20 / currentMapTransform.scale;
+            const canvasX = overlay.position.x;
+            const canvasY = overlay.position.y;
             pCtx.fillStyle = 'rgba(102, 255, 102, 0.9)';
             pCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
             pCtx.strokeStyle = 'black';
@@ -202,9 +188,9 @@ function drawOverlays_PlayerView(overlays) {
             pCtx.textBaseline = 'middle';
             pCtx.fillText('📝', canvasX, canvasY);
         } else if (overlay.type === 'characterLink' && overlay.position) {
-            const iconSize = 20; // The size of the icon on the canvas
-            const canvasX = (overlay.position.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-            const canvasY = (overlay.position.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+            const iconSize = 20 / currentMapTransform.scale;
+            const canvasX = overlay.position.x;
+            const canvasY = overlay.position.y;
 
             let fillStyle = 'rgba(102, 255, 102, 0.9)'; // Greenish if visible to player
 
@@ -222,15 +208,13 @@ function drawOverlays_PlayerView(overlays) {
             if (overlay.character_portrait) {
                 const img = new Image();
                 img.onload = function() {
-                    pCtx.save();
+                    // Note: We don't save/restore here because the whole function does it.
                     pCtx.beginPath();
                     pCtx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
                     pCtx.closePath();
                     pCtx.clip();
-
                     pCtx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
-
-                    pCtx.restore();
+                    pCtx.beginPath(); // Reset path after clipping
                 };
                 img.src = overlay.character_portrait;
             }
@@ -240,7 +224,7 @@ function drawOverlays_PlayerView(overlays) {
 
     if (initiativeTokens.length > 0) {
         initiativeTokens.forEach(token => {
-            drawToken(pCtx, token);
+            drawToken(pCtx, token); // This will also be drawn in the transformed space
         });
     }
 }
@@ -298,6 +282,12 @@ window.addEventListener('message', (event) => {
                 } else {
                     console.warn("loadMap message received without mapDataUrl.");
                     drawPlaceholder("Received invalid map data from DM.");
+                }
+                break;
+            case 'mapTransformUpdate':
+                if (data.transform) {
+                    currentMapTransform = data.transform;
+                    drawMapAndOverlays();
                 }
                 break;
             // Note: 'polygonVisibilityUpdate' from DM is largely superseded by DM sending
@@ -517,17 +507,21 @@ function displayToast(messageElement) {
 }
 
 function drawToken(ctx, token) {
-    const canvasX = (token.x * currentMapDisplayData.ratio) + currentMapDisplayData.offsetX;
-    const canvasY = (token.y * currentMapDisplayData.ratio) + currentMapDisplayData.offsetY;
+    // This function is now called within a transformed context,
+    // so we draw relative to the image's own coordinate system.
+    const canvasX = token.x;
+    const canvasY = token.y;
 
     const percentage = token.size / 100;
     const baseDimension = currentMapDisplayData.imgWidth;
     const pixelSizeOnImage = percentage * baseDimension;
-    const size = pixelSizeOnImage * currentMapDisplayData.ratio;
+    // We don't scale the size here because the context is already scaled.
+    const size = pixelSizeOnImage;
+    const invScale = 1 / currentMapDisplayData.scale;
 
     if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
         ctx.beginPath();
-        ctx.arc(canvasX, canvasY, (size / 2) + (5 * currentMapDisplayData.ratio), 0, Math.PI * 2, true);
+        ctx.arc(canvasX, canvasY, (size / 2) + (5 * invScale), 0, Math.PI * 2, true);
         ctx.fillStyle = 'rgba(255, 215, 0, 0.7)';
         ctx.fill();
     }
@@ -539,8 +533,8 @@ function drawToken(ctx, token) {
 
         if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
             const healthPercentage = Math.max(0, currentHp / maxHp);
-            const ringRadius = (size / 2) + (8 * currentMapDisplayData.ratio);
-            const ringWidth = 6 * currentMapDisplayData.ratio;
+            const ringRadius = (size / 2) + (8 * invScale);
+            const ringWidth = 6 * invScale;
 
             ctx.beginPath();
             ctx.arc(canvasX, canvasY, ringRadius, 0, Math.PI * 2, false);
@@ -591,17 +585,17 @@ function drawToken(ctx, token) {
     ctx.beginPath();
     ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2 * currentMapDisplayData.ratio;
+    ctx.lineWidth = 2 * invScale;
     ctx.stroke();
 
     ctx.fillStyle = 'white';
     ctx.shadowColor = 'black';
-    ctx.shadowBlur = 2;
-    ctx.font = `bold ${12 * currentMapDisplayData.ratio}px sans-serif`;
+    ctx.shadowBlur = 2 * invScale;
+    ctx.font = `bold ${12 * invScale}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * currentMapDisplayData.ratio));
-    ctx.font = `${10 * currentMapDisplayData.ratio}px sans-serif`;
-    ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * currentMapDisplayData.ratio));
+    ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * invScale));
+    ctx.font = `${10 * invScale}px sans-serif`;
+    ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * invScale));
     ctx.shadowBlur = 0;
 }
 
