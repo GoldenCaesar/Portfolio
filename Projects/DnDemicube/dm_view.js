@@ -6714,7 +6714,15 @@ function displayToast(messageElement) {
             </div>
 
             <h3>Starting Triggers</h3>
-            <textarea id="quest-starting-triggers" class="editable-textarea" rows="3">${quest.startingTriggers.join('\n')}</textarea>
+            <div id="quest-starting-triggers">
+                ${quest.startingTriggers.map((trigger, index) => `
+                    <div class="trigger-row" data-index="${index}">
+                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
+                        <button class="remove-trigger-btn">X</button>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="add-starting-trigger-btn">+ Add Trigger</button>
 
             <h3>Associated Maps</h3>
             <select id="quest-associated-maps" multiple size="4">
@@ -6749,10 +6757,26 @@ function displayToast(messageElement) {
             <button id="add-story-step-btn">+ Add Step</button>
 
             <h3>Success Triggers</h3>
-            <textarea id="quest-success-triggers" class="editable-textarea" rows="3">${quest.successTriggers.join('\n')}</textarea>
+            <div id="quest-success-triggers">
+                ${quest.successTriggers.map((trigger, index) => `
+                    <div class="trigger-row" data-index="${index}">
+                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
+                        <button class="remove-trigger-btn">X</button>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="add-success-trigger-btn">+ Add Trigger</button>
 
             <h3>Failure Triggers</h3>
-            <textarea id="quest-failure-triggers" class="editable-textarea" rows="3">${quest.failureTriggers.join('\n')}</textarea>
+            <div id="quest-failure-triggers">
+                ${quest.failureTriggers.map((trigger, index) => `
+                    <div class="trigger-row" data-index="${index}">
+                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
+                        <button class="remove-trigger-btn">X</button>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="add-failure-trigger-btn">+ Add Trigger</button>
 
             <h3>Rewards</h3>
             <div class="rewards-grid">
@@ -6789,9 +6813,10 @@ function displayToast(messageElement) {
             quest.questStatus = document.getElementById('quest-status').value;
             quest.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
             quest.storyDuration = document.getElementById('quest-story-duration').value;
-            quest.startingTriggers = document.getElementById('quest-starting-triggers').value.split('\n').filter(Boolean);
-            quest.failureTriggers = document.getElementById('quest-failure-triggers').value.split('\n').filter(Boolean);
-            quest.successTriggers = document.getElementById('quest-success-triggers').value.split('\n').filter(Boolean);
+
+            quest.startingTriggers = Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => div.innerText);
+            quest.successTriggers = Array.from(document.querySelectorAll('#quest-success-triggers .trigger-text')).map(div => div.innerText);
+            quest.failureTriggers = Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-text')).map(div => div.innerText);
 
             const mapsSelect = document.getElementById('quest-associated-maps');
             quest.associatedMaps = Array.from(mapsSelect.selectedOptions).map(opt => opt.value);
@@ -6877,6 +6902,34 @@ function displayToast(messageElement) {
                 e.target.closest('.story-step-row').remove();
             }
         });
+
+        // Add/Remove Triggers
+        const setupTriggerList = (containerId, buttonId) => {
+            const container = document.getElementById(containerId);
+            const addButton = document.getElementById(buttonId);
+
+            addButton.addEventListener('click', () => {
+                const newIndex = container.children.length;
+                const newRow = document.createElement('div');
+                newRow.className = 'trigger-row';
+                newRow.dataset.index = newIndex;
+                newRow.innerHTML = `
+                    <div contenteditable="true" class="editable-div trigger-text">New Trigger</div>
+                    <button class="remove-trigger-btn">X</button>
+                `;
+                container.appendChild(newRow);
+            });
+
+            container.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-trigger-btn')) {
+                    e.target.closest('.trigger-row').remove();
+                }
+            });
+        };
+
+        setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn');
+        setupTriggerList('quest-success-triggers', 'add-success-trigger-btn');
+        setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn');
     };
 
     /**

@@ -474,6 +474,21 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+.trigger-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.trigger-text {
+    flex-grow: 1;
+}
+
+.remove-trigger-btn {
+    padding: 5px 10px;
+}
+
 /* New Story Beat Card Overlay Styles */
 #story-beat-card-body h3 {
     border-bottom: 1px solid #ccc;
