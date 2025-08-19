@@ -7245,15 +7245,8 @@ function displayToast(messageElement) {
         });
     }
 
-    // Initial setup
-    resizeCanvas(); // Set initial canvas size
-    drawConnections();
-    renderCards();
-    }
-
     if (storyBeatCardExportButton) {
         storyBeatCardExportButton.addEventListener('click', () => {
-            // This relies on activeOverlayCardId being set correctly inside the initStoryTree function scope
             const quest = quests.find(q => q.id === activeOverlayCardId);
             if (quest) {
                 const exportQuest = {
@@ -7282,6 +7275,13 @@ function displayToast(messageElement) {
             }
         });
     }
+
+    // Initial setup
+    resizeCanvas(); // Set initial canvas size
+    drawConnections();
+    renderCards();
+    }
+
 
     if (jsonExportCloseButton) {
         jsonExportCloseButton.addEventListener('click', () => {
