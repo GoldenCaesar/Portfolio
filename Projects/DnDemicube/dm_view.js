@@ -1,0 +1,7076 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const skills = {
+        'Acrobatics': 'dexterity',
+        'Animal Handling': 'wisdom',
+        'Arcana': 'intelligence',
+        'Athletics': 'strength',
+        'Deception': 'charisma',
+        'History': 'intelligence',
+        'Insight': 'wisdom',
+        'Intimidation': 'charisma',
+        'Investigation': 'intelligence',
+        'Medicine': 'wisdom',
+        'Nature': 'intelligence',
+        'Perception': 'wisdom',
+        'Performance': 'charisma',
+        'Persuasion': 'charisma',
+        'Religion': 'intelligence',
+        'Sleight of Hand': 'dexterity',
+        'Stealth': 'dexterity',
+        'Survival': 'wisdom'
+    };
+
+    function calculateModifier(score) {
+        let mod = Math.floor((score - 10) / 2);
+        return mod >= 0 ? '+' + mod : mod;
+    }
+
+    const saveCampaignModal = document.getElementById('save-campaign-modal');
+    const saveCampaignModalCloseButton = document.getElementById('save-campaign-modal-close-button');
+    const confirmSaveButton = document.getElementById('confirm-save-button');
+    const cancelSaveButton = document.getElementById('cancel-save-button');
+    const saveOptionsContainer = document.getElementById('save-options-container');
+    const saveConflictWarnings = document.getElementById('save-conflict-warnings');
+    const saveMapsCheckbox = document.getElementById('save-maps-checkbox');
+    const saveCharactersCheckbox = document.getElementById('save-characters-checkbox');
+    const saveNotesCheckbox = document.getElementById('save-notes-checkbox');
+    const saveInitiativeCheckbox = document.getElementById('save-initiative-checkbox');
+    const saveRollsCheckbox = document.getElementById('save-rolls-checkbox');
+    const saveTimerCheckbox = document.getElementById('save-timer-checkbox');
+    const saveAudioCheckbox = document.getElementById('save-audio-checkbox');
+    const saveStoryBeatsCheckbox = document.getElementById('save-story-beats-checkbox');
+    const saveQuotesCheckbox = document.getElementById('save-quotes-checkbox');
+
+    const loadCampaignModal = document.getElementById('load-campaign-modal');
+    const loadCampaignModalCloseButton = document.getElementById('load-campaign-modal-close-button');
+    const loadOptionsContainer = document.getElementById('load-options-container');
+    const confirmLoadButton = document.getElementById('confirm-load-button');
+    const cancelLoadButton = document.getElementById('cancel-load-button');
+
+    const uploadMapsInput = document.getElementById('upload-maps-input');
+    const mapsList = document.getElementById('maps-list');
+    const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
+    const editMapsIcon = document.getElementById('edit-maps-icon');
+    const dmCanvas = document.getElementById('dm-canvas');
+    const drawingCanvas = document.getElementById('drawing-canvas');
+    const mapContainer = document.getElementById('map-container');
+    const noteEditorContainer = document.getElementById('note-editor-container'); // New container for the editor
+    const hoverLabel = document.getElementById('hover-label');
+    const polygonContextMenu = document.getElementById('polygon-context-menu');
+    const noteContextMenu = document.getElementById('note-context-menu');
+    const characterContextMenu = document.getElementById('character-context-menu');
+    const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
+    const displayedFileNames = new Set();
+
+    // Token Stat Block Elements
+    const tokenStatBlock = document.getElementById('token-stat-block');
+    const tokenStatBlockCharName = document.getElementById('token-stat-block-char-name');
+    const tokenStatBlockPlayerName = document.getElementById('token-stat-block-player-name');
+    const tokenStatBlockHp = document.getElementById('token-stat-block-hp');
+    const tokenStatBlockMaxHp = document.getElementById('token-stat-block-max-hp');
+    const tokenStatBlockSetTargets = document.getElementById('token-stat-block-set-targets');
+    const tokenStatBlockTargetsContainer = document.getElementById('token-stat-block-targets-container');
+    const tokenStatBlockTargetsList = document.getElementById('token-stat-block-targets-list');
+    const tokenStatBlockRollsList = document.getElementById('token-stat-block-rolls-list');
+    const tokenStatBlockAddRollName = document.getElementById('token-stat-block-add-roll-name');
+    const tokenStatBlockAddRollTags = document.getElementById('token-stat-block-add-roll-tags');
+    // const tokenStatBlockAddRollDice = document.getElementById('token-stat-block-add-roll-dice'); // REPLACED
+    // const tokenStatBlockAddRollBtn = document.getElementById('token-stat-block-add-roll-btn'); // REPLACED
+    const tokenStatBlockDiceButtons = document.getElementById('token-stat-block-dice-buttons');
+    const tokenStatBlockAddRollModifier = document.getElementById('token-stat-block-add-roll-modifier');
+    const tokenStatBlockSaveRollBtn = document.getElementById('token-stat-block-save-roll-btn');
+    let tokenStatBlockDiceCounts = {};
+
+    // Dice Roller Elements
+    const diceRollerIcon = document.getElementById('dice-roller-icon');
+    const dmFloatingFooter = document.getElementById('dm-floating-footer');
+    const dmToolsList = document.getElementById('dm-tools-list');
+    const diceRollerOverlay = document.getElementById('dice-roller-overlay');
+    const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
+    const diceDialogueRecord = document.getElementById('dice-dialogue-record');
+    let diceDialogueTimeout;
+    let diceRollHistory = [];
+    let savedRolls = []; // To store saved roll configurations
+    const saveRollNameInput = document.getElementById('save-roll-name-input');
+    const saveRollButton = document.getElementById('save-roll-button');
+    const savedRollsList = document.getElementById('saved-rolls-list');
+
+    // Initiative Tracker Elements
+    const initiativeTrackerOverlay = document.getElementById('initiative-tracker-overlay');
+    const initiativeTrackerCloseButton = document.getElementById('initiative-tracker-close-button');
+    const initiativeTrackerTitle = document.getElementById('initiative-tracker-title');
+    const masterCharacterList = document.getElementById('initiative-master-character-list');
+    const activeInitiativeList = document.getElementById('initiative-active-list');
+    const savedInitiativesList = document.getElementById('saved-initiatives-list');
+    const autoInitiativeButton = document.getElementById('auto-initiative-button');
+    const saveInitiativeNameInput = document.getElementById('save-initiative-name-input');
+    const saveInitiativeButton = document.getElementById('save-initiative-button');
+    const loadInitiativeButton = document.getElementById('load-initiative-button');
+    const startInitiativeButton = document.getElementById('start-initiative-button');
+    const wanderButton = document.getElementById('wander-button');
+    const prevTurnButton = document.getElementById('prev-turn-button');
+    const nextTurnButton = document.getElementById('next-turn-button');
+    const initiativeTimers = document.getElementById('initiative-timers');
+    const realTimeTimer = document.getElementById('real-time-timer');
+    const gameTimeTimer = document.getElementById('game-time-timer');
+    const mapIconSizeSlider = document.getElementById('map-icon-size-slider');
+    const mapIconSizeValue = document.getElementById('map-icon-size-value');
+
+
+    // Notes Tab Elements
+    const createNewNoteButton = document.getElementById('create-new-note-button');
+    const editNotesIcon = document.getElementById('edit-notes-icon');
+    const notesList = document.getElementById('notes-list');
+    const noteTitleInput = document.getElementById('note-title-input');
+    const saveNoteButton = document.getElementById('save-note-button');
+    const markdownEditorTextarea = document.getElementById('markdown-editor');
+    const tabNotes = document.getElementById('tab-notes');
+
+    // Characters Tab Elements
+    const addCharacterButton = document.getElementById('add-character-button');
+    const editCharactersIcon = document.getElementById('edit-characters-icon');
+    const charactersList = document.getElementById('characters-list');
+    const characterNameInput = document.getElementById('character-name-input');
+    const saveCharacterButton = document.getElementById('save-character-button');
+    const clearFieldsButton = document.getElementById('clear-fields-button');
+    const fillFromButton = document.getElementById('fill-from-button');
+    const fillFromDropdown = document.getElementById('fill-from-dropdown');
+    const fillFromPdfOption = document.getElementById('fill-from-pdf-option');
+    const fillFromJsonOption = document.getElementById('fill-from-json-option');
+    const jsonModal = document.getElementById('json-modal');
+    const jsonModalCloseButton = document.getElementById('json-modal-close-button');
+    const jsonInputTextarea = document.getElementById('json-input-textarea');
+    const fillFromJsonButton = document.getElementById('fill-from-json-button');
+    const cancelJsonButton = document.getElementById('cancel-json-button');
+    const pdfUploadInput = document.getElementById('pdf-upload-input');
+    const characterSheetContainer = document.getElementById('character-sheet-container');
+    const characterSheetIframe = document.getElementById('character-sheet-iframe');
+    const tabCharacters = document.getElementById('tab-characters');
+    const characterNotesButton = document.getElementById('character-notes-button');
+    const viewCharacterButton = document.getElementById('view-character-button');
+    const characterNotesEditorContainer = document.getElementById('character-notes-editor-container');
+    const characterMarkdownEditor = document.getElementById('character-markdown-editor');
+    const modeToggleSwitch = document.getElementById('mode-toggle-switch');
+    const viewPdfButton = document.getElementById('view-pdf-button');
+    const deletePdfButton = document.getElementById('delete-pdf-button');
+    const characterSheetContent = document.getElementById('character-sheet-content');
+    const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+    const pdfViewerIframe = document.getElementById('pdf-viewer-iframe');
+
+    // Story Beats Tab Elements
+    const storyBeatsTab = document.getElementById('tab-story-beats');
+    const modifyQuotesButton = document.getElementById('modify-quotes-button');
+    const viewStoryTreeButton = document.getElementById('view-story-tree-button');
+    const storyTreeContainer = document.getElementById('canvas-container');
+    const storyTreeCanvas = document.getElementById('quest-canvas');
+    const storyTreeCardContainer = document.getElementById('card-container');
+    const storyBeatCardOverlay = document.getElementById('story-beat-card-overlay');
+    const storyBeatCardExportButton = document.getElementById('story-beat-card-export-button');
+    const storyBeatCardBody = document.getElementById('story-beat-card-body');
+    const quoteEditorContainer = document.getElementById('quote-editor-container');
+    const jsonEditOverlay = document.getElementById('json-export-overlay'); // Changed name
+    const jsonEditContent = document.getElementById('json-edit-content'); // Changed name
+    const jsonEditCloseButton = document.getElementById('json-export-close-button'); // Changed name
+    const copyJsonButton = document.getElementById('copy-json-button');
+    const saveJsonButton = document.getElementById('save-json-button'); // New button
+    const saveQuotesButton = document.getElementById('save-quotes-button');
+    const quoteJsonEditor = document.getElementById('quote-json-editor');
+
+
+    // Map Tools Elements
+    const mapToolsSection = document.getElementById('map-tools-section');
+    // const mapToolButtons = mapToolsSection ? mapToolsSection.querySelectorAll('.map-tools-buttons button') : []; // Will re-evaluate usage of this
+
+    // Button References for Map Tools
+    const btnLinkChildMap = document.getElementById('btn-link-child-map');
+    // Add other tool buttons here as needed, e.g.:
+    const btnLinkNote = document.getElementById('btn-link-note');
+    const btnLinkCharacter = document.getElementById('btn-link-character');
+    // const btnLinkTrigger = document.getElementById('btn-link-trigger');
+    // const btnRemoveLinks = document.getElementById('btn-remove-links');
+
+
+    // const mapObjectURLs = new Map(); // Old: To store filename -> objectURL mapping for Manage Maps
+    // New structure: fileName -> { url: objectURL, name: fileName, overlays: [], transform: { scale: 1, originX: 0, originY: 0 } }
+    const detailedMapData = new Map();
+    let isEditMode = false;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    // Core state variables
+    let selectedMapFileName = null;
+
+    // Notes State Variables
+    let notesData = []; // Array of note objects: { id: uniqueId, title: "Note 1", content: "# Markdown" }
+    let selectedNoteId = null;
+    let isNotesEditMode = false;
+    let easyMDE = null;
+
+    // Characters State Variables
+    let charactersData = []; // Array of character objects: { id: uniqueId, name: "Character 1", sheetData: "...", notes: "" }
+    let selectedCharacterId = null;
+    let isCharactersEditMode = false;
+    let characterEasyMDE = null;
+
+    // Story Beats State Variables
+    let quests = [
+        {
+            id: 1,
+            name: 'Final Quest',
+            parentIds: [],
+            x: 0,
+            y: 0,
+            description: '',
+            // New Fields
+            questStatus: 'Active', // Unavailable, Available, Active, Completed, Failed, Abandoned
+            questType: ['Main Story'], // Taggable field
+            startingTriggers: [], // List of strings
+            associatedMaps: [], // List of map file names
+            associatedNPCs: [], // List of objects: { id: characterId, role: 'Quest Giver' }
+            failureTriggers: [], // List of strings
+            successTriggers: [], // List of strings
+            detailedRewards: {
+                xp: 0,
+                loot: '',
+                magicItems: '',
+                information: ''
+            },
+            storyDuration: '1 Session',
+            difficulty: 3,
+            storySteps: [],
+            // Old fields that are being replaced or kept for compatibility
+            status: 'active', // Will be deprecated in favor of questStatus
+            prerequisites: [],
+            rewards: [],
+            recommendations: [],
+            completionSteps: []
+        }
+    ];
+    let nextQuestId = 2;
+    let selectedQuestId = 1;
+
+    // Initiative Tracker State Variables
+    let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
+    let activeInitiative = []; // Array of character objects in the current initiative
+    let initiativeTurn = -1; // Index of the current turn in activeInitiative
+    let isWandering = false;
+    let initiativeStartTime = null;
+    let realTimeInterval = null;
+    let gameTime = 0;
+    let initiativeRound = 0;
+    let initiativeTokens = [];
+    let mapIconSize = 5;
+    let isDraggingToken = false;
+    let draggedToken = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let selectedTokenForStatBlock = null;
+
+    // State for 'Link to Child Map' tool
+    let isLinkingChildMap = false;
+    let isLinkingNote = false;
+    let isLinkingCharacter = false;
+    let currentPolygonPoints = [];
+    let polygonDrawingComplete = false; // Will be used in Phase 2
+    let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
+    let selectedNoteForContextMenu = null;
+    let selectedCharacterForContextMenu = null;
+    let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
+    let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
+    let preservedLinkedMapNameForRedraw = null; // Added: To store linked map name during redraw
+
+    // Player View window reference
+    let playerWindow = null;
+
+    let isMovingPolygon = false; // Added: State for "Move Polygon" action
+    let polygonBeingMoved = null; // Added: { overlay: reference, originalPoints: copy, parentMapName: string }
+    let isMovingNote = false;
+    let noteBeingMoved = null;
+    let isMovingCharacter = false;
+    let characterBeingMoved = null;
+    let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
+    let currentDragOffsets = {x: 0, y: 0};
+
+    // Campaign Timer State
+    let campaignTimerInterval = null;
+    let campaignTime = 0; // Total elapsed seconds
+    let isCampaignTimerPaused = true;
+
+    let isTargeting = false;
+    let targetingCharacter = null;
+
+    let currentMapDisplayData = { // To store details of the currently displayed map for coordinate conversion
+        img: null,
+        ratio: 1,
+        offsetX: 0,
+        offsetY: 0,
+        imgWidth: 0,
+        imgHeight: 0
+    };
+
+    // Slideshow state
+    let slideshowPlaylist = [];
+    let slideshowCurrentIndex = 0;
+    let quoteMap = null;
+    const quoteMapPromise = fetch('quote_map.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            quoteMap = data;
+            return data;
+        })
+        .catch(e => {
+            console.error("Failed to load quote_map.json for DM view:", e);
+            return null;
+        });
+
+
+    // Debounce utility function
+    function debounce(func, delay) {
+        let timeoutId;
+        return function(...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                func.apply(this, args);
+            }, delay);
+        };
+    }
+
+    function getQuote(stat, character) {
+        if (!quoteMap) {
+            return "Loading quotes...";
+        }
+
+        const visibility = character.isDetailsVisible ? 'visible' : 'notVisible';
+
+        if (quoteMap.ability_scores[stat.statName]) {
+            const score = parseInt(stat.statValue.score, 10);
+            const tiers = quoteMap.ability_scores[stat.statName];
+            for (const tier of tiers) {
+                if (score >= tier.condition.min && score <= tier.condition.max) {
+                    const quotes = tier[visibility];
+                    let quote = quotes[Math.floor(Math.random() * quotes.length)];
+                    if (visibility === 'visible') {
+                        quote = quote.replace('{{score}}', stat.statValue.score).replace('{{modifier}}', stat.statValue.modifier);
+                    }
+                    return quote;
+                }
+            }
+        } else if (quoteMap.character_details[stat.statName]) {
+            const quotes = quoteMap.character_details[stat.statName][visibility];
+            let quote = quotes[Math.floor(Math.random() * quotes.length)];
+            if (visibility === 'visible') {
+                if (stat.statName === 'class_and_level') {
+                    const level = stat.statValue.match(/\d+/);
+                    const className = stat.statValue.replace(/\d+/,'').trim();
+                    quote = quote.replace('{{level}}', level ? level[0] : '').replace('{{class}}', className);
+                } else if (stat.statName === 'alignment' && stat.statValue && typeof stat.statValue === 'object') {
+                    quote = quote.replace('{{alignment}}', stat.statValue.name || '');
+                } else {
+                    quote = quote.replace('{{race}}', stat.statValue);
+                }
+            }
+            return quote;
+        } else if (quoteMap.roleplaying_details[stat.statName]) {
+            const hasValue = stat.statValue ? 'has_value' : 'no_value';
+            const quotes = quoteMap.roleplaying_details[stat.statName][hasValue][visibility];
+            let quote = quotes[Math.floor(Math.random() * quotes.length)];
+            if (visibility === 'visible' && hasValue === 'has_value') {
+                quote = quote.replace('{{value}}', stat.statValue);
+            }
+            return quote;
+        }
+
+        return "No quote found.";
+    }
+
+    async function generateSlideshowPlaylist() {
+        await quoteMapPromise;
+
+        if (!quoteMap || charactersData.length === 0) {
+            return [];
+        }
+
+        const statKeyMap = {
+            'strength': 'strength_score',
+            'dexterity': 'dexterity_score',
+            'constitution': 'constitution_score',
+            'intelligence': 'intelligence_score',
+            'wisdom': 'wisdom_score',
+            'charisma': 'charisma_score',
+            'hit_points': ['hp_current', 'hp_max']
+        };
+
+        const allStats = [
+            ...Object.keys(quoteMap.ability_scores),
+            ...Object.keys(quoteMap.combat_stats),
+            ...Object.keys(quoteMap.character_details).filter(stat => stat !== 'alignment'),
+            ...Object.keys(quoteMap.roleplaying_details)
+        ];
+
+        let commonStats = allStats.filter(stat => {
+            return charactersData.every(character => {
+                if (!character.sheetData) return false;
+                const key = statKeyMap[stat] || stat;
+                if (Array.isArray(key)) {
+                    return key.every(k => character.sheetData[k] !== undefined && character.sheetData[k] !== '');
+                }
+                return character.sheetData[key] !== undefined && character.sheetData[key] !== '';
+            });
+        });
+
+        if (commonStats.length === 0) {
+            console.warn("No common stats found for all characters to generate a themed slideshow.");
+            return [];
+        }
+
+        const chosenStatName = commonStats[Math.floor(Math.random() * commonStats.length)];
+        console.log(`Generating slideshow playlist with common stat: ${chosenStatName}`);
+
+        const shuffledCharacters = [...charactersData].sort(() => 0.5 - Math.random());
+
+        const playlist = shuffledCharacters.map(character => {
+            let statValue;
+            const key = statKeyMap[chosenStatName] || chosenStatName;
+
+            if (quoteMap.ability_scores[chosenStatName]) {
+                const scoreKey = statKeyMap[chosenStatName]; // e.g., 'strength_score'
+                const modifierKey = scoreKey.replace('_score', '_modifier');
+                statValue = {
+                    score: character.sheetData[scoreKey],
+                    modifier: character.sheetData[modifierKey]
+                };
+            } else if (chosenStatName === 'hit_points') {
+                statValue = {
+                    current: character.sheetData['hp_current'],
+                    maximum: character.sheetData['hp_max']
+                };
+            } else {
+                statValue = character.sheetData[key];
+            }
+
+            const stat = {
+                statName: chosenStatName,
+                statValue: statValue
+            };
+            const quote = getQuote(stat, character);
+
+            return {
+                character: character,
+                quote: quote
+            };
+        });
+
+        return playlist;
+    }
+
+    function filterPlayerContent(content) {
+        if (!content) return "";
+        return content.replace(/\[dm\](.*?)\[\/dm\]/gs, '');
+    }
+
+    // Function to resize the canvas to fit its container
+    function resizeCanvas() {
+        if (dmCanvas && drawingCanvas && mapContainer) {
+            const style = window.getComputedStyle(mapContainer);
+            const paddingLeft = parseFloat(style.paddingLeft) || 0;
+            const paddingRight = parseFloat(style.paddingRight) || 0;
+            const paddingTop = parseFloat(style.paddingTop) || 0;
+            const paddingBottom = parseFloat(style.paddingBottom) || 0;
+
+            const canvasWidth = mapContainer.clientWidth - paddingLeft - paddingRight;
+            const canvasHeight = mapContainer.clientHeight - paddingTop - paddingBottom;
+
+            let mapWasDisplayed = currentMapDisplayData.img && currentMapDisplayData.img.complete;
+            let currentFileNameToRedraw = selectedMapFileName;
+
+            if (mapWasDisplayed) {
+                currentMapDisplayData.img = null;
+            }
+
+            // Apply new dimensions to both canvases
+            dmCanvas.width = canvasWidth;
+            dmCanvas.height = canvasHeight;
+            drawingCanvas.width = canvasWidth;
+            drawingCanvas.height = canvasHeight;
+
+            if (mapWasDisplayed && currentFileNameToRedraw) {
+                displayMapOnCanvas(currentFileNameToRedraw);
+            } else if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            } else {
+                const ctx = dmCanvas.getContext('2d');
+                ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+            }
+        }
+    }
+
+    function displayMapOnCanvas(fileName) {
+        if (!dmCanvas || !drawingCanvas || !mapContainer) {
+            console.error("One or more canvas elements or map container not found!");
+            return;
+        }
+
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+        const mapData = detailedMapData.get(fileName);
+        if (!mapData || !mapData.url) {
+            console.error(`Map data or URL not found for ${fileName}`);
+            return;
+        }
+
+        const ctx = dmCanvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+            if (fileName !== selectedMapFileName) {
+                console.log(`Map draw for ${fileName} cancelled; ${selectedMapFileName} is now selected.`);
+                return;
+            }
+
+            const transform = mapData.transform;
+            if (!transform) {
+                console.error(`Transform data not found for map: ${fileName}`);
+                return;
+            }
+
+            if (!transform.initialized) {
+                const hRatio = dmCanvas.width / img.width;
+                const vRatio = dmCanvas.height / img.height;
+                const ratio = Math.min(hRatio, vRatio);
+                const imgScaledWidth = img.width * ratio;
+                const imgScaledHeight = img.height * ratio;
+                const centerShift_x = (dmCanvas.width - imgScaledWidth) / 2;
+                const centerShift_y = (dmCanvas.height - imgScaledHeight) / 2;
+
+                transform.scale = ratio;
+                transform.originX = centerShift_x;
+                transform.originY = centerShift_y;
+                transform.initialized = true;
+            }
+
+            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+            ctx.save();
+            ctx.translate(transform.originX, transform.originY);
+            ctx.scale(transform.scale, transform.scale);
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            ctx.restore();
+
+            // The ratio is now simply the scale, and offsets are the origin.
+            // These are canvas-level transforms, not image-specific scaling to fit.
+            const hRatio = dmCanvas.width / img.width;
+            const vRatio = dmCanvas.height / img.height;
+            const fitRatio = Math.min(hRatio, vRatio);
+
+            currentMapDisplayData = {
+                img: img,
+                ratio: fitRatio, // Keep the original fit ratio for calculations if needed
+                imgWidth: img.width,
+                imgHeight: img.height,
+                // These are no longer simple values, they depend on the transform
+                scaledWidth: img.width * transform.scale,
+                scaledHeight: img.height * transform.scale,
+                offsetX: transform.originX,
+                offsetY: transform.originY,
+                scale: transform.scale
+            };
+
+
+            // Clamp initiative tokens to be within the new map's boundaries
+            if (initiativeTokens.length > 0) {
+                const imgWidth = currentMapDisplayData.imgWidth;
+                const imgHeight = currentMapDisplayData.imgHeight;
+                initiativeTokens.forEach(token => {
+                    // The token's radius on the image is half its size (which is a percentage of the image width).
+                    const tokenRadius = (token.size / 100 * imgWidth) / 2;
+
+                    // Clamp coordinates to ensure the token is fully on the map.
+                    token.x = Math.max(tokenRadius, Math.min(token.x, imgWidth - tokenRadius));
+                    token.y = Math.max(tokenRadius, Math.min(token.y, imgHeight - tokenRadius));
+                });
+            }
+
+            updateButtonStates();
+
+            if (mapData.overlays) {
+                drawOverlays(mapData.overlays);
+            }
+
+            if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapFileName === fileName) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'edit') {
+                    drawCurrentPolygon();
+                }
+            }
+        };
+        img.onerror = () => {
+            console.error(`Error loading image for ${fileName} from ${mapData.url}`);
+            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+            currentMapDisplayData = { img: null, ratio: 1, offsetX: 0, offsetY: 0, imgWidth: 0, imgHeight: 0, scaledWidth: 0, scaledHeight: 0 };
+            ctx.fillText(`Error loading: ${fileName}`, 10, 50);
+        };
+        img.src = mapData.url;
+    }
+
+    function drawToken(ctx, token) {
+        const { scale, originX, originY } = detailedMapData.get(selectedMapFileName).transform;
+
+        const canvasX = (token.x * scale) + originX;
+        const canvasY = (token.y * scale) + originY;
+
+        const percentage = token.size / 100;
+        const baseDimension = currentMapDisplayData.imgWidth;
+        const pixelSizeOnImage = percentage * baseDimension;
+        const size = pixelSizeOnImage * scale;
+
+        // Highlight for active turn
+        if (initiativeTurn !== -1 && activeInitiative[initiativeTurn] && activeInitiative[initiativeTurn].uniqueId === token.uniqueId) {
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * scale), 0, Math.PI * 2, true);
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'; // Golden glow
+            ctx.fill();
+        }
+
+        // Highlight for targeting
+        if (targetingCharacter && targetingCharacter.targets && targetingCharacter.targets.includes(token.uniqueId)) {
+            ctx.beginPath();
+            ctx.arc(canvasX, canvasY, (size / 2) + (5 * scale), 0, Math.PI * 2, true);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'; // Red glow
+            ctx.fill();
+        }
+
+        // Health Ring
+        const characterInInitiative = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (characterInInitiative && characterInInitiative.sheetData) {
+            const maxHp = parseInt(characterInInitiative.sheetData.hp_max, 10);
+            const currentHp = parseInt(characterInInitiative.sheetData.hp_current, 10);
+
+            if (!isNaN(maxHp) && !isNaN(currentHp) && maxHp > 0) {
+                const healthPercentage = Math.max(0, currentHp / maxHp);
+                const ringRadius = (size / 2) + (8 * scale);
+                const ringWidth = 6 * scale;
+
+                // Red background ring
+                ctx.beginPath();
+                ctx.arc(canvasX, canvasY, ringRadius, 0, Math.PI * 2, false);
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = ringWidth;
+                ctx.stroke();
+
+                // Green foreground ring
+                if (healthPercentage > 0) {
+                    ctx.beginPath();
+                    ctx.arc(canvasX, canvasY, ringRadius, -Math.PI / 2, (-Math.PI / 2) + (healthPercentage * Math.PI * 2), false);
+                    ctx.strokeStyle = 'green';
+                    ctx.lineWidth = ringWidth;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        ctx.save();
+
+        // Draw circle
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fillStyle = '#4a5f7a'; // Default background
+        ctx.fill();
+
+        // Clip to circle
+        ctx.clip();
+
+        // Draw portrait or initials
+        if (token.portrait) {
+            const img = new Image();
+            img.src = token.portrait;
+            if (img.complete) {
+                ctx.drawImage(img, canvasX - size / 2, canvasY - size / 2, size, size);
+            } else {
+                ctx.fillStyle = '#e0e0e0';
+                ctx.font = `${size * 0.4}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(token.initials, canvasX, canvasY);
+                img.onload = () => {
+                    if(selectedMapFileName) displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        } else {
+            ctx.fillStyle = '#e0e0e0';
+            ctx.font = `${size * 0.4}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(token.initials, canvasX, canvasY);
+        }
+
+        ctx.restore();
+
+        // Draw border
+        ctx.beginPath();
+        ctx.arc(canvasX, canvasY, size / 2, 0, Math.PI * 2, true);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        // Draw name and player name
+        ctx.fillStyle = 'white';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 2;
+        ctx.font = `bold ${12 * scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(token.name, canvasX, canvasY + size / 2 + (14 * scale));
+        ctx.font = `${10 * scale}px sans-serif`;
+        ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * scale));
+        ctx.shadowBlur = 0;
+    }
+
+    function updateCompactDiceDisplay() {
+        const buttons = tokenStatBlockDiceButtons.querySelectorAll('.dice-button-compact');
+        buttons.forEach(button => {
+            const die = button.dataset.die;
+            const count = tokenStatBlockDiceCounts[die] || 0;
+            const countSpan = button.querySelector('.dice-count');
+            if (countSpan) {
+                countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    if (storyBeatCardBody) {
+        storyBeatCardBody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('quest-link')) {
+                e.preventDefault();
+                const questId = parseInt(e.target.dataset.questId, 10);
+                const quest = quests.find(q => q.id === questId);
+                if (quest) {
+                    populateAndShowStoryBeatCard(quest);
+                }
+            }
+        });
+    }
+
+    if (tokenStatBlockSetTargets) {
+        tokenStatBlockSetTargets.addEventListener('click', () => {
+            if (!selectedTokenForStatBlock) return;
+
+            isTargeting = !isTargeting;
+
+            if (isTargeting) {
+                targetingCharacter = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+                if (!targetingCharacter.targets) {
+                    targetingCharacter.targets = [];
+                }
+                document.body.classList.add('targeting');
+                tokenStatBlockSetTargets.textContent = 'Finish Targeting';
+                tokenStatBlockSetTargets.classList.add('active');
+                tokenStatBlock.style.display = 'none';
+            } else {
+                document.body.classList.remove('targeting');
+                tokenStatBlockSetTargets.textContent = 'Set Targets';
+                tokenStatBlockSetTargets.classList.remove('active');
+
+                const token = selectedTokenForStatBlock;
+                if (token) {
+                    populateAndShowStatBlock(token, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+                }
+
+                targetingCharacter = null;
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        });
+    }
+
+    function formatDiceString(dice, modifier) {
+        let parts = [];
+        for (const die in dice) {
+            if (dice[die] > 0) {
+                parts.push(`${dice[die]}${die}`);
+            }
+        }
+        let str = parts.join(' + ');
+        if (modifier > 0) {
+            str += ` + ${modifier}`;
+        } else if (modifier < 0) {
+            str += ` - ${Math.abs(modifier)}`;
+        }
+        return str;
+    }
+
+    function populateAndShowStatBlock(token, pageX, pageY) {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (!character) return;
+
+        // Reset compact roller state
+        tokenStatBlockDiceCounts = {};
+        updateCompactDiceDisplay();
+        tokenStatBlockAddRollName.value = '';
+        tokenStatBlockAddRollModifier.value = '0';
+
+
+        tokenStatBlockCharName.textContent = character.name;
+        tokenStatBlockPlayerName.textContent = `(${character.sheetData.player_name || 'N/A'})`;
+        tokenStatBlockHp.value = character.sheetData.hp_current || 0;
+        tokenStatBlockMaxHp.textContent = `/ ${character.sheetData.hp_max || 'N/A'}`;
+
+        // Render saved rolls
+        tokenStatBlockRollsList.innerHTML = '';
+        if (character.savedRolls && character.savedRolls.length > 0) {
+            character.savedRolls.forEach((roll, index) => {
+                const li = document.createElement('li');
+                const diceString = formatDiceString(roll.dice, roll.modifier);
+                li.innerHTML = `
+                    <span class="roll-name">${roll.name} (${diceString})</span>
+                    <div class="roll-actions">
+                        <button class="roll-btn" data-action="roll" data-index="${index}">Roll</button>
+                        <button class="delete-roll-btn" data-action="delete" data-index="${index}">Del</button>
+                    </div>
+                `;
+                tokenStatBlockRollsList.appendChild(li);
+            });
+        }
+
+        // Render target list
+        if (character.targets && character.targets.length > 0) {
+            tokenStatBlockTargetsContainer.style.display = 'block';
+            tokenStatBlockTargetsList.innerHTML = '';
+            character.targets.forEach(targetId => {
+                const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                if (targetCharacter) {
+                    const li = document.createElement('li');
+                    li.textContent = targetCharacter.name;
+                    tokenStatBlockTargetsList.appendChild(li);
+                }
+            });
+        } else {
+            tokenStatBlockTargetsContainer.style.display = 'none';
+        }
+
+        // Position the stat block, ensuring it doesn't go off-screen
+        tokenStatBlock.style.display = 'block';
+        const statBlockRect = tokenStatBlock.getBoundingClientRect();
+        const bodyRect = document.body.getBoundingClientRect();
+
+        let left = pageX;
+        let top = pageY;
+
+        if (pageX + statBlockRect.width > bodyRect.width) {
+            left = pageX - statBlockRect.width;
+        }
+        if (pageY + statBlockRect.height > bodyRect.height) {
+            top = pageY - statBlockRect.height;
+        }
+
+        tokenStatBlock.style.left = `${left}px`;
+        tokenStatBlock.style.top = `${top}px`;
+        sendTokenStatBlockStateToPlayerView(true, token, { left: left, top: top });
+    }
+
+    function drawOverlays(overlays, isPlayerViewContext = false) {
+        if ((!overlays || overlays.length === 0) && initiativeTokens.length === 0) {
+             if (!currentMapDisplayData.img) return;
+        }
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) return;
+        const { scale, originX, originY } = mapData.transform;
+
+        if(overlays){
+            overlays.forEach(overlay => {
+            if (overlay.type === 'childMapLink' && overlay.polygon) {
+                if (isPlayerViewContext && (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible)) {
+                    return;
+                }
+
+                drawingCtx.beginPath();
+                let currentPointsToDraw = overlay.polygon;
+                let strokeStyle = 'rgba(0, 0, 255, 0.7)';
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'view') {
+                    if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
+                        strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                    } else {
+                        strokeStyle = 'rgba(0, 255, 0, 0.7)';
+                    }
+                }
+                if (isMovingPolygon && polygonBeingMoved && overlay === polygonBeingMoved.overlayRef) {
+                    strokeStyle = 'rgba(255, 255, 0, 0.9)';
+                    currentPointsToDraw = polygonBeingMoved.originalPoints.map(p => ({
+                        x: p.x + currentDragOffsets.x,
+                        y: p.y + currentDragOffsets.y
+                    }));
+                }
+
+                drawingCtx.strokeStyle = strokeStyle;
+                drawingCtx.lineWidth = 2;
+
+                currentPointsToDraw.forEach((point, index) => {
+                    const canvasX = (point.x * scale) + originX;
+                    const canvasY = (point.y * scale) + originY;
+                    if (index === 0) {
+                        drawingCtx.moveTo(canvasX, canvasY);
+                    } else {
+                        drawingCtx.lineTo(canvasX, canvasY);
+                    }
+                });
+
+                if (currentPointsToDraw.length > 2) {
+                    const firstPoint = currentPointsToDraw[0];
+                    const lastPoint = currentPointsToDraw[currentPointsToDraw.length - 1];
+                    if (firstPoint.x !== lastPoint.x || firstPoint.y !== lastPoint.y) {
+                        const firstPointCanvasX = (firstPoint.x * scale) + originX;
+                        const firstPointCanvasY = (firstPoint.y * scale) + originY;
+                        drawingCtx.lineTo(firstPointCanvasX, firstPointCanvasY);
+                    }
+                }
+                drawingCtx.stroke();
+            } else if (overlay.type === 'noteLink' && overlay.position) {
+                const iconSize = 20;
+                let position = overlay.position;
+                if (isMovingNote && noteBeingMoved && overlay === noteBeingMoved.overlayRef) {
+                    position = {
+                        x: noteBeingMoved.originalPosition.x + currentDragOffsets.x,
+                        y: noteBeingMoved.originalPosition.y + currentDragOffsets.y
+                    };
+                }
+
+                const canvasX = (position.x * scale) + originX;
+                const canvasY = (position.y * scale) + originY;
+
+                let fillStyle = 'rgba(255, 255, 102, 0.9)';
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'view') {
+                    if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
+                        fillStyle = 'rgba(255, 102, 102, 0.7)';
+                    } else {
+                        fillStyle = 'rgba(102, 255, 102, 0.9)';
+                    }
+                }
+                if (isMovingNote && noteBeingMoved && overlay === noteBeingMoved.overlayRef) {
+                    fillStyle = 'rgba(255, 255, 0, 0.9)';
+                }
+
+                drawingCtx.fillStyle = fillStyle;
+                drawingCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                drawingCtx.strokeStyle = 'black';
+                drawingCtx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                drawingCtx.fillStyle = 'black';
+                drawingCtx.font = `${iconSize * 0.8}px sans-serif`;
+                drawingCtx.textAlign = 'center';
+                drawingCtx.textBaseline = 'middle';
+                drawingCtx.fillText('📝', canvasX, canvasY);
+            } else if (overlay.type === 'characterLink' && overlay.position) {
+                const iconSize = 20;
+                let position = overlay.position;
+                if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
+                    position = {
+                        x: characterBeingMoved.originalPosition.x + currentDragOffsets.x,
+                        y: characterBeingMoved.originalPosition.y + currentDragOffsets.y
+                    };
+                }
+
+                const canvasX = (position.x * scale) + originX;
+                const canvasY = (position.y * scale) + originY;
+
+                let fillStyle = 'rgba(135, 206, 250, 0.9)';
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.mode === 'view') {
+                    if (typeof overlay.playerVisible === 'boolean' && !overlay.playerVisible) {
+                        fillStyle = 'rgba(255, 102, 102, 0.7)';
+                    } else {
+                        fillStyle = 'rgba(102, 255, 102, 0.9)';
+                    }
+                }
+                if (isMovingCharacter && characterBeingMoved && overlay === characterBeingMoved.overlayRef) {
+                    fillStyle = 'rgba(255, 255, 0, 0.9)';
+                }
+
+                drawingCtx.fillStyle = fillStyle;
+                drawingCtx.fillRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+                drawingCtx.strokeStyle = 'black';
+                drawingCtx.strokeRect(canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                drawingCtx.fillStyle = 'black';
+                drawingCtx.font = `${iconSize * 0.8}px sans-serif`;
+                drawingCtx.textAlign = 'center';
+                drawingCtx.textBaseline = 'middle';
+                drawingCtx.fillText('👤', canvasX, canvasY);
+
+                const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                if (character && character.sheetData && character.sheetData.character_portrait) {
+                    const img = new Image();
+                    img.onload = function() {
+                        drawingCtx.save();
+                        drawingCtx.beginPath();
+                        drawingCtx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
+                        drawingCtx.closePath();
+                        drawingCtx.clip();
+
+                        drawingCtx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
+
+                        drawingCtx.restore();
+                    };
+                    img.src = character.sheetData.character_portrait;
+                }
+            }
+            });
+        }
+
+        // Draw initiative tokens
+        if (initiativeTokens.length > 0) {
+            initiativeTokens.forEach(token => {
+                drawToken(drawingCtx, token);
+            });
+        }
+    }
+
+    const characterPreviewClose = document.getElementById('character-preview-close');
+    if (characterPreviewClose) {
+        characterPreviewClose.addEventListener('click', () => {
+            const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+            if (characterPreviewOverlay) {
+                characterPreviewOverlay.style.display = 'none';
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'hideCharacterPreview' }, '*');
+                }
+            }
+        });
+    }
+
+    if (viewCharacterButton) {
+        viewCharacterButton.addEventListener('click', () => {
+            if (characterSheetIframe && characterSheetIframe.contentWindow) {
+                characterSheetIframe.contentWindow.postMessage({ type: 'requestSheetDataForView' }, '*');
+            }
+        });
+    }
+
+    function getRelativeCoords(canvasX, canvasY) {
+        if (!currentMapDisplayData.img || !currentMapDisplayData.img.complete || !selectedMapFileName) {
+            return null;
+        }
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) {
+            return null;
+        }
+        const { scale, originX, originY } = mapData.transform;
+
+        const imageX = (canvasX - originX) / scale;
+        const imageY = (canvasY - originY) / scale;
+
+        // Optional: Check if the coords are within the image bounds
+        if (imageX < 0 || imageX > currentMapDisplayData.imgWidth || imageY < 0 || imageY > currentMapDisplayData.imgHeight) {
+            // return null; // This might be too restrictive for panning/zooming outside bounds
+        }
+
+        return { x: imageX, y: imageY };
+    }
+
+
+    function drawCurrentPolygon() {
+        if (currentPolygonPoints.length === 0 || !currentMapDisplayData.img) return;
+
+        const ctx = drawingCanvas.getContext('2d');
+        // Don't clear here, as other overlays might be drawn already.
+        // The main drawOverlays function will clear the canvas.
+        // Let's assume this is called within a context where the canvas is ready for drawing.
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) return;
+        const { scale, originX, originY } = mapData.transform;
+
+
+        ctx.beginPath();
+        ctx.strokeStyle = 'yellow';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.25)';
+
+        currentPolygonPoints.forEach((point, index) => {
+            const canvasX = (point.x * scale) + originX;
+            const canvasY = (point.y * scale) + originY;
+            if (index === 0) {
+                ctx.moveTo(canvasX, canvasY);
+            } else {
+                ctx.lineTo(canvasX, canvasY);
+            }
+        });
+
+        if (polygonDrawingComplete && currentPolygonPoints.length > 2) {
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        ctx.stroke();
+
+        ctx.fillStyle = 'red';
+        currentPolygonPoints.forEach(point => {
+            const canvasX = (point.x * scale) + originX;
+            const canvasY = (point.y * scale) + originY;
+            ctx.fillRect(canvasX - 3, canvasY - 3, 6, 6);
+        });
+    }
+
+
+    drawingCanvas.addEventListener('click', (event) => {
+        if (!isLinkingChildMap && !isRedrawingPolygon) return;
+
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (!imageCoords) return;
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData || selectedMapData.mode !== 'edit') return;
+
+        if (!polygonDrawingComplete) {
+            const clickThreshold = 10 / currentMapDisplayData.ratio;
+            if (currentPolygonPoints.length > 0) {
+                const firstPoint = currentPolygonPoints[0];
+                const dx = Math.abs(imageCoords.x - firstPoint.x);
+                const dy = Math.abs(imageCoords.y - firstPoint.y);
+
+                if (currentPolygonPoints.length >= 2 && dx < clickThreshold && dy < clickThreshold) {
+                    currentPolygonPoints.push({ x: firstPoint.x, y: firstPoint.y });
+                    polygonDrawingComplete = true;
+                    drawingCanvas.style.pointerEvents = 'none';
+                    dmCanvas.style.cursor = 'auto';
+
+                    if (isLinkingChildMap) {
+                        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from List';
+                        alert('Polygon complete. Select a map from the list to link as its child.');
+                    } else if (isRedrawingPolygon) {
+                        const newOverlay = {
+                            type: 'childMapLink',
+                            polygon: [...currentPolygonPoints],
+                            linkedMapName: preservedLinkedMapNameForRedraw
+                        };
+                        selectedMapData.overlays.push(newOverlay);
+                        alert(`Polygon redrawn successfully, linked to "${preservedLinkedMapNameForRedraw}".`);
+
+                        const drawingCtx = drawingCanvas.getContext('2d');
+                        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+                        displayMapOnCanvas(selectedMapFileName);
+                        resetAllInteractiveStates();
+                    }
+                } else {
+                    currentPolygonPoints.push(imageCoords);
+                }
+            } else {
+                currentPolygonPoints.push(imageCoords);
+            }
+            drawCurrentPolygon();
+        }
+    });
+
+    dmCanvas.addEventListener('click', (event) => {
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (imageCoords && initiativeTokens.length > 0) {
+            let tokenClicked = false;
+            for (const token of initiativeTokens) {
+                if (isPointInToken(imageCoords, token)) {
+                    tokenClicked = true;
+                    if (isTargeting) {
+                        if (targetingCharacter && token.uniqueId === targetingCharacter.uniqueId) {
+                            // Finish targeting by clicking the originating token
+                            isTargeting = false;
+                            document.body.classList.remove('targeting');
+                            tokenStatBlockSetTargets.textContent = 'Set Targets';
+                            tokenStatBlockSetTargets.classList.remove('active');
+                            populateAndShowStatBlock(token, event.pageX, event.pageY);
+                            targetingCharacter = null;
+                        } else {
+                            // Add/remove a target from the list
+                            const targetCharacter = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+                            if (targetCharacter) {
+                                const targetIndex = targetingCharacter.targets.indexOf(targetCharacter.uniqueId);
+                                if (targetIndex > -1) {
+                                    targetingCharacter.targets.splice(targetIndex, 1);
+                                } else {
+                                    targetingCharacter.targets.push(targetCharacter.uniqueId);
+                                }
+                                if (selectedMapFileName) {
+                                    displayMapOnCanvas(selectedMapFileName);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            if (tokenClicked) {
+                return;
+            }
+        }
+
+        if (isMovingPolygon) {
+            if (!moveStartPoint) {
+                console.log("In move mode, click occurred but not on polygon to start drag. No action.");
+                return;
+            }
+            return;
+        }
+
+        if (!imageCoords) {
+            return;
+        }
+
+        if (selectedTokenForStatBlock) {
+            tokenStatBlock.style.display = 'none';
+            selectedTokenForStatBlock = null;
+            sendTokenStatBlockStateToPlayerView(false);
+        }
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+        if (selectedMapData.mode === 'edit' && isLinkingNote) {
+            const newOverlay = {
+                type: 'noteLink',
+                position: imageCoords,
+                linkedNoteId: null,
+                playerVisible: false
+            };
+            selectedMapData.overlays.push(newOverlay);
+            console.log('Note icon placed. Overlay:', newOverlay);
+            resetAllInteractiveStates();
+            return;
+        }
+
+        if (selectedMapData.mode === 'edit' && isLinkingCharacter) {
+            const newOverlay = {
+                type: 'characterLink',
+                position: imageCoords,
+                linkedCharacterId: null,
+                playerVisible: false
+            };
+            selectedMapData.overlays.push(newOverlay);
+            console.log('Character icon placed. Overlay:', newOverlay);
+            resetAllInteractiveStates();
+            return;
+        }
+
+        if (selectedMapData.mode === 'view' && selectedMapData.overlays) {
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    console.log("Clicked on child map link:", overlay);
+                    const childMapName = overlay.linkedMapName;
+                    const childMapData = detailedMapData.get(childMapName);
+                    if (childMapData) {
+                        childMapData.mode = 'view';
+                        selectedMapFileName = childMapName;
+                        clearAllSelections();
+                        const mapItems = mapsList.querySelectorAll('li');
+                        mapItems.forEach(li => {
+                            if (li.dataset.fileName === childMapName) {
+                                li.classList.add('selected-map-item');
+                            }
+                        });
+                        displayMapOnCanvas(childMapName);
+                        updateButtonStates();
+                        sendMapToPlayerView(childMapName);
+                        console.log(`Switched to child map: ${childMapName}`);
+                    } else {
+                        alert(`Map "${childMapName}" not found.`);
+                    }
+                    return;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
+                    if (overlay.linkedNoteId) {
+                        const note = notesData.find(n => n.id === overlay.linkedNoteId);
+                        if (note) {
+                            const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                            const notePreviewBody = document.getElementById('note-preview-body');
+                            if (notePreviewOverlay && notePreviewBody) {
+                                const renderedHTML = easyMDE.options.previewRender(note.content);
+                                notePreviewBody.innerHTML = renderedHTML;
+                                notePreviewOverlay.style.display = 'flex';
+                                if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                    const playerNoteContent = filterPlayerContent(note.content);
+                                    const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
+                                    playerWindow.postMessage({
+                                        type: 'showNotePreview',
+                                        content: playerRenderedHTML
+                                    }, '*');
+                                }
+                            }
+                        }
+                    }
+                    return;
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
+                    if (overlay.linkedCharacterId) {
+                        const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                        if (character) {
+                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
+                            const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                            const characterPreviewBody = document.getElementById('character-preview-body');
+                            if (characterPreviewOverlay && characterPreviewBody) {
+                                characterPreviewBody.innerHTML = markdown;
+                                characterPreviewOverlay.style.display = 'flex';
+                            }
+
+                            if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                const playerMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, true, character.isDetailsVisible);
+                                playerWindow.postMessage({
+                                    type: 'showCharacterPreview',
+                                    content: playerMarkdown
+                                }, '*');
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+    });
+
+    function isPointInPolygon(point, polygon) {
+        if (!polygon || polygon.length < 3) return false;
+        let x = point.x, y = point.y;
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            let xi = polygon[i].x, yi = polygon[i].y;
+            let xj = polygon[j].x, yj = polygon[j].y;
+            let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function isPointInNoteIcon(point, noteOverlay) {
+        const iconSize = 20 / currentMapDisplayData.ratio;
+        const notePos = noteOverlay.position;
+        return point.x >= notePos.x - iconSize / 2 && point.x <= notePos.x + iconSize / 2 &&
+               point.y >= notePos.y - iconSize / 2 && point.y <= notePos.y + iconSize / 2;
+    }
+
+    function isPointInCharacterIcon(point, characterOverlay) {
+        const iconSize = 20 / currentMapDisplayData.ratio;
+        const charPos = characterOverlay.position;
+        return point.x >= charPos.x - iconSize / 2 && point.x <= charPos.x + iconSize / 2 &&
+               point.y >= charPos.y - iconSize / 2 && point.y <= charPos.y + iconSize / 2;
+    }
+
+    function isPointInToken(point, token) {
+        const percentage = token.size / 100;
+        const baseDimension = currentMapDisplayData.imgWidth;
+        const pixelSizeOnImage = percentage * baseDimension;
+        const tokenRadius = pixelSizeOnImage / 2;
+        const dx = point.x - token.x;
+        const dy = point.y - token.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance <= tokenRadius;
+    }
+
+    function handleMouseMoveOnCanvas(event) {
+        if (!currentMapDisplayData.img || !hoverLabel) return;
+
+        const rect = dmCanvas.getBoundingClientRect();
+        const canvasX = Math.round(event.clientX - rect.left);
+        const canvasY = Math.round(event.clientY - rect.top);
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        let overlaysToCheck = selectedMapData ? selectedMapData.overlays : null;
+
+        if (imageCoords && overlaysToCheck && overlaysToCheck.length > 0) {
+            for (let i = overlaysToCheck.length - 1; i >= 0; i--) {
+                const overlay = overlaysToCheck[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    hoverLabel.textContent = overlay.linkedMapName;
+                    hoverLabel.style.left = `${event.pageX + 10}px`;
+                    hoverLabel.style.top = `${event.pageY + 10}px`;
+                    hoverLabel.style.display = 'block';
+                    return;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay) && overlay.linkedNoteId) {
+                    const note = notesData.find(n => n.id === overlay.linkedNoteId);
+                    if (note) {
+                        hoverLabel.textContent = note.title;
+                        hoverLabel.style.left = `${event.pageX + 10}px`;
+                        hoverLabel.style.top = `${event.pageY + 10}px`;
+                        hoverLabel.style.display = 'block';
+                        return;
+                    }
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay) && overlay.linkedCharacterId) {
+                    const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                    if (character) {
+                        hoverLabel.textContent = character.name;
+                        hoverLabel.style.left = `${event.pageX + 10}px`;
+                        hoverLabel.style.top = `${event.pageY + 10}px`;
+                        hoverLabel.style.display = 'block';
+                        return;
+                    }
+                }
+            }
+        }
+
+        hoverLabel.style.display = 'none';
+    }
+
+    function handleDelete(item) {
+        const fileName = item.dataset.fileName;
+        if (confirm(`Are you sure you want to delete "${fileName}"?`)) {
+            const list = item.parentNode;
+            item.remove();
+            displayedFileNames.delete(fileName);
+
+            const mapDataEntry = detailedMapData.get(fileName);
+            if (mapDataEntry && mapDataEntry.url) {
+                URL.revokeObjectURL(mapDataEntry.url);
+                detailedMapData.delete(fileName);
+            }
+
+            if (selectedMapFileName === fileName) {
+                selectedMapFileName = null;
+                if (modeToggleSwitch) modeToggleSwitch.disabled = true;
+                const ctx = dmCanvas.getContext('2d');
+                ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+                updateButtonStates();
+            }
+
+            updateMoveIconVisibility(list);
+        }
+    }
+
+    function moveItemUp(item) {
+        if (item.previousElementSibling) {
+            item.parentNode.insertBefore(item, item.previousElementSibling);
+            updateMoveIconVisibility(item.parentNode);
+        }
+    }
+
+    function moveItemDown(item) {
+        if (item.nextElementSibling) {
+            item.parentNode.insertBefore(item.nextElementSibling, item);
+            updateMoveIconVisibility(item.parentNode);
+        }
+    }
+
+    function updateMoveIconVisibility(list) {
+        const items = list.querySelectorAll('li');
+        items.forEach((item, index) => {
+            const upIcon = item.querySelector('.move-map-up');
+            const downIcon = item.querySelector('.move-map-down');
+
+            if (upIcon) upIcon.style.display = (index === 0) ? 'none' : 'inline-block';
+            if (downIcon) downIcon.style.display = (index === items.length - 1) ? 'none' : 'inline-block';
+        });
+    }
+
+    function resetAllInteractiveStates() {
+        isLinkingChildMap = false;
+        isLinkingNote = false;
+        isLinkingCharacter = false;
+        isRedrawingPolygon = false;
+        isMovingPolygon = false;
+        isMovingNote = false;
+        isMovingCharacter = false;
+
+        preservedLinkedMapNameForRedraw = null;
+        currentPolygonPoints = [];
+        polygonDrawingComplete = false;
+
+        polygonBeingMoved = null;
+        noteBeingMoved = null;
+        characterBeingMoved = null;
+        moveStartPoint = null;
+        currentDragOffsets = {x: 0, y: 0};
+
+        if (btnLinkChildMap) btnLinkChildMap.textContent = 'Link to Child Map';
+        if (btnLinkNote) btnLinkNote.textContent = 'Link Note';
+        if (btnLinkCharacter) btnLinkCharacter.textContent = 'Link Character';
+
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        drawingCanvas.style.pointerEvents = 'none';
+        dmCanvas.style.cursor = 'auto';
+        selectedPolygonForContextMenu = null;
+        selectedNoteForContextMenu = null;
+        selectedCharacterForContextMenu = null;
+
+        if (selectedMapFileName) {
+            displayMapOnCanvas(selectedMapFileName);
+        }
+        updateButtonStates();
+        console.log("All interactive states reset.");
+    }
+
+
+    if (btnLinkChildMap) {
+        btnLinkChildMap.addEventListener('click', () => {
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                alert("Please select a map and ensure it is in 'Edit' mode to add a link to it.");
+                return;
+            }
+
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote) {
+                resetAllInteractiveStates();
+                console.log("Interactive operation cancelled via Link/Cancel button.");
+            } else {
+                resetAllInteractiveStates();
+                isLinkingChildMap = true;
+                btnLinkChildMap.textContent = 'Cancel Drawing Link';
+                drawingCanvas.style.pointerEvents = 'auto';
+                dmCanvas.style.cursor = 'crosshair';
+                alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
+                updateButtonStates();
+            }
+        });
+    }
+
+    if (btnLinkNote) {
+        btnLinkNote.addEventListener('click', () => {
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                alert("Please select a map and ensure it is in 'Edit' mode to add a note to it.");
+                return;
+            }
+
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote || isLinkingCharacter) {
+                resetAllInteractiveStates();
+                console.log("Interactive operation cancelled via Link Note/Cancel button.");
+            } else {
+                resetAllInteractiveStates();
+                isLinkingNote = true;
+                btnLinkNote.textContent = 'Cancel Linking Note';
+                dmCanvas.style.cursor = 'crosshair';
+                alert("Click on the map to place a note icon.");
+                updateButtonStates();
+            }
+        });
+    }
+
+    if (btnLinkCharacter) {
+        btnLinkCharacter.addEventListener('click', () => {
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || selectedMapData.mode !== 'edit') {
+                alert("Please select a map and ensure it is in 'Edit' mode to add a character to it.");
+                return;
+            }
+
+            if (isLinkingChildMap || isRedrawingPolygon || isMovingPolygon || isLinkingNote || isLinkingCharacter) {
+                resetAllInteractiveStates();
+                console.log("Interactive operation cancelled via Link Character/Cancel button.");
+            } else {
+                resetAllInteractiveStates();
+                isLinkingCharacter = true;
+                btnLinkCharacter.textContent = 'Cancel Linking Character';
+                dmCanvas.style.cursor = 'crosshair';
+                alert("Click on the map to place a character icon.");
+                updateButtonStates();
+            }
+        });
+    }
+
+
+
+    dmCanvas.addEventListener('mouseup', (event) => {
+        if (event.button !== 0) return;
+
+        if (isDraggingToken) {
+            isDraggingToken = false;
+            draggedToken = null;
+            sendInitiativeDataToPlayerView();
+        }
+
+        if (isMovingPolygon && polygonBeingMoved && moveStartPoint) {
+            const finalDeltaX = currentDragOffsets.x;
+            const finalDeltaY = currentDragOffsets.y;
+            polygonBeingMoved.overlayRef.polygon = polygonBeingMoved.originalPoints.map(p => ({
+                x: p.x + finalDeltaX,
+                y: p.y + finalDeltaY
+            }));
+            console.log(`Polygon moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
+            alert(`Polygon moved to new position.`);
+            resetAllInteractiveStates();
+        } else if (isMovingNote && noteBeingMoved && moveStartPoint) {
+            const finalDeltaX = currentDragOffsets.x;
+            const finalDeltaY = currentDragOffsets.y;
+            noteBeingMoved.overlayRef.position = {
+                x: noteBeingMoved.originalPosition.x + finalDeltaX,
+                y: noteBeingMoved.originalPosition.y + finalDeltaY
+            };
+            console.log(`Note moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
+            alert(`Note moved to new position.`);
+            resetAllInteractiveStates();
+        } else if (isMovingCharacter && characterBeingMoved && moveStartPoint) {
+            const finalDeltaX = currentDragOffsets.x;
+            const finalDeltaY = currentDragOffsets.y;
+            characterBeingMoved.overlayRef.position = {
+                x: characterBeingMoved.originalPosition.x + finalDeltaX,
+                y: characterBeingMoved.originalPosition.y + finalDeltaY
+            };
+            console.log(`Character moved. Final delta: {x: ${finalDeltaX}, y: ${finalDeltaY}}.`);
+            alert(`Character moved to new position.`);
+            resetAllInteractiveStates();
+        }
+    });
+
+    function enableRename(listItem, textNode) {
+        const currentName = textNode.textContent;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.classList.add('rename-input-active');
+        input.addEventListener('blur', () => finishRename(listItem, textNode, input, currentName));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                input.blur();
+            } else if (e.key === 'Escape') {
+                textNode.textContent = currentName;
+                listItem.replaceChild(textNode, input);
+            }
+        });
+
+        listItem.replaceChild(input, textNode);
+        input.focus();
+        input.select();
+    }
+
+    function finishRename(listItem, textNode, input, originalName) {
+        const newName = input.value.trim();
+        if (newName && newName !== originalName) {
+            if (displayedFileNames.has(newName)) {
+                alert(`A map with the name "${newName}" already exists. Please choose a different name.`);
+                textNode.textContent = originalName;
+                listItem.replaceChild(textNode, input);
+            } else {
+                textNode.textContent = newName;
+                listItem.dataset.fileName = newName;
+                displayedFileNames.delete(originalName);
+                displayedFileNames.add(newName);
+
+                const mapDataEntry = detailedMapData.get(originalName);
+                if (mapDataEntry) {
+                    mapDataEntry.name = newName;
+                    detailedMapData.delete(originalName);
+                    detailedMapData.set(newName, mapDataEntry);
+
+                    let displayedMapLinksUpdated = false;
+
+                    detailedMapData.forEach(dmEntry => {
+                        if (dmEntry.overlays && dmEntry.overlays.length > 0) {
+                            dmEntry.overlays.forEach(overlay => {
+                                if (overlay.type === 'childMapLink' && overlay.linkedMapName === originalName) {
+                                    overlay.linkedMapName = newName;
+                                    console.log(`DM Overlay: Map '${dmEntry.name}' link to '${originalName}' changed to '${newName}'.`);
+                                    if (dmEntry.name === selectedMapFileName && selectedMapFileName !== newName) {
+                                        displayedMapLinksUpdated = true;
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    let selectionUpdated = false;
+                    if (selectedMapFileName === originalName) {
+                        selectedMapFileName = newName;
+                        selectionUpdated = true;
+                    }
+
+                    if (selectionUpdated || displayedMapLinksUpdated) {
+                        if (selectedMapFileName) {
+                            console.log(`Redrawing canvas for: ${selectedMapFileName} (Selection updated: ${selectionUpdated}, Links updated: ${displayedMapLinksUpdated})`);
+                            displayMapOnCanvas(selectedMapFileName);
+                        }
+                    }
+                    updateButtonStates();
+                }
+                listItem.replaceChild(textNode, input);
+            }
+        } else {
+            textNode.textContent = originalName;
+            listItem.replaceChild(textNode, input);
+        }
+    }
+
+
+    if (editMapsIcon) {
+        editMapsIcon.addEventListener('click', () => {
+            isEditMode = !isEditMode;
+            mapsList.classList.toggle('edit-mode-active', isEditMode);
+            const mapItems = mapsList.querySelectorAll('li');
+            mapItems.forEach(item => {
+                item.classList.toggle('clickable-map', !isEditMode);
+                let actionsSpan = item.querySelector('.file-actions');
+                if (!actionsSpan && isEditMode) {
+                    actionsSpan = document.createElement('span');
+                    actionsSpan.classList.add('file-actions');
+                    actionsSpan.style.marginLeft = '10px';
+
+                    const renameIcon = document.createElement('span');
+                    renameIcon.textContent = '✏️';
+                    renameIcon.classList.add('file-action-icon', 'rename-map');
+                    renameIcon.title = 'Rename map';
+                    renameIcon.style.cursor = 'pointer';
+                    renameIcon.style.marginRight = '5px';
+                    renameIcon.onclick = () => {
+                        const textNode = Array.from(item.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+                        if (textNode) enableRename(item, textNode);
+                    };
+
+                    const deleteIcon = document.createElement('span');
+                    deleteIcon.textContent = '🗑️';
+                    deleteIcon.classList.add('file-action-icon', 'delete-map');
+                    deleteIcon.title = 'Delete map';
+                    deleteIcon.style.cursor = 'pointer';
+                    deleteIcon.onclick = () => handleDelete(item);
+
+                    const upIcon = document.createElement('span');
+                    upIcon.textContent = '↑';
+                    upIcon.classList.add('file-action-icon', 'move-map-up');
+                    upIcon.title = 'Move up';
+                    upIcon.style.cursor = 'pointer';
+                    upIcon.style.marginRight = '5px';
+                    upIcon.onclick = () => moveItemUp(item);
+
+                    const downIcon = document.createElement('span');
+                    downIcon.textContent = '↓';
+                    downIcon.classList.add('file-action-icon', 'move-map-down');
+                    downIcon.title = 'Move down';
+                    downIcon.style.cursor = 'pointer';
+                    downIcon.onclick = () => moveItemDown(item);
+
+                    actionsSpan.appendChild(renameIcon);
+                    actionsSpan.appendChild(upIcon);
+                    actionsSpan.appendChild(downIcon);
+                    actionsSpan.appendChild(deleteIcon);
+                    item.appendChild(actionsSpan);
+                }
+                if (actionsSpan) {
+                    actionsSpan.style.display = isEditMode ? 'inline' : 'none';
+                }
+                updateMoveIconVisibility(mapsList);
+                const activeInput = item.querySelector('.rename-input-active');
+                if (!isEditMode && activeInput) {
+                    const originalName = item.dataset.fileName;
+                    const textNode = document.createTextNode(originalName);
+                    item.replaceChild(textNode, activeInput);
+                    if (actionsSpan) item.insertBefore(textNode, actionsSpan);
+                }
+            });
+            editMapsIcon.textContent = isEditMode ? '✅' : '✏️';
+        });
+    }
+
+    if (uploadMapsInput && mapsList) {
+        uploadMapsInput.addEventListener('change', (event) => {
+            const files = event.target.files;
+            if (!files) {
+                return;
+            }
+
+            for (const file of files) {
+                if (!displayedFileNames.has(file.name)) {
+                    const listItem = document.createElement('li');
+
+                    listItem.dataset.fileName = file.name;
+                    listItem.classList.add('map-list-item');
+
+                    const textNode = document.createTextNode(file.name);
+
+                    listItem.appendChild(textNode);
+
+                    mapsList.appendChild(listItem);
+                    displayedFileNames.add(file.name);
+
+                    const objectURL = URL.createObjectURL(file);
+                    detailedMapData.set(file.name, {
+                        url: objectURL,
+                        name: file.name,
+                        overlays: [],
+                        mode: 'edit',
+                        transform: { scale: 1, originX: 0, originY: 0, initialized: false }
+                    });
+
+                    if (!isEditMode) {
+                        listItem.classList.add('clickable-map');
+                    }
+
+                    if (isEditMode) {
+                        const actionsSpan = document.createElement('span');
+                        actionsSpan.classList.add('file-actions');
+                        actionsSpan.style.marginLeft = '10px';
+                        actionsSpan.style.display = 'inline';
+
+                        const renameIcon = document.createElement('span');
+                        renameIcon.textContent = '✏️';
+                        renameIcon.classList.add('file-action-icon', 'rename-map');
+                        renameIcon.title = 'Rename map';
+                        renameIcon.style.cursor = 'pointer';
+                        renameIcon.style.marginRight = '5px';
+                        renameIcon.onclick = () => {
+                            const textNode = Array.from(listItem.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+                            if (textNode) enableRename(listItem, textNode);
+                        };
+
+                        const deleteIcon = document.createElement('span');
+                        deleteIcon.textContent = '🗑️';
+                        deleteIcon.classList.add('file-action-icon', 'delete-map');
+                        deleteIcon.title = 'Delete map';
+                        deleteIcon.style.cursor = 'pointer';
+                        deleteIcon.onclick = () => handleDelete(listItem);
+
+                        const upIcon = document.createElement('span');
+                        upIcon.textContent = '↑';
+                        upIcon.classList.add('file-action-icon', 'move-map-up');
+                        upIcon.title = 'Move up';
+                        upIcon.style.cursor = 'pointer';
+                        upIcon.style.marginRight = '5px';
+                        upIcon.onclick = () => moveItemUp(listItem);
+
+                        const downIcon = document.createElement('span');
+                        downIcon.textContent = '↓';
+                        downIcon.classList.add('file-action-icon', 'move-map-down');
+                        downIcon.title = 'Move down';
+                        downIcon.style.cursor = 'pointer';
+                        downIcon.onclick = () => moveItemDown(listItem);
+
+                        actionsSpan.appendChild(renameIcon);
+                        actionsSpan.appendChild(upIcon);
+                        actionsSpan.appendChild(downIcon);
+                        actionsSpan.appendChild(deleteIcon);
+                        listItem.appendChild(actionsSpan);
+                        updateMoveIconVisibility(mapsList);
+                    }
+                }
+            }
+            event.target.value = null;
+            updateMoveIconVisibility(mapsList);
+        });
+    } else {
+        console.error('Could not find the upload input or the list element. Check IDs.');
+    }
+
+    mapsList.addEventListener('click', (event) => {
+        if (isEditMode) {
+            return;
+        }
+
+        let targetItem = event.target;
+        while (targetItem && targetItem.tagName !== 'LI' && targetItem !== mapsList) {
+            targetItem = targetItem.parentNode;
+        }
+
+        if (targetItem && targetItem.tagName === 'LI' && targetItem.classList.contains('map-list-item')) {
+            const clickedFileName = targetItem.dataset.fileName;
+            if (clickedFileName) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+
+                if (isChangingChildMapForPolygon && selectedPolygonForContextMenu && selectedMapData && selectedMapData.mode === 'edit') {
+                    const { overlay, index, parentMapName } = selectedPolygonForContextMenu;
+                    if (parentMapName === clickedFileName) {
+                        alert("Cannot link a map to itself as a child. Please select a different map.");
+                        return;
+                    }
+                    const parentMapData = detailedMapData.get(parentMapName);
+                    if (parentMapData && parentMapData.overlays[index] === overlay) {
+                        const oldLinkedMapName = overlay.linkedMapName;
+                        parentMapData.overlays[index].linkedMapName = clickedFileName;
+                        alert(`Child map for the selected polygon on "${parentMapName}" changed from "${oldLinkedMapName}" to "${clickedFileName}".`);
+                        if (selectedMapFileName === parentMapName) {
+                            displayMapOnCanvas(parentMapName);
+                        }
+                    } else {
+                        alert("An error occurred while trying to change the child map. Please try again.");
+                    }
+                    isChangingChildMapForPolygon = false;
+                    selectedPolygonForContextMenu = null;
+                } else if (isLinkingChildMap && polygonDrawingComplete && selectedMapData && selectedMapData.mode === 'edit') {
+                    if (selectedMapFileName === clickedFileName) {
+                        alert("Cannot link a map to itself. Please select a different map to be the child.");
+                        return;
+                    }
+
+                    const parentMapData = detailedMapData.get(selectedMapFileName);
+                    if (parentMapData) {
+                        const newOverlay = {
+                            type: 'childMapLink',
+                            polygon: [...currentPolygonPoints],
+                            linkedMapName: clickedFileName,
+                            playerVisible: false
+                        };
+                        parentMapData.overlays.push(newOverlay);
+                        alert(`Map "${clickedFileName}" successfully linked as a new child to "${parentMapData.name}".`);
+
+                        const drawingCtx = drawingCanvas.getContext('2d');
+                        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+                        resetAllInteractiveStates();
+                        displayMapOnCanvas(selectedMapFileName);
+                    } else {
+                        alert("Error: Could not find data for the parent map. Linking failed.");
+                        resetAllInteractiveStates();
+                    }
+                } else {
+                    if (selectedMapFileName === clickedFileName) {
+                        // Re-clicked the same map, so reset the view
+                        const mapData = detailedMapData.get(clickedFileName);
+                        if (mapData && mapData.transform) {
+                            mapData.transform.initialized = false;
+                            displayMapOnCanvas(clickedFileName);
+                            if (mapData.mode === 'view') {
+                                sendMapToPlayerView(clickedFileName);
+                            }
+                        }
+                        return;
+                    }
+
+                    if (selectedMapFileName !== null && selectedMapFileName !== clickedFileName) {
+                        resetAllInteractiveStates();
+                    }
+                    selectedMapFileName = clickedFileName;
+
+                    clearAllSelections();
+                    targetItem.classList.add('selected-map-item');
+
+                    displayMapOnCanvas(clickedFileName);
+                    updateButtonStates();
+
+                    const newSelectedMapData = detailedMapData.get(clickedFileName);
+                    if (newSelectedMapData) {
+                        modeToggleSwitch.checked = newSelectedMapData.mode === 'view';
+                        modeToggleSwitch.disabled = false;
+                        if (newSelectedMapData.mode === 'view') {
+                            sendMapToPlayerView(clickedFileName);
+                        }
+                    } else {
+                        modeToggleSwitch.disabled = true;
+                    }
+                }
+            }
+        }
+    });
+
+    if (modeToggleSwitch) {
+        modeToggleSwitch.addEventListener('change', () => {
+            if (!selectedMapFileName) return;
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (selectedMapData) {
+                selectedMapData.mode = modeToggleSwitch.checked ? 'view' : 'edit';
+                console.log(`Map '${selectedMapFileName}' mode changed to ${selectedMapData.mode}`);
+                displayMapOnCanvas(selectedMapFileName);
+                updateButtonStates();
+                if (selectedMapData.mode === 'view') {
+                    sendMapToPlayerView(selectedMapFileName);
+                } else {
+                    triggerSlideshow();
+                }
+            }
+        });
+    }
+
+    function clearAllSelections() {
+        const allMapItems = document.querySelectorAll('#maps-list li');
+        allMapItems.forEach(item => item.classList.remove('selected-map-item'));
+    }
+
+    if (dmCanvas && mapContainer) {
+        window.addEventListener('resize', debounce(resizeCanvas, 250));
+
+        mapContainer.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+
+            const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+            if (!imageCoords) return;
+
+            // Priority 1: Check for token drag
+            for (let i = initiativeTokens.length - 1; i >= 0; i--) {
+                const token = initiativeTokens[i];
+                if (isPointInToken(imageCoords, token)) {
+                    isDraggingToken = true;
+                    draggedToken = token;
+                    dragStartX = imageCoords.x;
+                    dragStartY = imageCoords.y;
+                    e.preventDefault();
+                    return; // Token found, stop further processing
+                }
+            }
+
+            // Priority 2: Check for overlay move (polygons, notes, etc.)
+            if (isMovingPolygon && polygonBeingMoved) {
+                if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
+                    x: p.x + currentDragOffsets.x,
+                    y: p.y + currentDragOffsets.y
+                })))) {
+                    moveStartPoint = imageCoords;
+                    moveStartPoint.x -= currentDragOffsets.x;
+                    moveStartPoint.y -= currentDragOffsets.y;
+                    e.preventDefault();
+                    return;
+                }
+            } else if (isMovingNote && noteBeingMoved) {
+                if (isPointInNoteIcon(imageCoords, noteBeingMoved.overlayRef)) {
+                    moveStartPoint = imageCoords;
+                    moveStartPoint.x -= currentDragOffsets.x;
+                    moveStartPoint.y -= currentDragOffsets.y;
+                    e.preventDefault();
+                    return;
+                }
+            } else if (isMovingCharacter && characterBeingMoved) {
+                if (isPointInCharacterIcon(imageCoords, characterBeingMoved.overlayRef)) {
+                    moveStartPoint = imageCoords;
+                    moveStartPoint.x -= currentDragOffsets.x;
+                    moveStartPoint.y -= currentDragOffsets.y;
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // If nothing else was clicked, start panning the map
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (!mapData) return;
+
+            isPanning = true;
+            panStartX = e.clientX - mapData.transform.originX;
+            panStartY = e.clientY - mapData.transform.originY;
+            mapContainer.style.cursor = 'grabbing';
+        });
+
+        mapContainer.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            isPanning = false;
+            mapContainer.style.cursor = 'grab';
+        });
+
+        mapContainer.addEventListener('mouseleave', () => {
+            isPanning = false;
+            mapContainer.style.cursor = 'grab';
+        });
+
+        mapContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (!mapData) return;
+
+            const transform = mapData.transform;
+            const zoomAmount = -e.deltaY * 0.001;
+            const newScale = Math.min(Math.max(0.1, transform.scale + zoomAmount), 10.0);
+
+            const rect = mapContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            transform.originX = mouseX - (mouseX - transform.originX) * (newScale / transform.scale);
+            transform.originY = mouseY - (mouseY - transform.originY) * (newScale / transform.scale);
+            transform.scale = newScale;
+
+            displayMapOnCanvas(selectedMapFileName);
+            sendMapTransformToPlayerView(transform);
+        });
+
+        mapContainer.addEventListener('mousemove', (e) => {
+            const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+
+            if (isDraggingToken && draggedToken) {
+                if (imageCoords) {
+                    const dx = imageCoords.x - dragStartX;
+                    const dy = imageCoords.y - dragStartY;
+                    draggedToken.x += dx;
+                    draggedToken.y += dy;
+                    dragStartX = imageCoords.x;
+                    dragStartY = imageCoords.y;
+                    const mapData = detailedMapData.get(selectedMapFileName);
+                    if (mapData) {
+                        drawOverlays(mapData.overlays);
+                    }
+                }
+            } else if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
+                if (imageCoords) {
+                    currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
+                    currentDragOffsets.y = imageCoords.y - moveStartPoint.y;
+                    // This more direct redraw approach seems to work better for smoother dragging.
+                    const mapData = detailedMapData.get(selectedMapFileName);
+                    if (mapData) {
+                        drawOverlays(mapData.overlays);
+                    }
+                }
+            } else if (isPanning) {
+                const mapData = detailedMapData.get(selectedMapFileName);
+                if (!mapData) return;
+                mapData.transform.originX = e.clientX - panStartX;
+                mapData.transform.originY = e.clientY - panStartY;
+                displayMapOnCanvas(selectedMapFileName);
+                sendMapTransformToPlayerView(mapData.transform);
+            } else {
+                handleMouseMoveOnCanvas(e);
+            }
+        });
+        dmCanvas.addEventListener('mouseout', () => {
+            if (hoverLabel) {
+                hoverLabel.style.display = 'none';
+            }
+        });
+    } else {
+        console.error("Could not find DM canvas or map container for initial sizing.");
+    }
+
+    function updateButtonStates() {
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        const isEditMode = selectedMapData && selectedMapData.mode === 'edit';
+        const inLinkingProcess = isLinkingChildMap || polygonDrawingComplete;
+
+        if (btnLinkChildMap) {
+            if (isLinkingChildMap && !polygonDrawingComplete) {
+                btnLinkChildMap.textContent = 'Cancel Drawing Link';
+                btnLinkChildMap.disabled = false;
+            } else if (isLinkingChildMap && polygonDrawingComplete) {
+                btnLinkChildMap.textContent = 'Cancel Link - Select Child';
+                btnLinkChildMap.disabled = false;
+            } else {
+                btnLinkChildMap.textContent = 'Link to Child Map';
+                btnLinkChildMap.disabled = !isEditMode || inLinkingProcess;
+            }
+        }
+
+        const btnLinkNote = document.getElementById('btn-link-note');
+        if (btnLinkNote) btnLinkNote.disabled = !isEditMode || inLinkingProcess;
+        const btnLinkCharacter = document.getElementById('btn-link-character');
+        if (btnLinkCharacter) btnLinkCharacter.disabled = !isEditMode || inLinkingProcess;
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    updateButtonStates();
+
+    renderNotesList();
+    renderCharactersList();
+
+    const saveCampaignButton = document.getElementById('save-campaign-button');
+    const loadCampaignInput = document.getElementById('load-campaign-input');
+
+
+    async function saveCampaign() {
+        if (!isCampaignTimerPaused) {
+            toggleCampaignTimer(); // Pause the timer
+            alert("Campaign timer has been automatically paused for the save operation.");
+        }
+
+        confirmSaveButton.textContent = 'Saving...';
+        confirmSaveButton.disabled = true;
+
+        try {
+            const zip = new JSZip();
+            const campaignData = {};
+
+            // 1. Handle Maps & Map Links
+            if (saveMapsCheckbox.checked) {
+                const imagesFolder = zip.folder("images");
+                const imagePromises = [];
+                for (const [name, data] of detailedMapData.entries()) {
+                    if (data.url) {
+                        const promise = fetch(data.url)
+                            .then(response => response.blob())
+                            .then(blob => {
+                                imagesFolder.file(name, blob);
+                            })
+                            .catch(err => console.error(`Failed to fetch and zip map ${name}:`, err));
+                        imagePromises.push(promise);
+                    }
+                }
+                await Promise.all(imagePromises);
+
+                const serializableDetailedMapData = {};
+                for (const [name, data] of detailedMapData) {
+                    serializableDetailedMapData[name] = {
+                        name: data.name,
+                        overlays: data.overlays,
+                        mode: data.mode,
+                        transform: data.transform
+                    };
+                }
+                campaignData.mapDefinitions = serializableDetailedMapData;
+            }
+
+            // 2. Handle Characters
+            if (saveCharactersCheckbox.checked) {
+                const charactersFolder = zip.folder("characters");
+                if (activeInitiative.length > 0) {
+                    activeInitiative.forEach(activeChar => {
+                        const mainChar = charactersData.find(c => c.id === activeChar.id);
+                        if (mainChar) {
+                            if (!mainChar.sheetData) mainChar.sheetData = {};
+                            mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
+                            mainChar.savedRolls = activeChar.savedRolls;
+                        }
+                    });
+                }
+
+                const charactersToSave = JSON.parse(JSON.stringify(charactersData));
+                charactersToSave.forEach(character => {
+                    const originalCharacter = charactersData.find(c => c.id === character.id);
+                    if (originalCharacter && originalCharacter.pdfData && originalCharacter.pdfFileName) {
+                        charactersFolder.file(originalCharacter.pdfFileName, originalCharacter.pdfData);
+                        delete character.pdfData;
+                    }
+                });
+                campaignData.characters = charactersToSave;
+                campaignData.selectedCharacterId = selectedCharacterId;
+            }
+
+            // 3. Handle Notes
+            if (saveNotesCheckbox.checked) {
+                campaignData.notes = notesData;
+                campaignData.selectedNoteId = selectedNoteId;
+            }
+
+            // 4. Handle Initiative
+            if (saveInitiativeCheckbox.checked) {
+                campaignData.savedInitiatives = savedInitiatives;
+                campaignData.initiativeTokens = initiativeTokens;
+                campaignData.mapIconSize = mapIconSize;
+                campaignData.activeInitiative = activeInitiative;
+                campaignData.initiativeTurn = initiativeTurn;
+                campaignData.initiativeRound = initiativeRound;
+                campaignData.gameTime = gameTime;
+                campaignData.initiativeStartTime = initiativeStartTime ? Date.now() - initiativeStartTime : null;
+                campaignData.isWandering = isWandering;
+            }
+
+            // 5. Handle Rolls & History
+            if (saveRollsCheckbox.checked) {
+                campaignData.diceRollHistory = diceRollHistory;
+                campaignData.savedRolls = savedRolls;
+            }
+
+            // 6. Handle Campaign Timer
+            if (saveTimerCheckbox.checked) {
+                campaignData.campaignTime = campaignTime;
+            }
+
+            // 7. Handle Audio Recordings
+            if (saveAudioCheckbox.checked && audioBlobs.length > 0) {
+                const audioFolder = zip.folder("audio");
+                audioBlobs.forEach(audio => {
+                    audioFolder.file(audio.name, audio.blob);
+                });
+            }
+
+            // 8. Handle Story Beats
+            if (saveStoryBeatsCheckbox.checked) {
+                campaignData.storyTree = {
+                    quests: quests,
+                    nextQuestId: nextQuestId,
+                    selectedQuestId: selectedQuestId
+                };
+            }
+
+            // 9. Handle Custom Quotes
+            if (saveQuotesCheckbox.checked && quoteMap) {
+                campaignData.quoteMap = quoteMap;
+            }
+
+            const campaignJSON = JSON.stringify(campaignData, null, 2);
+            zip.file("campaign.json", campaignJSON);
+
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            const date = new Date();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const year = String(date.getFullYear()).slice(-2);
+            a.download = `DnDemicube_campaign_${month}-${day}-${year}.zip`;
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log("Campaign saved successfully to zip.");
+            alert("Campaign saved successfully!");
+
+        } catch (error) {
+            console.error("Error saving campaign to zip:", error);
+            alert("An error occurred while saving the campaign. Please check the console for details.");
+        } finally {
+            confirmSaveButton.textContent = 'Save';
+            confirmSaveButton.disabled = false;
+        }
+    }
+
+    function restoreInitiativeState(campaignData) {
+        isWandering = campaignData.isWandering || false;
+        if (isWandering) {
+            wanderButton.textContent = 'Stop Wandering';
+        }
+
+        activeInitiative = campaignData.activeInitiative || [];
+        initiativeTurn = campaignData.initiativeTurn ?? -1;
+        initiativeRound = campaignData.initiativeRound || 0;
+        gameTime = campaignData.gameTime || 0;
+
+        if (initiativeTurn > -1 && campaignData.initiativeStartTime) {
+            initiativeStartTime = Date.now() - campaignData.initiativeStartTime;
+            realTimeInterval = setInterval(updateRealTimeTimer, 1000);
+            initiativeTimers.style.display = 'flex';
+            updateGameTimeTimer();
+            startInitiativeButton.textContent = 'Stop Initiative';
+            nextTurnButton.style.display = 'inline-block';
+            prevTurnButton.style.display = 'inline-block';
+        }
+    }
+
+    function isDeepEqual(obj1, obj2) {
+        if (obj1 === obj2) return true;
+        if (obj1 === null || obj1 === undefined || obj2 === null || obj2 === undefined) {
+            return obj1 === obj2;
+        }
+        if (obj1.constructor !== obj2.constructor) return false;
+
+        if (Array.isArray(obj1)) {
+            if (obj1.length !== obj2.length) return false;
+            for (let i = 0; i < obj1.length; i++) {
+                if (!isDeepEqual(obj1[i], obj2[i])) return false;
+            }
+            return true;
+        }
+
+        if (obj1 instanceof Object) {
+            const keys1 = Object.keys(obj1);
+            const keys2 = Object.keys(obj2);
+            if (keys1.length !== keys2.length) return false;
+            for (const key of keys1) {
+                if (!keys2.includes(key) || !isDeepEqual(obj1[key], obj2[key])) return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+
+    async function loadCampaign(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const loadButtonLabel = document.querySelector('label[for="load-campaign-input"]');
+        loadButtonLabel.textContent = 'Loading...';
+        loadCampaignInput.disabled = true;
+
+        try {
+            if (file.name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(file);
+                const campaignFile = zip.file("campaign.json");
+                if (!campaignFile) throw new Error("campaign.json not found in the zip file.");
+
+                const campaignJSON = await campaignFile.async("string");
+                const campaignData = JSON.parse(campaignJSON);
+
+                await showLoadOptionsModal(zip, campaignData);
+            } else if (file.name.endsWith('.json')) {
+                await loadFromJson(file);
+                alert("Legacy JSON campaign loaded successfully.");
+                renderAllLists();
+                if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
+                if (selectedNoteId) loadNoteIntoEditor(selectedNoteId);
+            } else {
+                throw new Error("Unsupported file type. Please select a .zip or .json file.");
+            }
+        } catch (error) {
+            console.error("Error preparing campaign load:", error);
+            alert(`Failed to prepare campaign for loading: ${error.message}`);
+        } finally {
+            loadButtonLabel.textContent = 'Load Campaign';
+            loadCampaignInput.disabled = false;
+            loadCampaignInput.value = null;
+        }
+    }
+
+    async function showLoadOptionsModal(zip, campaignData) {
+        loadOptionsContainer.innerHTML = ''; // Clear previous options
+        const availableData = {};
+
+        const dataTypeMapping = {
+            mapDefinitions: "Maps & Map Links",
+            characters: "Characters",
+            notes: "Notes",
+            savedInitiatives: "Initiative",
+            diceRollHistory: "Dice Rolls & History",
+            campaignTime: "Campaign Timer",
+            audio: "Audio Recordings",
+            storyTree: "Story Beats",
+            quoteMap: "Character Quotes"
+        };
+
+        for (const key in dataTypeMapping) {
+            let dataExists = false;
+            if (key === 'audio') {
+                const audioFolder = zip.folder("audio");
+                dataExists = audioFolder && audioFolder.filter((_, file) => !file.dir).length > 0;
+            } else {
+                dataExists = campaignData.hasOwnProperty(key) && campaignData[key] !== null && (!Array.isArray(campaignData[key]) || campaignData[key].length > 0);
+            }
+
+            if (dataExists) {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `load-${key}-checkbox`;
+                checkbox.name = key;
+                checkbox.value = key;
+                checkbox.checked = true;
+
+                const label = document.createElement('label');
+                label.htmlFor = `load-${key}-checkbox`;
+                label.textContent = ` ${dataTypeMapping[key]}`;
+
+                const div = document.createElement('div');
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                loadOptionsContainer.appendChild(div);
+                availableData[key] = true;
+            }
+        }
+
+        if (Object.keys(availableData).length === 0) {
+            alert("The selected campaign file appears to be empty.");
+            return;
+        }
+
+        loadCampaignModal.style.display = 'block';
+
+        const handleConfirm = async () => {
+            const selectedOptions = {};
+            loadOptionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                selectedOptions[checkbox.name] = checkbox.checked;
+            });
+
+            await mergeCampaignData(zip, campaignData, selectedOptions);
+            loadCampaignModal.style.display = 'none';
+            confirmLoadButton.removeEventListener('click', handleConfirm);
+            cancelLoadButton.removeEventListener('click', handleCancel);
+        };
+
+        const handleCancel = () => {
+            loadCampaignModal.style.display = 'none';
+            confirmLoadButton.removeEventListener('click', handleConfirm);
+            cancelLoadButton.removeEventListener('click', handleCancel);
+        };
+
+        confirmLoadButton.addEventListener('click', handleConfirm);
+        cancelLoadButton.addEventListener('click', handleCancel);
+        loadCampaignModalCloseButton.addEventListener('click', handleCancel);
+    }
+
+
+    async function mergeCampaignData(zip, campaignData, selectedOptions) {
+        try {
+            // Merge Characters
+            if (selectedOptions.characters && campaignData.characters) {
+                const characterPromises = [];
+                const charactersFolder = zip.folder("characters");
+
+                for (const incomingChar of campaignData.characters) {
+                    const existingChar = charactersData.find(c => c.id === incomingChar.id);
+                    if (!existingChar) {
+                        if (incomingChar.pdfFileName && charactersFolder) {
+                            const pdfFile = charactersFolder.file(incomingChar.pdfFileName);
+                            if (pdfFile) {
+                                const promise = pdfFile.async("uint8array").then(pdfData => {
+                                    incomingChar.pdfData = pdfData;
+                                });
+                                characterPromises.push(promise);
+                            }
+                        }
+                        charactersData.push(incomingChar);
+                    } else {
+                        console.log(`Skipping character "${incomingChar.name}" (ID: ${incomingChar.id}) as it already exists.`);
+                    }
+                }
+                await Promise.all(characterPromises);
+            }
+
+            // Merge Notes
+            if (selectedOptions.notes && campaignData.notes) {
+                for (const incomingNote of campaignData.notes) {
+                    const existingNote = notesData.find(n => n.id === incomingNote.id);
+                    if (!existingNote) {
+                        notesData.push(incomingNote);
+                    } else {
+                         console.log(`Skipping note "${incomingNote.title}" (ID: ${incomingNote.id}) as it already exists.`);
+                    }
+                }
+            }
+
+            // Merge Maps
+            if (selectedOptions.mapDefinitions && campaignData.mapDefinitions) {
+                const imagePromises = [];
+                const imagesFolder = zip.folder("images");
+
+                for (const mapName in campaignData.mapDefinitions) {
+                    if (!detailedMapData.has(mapName)) {
+                        const definition = campaignData.mapDefinitions[mapName];
+                        const imageFile = imagesFolder ? imagesFolder.file(mapName) : null;
+                        if (imageFile) {
+                            const promise = imageFile.async("blob").then(blob => {
+                                const url = URL.createObjectURL(blob);
+                                detailedMapData.set(mapName, {
+                                    name: definition.name,
+                                    url: url,
+                                    overlays: definition.overlays || [],
+                                    mode: definition.mode || 'edit',
+                                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false }
+                                });
+                                displayedFileNames.add(mapName);
+                            });
+                            imagePromises.push(promise);
+                        }
+                    } else {
+                        console.log(`Skipping map "${mapName}" as it already exists.`);
+                    }
+                }
+                await Promise.all(imagePromises);
+            }
+
+            // Merge Initiative
+            if (selectedOptions.savedInitiatives && campaignData.savedInitiatives) {
+                // Overwrite existing initiatives with the same name
+                Object.assign(savedInitiatives, campaignData.savedInitiatives);
+            }
+
+            // For active initiative, it's better to replace than merge if loaded.
+            if (selectedOptions.savedInitiatives && campaignData.activeInitiative) {
+                activeInitiative = campaignData.activeInitiative || [];
+                initiativeTurn = campaignData.initiativeTurn ?? -1;
+                initiativeRound = campaignData.initiativeRound || 0;
+                gameTime = campaignData.gameTime || 0;
+                initiativeStartTime = campaignData.initiativeStartTime ? Date.now() - campaignData.initiativeStartTime : null;
+                isWandering = campaignData.isWandering || false;
+                initiativeTokens = campaignData.initiativeTokens || [];
+                mapIconSize = campaignData.mapIconSize || 5;
+                if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+                if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
+            }
+
+
+            // Merge Rolls & History
+            if (selectedOptions.diceRollHistory && campaignData.diceRollHistory) {
+                const existingHistory = new Set(diceRollHistory.map(h => JSON.stringify(h)));
+                const newHistory = campaignData.diceRollHistory.filter(h => !existingHistory.has(JSON.stringify(h)));
+                diceRollHistory.push(...newHistory);
+            }
+            if (selectedOptions.diceRollHistory && campaignData.savedRolls) {
+                 const existingRolls = new Set(savedRolls.map(r => r.name));
+                 const newRolls = campaignData.savedRolls.filter(r => !existingRolls.has(r.name));
+                 savedRolls.push(...newRolls);
+            }
+
+            // Merge Campaign Timer
+            if (selectedOptions.campaignTime && typeof campaignData.campaignTime === 'number') {
+                campaignTime = campaignData.campaignTime;
+                isCampaignTimerPaused = true;
+                clearInterval(campaignTimerInterval);
+                campaignTimerToggle.textContent = 'Resume Campaign';
+                updateCampaignTimerDisplay();
+            }
+
+
+            // Merge Audio
+            if (selectedOptions.audio && zip.folder("audio")) {
+                const audioFolder = zip.folder("audio");
+                const audioPromises = [];
+                audioFolder.forEach((relativePath, file) => {
+                    if (!file.dir) {
+                        const promise = file.async("blob").then(blob => {
+                            if (!audioBlobs.some(ab => ab.name === relativePath)) {
+                                audioBlobs.push({ name: relativePath, blob: blob });
+                            }
+                        });
+                        audioPromises.push(promise);
+                    }
+                });
+                await Promise.all(audioPromises);
+            }
+
+            // Merge Story Beats
+            if (selectedOptions.storyTree && campaignData.storyTree) {
+                if (campaignData.storyTree.quests) { // New format
+                    quests = campaignData.storyTree.quests;
+                    nextQuestId = campaignData.storyTree.nextQuestId;
+                    selectedQuestId = campaignData.storyTree.selectedQuestId;
+
+                    // Backward compatibility for quests missing new fields
+                    quests.forEach(quest => {
+                        if (quest.parentId !== undefined) {
+                            quest.parentIds = quest.parentId !== null ? [quest.parentId] : [];
+                            delete quest.parentId;
+                        }
+                        if (quest.description === undefined) {
+                            quest.description = '';
+                        }
+                        if (quest.status === undefined) {
+                            quest.status = 'active';
+                        }
+                        if (quest.prerequisites === undefined) {
+                            quest.prerequisites = [];
+                        }
+                        if (quest.rewards === undefined) {
+                            quest.rewards = [];
+                        }
+                        if (quest.recommendations === undefined) {
+                            quest.recommendations = [];
+                        }
+                        if (quest.completionSteps === undefined) {
+                            quest.completionSteps = [];
+                        }
+                        // New fields for backward compatibility
+                        if (quest.questStatus === undefined) {
+                            quest.questStatus = quest.status || 'Active';
+                        }
+                        if (quest.questType === undefined) {
+                            quest.questType = [];
+                        }
+                        if (quest.startingTriggers === undefined) {
+                            quest.startingTriggers = [];
+                        }
+                        if (quest.associatedMaps === undefined) {
+                            quest.associatedMaps = [];
+                        }
+                        if (quest.associatedNPCs === undefined) {
+                            quest.associatedNPCs = [];
+                        }
+                        if (quest.failureTriggers === undefined) {
+                            quest.failureTriggers = [];
+                        }
+                        if (quest.successTriggers === undefined) {
+                            quest.successTriggers = [];
+                        }
+                        if (quest.detailedRewards === undefined) {
+                            quest.detailedRewards = { xp: 0, loot: '', magicItems: '', information: '' };
+                        }
+                        if (quest.storyDuration === undefined) {
+                            quest.storyDuration = '';
+                        }
+                        if (quest.difficulty === undefined) {
+                            quest.difficulty = 0;
+                        }
+                        if (quest.storySteps === undefined) {
+                            quest.storySteps = [];
+                        }
+                    });
+                } else if (Object.keys(campaignData.storyTree).length > 0) { // Old fabric.js format
+                    // Attempt to convert old data or notify user
+                    console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
+                    alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
+                    // Reset to default state
+                    quests = [{
+                        id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
+                        questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
+                        associatedNPCs: [], failureTriggers: [], successTriggers: [],
+                        detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                        storyDuration: '1 Session', difficulty: 3, storySteps: [],
+                        status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
+                    }];
+                    nextQuestId = 2;
+                    selectedQuestId = 1;
+                }
+            }
+
+            // Merge Custom Quotes
+            if (selectedOptions.quoteMap && campaignData.quoteMap) {
+                quoteMap = campaignData.quoteMap;
+                console.log("Custom character quotes loaded from campaign file.");
+            }
+
+            // Final UI updates
+            renderAllLists();
+            renderSavedInitiativesList();
+            renderSavedRolls();
+            updateButtonStates();
+
+            if (selectedCharacterId) loadCharacterIntoEditor(selectedCharacterId);
+            if (selectedNoteId) loadNoteIntoEditor(selectedNoteId);
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            } else {
+                const ctx = dmCanvas.getContext('2d');
+                ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+            }
+
+            alert("Campaign data merged successfully!");
+
+        } catch (error) {
+            console.error("Error merging campaign data:", error);
+            alert(`An error occurred while merging campaign data: ${error.message}`);
+        }
+    }
+
+    function renderAllLists() {
+        renderMapsList();
+        renderNotesList();
+        renderCharactersList();
+    }
+
+    async function loadFromJson(file) {
+        const campaignJSON = await file.text();
+        const campaignData = JSON.parse(campaignJSON);
+
+        notesData = campaignData.notes || [];
+        charactersData = campaignData.characters || [];
+        charactersData.forEach(character => {
+            if (typeof character.isDetailsVisible === 'undefined') {
+                character.isDetailsVisible = true;
+            }
+        });
+        selectedNoteId = campaignData.selectedNoteId || null;
+        selectedCharacterId = campaignData.selectedCharacterId || null;
+        savedRolls = campaignData.savedRolls || [];
+        savedInitiatives = campaignData.savedInitiatives || {};
+        initiativeTokens = campaignData.initiativeTokens || [];
+        restoreInitiativeState(campaignData);
+
+        if (campaignData.storyTree) {
+            // Attempt to convert old data or notify user
+            console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
+            alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
+            // Reset to default state
+            quests = [{
+                id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
+                questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
+                associatedNPCs: [], failureTriggers: [], successTriggers: [],
+                detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
+            }];
+            nextQuestId = 2;
+            selectedQuestId = 1;
+        }
+
+        let loadedMapIconSize = campaignData.mapIconSize || 40;
+        if (loadedMapIconSize > 20) { // Likely old pixel value
+            mapIconSize = 5; // Default to 5%
+        } else {
+            mapIconSize = loadedMapIconSize;
+        }
+
+        if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+        if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
+
+        diceDialogueRecord.innerHTML = ''; // Clear the log first
+        if (diceRollHistory && diceRollHistory.length > 0) {
+            diceRollHistory.forEach(historyItem => {
+                let rollData;
+                if (typeof historyItem === 'string') {
+                    const parts = historyItem.split(': ');
+                    rollData = {
+                        type: 'roll',
+                        sum: parts[0],
+                        roll: parts.length > 1 ? parts.slice(1).join(': ') : '',
+                        characterName: 'Dice Roller',
+                        playerName: 'DM',
+                        id: Date.now() + Math.random(),
+                        timestamp: '... old entry ...'
+                    };
+                } else {
+                    rollData = historyItem;
+                }
+                const messageElement = createLogCard(rollData);
+                diceDialogueRecord.prepend(messageElement);
+            });
+        } else if (campaignData.combatLog) { // Fallback for very old saves
+            diceDialogueRecord.innerHTML = campaignData.combatLog;
+        }
+
+        if (campaignData.mapDefinitions) {
+            for (const mapName in campaignData.mapDefinitions) {
+                const definition = campaignData.mapDefinitions[mapName];
+                detailedMapData.set(mapName, {
+                    name: definition.name,
+                    url: null,
+                    overlays: definition.overlays || [],
+                    mode: definition.mode || 'edit',
+                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false }
+                });
+                displayedFileNames.add(mapName);
+            }
+        }
+        if (campaignData.activeMaps) {
+            campaignData.activeMaps.forEach(activeMap => {
+                const mapData = detailedMapData.get(activeMap.fileName);
+                if (mapData) {
+                    mapData.mode = 'view';
+                }
+            });
+        }
+        alert("Legacy campaign loaded. Please re-upload map and character files manually.");
+    }
+
+    function renderMapsList() {
+        mapsList.innerHTML = '';
+        for (const mapName of displayedFileNames) {
+            const mapData = detailedMapData.get(mapName);
+            if (!mapData) continue;
+
+            const listItem = document.createElement('li');
+            listItem.dataset.fileName = mapName;
+            listItem.classList.add('map-list-item');
+
+            const textNode = document.createTextNode(mapName);
+
+            listItem.appendChild(textNode);
+            mapsList.appendChild(listItem);
+        }
+        if (isEditMode) {
+            editMapsIcon.click();
+            editMapsIcon.click();
+        }
+    }
+
+    if (saveCampaignButton) {
+        saveCampaignButton.addEventListener('click', () => {
+            updateSaveOptionsDependencies();
+            saveCampaignModal.style.display = 'block';
+        });
+    }
+
+    if (saveCampaignModalCloseButton) {
+        saveCampaignModalCloseButton.addEventListener('click', () => {
+            saveCampaignModal.style.display = 'none';
+        });
+    }
+
+    if (cancelSaveButton) {
+        cancelSaveButton.addEventListener('click', () => {
+            saveCampaignModal.style.display = 'none';
+        });
+    }
+
+    if (confirmSaveButton) {
+        confirmSaveButton.addEventListener('click', () => {
+            saveCampaign();
+            saveCampaignModal.style.display = 'none';
+        });
+    }
+
+    if (saveOptionsContainer) {
+        saveOptionsContainer.addEventListener('change', updateSaveOptionsDependencies);
+    }
+
+    function updateSaveOptionsDependencies() {
+        let warnings = [];
+        let mapsNeedNotes = false;
+        let mapsNeedCharacters = false;
+        let initiativeNeedsCharacters = false;
+
+        // Reset disabled states to re-evaluate
+        saveNotesCheckbox.disabled = false;
+        saveCharactersCheckbox.disabled = false;
+
+        // Check for dependencies if Maps is selected
+        if (saveMapsCheckbox.checked) {
+            for (const mapData of detailedMapData.values()) {
+                if (mapData.overlays) {
+                    for (const overlay of mapData.overlays) {
+                        if (overlay.type === 'noteLink' && overlay.linkedNoteId) {
+                            mapsNeedNotes = true;
+                        }
+                        if (overlay.type === 'characterLink' && overlay.linkedCharacterId) {
+                            mapsNeedCharacters = true;
+                        }
+                        if(mapsNeedNotes && mapsNeedCharacters) break;
+                    }
+                }
+                if(mapsNeedNotes && mapsNeedCharacters) break;
+            }
+        }
+
+        // Check for dependencies if Initiative is selected
+        if (saveInitiativeCheckbox.checked) {
+            if (activeInitiative.length > 0 || Object.keys(savedInitiatives).length > 0 || initiativeTokens.length > 0) {
+                initiativeNeedsCharacters = true;
+            }
+        }
+
+        // Enforce dependencies
+        if (mapsNeedNotes) {
+            if (!saveNotesCheckbox.checked) {
+                warnings.push("Notes must be saved because one or more maps have note links.");
+            }
+            saveNotesCheckbox.checked = true;
+            saveNotesCheckbox.disabled = true;
+        }
+
+        if (mapsNeedCharacters) {
+            if (!saveCharactersCheckbox.checked) {
+                warnings.push("Characters must be saved because one or more maps have character links.");
+            }
+            saveCharactersCheckbox.checked = true;
+            saveCharactersCheckbox.disabled = true;
+        }
+
+        if (initiativeNeedsCharacters) {
+            if (!saveCharactersCheckbox.checked) {
+                warnings.push("Characters must be saved because you have initiative data.");
+            }
+            saveCharactersCheckbox.checked = true;
+            saveCharactersCheckbox.disabled = true;
+        }
+
+        // Display warnings
+        saveConflictWarnings.innerHTML = warnings.join('<br>');
+    }
+
+    if (loadCampaignInput) {
+        loadCampaignInput.addEventListener('change', loadCampaign);
+    }
+
+    function sendMapToPlayerView(mapFileName) {
+        if (playerWindow && !playerWindow.closed && mapFileName) {
+            const mapData = detailedMapData.get(mapFileName);
+
+            if (mapData && mapData.url && mapData.mode === 'view') {
+                fetch(mapData.url)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const base64dataUrl = reader.result;
+                            const visibleOverlays = mapData.overlays
+                                .filter(overlay => (typeof overlay.playerVisible === 'boolean' ? overlay.playerVisible : true))
+                                .map(overlay => {
+                                    if (overlay.type === 'characterLink' && overlay.linkedCharacterId) {
+                                        const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                                        if (character && character.sheetData && character.sheetData.character_portrait) {
+                                            return {
+                                                ...overlay,
+                                                character_portrait: character.sheetData.character_portrait
+                                            };
+                                        }
+                                    }
+                                    return overlay;
+                                });
+
+                            const transform = mapData.transform;
+                            const viewRectangle = {
+                                x: (0 - transform.originX) / transform.scale,
+                                y: (0 - transform.originY) / transform.scale,
+                                width: dmCanvas.width / transform.scale,
+                                height: dmCanvas.height / transform.scale
+                            };
+                            playerWindow.postMessage({
+                                type: 'loadMap',
+                                mapDataUrl: base64dataUrl,
+                                overlays: JSON.parse(JSON.stringify(visibleOverlays)),
+                                viewRectangle: viewRectangle
+                            }, '*');
+                            console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
+                        };
+                        reader.onerror = () => {
+                            console.error(`Error converting map "${mapFileName}" to data URL for player view.`);
+                        };
+                        reader.readAsDataURL(blob);
+                    })
+                    .catch(error => {
+                        console.error(`Error fetching blob for map "${mapFileName}" to send to player view:`, error);
+                    });
+            } else {
+                console.warn(`Could not send map to player view: Map data, URL for "${mapFileName}", or mode is not 'view'.`);
+            }
+        }
+    }
+
+    function sendPolygonVisibilityUpdateToPlayerView(mapFileName, polygonIdentifier, isVisible) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({
+                type: 'polygonVisibilityUpdate',
+                mapFileName: mapFileName,
+                polygonIdentifier: polygonIdentifier,
+                isVisible: isVisible
+            }, '*');
+            console.log(`Sent polygon visibility update to player view: Map: ${mapFileName}, Visible: ${isVisible}`);
+        }
+    }
+
+    function sendMapTransformToPlayerView(transform) {
+        if (playerWindow && !playerWindow.closed) {
+            const viewRectangle = {
+                x: (0 - transform.originX) / transform.scale,
+                y: (0 - transform.originY) / transform.scale,
+                width: dmCanvas.width / transform.scale,
+                height: dmCanvas.height / transform.scale
+            };
+            playerWindow.postMessage({
+                type: 'mapTransformUpdate',
+                viewRectangle: viewRectangle
+            }, '*');
+        }
+    }
+
+
+    async function triggerSlideshow() {
+        if (playerWindow && !playerWindow.closed) {
+            if (slideshowPlaylist.length === 0 || slideshowCurrentIndex >= slideshowPlaylist.length) {
+                console.log("Generating new slideshow playlist...");
+                slideshowPlaylist = await generateSlideshowPlaylist();
+                slideshowCurrentIndex = 0;
+            }
+
+            if (slideshowPlaylist.length > 0) {
+                playerWindow.postMessage({
+                    type: 'startSlideshow',
+                    playlist: slideshowPlaylist,
+                    startIndex: slideshowCurrentIndex
+                }, '*');
+                console.log(`Sent startSlideshow message to player view with playlist of ${slideshowPlaylist.length} items, starting at index ${slideshowCurrentIndex}.`);
+            } else {
+                console.warn("Could not generate a slideshow playlist. No common stats or no characters.");
+            }
+        }
+    }
+
+    function sendDiceIconMenuStateToPlayerView(isOpen) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'diceIconMenuState', isOpen: isOpen }, '*');
+        }
+    }
+
+    function sendInitiativeTrackerStateToPlayerView(isOpen) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'initiativeTrackerState', isOpen: isOpen }, '*');
+        }
+    }
+
+    function sendActionLogStateToPlayerView(isOpen, content) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'actionLogState', isOpen: isOpen, content: content }, '*');
+        }
+    }
+
+    function sendToastToPlayerView(rollData) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'toast', rollData: rollData }, '*');
+        }
+    }
+
+    function sendInitiativeDataToPlayerView() {
+        if (playerWindow && !playerWindow.closed) {
+            // Cloning the character objects to avoid issues with circular references if any
+            const clonedActiveInitiative = JSON.parse(JSON.stringify(activeInitiative));
+            const clonedInitiativeTokens = JSON.parse(JSON.stringify(initiativeTokens));
+
+            playerWindow.postMessage({
+                type: 'initiativeDataUpdate',
+                activeInitiative: clonedActiveInitiative,
+                initiativeTurn: initiativeTurn,
+                initiativeRound: initiativeRound,
+                gameTime: gameTime,
+                initiativeTokens: clonedInitiativeTokens
+            }, '*');
+        }
+    }
+
+    function sendTokenStatBlockStateToPlayerView(show, token, position) {
+        if (playerWindow && !playerWindow.closed) {
+            const character = token ? activeInitiative.find(c => c.uniqueId === token.uniqueId) : null;
+            const clonedCharacter = character ? JSON.parse(JSON.stringify(character)) : null;
+            playerWindow.postMessage({ type: 'tokenStatBlockState', show: show, character: clonedCharacter, position: position }, '*');
+        }
+    }
+
+    if (openPlayerViewButton) {
+        openPlayerViewButton.addEventListener('click', () => {
+            const playerViewUrl = 'player_view.html';
+            if (playerWindow === null || playerWindow.closed) {
+                playerWindow = window.open(playerViewUrl, 'PlayerViewDnDemicube', 'width=800,height=600,resizable=yes,scrollbars=yes');
+                if (playerWindow) {
+                    setTimeout(() => {
+                        if (selectedMapFileName) {
+                            sendMapToPlayerView(selectedMapFileName);
+                        }
+                    }, 500);
+                }
+            } else {
+                playerWindow.focus();
+                if (selectedMapFileName) {
+                     sendMapToPlayerView(selectedMapFileName);
+                }
+            }
+        });
+    }
+
+    if (tokenStatBlockHp) {
+        tokenStatBlockHp.addEventListener('change', (event) => {
+            if (!selectedTokenForStatBlock) return;
+
+            const newHp = parseInt(event.target.value, 10);
+            if (isNaN(newHp)) return;
+
+            const characterInInitiative = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (characterInInitiative) {
+                characterInInitiative.sheetData.hp_current = newHp;
+
+                const mainCharacter = charactersData.find(c => c.id === characterInInitiative.id);
+                if (mainCharacter) {
+                    if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                    mainCharacter.sheetData.hp_current = newHp;
+                }
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+                sendInitiativeDataToPlayerView();
+            }
+        });
+    }
+
+    if (tokenStatBlockDiceButtons) {
+        tokenStatBlockDiceButtons.addEventListener('click', (event) => {
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die) {
+                tokenStatBlockDiceCounts[die] = (tokenStatBlockDiceCounts[die] || 0) + 1;
+                updateCompactDiceDisplay();
+            }
+        });
+
+        tokenStatBlockDiceButtons.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die && tokenStatBlockDiceCounts[die] > 0) {
+                tokenStatBlockDiceCounts[die]--;
+                updateCompactDiceDisplay();
+            }
+        });
+    }
+
+    if (tokenStatBlockSaveRollBtn) {
+        tokenStatBlockSaveRollBtn.addEventListener('click', () => {
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character) return;
+
+            const rollName = tokenStatBlockAddRollName.value.trim();
+            if (!rollName) {
+                alert('Please enter a name for the roll.');
+                return;
+            }
+
+            const tags = [tokenStatBlockAddRollTags.value];
+
+            const hasDice = Object.values(tokenStatBlockDiceCounts).some(count => count > 0);
+            if (!hasDice) {
+                alert('Please select at least one die to save.');
+                return;
+            }
+
+            const modifier = parseInt(tokenStatBlockAddRollModifier.value, 10) || 0;
+
+            if (!character.savedRolls) {
+                character.savedRolls = [];
+            }
+
+            character.savedRolls.push({
+                name: rollName,
+                dice: { ...tokenStatBlockDiceCounts },
+                modifier: modifier,
+                tags: tags
+            });
+
+            populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+        });
+    }
+
+    if (tokenStatBlockRollsList) {
+        tokenStatBlockRollsList.addEventListener('click', (event) => {
+            const button = event.target;
+            const action = button.dataset.action;
+            const index = parseInt(button.dataset.index, 10);
+
+            if (!action || isNaN(index)) return;
+
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character || !character.savedRolls || !character.savedRolls[index]) return;
+
+            if (action === 'delete') {
+                character.savedRolls.splice(index, 1);
+                populateAndShowStatBlock(selectedTokenForStatBlock, parseInt(tokenStatBlock.style.left), parseInt(tokenStatBlock.style.top));
+            } else if (action === 'roll') {
+                const savedRoll = character.savedRolls[index];
+                let allRolls = [];
+                let totalSum = 0;
+                const rollsByDie = {};
+                const modifier = savedRoll.modifier || 0;
+
+                for (const die in savedRoll.dice) {
+                    const count = savedRoll.dice[die];
+                    if (count === 0) continue;
+
+                    const sides = parseInt(die.substring(1), 10);
+                    if (isNaN(sides)) continue;
+
+                    if (!rollsByDie[die]) rollsByDie[die] = [];
+                    for (let i = 0; i < count; i++) {
+                        const roll = Math.floor(Math.random() * sides) + 1;
+                        allRolls.push(roll);
+                        totalSum += roll;
+                        rollsByDie[die].push(roll);
+                    }
+                }
+
+                totalSum += modifier;
+
+                const detailsParts = [];
+                for (const dieName in rollsByDie) {
+                    detailsParts.push(`${rollsByDie[dieName].length}${dieName}[${rollsByDie[dieName].join(',')}]`);
+                }
+                let detailsMessage = `${savedRoll.name}: ${detailsParts.join(', ')}`;
+                if (modifier !== 0) {
+                    detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+                }
+
+                if (savedRoll.tags && savedRoll.tags.includes('Hit')) {
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a 'Hit' roll but has no targets.`
+                        });
+                        return; // Stop here if no targets
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const targetAC = parseInt(targetCharacter.sheetData.ac, 10) || 10;
+                            let hitResult = 'miss';
+                            if (totalSum >= targetAC) {
+                                hitResult = 'hit';
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `${character.name} attacks ${targetCharacter.name}! Roll: ${totalSum} vs AC: ${targetAC}. It's a ${hitResult.toUpperCase()}!`
+                            });
+                        }
+                    });
+                } else if (savedRoll.tags && savedRoll.tags.includes('Damage')) {
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a 'Damage' roll but has no targets.`
+                        });
+                        return; // Stop here if no targets
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const currentHp = parseInt(targetCharacter.sheetData.hp_current, 10) || 0;
+                            const newHp = currentHp - totalSum;
+                            targetCharacter.sheetData.hp_current = newHp;
+
+                            const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
+                            if (mainCharacter) {
+                                if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                                mainCharacter.sheetData.hp_current = newHp;
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `${character.name} deals ${totalSum} damage to ${targetCharacter.name}! Their HP is now ${newHp}.`
+                            });
+
+                            if (selectedMapFileName) {
+                                displayMapOnCanvas(selectedMapFileName);
+                            }
+                            sendInitiativeDataToPlayerView();
+                        }
+                    });
+                } else if (savedRoll.tags && savedRoll.tags.includes('Healing')) {
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a 'Healing' roll but has no targets.`
+                        });
+                        return;
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const currentHp = parseInt(targetCharacter.sheetData.hp_current, 10) || 0;
+                            const newHp = currentHp + totalSum;
+                            targetCharacter.sheetData.hp_current = newHp;
+
+                            const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
+                            if (mainCharacter) {
+                                if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                                mainCharacter.sheetData.hp_current = newHp;
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `${character.name} heals ${targetCharacter.name} for ${totalSum}! Their HP is now ${newHp}.`
+                            });
+
+                            if (selectedMapFileName) {
+                                displayMapOnCanvas(selectedMapFileName);
+                            }
+                            sendInitiativeDataToPlayerView();
+                        }
+                    });
+                } else if (savedRoll.tags && (savedRoll.tags.includes('Strength') || savedRoll.tags.includes('Dexterity') || savedRoll.tags.includes('Constitution') || savedRoll.tags.includes('Intelligence') || savedRoll.tags.includes('Wisdom') || savedRoll.tags.includes('Charisma'))) {
+                    const skillName = savedRoll.tags.find(t => ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'].includes(t));
+                    if (!character.targets || character.targets.length === 0) {
+                        addLogEntry({
+                            type: 'system',
+                            message: `${character.name} made a '${skillName}' roll but has no targets.`
+                        });
+                        return;
+                    }
+
+                    character.targets.forEach(targetId => {
+                        const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                        if (targetCharacter) {
+                            const attackerTotal = totalSum;
+
+                            const targetAttr = skillName.toLowerCase();
+                            const targetModifier = calculateModifier(parseInt(targetCharacter.sheetData[`${targetAttr}_score`], 10) || 10);
+                            const defenderRoll = Math.floor(Math.random() * 20) + 1;
+                            const defenderTotal = defenderRoll + parseInt(targetModifier);
+
+                            let resultMessage;
+                            if (attackerTotal > defenderTotal) {
+                                resultMessage = `${character.name} wins the contested ${skillName} check against ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                            } else if (defenderTotal > attackerTotal) {
+                                resultMessage = `${targetCharacter.name} wins the contested ${skillName} check against ${character.name}! (${defenderTotal} to ${attackerTotal})`;
+                            } else {
+                                resultMessage = `It's a tie for the contested ${skillName} check between ${character.name} and ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                            }
+
+                            addLogEntry({
+                                type: 'system',
+                                message: resultMessage
+                            });
+                        }
+                    });
+                } else {
+                    addLogEntry({
+                        characterName: character.name,
+                        playerName: character.sheetData.player_name || 'DM',
+                        roll: detailsMessage,
+                        sum: totalSum,
+                        characterPortrait: character.sheetData.character_portrait,
+                        characterInitials: getInitials(character.name)
+                    });
+                    sendDiceRollToPlayerView(allRolls, totalSum);
+                }
+            }
+        });
+    }
+
+    mapContainer.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+
+        if (isMovingPolygon) {
+            resetAllInteractiveStates();
+            alert("Polygon move cancelled.");
+            console.log("Polygon move cancelled via right-click.");
+            return;
+        }
+
+        polygonContextMenu.style.display = 'none';
+        noteContextMenu.style.display = 'none';
+        characterContextMenu.style.display = 'none';
+        mapToolsContextMenu.style.display = 'none';
+        selectedPolygonForContextMenu = null;
+        selectedNoteForContextMenu = null;
+
+        if (!selectedMapFileName) {
+            return;
+        }
+
+        const canvasX = event.offsetX;
+        const canvasY = event.offsetY;
+        const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (!imageCoords) return;
+
+        if (initiativeTokens.length > 0) {
+            for (const token of initiativeTokens) {
+                if (isPointInToken(imageCoords, token)) {
+                    if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
+                        tokenStatBlock.style.display = 'none';
+                        selectedTokenForStatBlock = null;
+                        sendTokenStatBlockStateToPlayerView(false);
+                    } else {
+                        selectedTokenForStatBlock = token;
+                        populateAndShowStatBlock(token, event.pageX, event.pageY);
+                    }
+                    return; // Token was clicked, don't show other context menus
+                }
+            }
+        }
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+
+        let overlayClicked = false;
+        if (selectedMapData.overlays) {
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    selectedPolygonForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: selectedMapData.name,
+                        source: selectedMapData.mode
+                    };
+                    const toggleVisibilityItem = polygonContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const changeChildMapItem = polygonContextMenu.querySelector('[data-action="change-child-map"]');
+                    const redrawPolygonItem = polygonContextMenu.querySelector('[data-action="redraw-polygon"]');
+                    const movePolygonItem = polygonContextMenu.querySelector('[data-action="move-polygon"]');
+                    const deleteLinkItem = polygonContextMenu.querySelector('[data-action="delete-link"]');
+                    if (selectedMapData.mode === 'view') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (changeChildMapItem) changeChildMapItem.style.display = 'none';
+                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'none';
+                        if (movePolygonItem) movePolygonItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // edit mode
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (changeChildMapItem) changeChildMapItem.style.display = 'list-item';
+                        if (redrawPolygonItem) redrawPolygonItem.style.display = 'list-item';
+                        if (movePolygonItem) movePolygonItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
+                    polygonContextMenu.style.left = `${event.pageX}px`;
+                    polygonContextMenu.style.top = `${event.pageY}px`;
+                    polygonContextMenu.style.display = 'block';
+                    console.log('Right-clicked on polygon:', selectedPolygonForContextMenu);
+                    overlayClicked = true;
+                    break;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
+                    selectedNoteForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: selectedMapData.name,
+                        source: selectedMapData.mode
+                    };
+                    const toggleVisibilityItem = noteContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const linkToNewNoteItem = noteContextMenu.querySelector('[data-action="link-to-new-note"]');
+                    const moveNoteItem = noteContextMenu.querySelector('[data-action="move-note"]');
+                    const deleteLinkItem = noteContextMenu.querySelector('[data-action="delete-link"]');
+                    if (selectedMapData.mode === 'view') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'none';
+                        if (moveNoteItem) moveNoteItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // edit mode
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (linkToNewNoteItem) linkToNewNoteItem.style.display = 'list-item';
+                        if (moveNoteItem) moveNoteItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
+                    noteContextMenu.style.left = `${event.pageX}px`;
+                    noteContextMenu.style.top = `${event.pageY}px`;
+                    noteContextMenu.style.display = 'block';
+                    console.log('Right-clicked on note icon:', selectedNoteForContextMenu);
+                    overlayClicked = true;
+                    break;
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
+                    selectedCharacterForContextMenu = {
+                        overlay: overlay,
+                        index: i,
+                        parentMapName: selectedMapData.name,
+                        source: selectedMapData.mode
+                    };
+                    const toggleVisibilityItem = characterContextMenu.querySelector('[data-action="toggle-player-visibility"]');
+                    const linkToCharacterItem = characterContextMenu.querySelector('[data-action="link-to-character"]');
+                    const moveCharacterItem = characterContextMenu.querySelector('[data-action="move-character"]');
+                    const deleteLinkItem = characterContextMenu.querySelector('[data-action="delete-link"]');
+                    if (selectedMapData.mode === 'view') {
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'list-item';
+                        if (linkToCharacterItem) linkToCharacterItem.style.display = 'none';
+                        if (moveCharacterItem) moveCharacterItem.style.display = 'none';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'none';
+                    } else { // edit mode
+                        if (toggleVisibilityItem) toggleVisibilityItem.style.display = 'none';
+                        if (linkToCharacterItem) linkToCharacterItem.style.display = 'list-item';
+                        if (moveCharacterItem) moveCharacterItem.style.display = 'list-item';
+                        if (deleteLinkItem) deleteLinkItem.style.display = 'list-item';
+                    }
+                    characterContextMenu.style.left = `${event.pageX}px`;
+                    characterContextMenu.style.top = `${event.pageY}px`;
+                    characterContextMenu.style.display = 'block';
+                    console.log('Right-clicked on character icon:', selectedCharacterForContextMenu);
+                    overlayClicked = true;
+                    break;
+                }
+            }
+        }
+
+        if (!overlayClicked && selectedMapData.mode === 'edit') {
+            mapToolsContextMenu.style.left = `${event.pageX}px`;
+            mapToolsContextMenu.style.top = `${event.pageY}px`;
+            mapToolsContextMenu.style.display = 'block';
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (dmFloatingFooter && dmFloatingFooter.classList.contains('visible')) {
+            if (!diceRollerIcon.contains(event.target) && !dmFloatingFooter.contains(event.target)) {
+                dmFloatingFooter.classList.remove('visible');
+            }
+        }
+        if (polygonContextMenu.style.display === 'block') {
+            if (!polygonContextMenu.contains(event.target)) {
+                polygonContextMenu.style.display = 'none';
+                selectedPolygonForContextMenu = null;
+            }
+        }
+        if (noteContextMenu.style.display === 'block') {
+            if (!noteContextMenu.contains(event.target)) {
+                noteContextMenu.style.display = 'none';
+                selectedNoteForContextMenu = null;
+            }
+        }
+        if (characterContextMenu.style.display === 'block') {
+            if (!characterContextMenu.contains(event.target)) {
+                characterContextMenu.style.display = 'none';
+                selectedCharacterForContextMenu = null;
+            }
+        }
+        if (mapToolsContextMenu.style.display === 'block') {
+            if (!mapToolsContextMenu.contains(event.target)) {
+                mapToolsContextMenu.style.display = 'none';
+            }
+        }
+
+        if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
+            tokenStatBlock.style.display = 'none';
+            selectedTokenForStatBlock = null;
+            sendTokenStatBlockStateToPlayerView(false);
+            if (isTargeting) {
+                isTargeting = false;
+                document.body.classList.remove('targeting');
+                tokenStatBlockSetTargets.textContent = 'Set Targets';
+                tokenStatBlockSetTargets.classList.remove('active');
+                targetingCharacter = null;
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        }
+    });
+
+    mapToolsContextMenu.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const action = event.target.dataset.action;
+
+        if (action) {
+            const button = document.getElementById(`btn-${action.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
+            if (button) {
+                button.click();
+            } else if (action === 'link-child-map') {
+                // Special case for the first button's ID
+                document.getElementById('btn-link-child-map').click();
+            }
+        }
+        mapToolsContextMenu.style.display = 'none';
+    });
+
+    polygonContextMenu.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const action = event.target.dataset.action;
+
+        if (action && selectedPolygonForContextMenu) {
+            const { overlay, index, parentMapName, source } = selectedPolygonForContextMenu;
+
+            const parentMapData = detailedMapData.get(parentMapName);
+
+            if (!parentMapData) {
+                console.error(`Parent map data not found for context menu action. Name: ${parentMapName}, Source: ${source}`);
+                polygonContextMenu.style.display = 'none';
+                selectedPolygonForContextMenu = null;
+                return;
+            }
+
+            switch (action) {
+                case 'toggle-player-visibility':
+                    if (source === 'view') {
+                        if (typeof overlay.playerVisible !== 'boolean') {
+                            overlay.playerVisible = true;
+                        }
+                        overlay.playerVisible = !overlay.playerVisible;
+                        console.log(`Polygon visibility for "${overlay.linkedMapName}" on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
+                        alert(`Player visibility for this area is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
+
+                        if (selectedMapFileName === parentMapName) {
+                            displayMapOnCanvas(parentMapName);
+                            sendMapToPlayerView(parentMapName);
+                        } else {
+                            if (playerWindow && !playerWindow.closed) {
+                                sendMapToPlayerView(parentMapName);
+                            }
+                        }
+                    } else {
+                        console.warn("Toggle Player Visibility action called on a map not in 'view' mode.");
+                        alert("This action is only available for maps in 'View' mode.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    selectedPolygonForContextMenu = null;
+                    break;
+                case 'change-child-map':
+                    if (source === 'edit') {
+                        isChangingChildMapForPolygon = true;
+                        alert(`"Change Child Map" selected for polygon linking to "${overlay.linkedMapName}". Please click a new map from the list to be its new child.`);
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    break;
+                case 'redraw-polygon':
+                    if (source === 'edit' && parentMapData.overlays && parentMapData.overlays[index]) {
+                        isRedrawingPolygon = true;
+                        preservedLinkedMapNameForRedraw = overlay.linkedMapName;
+                        currentPolygonPoints = [];
+                        polygonDrawingComplete = false;
+                        parentMapData.overlays.splice(index, 1);
+                        drawingCanvas.style.pointerEvents = 'auto';
+                        dmCanvas.style.cursor = 'crosshair';
+                        alert(`Redrawing polygon for link to "${preservedLinkedMapNameForRedraw}". Click on the map to start drawing. Click the first point to close it.`);
+                        if (selectedMapFileName === parentMapName) {
+                            displayMapOnCanvas(parentMapName);
+                        }
+                        console.log('Redraw Polygon initiated. Old polygon removed. Preserved link:', preservedLinkedMapNameForRedraw);
+                    } else if (source === 'edit') {
+                        console.error("Error initiating redraw: Parent map data or overlay not found.");
+                        alert("Error: Could not find the polygon to redraw.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    if (!isRedrawingPolygon) selectedPolygonForContextMenu = null;
+                    break;
+                case 'move-polygon':
+                    if (source === 'edit' && parentMapData.overlays && parentMapData.overlays[index]) {
+                        isMovingPolygon = true;
+                        polygonBeingMoved = {
+                            overlayRef: overlay,
+                            originalPoints: JSON.parse(JSON.stringify(overlay.polygon)),
+                            parentMapName: parentMapName,
+                            originalIndex: index
+                        };
+                        moveStartPoint = null;
+                        currentPolygonDragOffsets = {x: 0, y: 0};
+                        dmCanvas.style.cursor = 'move';
+                        alert(`Move mode activated for polygon linking to "${overlay.linkedMapName}". Click and drag the polygon. Click again to place, or right-click to cancel.`);
+                        console.log('Move Polygon initiated for:', polygonBeingMoved);
+                    } else if (source === 'edit') {
+                        console.error("Error initiating move: Parent map data or overlay not found.");
+                        alert("Error: Could not find the polygon to move.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    selectedPolygonForContextMenu = null;
+                    break;
+                case 'delete-link':
+                    if (source === 'edit' && parentMapData.overlays && parentMapData.overlays[index]) {
+                        if (confirm(`Are you sure you want to delete the link to "${overlay.linkedMapName}"?`)) {
+                            parentMapData.overlays.splice(index, 1);
+                            console.log(`Link to "${overlay.linkedMapName}" deleted from map "${parentMapName}".`);
+                            alert(`Link to "${overlay.linkedMapName}" has been deleted.`);
+                            if (selectedMapFileName === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                            }
+                        }
+                    } else if (source === 'edit') {
+                        console.error("Error deleting link: Parent map data or overlay not found.");
+                        alert("Error: Could not find the link to delete.");
+                    }
+                    polygonContextMenu.style.display = 'none';
+                    selectedPolygonForContextMenu = null;
+                    break;
+            }
+        } else if (action) {
+            console.warn("Context menu action clicked, but no polygon was selected.");
+            polygonContextMenu.style.display = 'none';
+            selectedPolygonForContextMenu = null;
+        }
+    });
+
+    function initEasyMDE() {
+        if (easyMDE) {
+            return;
+        }
+        if (!markdownEditorTextarea) {
+            console.error("Markdown textarea element not found for EasyMDE.");
+            return;
+        }
+        try {
+            easyMDE = new EasyMDE({
+                element: markdownEditorTextarea,
+                spellChecker: false,
+                placeholder: "Type your markdown notes here...",
+                minHeight: "150px",
+                autosave: {
+                    enabled: true,
+                    uniqueId: selectedNoteId ? `note_${selectedNoteId}` : "dndemicube_unsaved_note",
+                    delay: 3000,
+                },
+                toolbar: [
+                    "bold", "italic", "heading", "|",
+                    "quote", "unordered-list", "ordered-list", "|",
+                    "link", "image", "table", "|",
+                    "preview", "side-by-side", "fullscreen", "|",
+                    "guide", "|",
+                    {
+                        name: "dm-mode",
+                        action: function(editor) {
+                            const cm = editor.codemirror;
+                            const selection = cm.getSelection();
+                            cm.replaceSelection(`[dm]${selection}[/dm]`);
+                        },
+                        className: "fa fa-user-secret",
+                        title: "DM Only Content",
+                    }
+                ],
+                uploadImage: true,
+                imageUploadFunction: function(file, onSuccess, onError) {
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        onSuccess(event.target.result);
+                    };
+                    reader.onerror = function (error) {
+                        onError("Error reading file: " + error);
+                    };
+                    reader.readAsDataURL(file);
+                },
+            });
+
+            if (tabNotes && tabNotes.classList.contains('active') && easyMDE.codemirror) {
+                setTimeout(() => easyMDE.codemirror.refresh(), 10);
+            }
+        } catch (e) {
+            console.error("Error initializing EasyMDE:", e);
+            easyMDE = null;
+        }
+    }
+
+    function destroyEasyMDE() {
+        if (easyMDE) {
+            try {
+                easyMDE.toTextArea();
+            } catch (e) {
+                console.error("Error destroying EasyMDE:", e);
+            }
+            easyMDE = null;
+        }
+    }
+
+    function clearNoteEditor() {
+        if (noteTitleInput) noteTitleInput.value = "";
+
+        if (easyMDE && typeof easyMDE.value === 'function') {
+            easyMDE.value("");
+        } else if (markdownEditorTextarea) {
+             markdownEditorTextarea.value = "";
+        }
+    }
+
+
+    function renderNotesList() {
+        if (!notesList) return;
+        const currentScrollTop = notesList.scrollTop;
+        notesList.innerHTML = '';
+
+        notesData.forEach(note => {
+            const listItem = document.createElement('li');
+            listItem.dataset.noteId = note.id;
+            listItem.classList.add('note-list-item');
+
+            const nameSpan = document.createElement('span');
+            nameSpan.classList.add('note-list-item-name');
+            nameSpan.textContent = note.title;
+            listItem.appendChild(nameSpan);
+
+
+            if (note.id === selectedNoteId) {
+                listItem.classList.add('selected-note-item');
+            }
+
+            if (isNotesEditMode) {
+                notesList.classList.add('edit-mode-active');
+                const actionsSpan = document.createElement('span');
+                actionsSpan.classList.add('note-actions');
+
+                const renameIconHTML = `<span class="note-action-icon rename-note" title="Rename Note" data-action="rename">✏️</span>`;
+                const upIconHTML = `<span class="note-action-icon move-note-up" title="Move Up" data-action="move-up">↑</span>`;
+                const downIconHTML = `<span class="note-action-icon move-note-down" title="Move Down" data-action="move-down">↓</span>`;
+                const deleteIconHTML = `<span class="note-action-icon delete-note" title="Delete Note" data-action="delete">🗑️</span>`;
+
+                actionsSpan.innerHTML = renameIconHTML + upIconHTML + downIconHTML + deleteIconHTML;
+                listItem.appendChild(actionsSpan);
+            } else {
+                notesList.classList.remove('edit-mode-active');
+            }
+            notesList.appendChild(listItem);
+        });
+        updateNoteMoveIconVisibility();
+        notesList.scrollTop = currentScrollTop;
+    }
+
+    function updateNoteMoveIconVisibility() {
+        if (!notesList || !isNotesEditMode) return;
+        const items = notesList.querySelectorAll('li.note-list-item');
+        items.forEach((item, index) => {
+            const upIcon = item.querySelector('.move-note-up');
+            const downIcon = item.querySelector('.move-note-down');
+
+            if (upIcon) upIcon.style.display = (index === 0 || items.length === 1) ? 'none' : 'inline-block';
+            if (downIcon) downIcon.style.display = (index === items.length - 1 || items.length === 1) ? 'none' : 'inline-block';
+        });
+    }
+
+    function handleCreateNewNote() {
+        const newNoteId = Date.now();
+        let noteCounter = 1;
+        let newTitle = `Note ${noteCounter}`;
+        while (notesData.some(note => note.title === newTitle)) {
+            noteCounter++;
+            newTitle = `Note ${noteCounter}`;
+        }
+
+        const newNote = {
+            id: newNoteId,
+            title: newTitle,
+            content: `# ${newTitle}\n\nStart writing your notes here.`
+        };
+        notesData.push(newNote);
+
+        loadNoteIntoEditor(newNoteId);
+        if (noteTitleInput) noteTitleInput.focus();
+    }
+
+    function loadNoteIntoEditor(noteId) {
+        const note = notesData.find(n => n.id === noteId);
+        if (!note) {
+            console.error("Note not found for ID:", noteId);
+            if (selectedNoteId === noteId) {
+                 selectedNoteId = null;
+                 clearNoteEditor();
+                 if (easyMDE && easyMDE.options.autosave) {
+                    easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                 }
+            }
+            renderNotesList();
+            return;
+        }
+
+        selectedNoteId = note.id;
+        if (noteTitleInput) noteTitleInput.value = note.title;
+
+        if (!easyMDE && markdownEditorTextarea) {
+            initEasyMDE();
+        }
+
+        if (easyMDE) {
+            if (easyMDE.options.autosave) {
+                if (easyMDE.options.autosave.uniqueId !== `note_${note.id}`) {
+                }
+                easyMDE.options.autosave.uniqueId = `note_${note.id}`;
+            }
+            easyMDE.value(note.content);
+             if (easyMDE.codemirror && tabNotes.classList.contains('active')) {
+                setTimeout(() => easyMDE.codemirror.refresh(), 0);
+            }
+        } else if (markdownEditorTextarea) {
+            markdownEditorTextarea.value = note.content;
+        }
+
+        renderNotesList();
+    }
+
+    function handleSaveNote() {
+        if (!selectedNoteId) {
+            alert("No note selected to save.");
+            return;
+        }
+        const note = notesData.find(n => n.id === selectedNoteId);
+        if (!note) {
+            alert("Error: Selected note not found in data.");
+            return;
+        }
+
+        const newTitle = noteTitleInput ? noteTitleInput.value.trim() : note.title;
+        if (!newTitle) {
+            alert("Note title cannot be empty.");
+            if (noteTitleInput) noteTitleInput.focus();
+            return;
+        }
+
+        note.title = newTitle;
+        if (easyMDE && typeof easyMDE.value === 'function') {
+            note.content = easyMDE.value();
+        } else if (markdownEditorTextarea) {
+            note.content = markdownEditorTextarea.value;
+        }
+
+        renderNotesList();
+    }
+
+    function handleRenameNote(noteId) {
+        const note = notesData.find(n => n.id === noteId);
+        if (!note) return;
+
+        const newTitle = prompt("Enter new name for the note:", note.title);
+        if (newTitle && newTitle.trim() !== "" && newTitle.trim() !== note.title) {
+            note.title = newTitle.trim();
+            renderNotesList();
+            if (note.id === selectedNoteId && noteTitleInput) {
+                noteTitleInput.value = note.title;
+            }
+        }
+    }
+
+    function handleDeleteNote(noteId) {
+        const noteIndex = notesData.findIndex(n => n.id === noteId);
+        if (noteIndex === -1) return;
+
+        const note = notesData[noteIndex];
+        if (confirm(`Are you sure you want to delete "${note.title}"?`)) {
+
+            if (easyMDE && easyMDE.options.autosave.enabled && selectedNoteId === noteId) {
+                const oldUniqueId = easyMDE.options.autosave.uniqueId;
+                easyMDE.options.autosave.uniqueId = `deleting_${noteId}_${Date.now()}`;
+                easyMDE.clearAutosavedValue();
+            }
+
+            notesData.splice(noteIndex, 1);
+
+            if (selectedNoteId === noteId) {
+                selectedNoteId = null;
+                clearNoteEditor();
+                if (easyMDE && easyMDE.options.autosave) {
+                    easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                }
+            }
+            renderNotesList();
+        }
+    }
+
+    function handleMoveNote(noteId, direction) {
+        const index = notesData.findIndex(n => n.id === noteId);
+        if (index === -1) return;
+
+        if (direction === 'up' && index > 0) {
+            [notesData[index - 1], notesData[index]] = [notesData[index], notesData[index - 1]];
+        } else if (direction === 'down' && index < notesData.length - 1) {
+            [notesData[index], notesData[index + 1]] = [notesData[index + 1], notesData[index]];
+        }
+        renderNotesList();
+    }
+
+
+    if (createNewNoteButton) {
+        createNewNoteButton.addEventListener('click', handleCreateNewNote);
+    }
+
+    if (saveNoteButton) {
+        saveNoteButton.addEventListener('click', handleSaveNote);
+    }
+    if (noteTitleInput) {
+        noteTitleInput.addEventListener('blur', handleSaveNote);
+        noteTitleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveNote();
+                if(easyMDE) easyMDE.codemirror.focus();
+            }
+        });
+    }
+
+
+    if (editNotesIcon) {
+        editNotesIcon.addEventListener('click', () => {
+            isNotesEditMode = !isNotesEditMode;
+            editNotesIcon.textContent = isNotesEditMode ? '✅' : '✏️';
+            renderNotesList();
+        });
+    }
+
+    if (notesList) {
+        notesList.addEventListener('click', (event) => {
+            const listItem = event.target.closest('li.note-list-item');
+            if (!listItem) return;
+
+            const noteId = parseInt(listItem.dataset.noteId, 10);
+            if (isNaN(noteId)) return;
+
+            const actionIcon = event.target.closest('.note-action-icon');
+
+            if (isNotesEditMode && actionIcon) {
+                const action = actionIcon.dataset.action;
+                if (action === 'rename') {
+                    handleRenameNote(noteId);
+                } else if (action === 'delete') {
+                    handleDeleteNote(noteId);
+                } else if (action === 'move-up') {
+                    handleMoveNote(noteId, 'up');
+                } else if (action === 'move-down') {
+                    handleMoveNote(noteId, 'down');
+                }
+            } else if (!actionIcon) {
+                if (selectedNoteForContextMenu) {
+                    const { overlay, parentMapName, source } = selectedNoteForContextMenu;
+                    overlay.linkedNoteId = noteId;
+                    alert(`Note linked successfully.`);
+                    selectedNoteForContextMenu = null;
+                    switchTab('tab-dm-controls');
+                    displayMapOnCanvas(parentMapName);
+                } else {
+                    if (selectedNoteId !== noteId) {
+                        loadNoteIntoEditor(noteId);
+                    }
+                }
+            }
+        });
+    }
+
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    function switchTab(tabId) {
+        // Hide all main content containers by default
+        if (mapContainer) mapContainer.style.display = 'none';
+        if (noteEditorContainer) noteEditorContainer.style.display = 'none';
+        if (characterSheetContainer) characterSheetContainer.style.display = 'none';
+        if (storyTreeContainer) storyTreeContainer.style.display = 'none';
+        if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
+
+        // Toggle active state for tab buttons and sidebar content
+        tabButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === tabId);
+        });
+        tabContents.forEach(content => {
+            content.classList.toggle('active', content.id === tabId);
+        });
+
+        // Show the correct container based on the tabId
+        if (tabId === 'tab-notes') {
+            if (noteEditorContainer) noteEditorContainer.style.display = 'flex';
+
+            if (!easyMDE && markdownEditorTextarea) {
+                initEasyMDE();
+            }
+            if (easyMDE && easyMDE.codemirror) {
+                setTimeout(() => easyMDE.codemirror.refresh(), 10);
+            }
+
+            if (!selectedNoteId || !notesData.some(n => n.id === selectedNoteId)) {
+                if (notesData.length > 0) {
+                    loadNoteIntoEditor(notesData[0].id);
+                } else {
+                    clearNoteEditor();
+                    if (easyMDE && easyMDE.options.autosave) {
+                        easyMDE.options.autosave.uniqueId = "dndemicube_unsaved_note";
+                    }
+                    renderNotesList();
+                }
+            } else {
+                 if (easyMDE && easyMDE.codemirror) {
+                    setTimeout(() => easyMDE.codemirror.refresh(), 10);
+                }
+            }
+        } else if (tabId === 'tab-characters') {
+            if (characterSheetContainer) characterSheetContainer.style.display = 'flex';
+
+            if (!selectedCharacterId || !charactersData.some(c => c.id === selectedCharacterId)) {
+                if (charactersData.length > 0) {
+                    loadCharacterIntoEditor(charactersData[0].id);
+                } else {
+                    clearCharacterEditor();
+                    renderCharactersList();
+                }
+            }
+        } else if (tabId === 'tab-story-beats') {
+            if (storyTreeContainer) {
+                storyTreeContainer.style.display = 'flex';
+                storyTreeContainer.style.flexGrow = '1';
+            }
+            initStoryTree();
+        } else { // Default to DM Controls tab
+            if (mapContainer) mapContainer.style.display = 'flex';
+            resizeCanvas(); // Ensure map is resized correctly
+        }
+    }
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            switchTab(targetTab);
+        });
+    });
+
+    if (noteContextMenu) {
+        noteContextMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const action = event.target.dataset.action;
+
+            if (action && selectedNoteForContextMenu) {
+                const { overlay, index, parentMapName, source } = selectedNoteForContextMenu;
+
+                const parentMapData = detailedMapData.get(parentMapName);
+
+                if (!parentMapData) {
+                    console.error(`Parent map data not found for note context menu action. Name: ${parentMapName}, Source: ${source}`);
+                    noteContextMenu.style.display = 'none';
+                    selectedNoteForContextMenu = null;
+                    return;
+                }
+
+                switch (action) {
+                    case 'link-to-new-note':
+                        if (source === 'edit') {
+                            if (notesData.length === 0) {
+                                alert("No notes available. Please create a new note first in the Notes tab.");
+                                selectedNoteForContextMenu = null;
+                            } else {
+                                alert("Please select a note from the list in the Notes tab to link it.");
+                                switchTab('tab-notes');
+                            }
+                        }
+                        break;
+                    case 'move-note':
+                        if (source === 'edit') {
+                            isMovingNote = true;
+                            noteBeingMoved = {
+                                overlayRef: overlay,
+                                originalPosition: { ...overlay.position },
+                                parentMapName: parentMapName,
+                                originalIndex: index
+                            };
+                            moveStartPoint = null;
+                            currentDragOffsets = { x: 0, y: 0 };
+                            dmCanvas.style.cursor = 'move';
+                            alert(`Move mode activated for note. Click and drag the note icon. Click again to place, or right-click to cancel.`);
+                            console.log('Move Note initiated for:', noteBeingMoved);
+                        }
+                        break;
+                    case 'delete-link':
+                        if (source === 'edit' && confirm(`Are you sure you want to delete this note link?`)) {
+                            parentMapData.overlays.splice(index, 1);
+                            console.log(`Note link deleted from map "${parentMapName}".`);
+                            alert(`Note link has been deleted.`);
+                            if (selectedMapFileName === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                            }
+                        }
+                        break;
+                    case 'toggle-player-visibility':
+                        if (source === 'view') {
+                            if (typeof overlay.playerVisible !== 'boolean') {
+                                overlay.playerVisible = true;
+                            }
+                            overlay.playerVisible = !overlay.playerVisible;
+                            console.log(`Note visibility for note link on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
+                            alert(`Player visibility for this note is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
+                            if (selectedMapFileName === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                                sendMapToPlayerView(parentMapName);
+                            }
+                        }
+                        selectedNoteForContextMenu = null;
+                        break;
+                }
+            }
+            noteContextMenu.style.display = 'none';
+        });
+    }
+
+    const notePreviewClose = document.getElementById('note-preview-close');
+    if (notePreviewClose) {
+        notePreviewClose.addEventListener('click', () => {
+            const notePreviewOverlay = document.getElementById('note-preview-overlay');
+            if (notePreviewOverlay) {
+                notePreviewOverlay.style.display = 'none';
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'hideNotePreview' }, '*');
+                }
+            }
+        });
+    }
+
+    function renderCharactersList() {
+        if (!charactersList) return;
+        const currentScrollTop = charactersList.scrollTop;
+        charactersList.innerHTML = '';
+
+        charactersData.forEach(character => {
+            const listItem = document.createElement('li');
+            listItem.dataset.characterId = character.id;
+            listItem.classList.add('character-list-item');
+
+            const nameSpan = document.createElement('span');
+            nameSpan.classList.add('character-list-item-name');
+            nameSpan.textContent = character.name;
+            listItem.appendChild(nameSpan);
+
+
+            if (character.id === selectedCharacterId) {
+                listItem.classList.add('selected-character-item');
+            }
+
+            if (isCharactersEditMode) {
+                charactersList.classList.add('edit-mode-active');
+                const actionsSpan = document.createElement('span');
+                actionsSpan.classList.add('character-actions');
+
+                const renameIconHTML = `<span class="character-action-icon rename-character" title="Rename Character" data-action="rename">✏️</span>`;
+                const upIconHTML = `<span class="character-action-icon move-character-up" title="Move Up" data-action="move-up">↑</span>`;
+                const downIconHTML = `<span class="character-action-icon move-character-down" title="Move Down" data-action="move-down">↓</span>`;
+                const deleteIconHTML = `<span class="character-action-icon delete-character" title="Delete Character" data-action="delete">🗑️</span>`;
+
+                actionsSpan.innerHTML = renameIconHTML + upIconHTML + downIconHTML + deleteIconHTML;
+                listItem.appendChild(actionsSpan);
+            } else {
+                charactersList.classList.remove('edit-mode-active');
+            }
+            charactersList.appendChild(listItem);
+        });
+        updateCharacterMoveIconVisibility();
+        charactersList.scrollTop = currentScrollTop;
+    }
+
+    function updateCharacterMoveIconVisibility() {
+        if (!charactersList || !isCharactersEditMode) return;
+        const items = charactersList.querySelectorAll('li.character-list-item');
+        items.forEach((item, index) => {
+            const upIcon = item.querySelector('.move-character-up');
+            const downIcon = item.querySelector('.move-character-down');
+
+            if (upIcon) upIcon.style.display = (index === 0 || items.length === 1) ? 'none' : 'inline-block';
+            if (downIcon) downIcon.style.display = (index === items.length - 1 || items.length === 1) ? 'none' : 'inline-block';
+        });
+    }
+
+    function handleCreateCharacter() {
+        const newCharacterId = Date.now();
+        let characterCounter = 1;
+        let newName = `Character ${characterCounter}`;
+        while (charactersData.some(character => character.name === newName)) {
+            characterCounter++;
+            newName = `Character ${characterCounter}`;
+        }
+
+        const newCharacter = {
+            id: newCharacterId,
+            name: newName,
+            sheetData: {},
+            notes: "",
+            isDetailsVisible: true
+        };
+        charactersData.push(newCharacter);
+
+        loadCharacterIntoEditor(newCharacterId);
+        if (characterNameInput) characterNameInput.focus();
+    }
+
+    function loadCharacterIntoEditor(characterId) {
+        const character = charactersData.find(c => c.id === characterId);
+        if (!character) {
+            console.error("Character not found for ID:", characterId);
+            if (selectedCharacterId === characterId) {
+                selectedCharacterId = null;
+                clearCharacterEditor();
+            }
+            renderCharactersList();
+            return;
+        }
+
+        selectedCharacterId = character.id;
+        if (characterNameInput) characterNameInput.value = character.name;
+
+        if (characterSheetIframe && characterSheetIframe.contentWindow) {
+            const dataToSend = {
+                ...(character.sheetData || {}),
+                isDetailsVisible: character.isDetailsVisible
+            };
+            characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: dataToSend }, '*');
+        } else {
+            console.warn("Character sheet iframe not ready to receive data.");
+        }
+
+        if (pdfViewerIframe.src) {
+            URL.revokeObjectURL(pdfViewerIframe.src);
+            pdfViewerIframe.src = '';
+        }
+        characterSheetContent.style.display = 'block';
+        pdfViewerContainer.style.display = 'none';
+        characterNotesEditorContainer.style.display = 'none';
+        viewPdfButton.textContent = 'View PDF';
+
+        if (character.pdfData) {
+            viewPdfButton.style.display = 'inline-block';
+            deletePdfButton.style.display = 'inline-block';
+        } else {
+            viewPdfButton.style.display = 'none';
+            deletePdfButton.style.display = 'none';
+        }
+
+        if (characterEasyMDE) {
+            characterEasyMDE.value(character.notes || "");
+        }
+
+        renderCharactersList();
+    }
+
+    function handleSaveCharacter() {
+        if (!selectedCharacterId) {
+            alert("No character selected to save.");
+            return;
+        }
+        const character = charactersData.find(c => c.id === selectedCharacterId);
+        if (!character) {
+            alert("Error: Selected character not found in data.");
+            return;
+        }
+
+        const newName = characterNameInput ? characterNameInput.value.trim() : character.name;
+        if (!newName) {
+            alert("Character name cannot be empty.");
+            if (characterNameInput) characterNameInput.focus();
+            return;
+        }
+
+        character.name = newName;
+        if (characterSheetIframe && characterSheetIframe.contentWindow) {
+            characterSheetIframe.contentWindow.postMessage({ type: 'requestSheetData' }, '*');
+        }
+        if (characterEasyMDE) {
+            character.notes = characterEasyMDE.value();
+        }
+
+        renderCharactersList();
+    }
+
+    function handleRenameCharacter(characterId) {
+        const character = charactersData.find(c => c.id === characterId);
+        if (!character) return;
+
+        const newName = prompt("Enter new name for the character:", character.name);
+        if (newName && newName.trim() !== "" && newName.trim() !== character.name) {
+            character.name = newName.trim();
+            renderCharactersList();
+            if (character.id === selectedCharacterId && characterNameInput) {
+                characterNameInput.value = character.name;
+            }
+        }
+    }
+
+    function handleDeleteCharacter(characterId) {
+        const characterIndex = charactersData.findIndex(c => c.id === characterId);
+        if (characterIndex === -1) return;
+
+        const character = charactersData[characterIndex];
+        if (confirm(`Are you sure you want to delete "${character.name}"?`)) {
+            charactersData.splice(characterIndex, 1);
+
+            if (selectedCharacterId === characterId) {
+                selectedCharacterId = null;
+                clearCharacterEditor();
+            }
+            renderCharactersList();
+        }
+    }
+
+    function handleMoveCharacter(characterId, direction) {
+        const index = charactersData.findIndex(c => c.id === characterId);
+        if (index === -1) return;
+
+        if (direction === 'up' && index > 0) {
+            [charactersData[index - 1], charactersData[index]] = [charactersData[index], charactersData[index - 1]];
+        } else if (direction === 'down' && index < charactersData.length - 1) {
+            [charactersData[index], charactersData[index + 1]] = [charactersData[index + 1], charactersData[index]];
+        }
+        renderCharactersList();
+    }
+
+    function clearCharacterEditor() {
+        if (characterNameInput) characterNameInput.value = "";
+    }
+
+    function initCharacterEasyMDE() {
+        if (characterEasyMDE) {
+            return;
+        }
+        if (!characterMarkdownEditor) {
+            console.error("Character markdown textarea element not found for EasyMDE.");
+            return;
+        }
+        try {
+            characterEasyMDE = new EasyMDE({
+                element: characterMarkdownEditor,
+                spellChecker: false,
+                placeholder: "Type your character notes here...",
+                minHeight: "150px",
+                autosave: {
+                    enabled: true,
+                    uniqueId: selectedCharacterId ? `character_note_${selectedCharacterId}` : "dndemicube_unsaved_character_note",
+                    delay: 3000,
+                },
+                toolbar: [
+                    "bold", "italic", "heading", "|",
+                    "quote", "unordered-list", "ordered-list", "|",
+                    "link", "image", "table", "|",
+                    "preview", "side-by-side", "fullscreen", "|",
+                    "guide", "|",
+                    {
+                        name: "dm-mode",
+                        action: function(editor) {
+                            const cm = editor.codemirror;
+                            const selection = cm.getSelection();
+                            cm.replaceSelection(`[dm]${selection}[/dm]`);
+                        },
+                        className: "fa fa-user-secret",
+                        title: "DM Only Content",
+                    }
+                ],
+            });
+        } catch (e) {
+            console.error("Error initializing Character EasyMDE:", e);
+            characterEasyMDE = null;
+        }
+    }
+
+    if (characterNotesButton) {
+        characterNotesButton.addEventListener('click', () => {
+            if (characterNotesEditorContainer.style.display === 'none') {
+                characterNotesEditorContainer.style.display = 'block';
+                characterSheetContent.style.display = 'none';
+                pdfViewerContainer.style.display = 'none';
+                initCharacterEasyMDE();
+                if (characterEasyMDE) {
+                    characterEasyMDE.codemirror.refresh();
+                }
+            } else {
+                characterNotesEditorContainer.style.display = 'none';
+                characterSheetContent.style.display = 'block';
+            }
+        });
+    }
+
+    if (addCharacterButton) {
+        addCharacterButton.addEventListener('click', handleCreateCharacter);
+    }
+
+    if (saveCharacterButton) {
+        saveCharacterButton.addEventListener('click', handleSaveCharacter);
+    }
+
+    if (clearFieldsButton) {
+        clearFieldsButton.addEventListener('click', () => {
+            if (characterSheetIframe && characterSheetIframe.contentWindow) {
+                characterSheetIframe.contentWindow.postMessage({ type: 'clearCharacterSheet' }, '*');
+            }
+        });
+    }
+
+    if (fillFromButton) {
+        fillFromButton.addEventListener('click', () => {
+            fillFromDropdown.style.display = fillFromDropdown.style.display === 'block' ? 'none' : 'block';
+        });
+    }
+
+    if (fillFromPdfOption) {
+        fillFromPdfOption.addEventListener('click', (e) => {
+            e.preventDefault();
+            pdfUploadInput.click();
+            fillFromDropdown.style.display = 'none';
+        });
+    }
+
+    const defaultCharacterJson = {
+        "character_name": "", "class_and_level": "", "background": "", "player_name": "", "race_or_species": "", "alignment": "", "experience_points": "",
+        "strength": { "score": "", "modifier": "+0" }, "dexterity": { "score": "", "modifier": "+0" }, "constitution": { "score": "", "modifier": "+0" },
+        "intelligence": { "score": "", "modifier": "+0" }, "wisdom": { "score": "", "modifier": "+0" }, "charisma": { "score": "", "modifier": "+0" },
+        "saving_throws": { "strength": "", "dexterity": "", "constitution": "", "intelligence": "", "wisdom": "", "charisma": "" },
+        "skills": {
+            "acrobatics_dex": "", "animal_handling_wis": "", "arcana_int": "", "athletics_str": "", "deception_cha": "", "history_int": "", "insight_wis": "", "intimidation_cha": "",
+            "investigation_int": "", "medicine_wis": "", "nature_int": "", "perception_wis": "", "performance_cha": "", "persuasion_cha": "", "religion_int": "",
+            "sleight_of_hand_dex": "", "stealth_dex": "", "survival_wis": ""
+        },
+        "armor_class": "", "initiative": "", "speed": "",
+        "hit_points": { "maximum": "", "current": "", "temporary": "" },
+        "hit_dice": "",
+        "death_saves": { "successes": "", "failures": "" },
+        "proficiency_bonus": "", "passive_perception": "", "passive_insight": "", "passive_investigation": "",
+        "proficiencies": { "armor": "", "weapons": "", "tools": "" },
+        "languages": "", "attacks_and_spellcasting": "", "features_and_traits": "", "equipment": "", "character_appearance": "", "character_backstory": "",
+        "personality_traits": "", "ideals": "", "bonds": "", "flaws": ""
+    };
+
+    function flattenCharacterJson(data) {
+        const flattened = {};
+        for (const key in data) {
+            if (typeof data[key] === 'object' && data[key] !== null && !Array.isArray(data[key])) {
+                for (const subKey in data[key]) {
+                    flattened[`${key}_${subKey}`] = data[key][subKey];
+                }
+            } else {
+                flattened[key] = data[key];
+            }
+        }
+        return flattened;
+    }
+
+    if (fillFromJsonOption) {
+        fillFromJsonOption.addEventListener('click', (e) => {
+            e.preventDefault();
+            jsonInputTextarea.value = JSON.stringify(defaultCharacterJson, null, 2);
+            jsonModal.style.display = 'block';
+            fillFromDropdown.style.display = 'none';
+        });
+    }
+
+    if (jsonModalCloseButton) {
+        jsonModalCloseButton.addEventListener('click', () => {
+            jsonModal.style.display = 'none';
+        });
+    }
+
+    if (cancelJsonButton) {
+        cancelJsonButton.addEventListener('click', () => {
+            jsonModal.style.display = 'none';
+        });
+    }
+
+    if (fillFromJsonButton) {
+        fillFromJsonButton.addEventListener('click', () => {
+            try {
+                const jsonData = JSON.parse(jsonInputTextarea.value);
+                const flattenedData = flattenCharacterJson(jsonData);
+
+                const finalData = {};
+                for (const key in flattenedData) {
+                    let newKey = key;
+                    if (key === 'race_or_species') newKey = 'race';
+                    else if (key === 'experience_points') newKey = 'xp';
+                    else if (key === 'hit_points_maximum') newKey = 'hp_max';
+                    else if (key === 'hit_points_current') newKey = 'hp_current';
+                    else if (key === 'hit_points_temporary') newKey = 'hp_temp';
+                    else if (key === 'hit_dice') newKey = 'hit_dice_total';
+                    else if (key === 'proficiencies_armor') newKey = 'armor_proficiencies';
+                    else if (key === 'proficiencies_weapons') newKey = 'weapon_proficiencies';
+                    else if (key === 'proficiencies_tools') newKey = 'tool_proficiencies';
+                    else if (key === 'character_name') newKey = 'char_name';
+                    else if (key === 'class_and_level') newKey = 'class_level';
+                    else if (key === 'armor_class') newKey = 'ac';
+
+                    finalData[newKey] = flattenedData[key];
+                }
+
+                characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: finalData }, '*');
+                jsonModal.style.display = 'none';
+            } catch (error) {
+                alert('Invalid JSON format. Please check your input.');
+                console.error('Error parsing character JSON:', error);
+            }
+        });
+    }
+
+    window.addEventListener('click', (e) => {
+        if (!e.target.matches('.dropdown-toggle')) {
+            if (fillFromDropdown.style.display === 'block') {
+                fillFromDropdown.style.display = 'none';
+            }
+        }
+    });
+
+    if (pdfUploadInput) {
+        pdfUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file && selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (!character) {
+                    alert("Please select a character before uploading a PDF.");
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const pdfData = new Uint8Array(e.target.result);
+                    character.pdfData = pdfData;
+                    character.pdfFileName = file.name;
+
+                    viewPdfButton.style.display = 'inline-block';
+                    deletePdfButton.style.display = 'inline-block';
+                    alert(`PDF "${file.name}" has been attached to the character.`);
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (!selectedCharacterId) {
+                alert("No character selected. Please select a character before uploading a PDF.");
+            }
+        });
+    }
+
+    if (viewPdfButton) {
+        viewPdfButton.addEventListener('click', () => {
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (!character || !character.pdfData) {
+                alert("No PDF found for this character.");
+                return;
+            }
+
+            if (pdfViewerContainer.style.display === 'none') {
+                const pdfUrl = URL.createObjectURL(new Blob([character.pdfData], { type: 'application/pdf' }));
+                pdfViewerIframe.src = pdfUrl;
+                characterSheetContent.style.display = 'none';
+                pdfViewerContainer.style.display = 'block';
+                viewPdfButton.textContent = 'Local Character Editor';
+            } else {
+                if (pdfViewerIframe.src) {
+                    URL.revokeObjectURL(pdfViewerIframe.src);
+                }
+                pdfViewerIframe.src = '';
+                characterSheetContent.style.display = 'block';
+                pdfViewerContainer.style.display = 'none';
+                viewPdfButton.textContent = 'View PDF';
+            }
+        });
+    }
+
+    if (deletePdfButton) {
+        deletePdfButton.addEventListener('click', () => {
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (character) {
+                character.pdfData = null;
+                character.pdfFileName = null;
+            }
+
+            if (pdfViewerIframe.src) {
+                URL.revokeObjectURL(pdfViewerIframe.src);
+            }
+            pdfViewerIframe.src = '';
+
+            characterSheetContent.style.display = 'block';
+            pdfViewerContainer.style.display = 'none';
+            viewPdfButton.textContent = 'View PDF';
+            viewPdfButton.style.display = 'none';
+            deletePdfButton.style.display = 'none';
+            alert("PDF has been removed from this character.");
+        });
+    }
+
+    function parsePdfText(text) {
+        const sheetData = {};
+        const upperText = text.toUpperCase();
+
+        const extract = (regex) => {
+            const match = upperText.match(regex);
+            return match ? match[1].trim() : null;
+        };
+
+        sheetData.char_name = extract(/CHARACTER NAME\s*([A-Z\s]+)\s*EXPERIENCE POINTS/);
+        console.log("Extracted char_name:", sheetData.char_name);
+        sheetData.class_level = extract(/CLASS & LEVEL\s*([^\n]+)/);
+        sheetData.background = extract(/BACKGROUND\s*([^\n]+)/);
+        sheetData.player_name = extract(/PLAYER NAME\s*([^\n]+)/);
+        sheetData.race = extract(/RACE\s*([^\n]+)/);
+        sheetData.alignment = extract(/ALIGNMENT\s*([^\n]+)/);
+        sheetData.xp = extract(/EXPERIENCE POINTS\s*([^\n]+)/);
+
+        sheetData.strength_score = extract(/STRENGTH\s*(\d+)/);
+        sheetData.dexterity_score = extract(/DEXTERITY\s*(\d+)/);
+        sheetData.constitution_score = extract(/CONSTITUTION\s*(\d+)/);
+        sheetData.intelligence_score = extract(/INTELLIGENCE\s*(\d+)/);
+        sheetData.wisdom_score = extract(/WISDOM\s*(\d+)/);
+        sheetData.charisma_score = extract(/CHARISMA\s*(\d+)/);
+
+        sheetData.ac = extract(/ARMOR CLASS\s*(\d+)/);
+        sheetData.initiative = extract(/INITIATIVE\s*([+-]?\d+)/);
+        sheetData.speed = extract(/SPEED\s*([^\n]+)/);
+        sheetData.hp_max = extract(/HIT POINT MAXIMUM\s*(\d+)/);
+        sheetData.hp_current = extract(/CURRENT HIT POINTS\s*(\d*)/);
+        sheetData.hp_temp = extract(/TEMPORARY HIT POINTS\s*(\d*)/);
+        sheetData.hit_dice_total = extract(/TOTAL\s*([^\n]+)\s*HIT DICE/);
+        sheetData.hit_dice_current = extract(/HIT DICE\s*([^\n]+)/);
+        sheetData.proficiency_bonus = extract(/PROFICIENCY BONUS\s*([+-]?\d+)/);
+        sheetData.passive_perception = extract(/PASSIVE PERCEPTION\s*(\d+)/);
+        sheetData.passive_insight = extract(/PASSIVE INSIGHT\s*(\d+)/);
+        sheetData.passive_investigation = extract(/PASSIVE INVESTIGATION\s*(\d+)/);
+
+        const extractTextArea = (start, end) => {
+            const regex = new RegExp(`${start}\\s*([\\s\\S]*?)\\s*${end}`);
+            const match = upperText.match(regex);
+            return match ? match[1].trim() : null;
+        };
+        
+        sheetData.attacks_spellcasting = extractTextArea('Attacks & Spellcasting', 'Equipment');
+        sheetData.equipment = extractTextArea('Equipment', 'Features & Traits');
+        sheetData.features_traits = extractTextArea('Features & Traits', 'Personality Traits');
+        sheetData.personality_traits = extractTextArea('Personality Traits', 'Ideals');
+        sheetData.ideals = extractTextArea('Ideals', 'Bonds');
+        sheetData.bonds = extractTextArea('Bonds', 'Flaws');
+        sheetData.flaws = extractTextArea('Flaws', 'Character Appearance');
+
+        return sheetData;
+    }
+
+    if (characterNameInput) {
+        characterNameInput.addEventListener('blur', handleSaveCharacter);
+        characterNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveCharacter();
+            }
+        });
+    }
+
+    if (editCharactersIcon) {
+        editCharactersIcon.addEventListener('click', () => {
+            isCharactersEditMode = !isCharactersEditMode;
+            editCharactersIcon.textContent = isCharactersEditMode ? '✅' : '✏️';
+            renderCharactersList();
+        });
+    }
+
+    if (charactersList) {
+        charactersList.addEventListener('click', (event) => {
+            const listItem = event.target.closest('li.character-list-item');
+            if (!listItem) return;
+
+            const characterId = parseInt(listItem.dataset.characterId, 10);
+            if (isNaN(characterId)) return;
+
+            const actionIcon = event.target.closest('.character-action-icon');
+
+            if (isCharactersEditMode && actionIcon) {
+                const action = actionIcon.dataset.action;
+                if (action === 'rename') {
+                    handleRenameCharacter(characterId);
+                } else if (action === 'delete') {
+                    handleDeleteCharacter(characterId);
+                } else if (action === 'move-up') {
+                    handleMoveCharacter(characterId, 'up');
+                } else if (action === 'move-down') {
+                    handleMoveCharacter(characterId, 'down');
+                }
+            } else if (!actionIcon) {
+                if (selectedCharacterForContextMenu) {
+                    const { overlay, parentMapName, source } = selectedCharacterForContextMenu;
+                    overlay.linkedCharacterId = characterId;
+                    alert(`Character linked successfully.`);
+                    selectedCharacterForContextMenu = null;
+                    switchTab('tab-dm-controls');
+                    displayMapOnCanvas(parentMapName);
+                } else {
+                    if (selectedCharacterId !== characterId) {
+                        loadCharacterIntoEditor(characterId);
+                    }
+                }
+            }
+        });
+    }
+
+    if (characterContextMenu) {
+        characterContextMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const action = event.target.dataset.action;
+
+            if (action && selectedCharacterForContextMenu) {
+                const { overlay, index, parentMapName, source } = selectedCharacterForContextMenu;
+
+                const parentMapData = detailedMapData.get(parentMapName);
+                
+                if (!parentMapData) {
+                    console.error(`Parent map data not found for character context menu action. Name: ${parentMapName}, Source: ${source}`);
+                    characterContextMenu.style.display = 'none';
+                    selectedCharacterForContextMenu = null;
+                    return;
+                }
+
+                switch (action) {
+                    case 'link-to-character':
+                        if (source === 'edit') {
+                            if (charactersData.length === 0) {
+                                alert("No characters available. Please create a new character first in the Characters tab.");
+                                selectedCharacterForContextMenu = null;
+                            } else {
+                                alert("Please select a character from the list in the Characters tab to link it.");
+                                switchTab('tab-characters');
+                            }
+                        }
+                        break;
+                    case 'move-character':
+                         if (source === 'edit') {
+                            isMovingCharacter = true;
+                            characterBeingMoved = {
+                                overlayRef: overlay,
+                                originalPosition: { ...overlay.position },
+                                parentMapName: parentMapName,
+                                originalIndex: index
+                            };
+                            moveStartPoint = null;
+                            currentDragOffsets = { x: 0, y: 0 };
+                            dmCanvas.style.cursor = 'move';
+                            alert(`Move mode activated for character. Click and drag the character icon. Click again to place, or right-click to cancel.`);
+                            console.log('Move Character initiated for:', characterBeingMoved);
+                        }
+                        break;
+                    case 'delete-link':
+                        if (source === 'edit' && confirm(`Are you sure you want to delete this character link?`)) {
+                            parentMapData.overlays.splice(index, 1);
+                            console.log(`Character link deleted from map "${parentMapName}".`);
+                            alert(`Character link has been deleted.`);
+                            if (selectedMapFileName === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                            }
+                        }
+                        break;
+                    case 'toggle-player-visibility':
+                        if (source === 'view') {
+                            if (typeof overlay.playerVisible !== 'boolean') {
+                                overlay.playerVisible = true;
+                            }
+                            overlay.playerVisible = !overlay.playerVisible;
+                            console.log(`Character visibility for character link on map "${parentMapName}" toggled to: ${overlay.playerVisible}`);
+                            alert(`Player visibility for this character is now ${overlay.playerVisible ? 'ON' : 'OFF'}.`);
+                            if (selectedMapFileName === parentMapName) {
+                                displayMapOnCanvas(parentMapName);
+                                sendMapToPlayerView(parentMapName);
+                            }
+                        }
+                        selectedCharacterForContextMenu = null;
+                        break;
+                }
+            }
+            characterContextMenu.style.display = 'none';
+        });
+    }
+
+    window.addEventListener('message', (event) => {
+        if (event.source !== characterSheetIframe.contentWindow) {
+            return;
+        }
+
+        if (event.data.type === 'saveCharacterSheet') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.sheetData = event.data.data;
+
+                    // Propagate changes to any instance of this character in the active initiative
+                    activeInitiative.forEach(activeChar => {
+                        if (activeChar.id === selectedCharacterId) {
+                            activeChar.sheetData = character.sheetData;
+                        }
+                    });
+
+                    // Rerender lists and tokens to show updated info
+                    renderActiveInitiativeList();
+                    if (selectedMapFileName) {
+                        displayMapOnCanvas(selectedMapFileName);
+                    }
+                    sendInitiativeDataToPlayerView();
+                }
+            }
+        } else if (event.data.type === 'characterSheetReady') {
+            if (selectedCharacterId) {
+                loadCharacterIntoEditor(selectedCharacterId);
+            }
+        } else if (event.data.type === 'characterDetailsVisibilityChange') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.isDetailsVisible = event.data.isDetailsVisible;
+                }
+            }
+        } else if (event.data.type === 'sheetDataForView') {
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (character) {
+                const markdown = generateCharacterMarkdown(event.data.data, character.notes, false, character.isDetailsVisible);
+                const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                const characterPreviewBody = document.getElementById('character-preview-body');
+                if (characterPreviewOverlay && characterPreviewBody) {
+                    characterPreviewBody.innerHTML = markdown;
+                    characterPreviewOverlay.style.display = 'flex';
+                }
+            }
+        } else if (event.data.type === 'characterDetailsVisibilityChange') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.isDetailsVisible = event.data.isDetailsVisible;
+                }
+            }
+        } else if (event.data.type === 'skillRoll') {
+            const { skillName, modifier } = event.data;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            const characterName = character ? character.name : 'Unknown';
+            const playerName = character && character.sheetData ? character.sheetData.player_name : 'DM';
+
+            const activeCharacter = activeInitiative.find(c => c.id === selectedCharacterId);
+
+            if (activeCharacter && activeCharacter.targets && activeCharacter.targets.length > 0) {
+                // Contested roll
+                activeCharacter.targets.forEach(targetId => {
+                    const targetCharacter = activeInitiative.find(c => c.uniqueId === targetId);
+                    if (targetCharacter) {
+                        // Attacker's roll
+                        const attackerRoll = Math.floor(Math.random() * 20) + 1;
+                        const attackerTotal = attackerRoll + parseInt(modifier);
+
+                        // Target's roll
+                        const targetSkill = Object.keys(skills).find(key => key.toLowerCase() === skillName.toLowerCase());
+                        const targetAttr = skills[targetSkill];
+                        const targetModifier = calculateModifier(parseInt(targetCharacter.sheetData[`${targetAttr}_score`], 10) || 10);
+                        const defenderRoll = Math.floor(Math.random() * 20) + 1;
+                        const defenderTotal = defenderRoll + parseInt(targetModifier);
+
+                        let resultMessage;
+                        if (attackerTotal > defenderTotal) {
+                            resultMessage = `${characterName} wins the contested ${skillName} check against ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                        } else if (defenderTotal > attackerTotal) {
+                            resultMessage = `${targetCharacter.name} wins the contested ${skillName} check against ${characterName}! (${defenderTotal} to ${attackerTotal})`;
+                        } else {
+                            resultMessage = `It's a tie for the contested ${skillName} check between ${characterName} and ${targetCharacter.name}! (${attackerTotal} to ${defenderTotal})`;
+                        }
+
+                        addLogEntry({
+                            type: 'system',
+                            message: resultMessage
+                        });
+                    }
+                });
+            } else {
+                // Standard roll
+                const d20Roll = Math.floor(Math.random() * 20) + 1;
+                const total = d20Roll + parseInt(modifier);
+
+                const rollData = {
+                    characterName: characterName,
+                    playerName: playerName,
+                    roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${skillName}`,
+                    sum: total
+                };
+
+                addLogEntry(rollData);
+                sendDiceRollToPlayerView([d20Roll], total);
+            }
+        } else if (event.data.type === 'statRoll') {
+            const { rollName, modifier } = event.data;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            const characterName = character ? character.name : 'Unknown';
+            const playerName = character && character.sheetData ? character.sheetData.player_name : 'DM';
+            const characterPortrait = character && character.sheetData ? character.sheetData.character_portrait : null;
+            const characterInitials = getInitials(characterName);
+
+            const d20Roll = Math.floor(Math.random() * 20) + 1;
+            const total = d20Roll + parseInt(modifier);
+
+            const rollData = {
+                characterName: characterName,
+                playerName: playerName,
+                roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${rollName}`,
+                sum: total,
+                characterPortrait: characterPortrait,
+                characterInitials: characterInitials
+            };
+
+            addLogEntry(rollData);
+            sendDiceRollToPlayerView([d20Roll], total);
+        }
+    });
+
+function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDetailsVisible = true) {
+    const playerNotes = forPlayerView ? filterPlayerContent(notes) : notes;
+
+    let md = `${playerNotes || ''}\n\n${sheetData.character_portrait ? `![Character Portrait](${sheetData.character_portrait})` : ''}`;
+
+    if (!forPlayerView || (forPlayerView && isDetailsVisible)) {
+        md += `
+
+## **Character Information**
+| Field | Value |
+| :--- | :--- |
+| **Character Name** | ${sheetData.char_name || ''} |
+| **Class & Level** | ${sheetData.class_level || ''} |
+| **Background** | ${sheetData.background || ''} |
+| **Player Name** | ${sheetData.player_name || ''} |
+| **Race or Species** | ${sheetData.race || ''} |
+| **Alignment** | ${sheetData.alignment || ''} |
+| **Experience Points** | ${sheetData.xp || ''} |
+
+***
+
+## **Attributes**
+| Ability | Score | Modifier |
+| :--- | :---: | :---: |
+| **Strength** | ${sheetData['strength_score'] || ''} | ${sheetData['strength_modifier'] || '+0'} |
+| **Dexterity** | ${sheetData['dexterity_score'] || ''} | ${sheetData['dexterity_modifier'] || '+0'} |
+| **Constitution** | ${sheetData['constitution_score'] || ''} | ${sheetData['constitution_modifier'] || '+0'} |
+| **Intelligence**| ${sheetData['intelligence_score'] || ''} | ${sheetData['intelligence_modifier'] || '+0'} |
+| **Wisdom** | ${sheetData['wisdom_score'] || ''} | ${sheetData['wisdom_modifier'] || '+0'} |
+| **Charisma** | ${sheetData['charisma_score'] || ''} | ${sheetData['charisma_modifier'] || '+0'} |
+
+---
+
+## **Combat**
+| Field | Value |
+| :--- | :---: |
+| **Armor Class** | ${sheetData.ac || ''} |
+| **Initiative** | ${sheetData.initiative || ''} |
+| **Speed** | ${sheetData.speed || ''} |
+
+### **Hit Points**
+| Type | Value |
+| :--- | :---: |
+| **Maximum** | ${sheetData.hp_max || ''} |
+| **Current** | ${sheetData.hp_current || ''} |
+| **Temporary** | ${sheetData.hp_temp || ''} |
+
+### **Hit Dice**
+| Type | Value |
+| :--- | :---: |
+| **Hit Dice** | ${sheetData.hit_dice_total || ''} |
+| **Death Saves (Successes)** | ${sheetData.death_saves_successes || ''} |
+| **Death Saves (Failures)** | ${sheetData.death_saves_failures || ''} |
+
+---
+
+## **Saving Throws**
+| Saving Throw | Value |
+| :--- | :---: |
+| **Strength** | ${sheetData.save_strength_mod || ''} |
+| **Dexterity** | ${sheetData.save_dexterity_mod || ''} |
+| **Constitution** | ${sheetData.save_constitution_mod || ''} |
+| **Intelligence** | ${sheetData.save_intelligence_mod || ''} |
+| **Wisdom** | ${sheetData.save_wisdom_mod || ''} |
+| **Charisma** | ${sheetData.save_charisma_mod || ''} |
+
+---
+
+## **Skills**
+| Skill | Value |
+| :--- | :---: |
+| Acrobatics (Dex) | ${sheetData.skill_acrobatics_mod || ''} |
+| Animal Handling (Wis) | ${sheetData.skill_animal_handling_mod || ''} |
+| Arcana (Int) | ${sheetData.skill_arcana_mod || ''} |
+| Athletics (Str) | ${sheetData.skill_athletics_mod || ''} |
+| Deception (Cha) | ${sheetData.skill_deception_mod || ''} |
+| History (Int) | ${sheetData.skill_history_mod || ''} |
+| Insight (Wis) | ${sheetData.skill_insight_mod || ''} |
+| Intimidation (Cha) | ${sheetData.skill_intimidation_mod || ''} |
+| Investigation (Int) | ${sheetData.skill_investigation_mod || ''} |
+| Medicine (Wis) | ${sheetData.skill_medicine_mod || ''} |
+| Nature (Int) | ${sheetData.skill_nature_mod || ''} |
+| Perception (Wis) | ${sheetData.skill_perception_mod || ''} |
+| Performance (Cha) | ${sheetData.skill_performance_mod || ''} |
+| Persuasion (Cha) | ${sheetData.skill_persuasion_mod || ''} |
+| Religion (Int) | ${sheetData.skill_religion_mod || ''} |
+| Sleight of Hand (Dex) | ${sheetData.skill_sleight_of_hand_mod || ''} |
+| Stealth (Dex) | ${sheetData.skill_stealth_mod || ''} |
+| Survival (Wis) | ${sheetData.skill_survival_mod || ''} |
+
+---
+
+## **Character Proficiencies**
+| Field | Value |
+| :--- | :---: |
+| **Proficiency Bonus** | ${sheetData.proficiency_bonus || ''} |
+| **Passive Perception** | ${sheetData.passive_perception || ''} |
+| **Passive Insight** | ${sheetData.passive_insight || ''} |
+| **Passive Investigation** | ${sheetData.passive_investigation || ''} |
+| **Armor Proficiencies** | ${sheetData.armor_proficiencies || ''} |
+| **Weapon Proficiencies**| ${sheetData.weapon_proficiencies || ''} |
+| **Tool Proficiencies** | ${sheetData.tool_proficiencies || ''} |
+| **Languages** | ${sheetData.languages || ''} |
+
+---
+
+## **Equipment & Features**
+| Field | Value |
+| :--- | :--- |
+| **Attacks & Spellcasting** | ${sheetData.attacks_spellcasting || ''} |
+| **Features & Traits** | ${sheetData.features_traits || ''} |
+| **Equipment** | ${sheetData.equipment || ''} |
+
+---
+
+## **Character Background**
+| Field | Value |
+| :--- | :--- |
+| **Character Appearance** | ${sheetData.char_appearance || ''} |
+| **Character Backstory** | ${sheetData.backstory || ''} |
+| **Personality Traits** | ${sheetData.personality_traits || ''} |
+| **Ideals** | ${sheetData.ideals || ''} |
+| **Bonds** | ${sheetData.bonds || ''} |
+| **Flaws** | ${sheetData.flaws || ''} |
+`;
+    }
+    return easyMDE.options.previewRender(md);
+}
+
+let activeToastTimers = [];
+
+function clearToasts() {
+    const toastContainer = document.getElementById('toast-container');
+    if (toastContainer) {
+        toastContainer.innerHTML = '';
+    }
+    activeToastTimers.forEach(timerId => clearTimeout(timerId));
+    activeToastTimers = [];
+}
+
+function displayToast(messageElement) {
+    const toastContainer = document.getElementById('toast-container');
+    // Do not show toasts if the container doesn't exist or if the main log is open
+    if (!toastContainer || diceDialogueRecord.classList.contains('persistent-log')) {
+        return;
+    }
+
+    const toastNode = messageElement.cloneNode(true);
+    toastNode.classList.add('toast-message');
+    toastContainer.appendChild(toastNode);
+
+    const timerId = setTimeout(() => {
+        // Add a fade-out animation before removing for a smoother experience
+        toastNode.style.animation = 'toast-fade-out 0.5s ease-out forwards';
+        toastNode.addEventListener('animationend', () => {
+            toastNode.remove();
+            const index = activeToastTimers.indexOf(timerId);
+            if (index > -1) {
+                activeToastTimers.splice(index, 1);
+            }
+        });
+    }, 4500); // Start fade-out at 4.5s for a 5s total lifespan
+
+    activeToastTimers.push(timerId);
+}
+
+    function createLogCard(data) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('dice-dialogue-message');
+        messageElement.dataset.id = data.id;
+
+        const cardContent = document.createElement('div');
+        cardContent.classList.add('dice-roll-card-content'); // Reuse styles
+        messageElement.appendChild(cardContent);
+
+        let detailsPara;
+
+        if (data.type === 'roll') {
+            const profilePic = document.createElement('div');
+            profilePic.classList.add('dice-roll-profile-pic');
+            if (data.characterPortrait) {
+                profilePic.style.backgroundImage = `url('${data.characterPortrait}')`;
+            } else {
+                profilePic.textContent = data.characterInitials || '??';
+            }
+            cardContent.appendChild(profilePic);
+
+            const textContainer = document.createElement('div');
+            textContainer.classList.add('dice-roll-text-container');
+            cardContent.appendChild(textContainer);
+
+            const namePara = document.createElement('p');
+            namePara.classList.add('dice-roll-name');
+            namePara.innerHTML = `<strong>${data.characterName}</strong> played by <strong>${data.playerName}</strong>`;
+            textContainer.appendChild(namePara);
+
+            detailsPara = document.createElement('p');
+            detailsPara.classList.add('dice-roll-details');
+            detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${data.sum}</strong> | ${data.roll}`;
+            textContainer.appendChild(detailsPara);
+
+            const timestampPara = document.createElement('p');
+            timestampPara.classList.add('dice-roll-timestamp');
+            timestampPara.textContent = data.timestamp;
+            textContainer.appendChild(timestampPara);
+
+        } else { // System or Note
+            detailsPara = document.createElement('p');
+            detailsPara.classList.add('dice-roll-details');
+             if (data.type === 'dm-note') {
+                detailsPara.innerHTML = `<strong>DM Note:</strong> ${data.message}`;
+            } else {
+                detailsPara.innerHTML = data.message;
+            }
+            cardContent.appendChild(detailsPara);
+
+            const timestampPara = document.createElement('p');
+            timestampPara.classList.add('dice-roll-timestamp');
+            timestampPara.textContent = data.timestamp;
+            cardContent.appendChild(timestampPara);
+        }
+
+        const actionContainer = document.createElement('div');
+        actionContainer.classList.add('dice-roll-actions');
+        actionContainer.innerHTML = `
+            <span class="action-icon edit-log" title="Edit Entry">✏️</span>
+            <span class="action-icon save-log" title="Save Entry" style="display: none;">💾</span>
+            <span class="action-icon delete-log" title="Delete Entry">🗑️</span>
+        `;
+        cardContent.appendChild(actionContainer);
+
+        return messageElement;
+    }
+
+    function addLogEntry(data) {
+        if (!diceDialogueRecord) return;
+
+        // Add timestamp and ID
+        const timestamp = new Date();
+        const hours = timestamp.getHours();
+        const minutes = timestamp.getMinutes();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        const formattedHours = hours % 12 || 12;
+        const formattedMinutes = minutes.toString().padStart(2, '0');
+        data.timestamp = `${(timestamp.getMonth() + 1).toString().padStart(2, '0')}.${timestamp.getDate().toString().padStart(2, '0')}.${timestamp.getFullYear().toString().slice(-2)} | ${formattedHours}:${formattedMinutes}${ampm}`;
+        data.id = timestamp.getTime() + Math.random();
+
+        // Set type if not present
+        if (!data.type) {
+            data.type = 'roll';
+        }
+
+        diceRollHistory.push(data);
+
+        const messageElement = createLogCard(data);
+
+        const logContentContainer = document.getElementById('action-log-content');
+        const targetContainer = logContentContainer || diceDialogueRecord;
+
+        const minimizeButton = document.getElementById('action-log-minimize-button');
+        if (minimizeButton && targetContainer === diceDialogueRecord) {
+             minimizeButton.after(messageElement);
+        } else {
+            targetContainer.prepend(messageElement);
+        }
+
+    displayToast(messageElement);
+    sendToastToPlayerView(data);
+
+        if (diceDialogueRecord.classList.contains('persistent-log')) {
+            sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+        }
+    }
+
+    function sendDiceMenuStateToPlayerView(isOpen) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'diceMenuState', isOpen: isOpen }, '*');
+        }
+    }
+
+    function sendDiceRollToPlayerView(results, sum) {
+        if (playerWindow && !playerWindow.closed) {
+            playerWindow.postMessage({ type: 'diceRoll', results: results, sum: sum }, '*');
+        }
+    }
+
+    function renderSavedRolls() {
+        if (!savedRollsList) return;
+        savedRollsList.innerHTML = '';
+
+        if (savedRolls.length === 0) {
+            const placeholder = document.createElement('li');
+            placeholder.textContent = 'No rolls saved yet.';
+            placeholder.style.color = '#a0b4c9';
+            savedRollsList.appendChild(placeholder);
+            return;
+        }
+
+        savedRolls.forEach((savedRoll, index) => {
+            const listItem = document.createElement('li');
+            listItem.style.display = 'flex';
+            listItem.style.justifyContent = 'space-between';
+            listItem.style.alignItems = 'center';
+            listItem.style.marginBottom = '10px';
+            listItem.dataset.index = index;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = savedRoll.name;
+            listItem.appendChild(nameSpan);
+
+            const buttonsDiv = document.createElement('div');
+            const rollBtn = document.createElement('button');
+            rollBtn.textContent = 'Roll';
+            rollBtn.dataset.action = 'roll';
+            rollBtn.style.marginRight = '5px';
+            buttonsDiv.appendChild(rollBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Del';
+            deleteBtn.dataset.action = 'delete';
+            buttonsDiv.appendChild(deleteBtn);
+
+            listItem.appendChild(buttonsDiv);
+            savedRollsList.appendChild(listItem);
+        });
+    }
+
+    if (saveRollButton) {
+        saveRollButton.addEventListener('click', () => {
+            const name = saveRollNameInput.value.trim();
+            if (!name) {
+                alert('Please enter a name for the roll.');
+                return;
+            }
+
+            const currentDice = { ...diceCounts };
+            const hasDice = Object.values(currentDice).some(count => count > 0);
+
+            if (!hasDice) {
+                alert('Please select at least one die to save.');
+                return;
+            }
+
+            const modifier = parseInt(modifierInput.value, 10) || 0;
+            savedRolls.push({ name: name, dice: currentDice, modifier: modifier });
+            saveRollNameInput.value = '';
+            renderSavedRolls();
+        });
+    }
+
+    if (savedRollsList) {
+        savedRollsList.addEventListener('click', (event) => {
+            const target = event.target;
+            const action = target.dataset.action;
+            const listItem = target.closest('li');
+            if (!action || !listItem) return;
+
+            const index = parseInt(listItem.dataset.index, 10);
+            if (isNaN(index) || index >= savedRolls.length) return;
+
+            if (action === 'roll') {
+                const savedRoll = savedRolls[index];
+                let allRolls = [];
+                let totalSum = 0;
+                const rollsByDie = {};
+                const modifier = savedRoll.modifier || 0;
+
+                for (const die in savedRoll.dice) {
+                    const count = savedRoll.dice[die];
+                    if (count === 0) continue;
+
+                    let sides;
+                    let dieName = die;
+                    if (die === 'd_custom') {
+                        sides = parseInt(customDieInput.value, 10);
+                        if (isNaN(sides) || sides < 2 || sides > 1000) continue;
+                        dieName = `d${sides}`;
+                    } else {
+                        sides = parseInt(die.substring(1), 10);
+                    }
+
+                    if (!rollsByDie[dieName]) rollsByDie[dieName] = [];
+                    for (let i = 0; i < count; i++) {
+                        const roll = Math.floor(Math.random() * sides) + 1;
+                        allRolls.push(roll);
+                        totalSum += roll;
+                        rollsByDie[dieName].push(roll);
+                    }
+                }
+
+                totalSum += modifier;
+
+                const detailsParts = [];
+                for (const dieName in rollsByDie) {
+                    detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
+                }
+                let detailsMessage = `${savedRoll.name}: ${detailsParts.join(', ')}`;
+                if (modifier !== 0) {
+                    detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+                }
+
+                diceResultSum.textContent = totalSum;
+                diceResultDetails.textContent = detailsMessage;
+                addLogEntry({
+                    characterName: 'Dice Roller',
+                    playerName: 'DM',
+                    roll: detailsMessage,
+                    sum: totalSum
+                });
+                sendDiceRollToPlayerView(allRolls, totalSum);
+
+            } else if (action === 'delete') {
+                if (confirm(`Are you sure you want to delete the "${savedRolls[index].name}" roll?`)) {
+                    savedRolls.splice(index, 1);
+                    renderSavedRolls();
+                }
+            }
+        });
+    }
+
+    const diceCounts = { d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, d100: 0, d_custom: 0 };
+    const diceButtons = document.querySelectorAll('.dice-button');
+    const rollButton = document.getElementById('roll-button');
+    const diceResultSum = document.getElementById('dice-result-sum');
+    const diceResultDetails = document.getElementById('dice-result-details');
+    const customDieInput = document.getElementById('custom-die-input');
+    const modifierInput = document.getElementById('dice-roll-modifier-input');
+
+    function updateDiceCountDisplay(die) {
+        const count = diceCounts[die];
+        const span = document.querySelector(`.dice-button[data-die="${die}"] .dice-count`);
+        if (span) {
+            span.textContent = count > 0 ? `+${count}` : '';
+        } else if (die === 'd_custom') {
+            const customSpan = document.querySelector('.dice-count[data-die-custom]');
+            if (customSpan) {
+                customSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        }
+    }
+
+    diceButtons.forEach(button => {
+        const die = button.dataset.die;
+        button.addEventListener('click', () => {
+            diceCounts[die]++;
+            updateDiceCountDisplay(die);
+        });
+
+        button.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (diceCounts[die] > 0) {
+                diceCounts[die]--;
+                updateDiceCountDisplay(die);
+            }
+        });
+    });
+
+    if (rollButton) {
+        rollButton.addEventListener('click', () => {
+            let allRolls = [];
+            let totalSum = 0;
+            const rollsByDie = {};
+
+            for (const die in diceCounts) {
+                const count = diceCounts[die];
+                if (count === 0) continue;
+
+                let sides;
+                let dieName = die;
+                if (die === 'd_custom') {
+                    sides = parseInt(customDieInput.value, 10);
+                    if (isNaN(sides) || sides < 2 || sides > 1000) {
+                        alert("Custom die must have between 2 and 1000 sides.");
+                        continue;
+                    }
+                    dieName = `d${sides}`;
+                } else {
+                    sides = parseInt(die.substring(1), 10);
+                }
+
+                if (!rollsByDie[dieName]) {
+                    rollsByDie[dieName] = [];
+                }
+
+                for (let i = 0; i < count; i++) {
+                    const roll = Math.floor(Math.random() * sides) + 1;
+                    allRolls.push(roll);
+                    totalSum += roll;
+                    rollsByDie[dieName].push(roll);
+                }
+            }
+
+            const modifier = parseInt(modifierInput.value, 10) || 0;
+            totalSum += modifier;
+            diceResultSum.textContent = totalSum;
+
+            const detailsParts = [];
+            for (const dieName in rollsByDie) {
+                detailsParts.push(`${dieName}[${rollsByDie[dieName].join(',')}]`);
+            }
+            let detailsMessage = `Custom: ${detailsParts.join(', ')}`;
+            if (modifier !== 0) {
+                detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+            }
+            diceResultDetails.textContent = detailsMessage;
+
+            addLogEntry({
+                characterName: 'Dice Roller',
+                playerName: 'DM',
+                roll: detailsMessage,
+                sum: totalSum
+            });
+
+            sendDiceRollToPlayerView(allRolls, totalSum);
+
+            for (const die in diceCounts) {
+                diceCounts[die] = 0;
+                updateDiceCountDisplay(die);
+            }
+        });
+    }
+
+    if (diceRollerIcon) {
+        diceRollerIcon.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (dmFloatingFooter) {
+                dmFloatingFooter.classList.toggle('visible');
+                // Optional: send state to player view if footer visibility should be synced
+                // sendDiceIconMenuStateToPlayerView(dmFloatingFooter.classList.contains('visible'));
+            }
+        });
+    }
+
+    if (dmToolsList) {
+        dmToolsList.addEventListener('click', (event) => {
+            const target = event.target.closest('li');
+            if (!target) return;
+
+            const action = target.dataset.action;
+            if (action) {
+                if (dmFloatingFooter) {
+                    dmFloatingFooter.classList.remove('visible');
+                }
+                // sendDiceIconMenuStateToPlayerView(false);
+
+                switch (action) {
+                    case 'open-initiative-tracker':
+                        if (initiativeTrackerOverlay) {
+                            initiativeTrackerOverlay.style.display = 'flex';
+                            if (!initiativeTrackerOverlay.querySelector('.overlay-minimize-button')) {
+                                const minimizeButton = document.createElement('button');
+                                minimizeButton.className = 'overlay-minimize-button';
+                                minimizeButton.textContent = '—';
+                                minimizeButton.onclick = () => {
+                                    initiativeTrackerOverlay.style.display = 'none';
+                                    sendInitiativeTrackerStateToPlayerView(false);
+                                };
+                                initiativeTrackerOverlay.querySelector('.overlay-content').prepend(minimizeButton);
+                            }
+                            renderInitiativeMasterList();
+                            sendInitiativeTrackerStateToPlayerView(true);
+                            sendInitiativeDataToPlayerView();
+                        }
+                        break;
+                    case 'open-dice-roller':
+                        if (diceRollerOverlay) {
+                            diceRollerOverlay.style.display = 'flex';
+                             if (!diceRollerOverlay.querySelector('.overlay-minimize-button')) {
+                                const minimizeButton = document.createElement('button');
+                                minimizeButton.className = 'overlay-minimize-button';
+                                minimizeButton.textContent = '—';
+                                minimizeButton.onclick = () => {
+                                    diceRollerOverlay.style.display = 'none';
+                                    sendDiceMenuStateToPlayerView(false);
+                                };
+                                diceRollerOverlay.querySelector('.overlay-content').prepend(minimizeButton);
+                            }
+                            sendDiceMenuStateToPlayerView(true);
+                        }
+                        break;
+                    case 'open-action-log':
+                        if (diceDialogueRecord) {
+                            clearToasts();
+                            diceDialogueRecord.classList.add('persistent-log');
+                            diceDialogueRecord.style.display = 'flex';
+
+                            // Ensure the structured layout exists
+                            if (!document.getElementById('action-log-header')) {
+                                diceDialogueRecord.innerHTML = ''; // Clear before structuring
+
+                                // Header
+                                const header = document.createElement('div');
+                                header.id = 'action-log-header';
+
+                                const noteInput = document.createElement('input');
+                                noteInput.type = 'text';
+                                noteInput.id = 'action-log-note-input';
+                                noteInput.placeholder = 'Add a quick note...';
+                                header.appendChild(noteInput);
+
+                                const addNoteBtn = document.createElement('button');
+                                addNoteBtn.id = 'action-log-add-note-btn';
+                                addNoteBtn.textContent = 'Add';
+                                addNoteBtn.addEventListener('click', () => {
+                                    if (noteInput.value.trim()) {
+                                        createLogEntry(noteInput.value.trim(), 'note');
+                                        noteInput.value = '';
+                                    }
+                                });
+                                header.appendChild(addNoteBtn);
+
+                                const minimizeButton = document.createElement('button');
+                                minimizeButton.id = 'action-log-minimize-button';
+                                minimizeButton.textContent = '—';
+                                minimizeButton.onclick = () => {
+                                    diceDialogueRecord.classList.remove('persistent-log');
+                                    diceDialogueRecord.style.display = 'none';
+                                    sendActionLogStateToPlayerView(false);
+                                };
+                                header.appendChild(minimizeButton);
+
+                                // Content
+                                const content = document.createElement('div');
+                                content.id = 'action-log-content';
+
+                                diceDialogueRecord.appendChild(header);
+                                diceDialogueRecord.appendChild(content);
+
+                                // Re-populate content from history
+                                diceRollHistory.forEach(item => {
+                                    const messageElement = createLogCard(item);
+                                    content.prepend(messageElement);
+                                });
+                            }
+                            sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                        }
+                        break;
+                }
+            }
+        });
+    }
+
+    if (diceRollerOverlay) {
+        diceRollerOverlay.addEventListener('click', (event) => {
+            if (event.target === diceRollerOverlay) {
+                diceRollerOverlay.style.display = 'none';
+                sendDiceMenuStateToPlayerView(false);
+            }
+        });
+    }
+
+    // --- Initiative Tracker Logic ---
+
+    function rollInitiativeForCharacter(character, newInitiative = null) {
+        const initiativeBonus = parseInt(character.sheetData?.initiative || 0, 10);
+        let roll;
+        let total;
+
+        if (newInitiative !== null) {
+            total = newInitiative;
+            roll = newInitiative - initiativeBonus;
+        } else {
+            roll = Math.floor(Math.random() * 20) + 1;
+            total = roll + initiativeBonus;
+        }
+
+        const characterName = character.name || 'Unknown';
+        const playerName = character.sheetData?.player_name || 'DM';
+        const characterPortrait = character.sheetData?.character_portrait || null;
+        const characterInitials = getInitials(characterName);
+
+        const rollData = {
+            characterName: characterName,
+            playerName: playerName,
+            roll: `d20(${roll}) + ${initiativeBonus} for Initiative`,
+            sum: total,
+            characterPortrait: characterPortrait,
+            characterInitials: characterInitials
+        };
+
+        addLogEntry(rollData);
+        sendDiceRollToPlayerView([roll], total);
+        return total;
+    }
+
+    function renderInitiativeMasterList() {
+        if (!masterCharacterList) return;
+        masterCharacterList.innerHTML = '';
+        charactersData.forEach(character => {
+            const card = createInitiativeCharacterCard(character);
+            card.dataset.characterId = character.id;
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', () => {
+                const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() };
+                activeInitiative.push(newInitiativeCharacter);
+                renderActiveInitiativeList();
+            });
+            masterCharacterList.appendChild(card);
+        });
+    }
+
+    function getInitials(name) {
+        if (!name) return '??';
+        const parts = name.split(' ');
+        if (parts.length > 1) {
+            return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
+        }
+        return name.substring(0, 2);
+    }
+
+    function createInitiativeCharacterCard(character) {
+        const li = document.createElement('li');
+        li.className = 'initiative-character-card';
+
+        if (character.sheetData?.character_portrait) {
+            const portrait = document.createElement('img');
+            portrait.src = character.sheetData.character_portrait;
+            li.appendChild(portrait);
+        } else {
+            const initials = document.createElement('div');
+            initials.className = 'initiative-character-initials';
+            initials.textContent = getInitials(character.name);
+            li.appendChild(initials);
+        }
+
+        const info = document.createElement('div');
+        info.className = 'initiative-character-info';
+
+        const name = document.createElement('h4');
+        name.textContent = character.name;
+        info.appendChild(name);
+
+        const details = document.createElement('p');
+        details.textContent = `${character.sheetData?.class_level || 'N/A'} ${character.sheetData?.race || ''} ${character.sheetData?.class_level || ''}`;
+        info.appendChild(details);
+
+        li.appendChild(info);
+
+        const hp = document.createElement('div');
+        hp.className = 'initiative-character-hp';
+        hp.innerHTML = `HP: <input type="number" value="${character.sheetData?.hp_current || ''}" style="width: 50px;" data-character-id="${character.uniqueId}" data-hp-input /> / ${character.sheetData?.hp_max || 'N/A'}`;
+        li.appendChild(hp);
+
+        const damageDealt = document.createElement('div');
+        damageDealt.className = 'initiative-character-damage';
+        damageDealt.innerHTML = `Dmg Dealt: <input type="number" value="0" style="width: 50px;" data-character-id="${character.uniqueId}" data-damage-input />`;
+        li.appendChild(damageDealt);
+
+        const initiativeValue = document.createElement('div');
+        initiativeValue.className = 'initiative-value';
+        initiativeValue.textContent = '-';
+        li.appendChild(initiativeValue);
+
+        return li;
+    }
+
+    function handleInitiativeDragStart(e) {
+        e.dataTransfer.setData('text/plain', e.target.dataset.characterId);
+        e.target.classList.add('dragging');
+    }
+
+    if(activeInitiativeList) {
+        activeInitiativeList.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        activeInitiativeList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const draggingElement = document.querySelector('.dragging');
+            if(draggingElement) {
+                draggingElement.classList.remove('dragging');
+            }
+
+            const characterId = e.dataTransfer.getData('text/plain');
+
+            const existingCharacter = activeInitiative.find(c => c.uniqueId == characterId);
+
+            if(existingCharacter) {
+                const newIndex = Array.from(activeInitiativeList.children).indexOf(e.target.closest('.initiative-character-card'));
+                const oldIndex = activeInitiative.indexOf(existingCharacter);
+                activeInitiative.splice(oldIndex, 1);
+                activeInitiative.splice(newIndex, 0, existingCharacter);
+            } else {
+                const character = charactersData.find(c => c.id == characterId);
+                if (character) {
+                    const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() };
+                    activeInitiative.push(newInitiativeCharacter);
+                }
+            }
+            renderActiveInitiativeList();
+        });
+
+        activeInitiativeList.addEventListener('dragenter', e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(activeInitiativeList, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (afterElement == null) {
+                activeInitiativeList.appendChild(draggable);
+            } else {
+                activeInitiativeList.insertBefore(draggable, afterElement);
+            }
+        });
+    }
+
+    function renderActiveInitiativeList() {
+        if (!activeInitiativeList) return;
+        activeInitiativeList.innerHTML = '';
+        activeInitiative.forEach(character => {
+            const card = createInitiativeCharacterCard(character);
+            card.dataset.uniqueId = character.uniqueId;
+            card.draggable = true;
+
+            const initiativeValueDiv = card.querySelector('.initiative-value');
+            initiativeValueDiv.textContent = character.initiative ?? '-';
+            initiativeValueDiv.contentEditable = true;
+            initiativeValueDiv.addEventListener('blur', (e) => {
+                const newInitiativeValue = parseInt(e.target.textContent, 10);
+                if (!isNaN(newInitiativeValue)) {
+                    character.initiative = rollInitiativeForCharacter(character, newInitiativeValue);
+                } else {
+                    character.initiative = null;
+                }
+                sortActiveInitiative();
+                renderActiveInitiativeList();
+            });
+
+            const hpInput = card.querySelector('[data-hp-input]');
+            hpInput.addEventListener('change', (e) => {
+                const charInInitiative = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
+                if (charInInitiative) {
+                    const newHp = e.target.value;
+                    // Update the character in the active initiative list
+                    charInInitiative.sheetData.hp_current = newHp;
+
+                    // Find and update the corresponding character in the master list
+                    const mainCharacter = charactersData.find(c => c.id === charInInitiative.id);
+                    if (mainCharacter) {
+                        if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                        mainCharacter.sheetData.hp_current = newHp;
+                    }
+
+                    // Let the player view know about the change
+                    sendInitiativeDataToPlayerView();
+                }
+            });
+
+            const damageInput = card.querySelector('[data-damage-input]');
+            damageInput.addEventListener('change', (e) => {
+                const char = activeInitiative.find(c => c.uniqueId == e.target.dataset.characterId);
+                if(char) {
+                    char.damageDealt = e.target.value;
+                }
+            });
+
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.dataset.uniqueId);
+                e.target.classList.add('dragging');
+            });
+            card.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+            });
+
+            activeInitiativeList.appendChild(card);
+        });
+        sendInitiativeDataToPlayerView();
+    }
+
+    function sortActiveInitiative() {
+        activeInitiative.sort((a, b) => {
+            if (b.initiative === null) return -1;
+            if (a.initiative === null) return 1;
+            return b.initiative - a.initiative;
+        });
+    }
+
+    if(initiativeTrackerOverlay) {
+        initiativeTrackerOverlay.addEventListener('click', (event) => {
+            if (event.target === initiativeTrackerOverlay) {
+                initiativeTrackerOverlay.style.display = 'none';
+                sendInitiativeTrackerStateToPlayerView(false);
+            }
+        });
+    }
+
+    if(autoInitiativeButton) {
+        autoInitiativeButton.addEventListener('click', () => {
+            activeInitiative.forEach(character => {
+                character.initiative = rollInitiativeForCharacter(character);
+            });
+            sortActiveInitiative();
+            renderActiveInitiativeList();
+        });
+    }
+
+    if(saveInitiativeButton) {
+        saveInitiativeButton.addEventListener('click', () => {
+            const name = saveInitiativeNameInput.value.trim();
+            if (!name) {
+                alert("Please enter a name for the initiative to save it.");
+                return;
+            }
+            savedInitiatives[name] = JSON.parse(JSON.stringify(activeInitiative));
+            renderSavedInitiativesList();
+        });
+    }
+
+    if(loadInitiativeButton) {
+        loadInitiativeButton.addEventListener('click', () => {
+            const selectedItem = savedInitiativesList.querySelector('.selected');
+            if (selectedItem) {
+                const name = selectedItem.dataset.name;
+                activeInitiative = JSON.parse(JSON.stringify(savedInitiatives[name]));
+                initiativeTrackerTitle.textContent = name;
+                saveInitiativeNameInput.value = name;
+                renderActiveInitiativeList();
+            } else {
+                alert("Please select a saved initiative to load.");
+            }
+        });
+    }
+
+    function renderSavedInitiativesList() {
+        if (!savedInitiativesList) return;
+        savedInitiativesList.innerHTML = '';
+        Object.keys(savedInitiatives).forEach(name => {
+            const li = document.createElement('li');
+            li.textContent = name;
+            li.dataset.name = name;
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = '🗑️';
+            deleteButton.classList.add('delete-initiative-button');
+            deleteButton.style.marginLeft = '10px';
+            deleteButton.onclick = (e) => {
+                e.stopPropagation(); // prevent the li click event from firing
+                if (confirm(`Are you sure you want to delete the initiative "${name}"?`)) {
+                    delete savedInitiatives[name];
+                    renderSavedInitiativesList();
+                }
+            };
+
+            li.appendChild(deleteButton);
+
+            li.addEventListener('click', () => {
+                const current = savedInitiativesList.querySelector('.selected');
+                if (current) current.classList.remove('selected');
+                li.classList.add('selected');
+            });
+            savedInitiativesList.appendChild(li);
+        });
+    }
+
+    function updateRealTimeTimer() {
+        const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
+        const hours = Math.floor(elapsedSeconds / 3600);
+        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+        const seconds = elapsedSeconds % 60;
+        realTimeTimer.textContent =
+            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function updateGameTimeTimer() {
+        gameTimeTimer.textContent = `${gameTime}s`;
+    }
+
+    function createLogEntry(message, type = 'system') {
+        addLogEntry({
+            type: type,
+            message: message
+        });
+    }
+
+    function createSurvivorStatus() {
+        let message = '<strong>Survivor Status:</strong><ul>';
+        activeInitiative.forEach(char => {
+            message += `<li>${char.name}: HP ${char.startingHP} -> ${char.sheetData.hp_current}, Damage Dealt: ${char.damageDealt}</li>`;
+        });
+        message += '</ul>';
+        createLogEntry(message);
+    }
+
+    if(startInitiativeButton) {
+        startInitiativeButton.addEventListener('click', () => {
+            if (activeInitiative.length === 0) {
+                alert("Please add characters to the initiative before starting.");
+                return;
+            }
+            if (initiativeTurn === -1) { // Starting initiative
+                if (isWandering) {
+                    isWandering = false;
+                    wanderButton.textContent = 'Wander';
+                }
+
+                initiativeTurn = 0;
+                initiativeRound = 1;
+                gameTime = 0;
+
+                activeInitiative.forEach(character => {
+                    character.startingHP = character.sheetData.hp_current;
+                    character.damageDealt = 0;
+                });
+
+                initiativeStartTime = Date.now();
+                realTimeInterval = setInterval(updateRealTimeTimer, 1000);
+                initiativeTimers.style.display = 'flex';
+                updateGameTimeTimer();
+
+                createLogEntry("Combat Started");
+
+                startInitiativeButton.textContent = 'Stop Initiative';
+                nextTurnButton.style.display = 'inline-block';
+                prevTurnButton.style.display = 'inline-block';
+
+                initiativeTokens = [];
+                let tokenX = 50;
+                let tokenY = 50;
+                let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
+
+                activeInitiative.forEach(character => {
+                    const token = {
+                        characterId: character.id,
+                        uniqueId: character.uniqueId,
+                        x: tokenX,
+                        y: tokenY,
+                        size: mapIconSize,
+                        name: character.name,
+                        playerName: character.sheetData.player_name,
+                        portrait: character.sheetData.character_portrait,
+                        initials: getInitials(character.name)
+                    };
+                    initiativeTokens.push(token);
+                    tokenX += tokenPixelSize + 10;
+                });
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+
+                highlightActiveTurn();
+                sendInitiativeDataToPlayerView();
+            } else { // Stopping initiative
+                initiativeTokens = [];
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+                clearInterval(realTimeInterval);
+                const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
+                const elapsedFormatted = new Date(elapsedSeconds * 1000).toISOString().substr(11, 8);
+                createLogEntry(`Combat Ended. Real Time: ${elapsedFormatted}, Game Time: ${gameTime}s`);
+                createSurvivorStatus();
+
+                initiativeTurn = -1;
+                initiativeStartTime = null;
+                initiativeTimers.style.display = 'none';
+                startInitiativeButton.textContent = 'Start Initiative';
+                nextTurnButton.style.display = 'none';
+                prevTurnButton.style.display = 'none';
+                clearTurnHighlight();
+
+                // Hide token stat block on both DM and player views when initiative ends
+                if (selectedTokenForStatBlock) {
+                    tokenStatBlock.style.display = 'none';
+                    selectedTokenForStatBlock = null;
+                    sendTokenStatBlockStateToPlayerView(false);
+                }
+
+                sendInitiativeDataToPlayerView();
+            }
+        });
+    }
+
+    if (wanderButton) {
+        wanderButton.addEventListener('click', () => {
+            if (isWandering) {
+                // Stop Wandering
+                isWandering = false;
+                wanderButton.textContent = 'Wander';
+                initiativeTokens = [];
+                createLogEntry("Stopped Wandering");
+
+                // Hide token stat block on both DM and player views when wandering ends
+                if (selectedTokenForStatBlock) {
+                    tokenStatBlock.style.display = 'none';
+                    selectedTokenForStatBlock = null;
+                    sendTokenStatBlockStateToPlayerView(false);
+                }
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+                sendInitiativeDataToPlayerView();
+            } else {
+                // Start Wandering
+                if (activeInitiative.length === 0) {
+                    alert("Please add characters to the initiative list before starting to wander.");
+                    return;
+                }
+                // Stop initiative if it's running
+                if (initiativeTurn !== -1) {
+                    clearInterval(realTimeInterval);
+                    initiativeTurn = -1;
+                    initiativeStartTime = null;
+                    initiativeTimers.style.display = 'none';
+                    startInitiativeButton.textContent = 'Start Initiative';
+                    nextTurnButton.style.display = 'none';
+                    prevTurnButton.style.display = 'none';
+                    clearTurnHighlight();
+                }
+
+                isWandering = true;
+                wanderButton.textContent = 'Stop Wandering';
+
+                initiativeTokens = [];
+                let tokenX = 50;
+                let tokenY = 50;
+                let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
+
+                activeInitiative.forEach(character => {
+                    const token = {
+                        characterId: character.id,
+                        uniqueId: character.uniqueId,
+                        x: tokenX,
+                        y: tokenY,
+                        size: mapIconSize,
+                        name: character.name,
+                        playerName: character.sheetData.player_name,
+                        portrait: character.sheetData.character_portrait,
+                        initials: getInitials(character.name)
+                    };
+                    initiativeTokens.push(token);
+                    tokenX += tokenPixelSize + 10;
+                });
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+
+                createLogEntry("Characters are Wandering");
+                sendInitiativeDataToPlayerView();
+            }
+        });
+    }
+
+    if(nextTurnButton) {
+        nextTurnButton.addEventListener('click', () => {
+            if(initiativeTurn !== -1) {
+                initiativeTurn = (initiativeTurn + 1) % activeInitiative.length;
+                if (initiativeTurn === 0) {
+                    initiativeRound++;
+                    gameTime += 6;
+                    updateGameTimeTimer();
+                    createLogEntry(`Round ${initiativeRound} Started`);
+                }
+                highlightActiveTurn();
+                sendInitiativeDataToPlayerView();
+            }
+        });
+    }
+
+    if(prevTurnButton) {
+        prevTurnButton.addEventListener('click', () => {
+            if(initiativeTurn !== -1) {
+                initiativeTurn = (initiativeTurn - 1 + activeInitiative.length) % activeInitiative.length;
+                highlightActiveTurn();
+                sendInitiativeDataToPlayerView();
+            }
+        });
+    }
+
+    function highlightActiveTurn() {
+        clearTurnHighlight();
+        if (activeInitiative.length > 0) {
+            const card = activeInitiativeList.querySelector(`[data-unique-id="${activeInitiative[initiativeTurn].uniqueId}"]`);
+            if (card) {
+                card.classList.add('active-turn');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        if (selectedMapFileName) {
+            displayMapOnCanvas(selectedMapFileName);
+        }
+    }
+
+    function clearTurnHighlight() {
+        const highlighted = activeInitiativeList.querySelector('.active-turn');
+        if (highlighted) {
+            highlighted.classList.remove('active-turn');
+        }
+    }
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.initiative-character-card:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    document.body.addEventListener('drop', (e) => {
+        const draggingElement = document.querySelector('.dragging');
+        if (draggingElement && !activeInitiativeList.contains(e.target) && !masterCharacterList.contains(e.target)) {
+            const uniqueId = draggingElement.dataset.uniqueId;
+            const index = activeInitiative.findIndex(c => c.uniqueId == uniqueId);
+            if (index > -1) {
+                activeInitiative.splice(index, 1);
+                renderActiveInitiativeList();
+            }
+        }
+    });
+
+    document.body.addEventListener('dragover', e => {
+        e.preventDefault();
+    });
+
+    if (mapIconSizeSlider && mapIconSizeValue) {
+        mapIconSizeSlider.addEventListener('input', (e) => {
+            mapIconSize = parseInt(e.target.value, 10);
+            mapIconSizeValue.textContent = `${mapIconSize}%`;
+            if (initiativeTokens.length > 0) {
+                initiativeTokens.forEach(token => {
+                    token.size = mapIconSize;
+                });
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+            }
+        });
+    }
+
+    if (diceDialogueRecord) {
+        diceDialogueRecord.addEventListener('click', (event) => {
+            const target = event.target;
+            const messageElement = target.closest('.dice-dialogue-message');
+            if (!messageElement) return;
+
+            const logId = messageElement.dataset.id;
+            const historyIndex = diceRollHistory.findIndex(item => String(item.id) === String(logId));
+            if (historyIndex === -1) return;
+
+            const detailsPara = messageElement.querySelector('.dice-roll-details');
+            const editIcon = messageElement.querySelector('.edit-log');
+            const saveIcon = messageElement.querySelector('.save-log');
+
+            if (target.classList.contains('delete-log')) {
+                // Handle Delete
+                if (confirm('Are you sure you want to delete this log entry?')) {
+                    diceRollHistory.splice(historyIndex, 1);
+                    messageElement.remove();
+                    if (diceDialogueRecord.classList.contains('persistent-log')) {
+                       sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                    }
+                }
+            } else if (target.classList.contains('edit-log')) {
+                // Handle Edit
+                detailsPara.contentEditable = true;
+                detailsPara.focus();
+                editIcon.style.display = 'none';
+                saveIcon.style.display = 'inline';
+            } else if (target.classList.contains('save-log')) {
+                // Handle Save
+                detailsPara.contentEditable = false;
+                editIcon.style.display = 'inline';
+                saveIcon.style.display = 'none';
+
+                const newText = detailsPara.innerText;
+
+                if (diceRollHistory[historyIndex].type === 'roll') {
+                    const separatorIndex = newText.indexOf('|');
+                    let newSum, newRoll;
+                    if (separatorIndex !== -1) {
+                        newSum = newText.substring(0, separatorIndex).trim();
+                        newRoll = newText.substring(separatorIndex + 1).trim();
+                    } else {
+                        newSum = '';
+                        newRoll = newText;
+                    }
+                    diceRollHistory[historyIndex].sum = newSum;
+                    diceRollHistory[historyIndex].roll = newRoll;
+                    detailsPara.innerHTML = `<strong class="dice-roll-sum-text">${newSum}</strong> | ${newRoll}`;
+                } else {
+                    diceRollHistory[historyIndex].message = newText;
+                    detailsPara.innerHTML = newText;
+                }
+
+                if (diceDialogueRecord.classList.contains('persistent-log')) {
+                   sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                }
+            }
+        });
+    }
+
+    // --- Campaign Timer Logic ---
+    const campaignTimerDisplay = document.getElementById('campaign-timer-display');
+    const campaignTimerToggle = document.getElementById('campaign-timer-toggle');
+
+    function formatTime(totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function updateCampaignTimerDisplay() {
+        if (campaignTimerDisplay) {
+            campaignTimerDisplay.textContent = formatTime(campaignTime);
+        }
+    }
+
+    function toggleCampaignTimer() {
+        isCampaignTimerPaused = !isCampaignTimerPaused;
+        if (!isCampaignTimerPaused) {
+            campaignTimerToggle.textContent = 'Pause Campaign';
+            addLogEntry({ type: 'system', message: 'Campaign timer has been resumed.' });
+            campaignTimerInterval = setInterval(() => {
+                campaignTime++;
+                updateCampaignTimerDisplay();
+            }, 1000);
+            startRecording();
+        } else {
+            campaignTimerToggle.textContent = 'Resume Campaign';
+            addLogEntry({ type: 'system', message: 'Campaign timer has been paused.' });
+            clearInterval(campaignTimerInterval);
+            stopRecording();
+        }
+    }
+
+    if (campaignTimerToggle) {
+        campaignTimerToggle.addEventListener('click', toggleCampaignTimer);
+    }
+    // --- End Campaign Timer Logic ---
+
+    const dmNotesInput = document.getElementById('dm-notes-input');
+    if (dmNotesInput) {
+        dmNotesInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && dmNotesInput.value.trim() !== '') {
+                event.preventDefault();
+                addLogEntry({
+                    type: 'dm-note',
+                    message: dmNotesInput.value.trim()
+                });
+                dmNotesInput.value = '';
+            }
+        });
+    }
+
+    // --- Audio Recording Logic ---
+    const recordButton = document.getElementById('record-button');
+    const testAudioButton = document.getElementById('test-audio-button');
+    const audioInputSelect = document.getElementById('audio-input-select');
+    const testAudioPlayback = document.getElementById('test-audio-playback');
+    let mediaRecorder;
+    let recordedChunks = [];
+    let audioBlobs = []; // To store multiple recordings
+
+    async function getAudioDevices() {
+        try {
+            await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioDevices = devices.filter(device => device.kind === 'audioinput');
+            audioInputSelect.innerHTML = '';
+            if (audioDevices.length === 0) {
+                audioInputSelect.innerHTML = '<option>No audio input devices found</option>';
+                recordButton.disabled = true;
+                testAudioButton.disabled = true;
+                return;
+            }
+            audioDevices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Microphone ${audioInputSelect.options.length + 1}`;
+                audioInputSelect.appendChild(option);
+            });
+            recordButton.disabled = false;
+            testAudioButton.disabled = false;
+        } catch (error) {
+            console.error('Error enumerating audio devices:', error);
+            audioInputSelect.innerHTML = '<option>Audio permission denied</option>';
+            recordButton.disabled = true;
+            testAudioButton.disabled = true;
+        }
+    }
+
+    async function startRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            console.log("Already recording.");
+            return;
+        }
+
+        const selectedDeviceId = audioInputSelect.value;
+        if (!selectedDeviceId) {
+            alert("No audio device selected.");
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedDeviceId } } });
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); // Use webm for better compression
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                const campaignName = "MyCampaign"; // Placeholder - should be dynamic later
+                const sessionDate = new Date().toISOString().slice(0, 19).replace(/T/g, '_').replace(/:/g, "-");
+                const fileName = `${campaignName}_Session_${sessionDate}.webm`;
+                audioBlobs.push({ name: fileName, blob: blob });
+                console.log(`Recording saved: ${fileName}`);
+                // Stop all tracks on the stream to release the device
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            recordButton.textContent = 'Stop';
+            recordButton.style.backgroundColor = '#ff4d4d'; // Indicate recording
+            console.log("Recording started.");
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert("Could not start recording. Check console for errors.");
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            recordButton.textContent = 'Record';
+            recordButton.style.backgroundColor = ''; // Revert to default style
+            console.log("Recording stopped.");
+        }
+    }
+
+    if (recordButton) {
+        recordButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+    }
+
+    if (testAudioButton) {
+        testAudioButton.addEventListener('click', async () => {
+            const selectedDeviceId = audioInputSelect.value;
+            if (!selectedDeviceId) {
+                alert("No audio device selected for testing.");
+                return;
+            }
+            testAudioButton.disabled = true;
+            testAudioButton.textContent = 'Testing...';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: selectedDeviceId } } });
+                const testRecorder = new MediaRecorder(stream);
+                const testChunks = [];
+
+                testRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        testChunks.push(event.data);
+                    }
+                };
+
+                testRecorder.onstop = () => {
+                    const blob = new Blob(testChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(blob);
+                    testAudioPlayback.src = audioUrl;
+                    testAudioPlayback.style.display = 'block';
+                    testAudioPlayback.play();
+                    // Stop all tracks on the stream to release the device
+                    stream.getTracks().forEach(track => track.stop());
+                    testAudioButton.disabled = false;
+                    testAudioButton.textContent = 'Test Audio';
+                };
+
+                testRecorder.start();
+                setTimeout(() => {
+                    if (testRecorder.state === 'recording') {
+                        testRecorder.stop();
+                    }
+                }, 5000); // 5-second test recording
+            } catch (error) {
+                console.error('Error during audio test:', error);
+                alert("Could not perform audio test. Check console for errors.");
+                testAudioButton.disabled = false;
+                testAudioButton.textContent = 'Test Audio';
+            }
+        });
+    }
+
+    // Initialize audio devices on load
+    getAudioDevices();
+
+    window.addEventListener('message', (event) => {
+        // We are only interested in messages from the player window, not iframes
+        if (event.source !== playerWindow) {
+            return;
+        }
+
+        const data = event.data;
+        if (data.type === 'slideshowPaused') {
+            slideshowCurrentIndex = data.index;
+            console.log(`Slideshow paused by player view at index: ${slideshowCurrentIndex}`);
+        } else if (data.type === 'slideshowFinished') {
+            console.log('Player view finished playlist. Generating a new one for seamless playback.');
+            slideshowPlaylist = []; // Clear old playlist
+            slideshowCurrentIndex = 0;
+            triggerSlideshow(); // This will generate and send a new playlist
+        }
+    });
+
+    if (modifyQuotesButton) {
+        modifyQuotesButton.addEventListener('click', () => {
+            mapContainer.style.display = 'none';
+            noteEditorContainer.style.display = 'none';
+            characterSheetContainer.style.display = 'none';
+            storyTreeContainer.style.display = 'none';
+
+            quoteEditorContainer.style.display = 'flex';
+
+            if (quoteMap) {
+                quoteJsonEditor.value = JSON.stringify(quoteMap, null, 2);
+            } else {
+                quoteJsonEditor.value = "Loading quotes...";
+                quoteMapPromise.then(data => {
+                    if (data) {
+                        quoteJsonEditor.value = JSON.stringify(data, null, 2);
+                    } else {
+                        quoteJsonEditor.value = "Failed to load quote_map.json. Check the console for errors.";
+                    }
+                });
+            }
+        });
+    }
+
+    if (saveQuotesButton) {
+        saveQuotesButton.addEventListener('click', () => {
+            try {
+                const updatedQuotes = JSON.parse(quoteJsonEditor.value);
+                quoteMap = updatedQuotes;
+                alert("Quotes updated in memory for this session. They will be saved with the campaign.");
+            } catch (e) {
+                alert("Invalid JSON format. Please correct the errors before saving.");
+                console.error("Error parsing quote JSON:", e);
+            }
+        });
+    }
+
+    if (viewStoryTreeButton) {
+        viewStoryTreeButton.addEventListener('click', () => {
+            switchTab('tab-story-beats');
+        });
+    }
+
+    function initStoryTree() {
+        // UI Elements
+        const canvas = document.getElementById('quest-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const cardContainer = document.getElementById('card-container');
+        const container = document.getElementById('canvas-container');
+        const overlay = document.getElementById('story-beat-card-overlay');
+        const storyBeatCardBody = document.getElementById('story-beat-card-body');
+
+        // Pan, Zoom, and Mode state
+        let scale = 1.0;
+        let originX = 0;
+        let originY = 0;
+        let isPanning = false;
+        let isLinking = false;
+        let isMoving = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let activeOverlayCardId = null;
+        let linkSourceId = null;
+
+        // --- Core Functions ---
+
+        const updateContainerTransform = () => {
+            cardContainer.style.transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
+            drawConnections();
+        };
+
+        const drawConnections = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(scale, scale);
+
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            quests.forEach(quest => {
+                if (quest.parentIds && quest.parentIds.length > 0) {
+                    quest.parentIds.forEach(parentId => {
+                        const parentQuest = quests.find(q => q.id === parentId);
+                        if (parentQuest) {
+                            ctx.beginPath();
+                            ctx.moveTo(parentQuest.x, parentQuest.y);
+                            ctx.lineTo(quest.x, quest.y);
+                            ctx.stroke();
+                        }
+                    });
+                }
+            });
+            ctx.restore();
+        };
+
+        const renderCards = () => {
+            cardContainer.innerHTML = ''; // Clear only when data changes
+
+            quests.forEach(quest => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                if (quest.id === selectedQuestId) {
+                    card.classList.add('selected');
+                }
+                card.dataset.id = quest.id;
+
+                const background = document.createElement('div');
+                background.classList.add('card-background');
+                if (quest.associatedMaps && quest.associatedMaps.length > 0) {
+                    const mapData = detailedMapData.get(quest.associatedMaps[0]);
+                    if (mapData && mapData.url) {
+                        background.style.backgroundImage = `url('${mapData.url}')`;
+                    }
+                }
+                card.appendChild(background);
+
+                const overlay = document.createElement('div');
+                overlay.classList.add('card-overlay');
+
+                const nameElement = document.createElement('h3');
+                nameElement.textContent = quest.name;
+                overlay.appendChild(nameElement);
+
+                const subtitle = document.createElement('div');
+                subtitle.classList.add('card-subtitle');
+                const duration = document.createElement('span');
+                duration.textContent = quest.storyDuration || '';
+                subtitle.appendChild(duration);
+                const rating = document.createElement('span');
+                rating.classList.add('card-rating');
+                let stars = '';
+                for (let i = 0; i < 5; i++) {
+                    stars += i < quest.difficulty ? '★' : '☆';
+                }
+                rating.textContent = stars;
+                subtitle.appendChild(rating);
+                overlay.appendChild(subtitle);
+
+                card.appendChild(overlay);
+
+                card.style.left = `${quest.x}px`;
+                card.style.top = `${quest.y}px`;
+                // The main transform is now on the container, not individual cards
+                card.style.transform = `translate(-50%, -50%)`;
+
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isLinking) {
+                        handleLink(quest.id);
+                    } else {
+                        if (activeOverlayCardId === quest.id) {
+                            hideOverlay();
+                        } else {
+                            populateAndShowStoryBeatCard(quest);
+                        }
+                        selectedQuestId = quest.id;
+                        document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                        card.classList.add('selected');
+                    }
+                });
+
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectedQuestId = quest.id;
+                    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    createCardContextMenu(e, quest);
+                });
+
+                cardContainer.appendChild(card);
+            });
+            updateContainerTransform(); // Apply initial transform
+        };
+
+        const populateAndShowStoryBeatCard = (quest) => {
+            if (!quest) return;
+            // (The rest of this function remains the same as it's for the overlay)
+            const statusOptions = ['Unavailable', 'Available', 'Active', 'Completed', 'Failed', 'Abandoned'];
+            const mapOptions = Array.from(detailedMapData.keys());
+            const characterOptions = charactersData.map(c => ({ id: c.id, name: c.name }));
+
+            let finalQuestNote = '';
+            if (quest.id === 1) {
+                finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is the final Campaign quest and cannot be deleted.</p>`;
+            }
+
+            let parentLinks = quest.parentIds.map(pid => {
+                const parent = quests.find(q => q.id === pid);
+                return parent ? `<a href="#" class="quest-link" data-quest-id="${pid}">${parent.name}</a>` : 'Unknown';
+            }).join('<br>');
+            if (!parentLinks) parentLinks = 'None';
+
+            let childrenLinks = quests.filter(q => q.parentIds.includes(quest.id)).map(child => {
+                return `<a href="#" class="quest-link" data-quest-id="${child.id}">${child.name}</a>`;
+            }).join('<br>');
+            if (!childrenLinks) childrenLinks = 'None';
+
+            storyBeatCardBody.innerHTML = `
+                <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
+                ${finalQuestNote}
+                <h3>Description</h3>
+                <div contenteditable="true" id="quest-description" class="editable-div">${quest.description || ''}</div>
+                <h3>Quest Status</h3>
+                <select id="quest-status">
+                    ${statusOptions.map(s => `<option value="${s}" ${quest.questStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+                <button id="save-quest-details-btn">Save All Changes</button>
+            `;
+
+            overlay.style.display = 'flex';
+            activeOverlayCardId = quest.id;
+
+            document.getElementById('save-quest-details-btn').addEventListener('click', () => {
+                const questToUpdate = quests.find(q => q.id === quest.id);
+                if (!questToUpdate) return;
+
+                questToUpdate.name = document.getElementById('quest-name').innerText;
+                questToUpdate.description = document.getElementById('quest-description').innerText;
+                questToUpdate.questStatus = document.getElementById('quest-status').value;
+
+                alert('Quest details saved!');
+                renderCards();
+                drawConnections();
+            });
+        };
+
+        const hideOverlay = () => {
+            overlay.style.display = 'none';
+            activeOverlayCardId = null;
+            const currentlySelected = document.querySelector('.card.selected');
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+        };
+
+        const createContextMenu = (e, options) => {
+        const existingMenu = document.querySelector('.context-menu');
+            if (existingMenu) existingMenu.remove();
+
+            const menu = document.createElement('ul');
+        menu.classList.add('context-menu');
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+
+            options.forEach(option => {
+                const item = document.createElement('li');
+                item.textContent = option.label;
+                if (option.disabled) {
+                    item.style.opacity = 0.5;
+                    item.style.cursor = 'not-allowed';
+                } else {
+                    item.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        option.action();
+                        menu.remove();
+                    });
+                }
+                menu.appendChild(item);
+            });
+
+            document.body.appendChild(menu);
+        };
+
+        const createCanvasContextMenu = (e) => {
+            const rect = container.getBoundingClientRect();
+            // Convert click coordinates to the transformed space of the card container
+            const newX = (e.clientX - rect.left - originX) / scale;
+            const newY = (e.clientY - rect.top - originY) / scale;
+
+            const options = [{
+                label: 'Add Quest',
+                action: () => {
+                    const newQuest = {
+                        id: nextQuestId++,
+                        name: `New Quest ${nextQuestId - 1}`,
+                        parentIds: [],
+                        x: newX,
+                        y: newY,
+                        description: '',
+                        questStatus: 'Available',
+                        questType: [],
+                        startingTriggers: [],
+                        associatedMaps: [],
+                        associatedNPCs: [],
+                        failureTriggers: [],
+                        successTriggers: [],
+                        detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                        storyDuration: '',
+                        difficulty: 0,
+                        storySteps: [],
+                    };
+                    quests.push(newQuest);
+                    selectedQuestId = newQuest.id;
+                    renderCards(); // Full re-render needed for new card
+                }
+            }];
+            createContextMenu(e, options);
+        };
+
+        const createCardContextMenu = (e, quest) => {
+            const options = [
+                {
+                    label: 'Rename',
+                    action: () => {
+                        const newName = prompt('Enter a new name for the quest:', quest.name);
+                        if (newName !== null && newName.trim() !== '') {
+                            quest.name = newName.trim();
+                            renderCards();
+                        }
+                    }
+                },
+                {
+                    label: 'Delete',
+                    disabled: quest.id === 1,
+                    action: () => {
+                        if (quest.id === 1) return;
+                        quests = quests.filter(q => q.id !== quest.id);
+                        quests.forEach(q => {
+                            if (q.parentIds) {
+                                q.parentIds = q.parentIds.filter(pid => pid !== quest.id);
+                            }
+                        });
+                        selectedQuestId = null;
+                        renderCards(); // Full re-render needed
+                    }
+                },
+                {
+                    label: 'Link',
+                    action: () => {
+                        isLinking = true;
+                        linkSourceId = quest.id;
+                        document.body.classList.add('linking-mode');
+                    }
+                },
+                {
+                    label: 'Move',
+                    action: () => {
+                        isMoving = true;
+                        document.body.classList.add('moving-mode');
+                        selectedQuestId = quest.id;
+                    }
+                }
+            ];
+            createContextMenu(e, options);
+        };
+
+        const handleLink = (targetId) => {
+            const sourceQuest = quests.find(q => q.id === linkSourceId);
+            const targetQuest = quests.find(q => q.id === targetId);
+
+            if (!sourceQuest || !targetQuest || sourceQuest.id === targetQuest.id) {
+                isLinking = false;
+                document.body.classList.remove('linking-mode');
+                return;
+            }
+
+            if (sourceQuest.parentIds.includes(targetId)) {
+                sourceQuest.parentIds = sourceQuest.parentIds.filter(id => id !== targetId);
+            } else {
+                if (!sourceQuest.parentIds.includes(targetId)) {
+                    sourceQuest.parentIds.push(targetId);
+                }
+            }
+            isLinking = false;
+            linkSourceId = null;
+            document.body.classList.remove('linking-mode');
+            drawConnections(); // Just need to redraw connections
+        };
+
+        const resizeHandler = () => {
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+            drawConnections();
+        };
+        window.addEventListener('resize', resizeHandler);
+
+        container.addEventListener('mousedown', (e) => {
+            if (e.target !== container && e.target !== canvas) return;
+            if (e.button === 0) {
+                isPanning = true;
+                panStartX = e.clientX - originX;
+                panStartY = e.clientY - originY;
+                container.style.cursor = 'grabbing';
+            }
+        });
+
+        container.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                isPanning = false;
+                container.style.cursor = 'grab';
+            }
+        });
+
+        container.addEventListener('mouseleave', () => {
+             isPanning = false;
+             container.style.cursor = 'grab';
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (isMoving) {
+                const questToMove = quests.find(q => q.id === selectedQuestId);
+                if (questToMove) {
+                    const rect = container.getBoundingClientRect();
+                    const newX = (e.clientX - rect.left - originX) / scale;
+                    const newY = (e.clientY - rect.top - originY) / scale;
+                    questToMove.x = newX;
+                    questToMove.y = newY;
+
+                    const cardElement = cardContainer.querySelector(`.card[data-id='${questToMove.id}']`);
+                    if(cardElement) {
+                        cardElement.style.left = `${newX}px`;
+                        cardElement.style.top = `${newY}px`;
+                    }
+                    drawConnections();
+                }
+            } else if (isPanning) {
+                originX = e.clientX - panStartX;
+                originY = e.clientY - panStartY;
+                updateContainerTransform();
+            }
+        });
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomAmount = -e.deltaY * 0.001;
+            const newScale = Math.min(Math.max(0.2, scale + zoomAmount), 2.0);
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            originX = mouseX - (mouseX - originX) * (newScale / scale);
+            originY = mouseY - (mouseY - originY) * (newScale / scale);
+
+            scale = newScale;
+            updateContainerTransform();
+        });
+
+        container.addEventListener('contextmenu', (e) => {
+            if (e.target === container || e.target === canvas){
+                e.preventDefault();
+                createCanvasContextMenu(e);
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            const menu = document.querySelector('.story-tree-context-menu');
+            if (menu) menu.remove();
+            if (isLinking) {
+                isLinking = false;
+                linkSourceId = null;
+                document.body.classList.remove('linking-mode');
+            }
+        });
+
+        // Initial setup
+        originX = container.offsetWidth / 2;
+        originY = container.offsetHeight / 2;
+        resizeHandler();
+        renderCards();
+    }
+
+    if (storyBeatCardExportButton) {
+        storyBeatCardExportButton.addEventListener('click', () => {
+            const quest = quests.find(q => q.id === activeOverlayCardId);
+            if (quest) {
+                const exportQuest = {
+                    id: quest.id,
+                    name: quest.name || '',
+                    parentIds: quest.parentIds || [],
+                    x: quest.x || 0,
+                    y: quest.y || 0,
+                    description: quest.description || '',
+                    questStatus: quest.questStatus || 'Unavailable',
+                    questType: quest.questType || [],
+                    startingTriggers: quest.startingTriggers || [],
+                    associatedMaps: quest.associatedMaps || [],
+                    associatedNPCs: quest.associatedNPCs || [],
+                    failureTriggers: quest.failureTriggers || [],
+                    successTriggers: quest.successTriggers || [],
+                    detailedRewards: quest.detailedRewards || { xp: 0, loot: '', magicItems: '', information: '' },
+                    storyDuration: quest.storyDuration || '',
+                    difficulty: quest.difficulty || 0,
+                    storySteps: quest.storySteps || [],
+                };
+                jsonEditContent.value = JSON.stringify(exportQuest, null, 2); // Use value for textarea
+                jsonEditOverlay.style.display = 'flex';
+            } else {
+                alert("Could not find quest data to export. Please reopen the quest card and try again.");
+            }
+        });
+    }
+
+    // Initial setup
+    resizeCanvas(); // Set initial canvas size
+    drawConnections();
+    renderCards();
+
+    if (saveJsonButton) {
+        saveJsonButton.addEventListener('click', () => {
+            try {
+                const updatedQuestData = JSON.parse(jsonEditContent.value);
+                const questId = updatedQuestData.id;
+
+                if (!questId || !quests.some(q => q.id === questId)) {
+                    alert("JSON must have a valid 'id' matching the current quest.");
+                    return;
+                }
+
+                // This is a temporary object to hold the changes.
+                // It will be used to repopulate the overlay.
+                const tempQuest = {
+                    ...quests.find(q => q.id === questId), // Start with existing data
+                    ...updatedQuestData // Overwrite with new data
+                };
+
+                // Repopulate the story beat card with the new data
+                populateAndShowStoryBeatCard(tempQuest);
+
+                alert("Quest details have been updated on the overlay. Click 'Save All Changes' to apply them to the story tree.");
+                jsonEditOverlay.style.display = 'none';
+
+            } catch (e) {
+                alert("Invalid JSON format. Please check the syntax and try again.");
+                console.error("Error parsing quest JSON:", e);
+            }
+        });
+    }
+
+
+    if (jsonEditCloseButton) {
+        jsonEditCloseButton.addEventListener('click', () => {
+            jsonEditOverlay.style.display = 'none';
+        });
+    }
+
+    if (copyJsonButton) {
+        copyJsonButton.addEventListener('click', () => {
+            navigator.clipboard.writeText(jsonEditContent.value).then(() => {
+                copyJsonButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyJsonButton.textContent = 'Copy to Clipboard';
+                }, 2000);
+            }, (err) => {
+                console.error('Could not copy text: ', err);
+                alert('Failed to copy JSON.');
+            });
+        });
+    }
+    }
+
+    if (storyBeatCardOverlay) {
+        storyBeatCardOverlay.addEventListener('click', (e) => {
+            if (e.target === storyBeatCardOverlay) {
+                storyBeatCardOverlay.style.display = 'none';
+                const currentlySelected = document.querySelector('.card.selected');
+                if (currentlySelected) {
+                    currentlySelected.classList.remove('selected');
+                }
+            }
+        });
+    }
+});
