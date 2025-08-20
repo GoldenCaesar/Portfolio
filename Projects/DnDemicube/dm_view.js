@@ -539,6 +539,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            if (!transform.initialized) {
+                const hRatio = dmCanvas.width / img.width;
+                const vRatio = dmCanvas.height / img.height;
+                const ratio = Math.min(hRatio, vRatio);
+                const imgScaledWidth = img.width * ratio;
+                const imgScaledHeight = img.height * ratio;
+                const centerShift_x = (dmCanvas.width - imgScaledWidth) / 2;
+                const centerShift_y = (dmCanvas.height - imgScaledHeight) / 2;
+
+                transform.scale = ratio;
+                transform.originX = centerShift_x;
+                transform.originY = centerShift_y;
+                transform.initialized = true;
+            }
+
             ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
             ctx.save();
             ctx.translate(transform.originX, transform.originY);
@@ -1872,7 +1887,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: file.name,
                         overlays: [],
                         mode: 'edit',
-                        transform: { scale: 1, originX: 0, originY: 0 }
+                        transform: { scale: 1, originX: 0, originY: 0, initialized: false }
                     });
 
                     if (!isEditMode) {
@@ -2090,8 +2105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMapTransformToPlayerView(transform);
         });
         
-        dmCanvas.addEventListener('mousemove', handleMouseMoveOnCanvas);
-        drawingCanvas.addEventListener('mousemove', (e) => {
+        mapContainer.addEventListener('mousemove', (e) => {
             if (isPanning) {
                 const mapData = detailedMapData.get(selectedMapFileName);
                 if (!mapData) return;
@@ -2100,7 +2114,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayMapOnCanvas(selectedMapFileName);
                 sendMapTransformToPlayerView(mapData.transform);
             } else {
-                 handleMouseMoveOnCanvas(e);
+                handleMouseMoveOnCanvas(e);
             }
         });
         dmCanvas.addEventListener('mouseout', () => {
@@ -2518,7 +2532,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     url: url,
                                     overlays: definition.overlays || [],
                                     mode: definition.mode || 'edit',
-                                    transform: definition.transform || { scale: 1, originX: 0, originY: 0 }
+                                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false }
                                 });
                                 displayedFileNames.add(mapName);
                             });
@@ -2787,7 +2801,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     url: null,
                     overlays: definition.overlays || [],
                     mode: definition.mode || 'edit',
-                    transform: definition.transform || { scale: 1, originX: 0, originY: 0 }
+                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false }
                 });
                 displayedFileNames.add(mapName);
             }
