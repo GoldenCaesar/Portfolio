@@ -103,6 +103,7 @@ let activeInitiative = [];
 let initiativeTurn = -1;
 
 function drawMapAndOverlays() {
+    console.log('drawMapAndOverlays called. Transform:', JSON.stringify(currentMapTransform));
     if (!playerCanvas || !pCtx) {
         console.error("Player canvas or context not initialized.");
         return;
@@ -218,7 +219,7 @@ function drawOverlays_PlayerView(overlays) {
                 if (!img) {
                     img = new Image();
                     img.src = overlay.character_portrait;
-                    img.onload = () => drawMapAndOverlays();
+                    // No onload redraw to prevent race conditions. The browser will draw it when it loads.
                     imageCache.set(overlay.character_portrait, img);
                 }
 
@@ -589,7 +590,7 @@ function drawToken(ctx, token) {
         if (!img) {
             img = new Image();
             img.src = token.portrait;
-            img.onload = () => drawMapAndOverlays();
+            // No onload redraw to prevent race conditions. The browser will draw it when it loads.
             imageCache.set(token.portrait, img);
         }
 

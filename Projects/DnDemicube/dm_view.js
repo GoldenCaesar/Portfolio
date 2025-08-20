@@ -2084,16 +2084,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     draggedToken.y += dy;
                     dragStartX = imageCoords.x;
                     dragStartY = imageCoords.y;
-                    if (selectedMapFileName) {
-                        displayMapOnCanvas(selectedMapFileName);
+                    const mapData = detailedMapData.get(selectedMapFileName);
+                    if (mapData) {
+                        drawOverlays(mapData.overlays);
                     }
                 }
             } else if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
                 if (imageCoords) {
                     currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
                     currentDragOffsets.y = imageCoords.y - moveStartPoint.y;
-                    if (selectedMapFileName) {
-                        displayMapOnCanvas(selectedMapFileName);
+                    // This more direct redraw approach seems to work better for smoother dragging.
+                    const mapData = detailedMapData.get(selectedMapFileName);
+                    if (mapData) {
+                        drawOverlays(mapData.overlays);
                     }
                 }
             } else if (isPanning) {
