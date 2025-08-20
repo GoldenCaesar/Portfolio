@@ -6648,13 +6648,13 @@ function displayToast(messageElement) {
                 rating.textContent = stars;
                 subtitle.appendChild(rating);
                 overlay.appendChild(subtitle);
-
+                
                 card.appendChild(overlay);
 
                 card.style.left = `${quest.x}px`;
                 card.style.top = `${quest.y}px`;
                 // The main transform is now on the container, not individual cards
-                card.style.transform = `translate(-50%, -50%)`;
+                card.style.transform = `translate(-50%, -50%)`; 
 
                 card.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -6692,23 +6692,23 @@ function displayToast(messageElement) {
             const statusOptions = ['Unavailable', 'Available', 'Active', 'Completed', 'Failed', 'Abandoned'];
             const mapOptions = Array.from(detailedMapData.keys());
             const characterOptions = charactersData.map(c => ({ id: c.id, name: c.name }));
-
+    
             let finalQuestNote = '';
             if (quest.id === 1) {
                 finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is the final Campaign quest and cannot be deleted.</p>`;
             }
-
+    
             let parentLinks = quest.parentIds.map(pid => {
                 const parent = quests.find(q => q.id === pid);
                 return parent ? `<a href="#" class="quest-link" data-quest-id="${pid}">${parent.name}</a>` : 'Unknown';
             }).join('<br>');
             if (!parentLinks) parentLinks = 'None';
-
+    
             let childrenLinks = quests.filter(q => q.parentIds.includes(quest.id)).map(child => {
                 return `<a href="#" class="quest-link" data-quest-id="${child.id}">${child.name}</a>`;
             }).join('<br>');
             if (!childrenLinks) childrenLinks = 'None';
-
+    
             storyBeatCardBody.innerHTML = `
                 <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
                 ${finalQuestNote}
@@ -6720,18 +6720,18 @@ function displayToast(messageElement) {
                 </select>
                 <button id="save-quest-details-btn">Save All Changes</button>
             `;
-
+    
             overlay.style.display = 'flex';
             activeOverlayCardId = quest.id;
-
+    
             document.getElementById('save-quest-details-btn').addEventListener('click', () => {
                 const questToUpdate = quests.find(q => q.id === quest.id);
                 if (!questToUpdate) return;
-
+    
                 questToUpdate.name = document.getElementById('quest-name').innerText;
                 questToUpdate.description = document.getElementById('quest-description').innerText;
                 questToUpdate.questStatus = document.getElementById('quest-status').value;
-
+    
                 alert('Quest details saved!');
                 renderCards();
                 drawConnections();
@@ -6904,7 +6904,7 @@ function displayToast(messageElement) {
                 container.style.cursor = 'grab';
             }
         });
-
+        
         container.addEventListener('mouseleave', () => {
              isPanning = false;
              container.style.cursor = 'grab';
@@ -6919,7 +6919,7 @@ function displayToast(messageElement) {
                     const newY = (e.clientY - rect.top - originY) / scale;
                     questToMove.x = newX;
                     questToMove.y = newY;
-
+                    
                     const cardElement = cardContainer.querySelector(`.card[data-id='${questToMove.id}']`);
                     if(cardElement) {
                         cardElement.style.left = `${newX}px`;
