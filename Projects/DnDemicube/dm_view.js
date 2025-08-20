@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let characterEasyMDE = null;
 
     // Story Beats State Variables
+    let isStoryTreeInitialized = false;
     let quests = [
         {
             id: 1,
@@ -4102,7 +4103,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyTreeContainer.style.display = 'flex';
                 storyTreeContainer.style.flexGrow = '1';
             }
-            initStoryTree();
+            if (!isStoryTreeInitialized) {
+                initStoryTree();
+                isStoryTreeInitialized = true;
+            }
         } else { // Default to DM Controls tab
             if (mapContainer) mapContainer.style.display = 'flex';
             resizeCanvas(); // Ensure map is resized correctly
