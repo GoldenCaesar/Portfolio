@@ -6551,54 +6551,52 @@ function displayToast(messageElement) {
     }
 
     function initStoryTree() {
-    // UI Elements
-    const canvas = document.getElementById('quest-canvas');
-    if (!canvas) return; // Don't run if the element is not there
+        // UI Elements
+        const canvas = document.getElementById('quest-canvas');
+        if (!canvas) return;
         const ctx = canvas.getContext('2d');
-    const cardContainer = document.getElementById('card-container');
-    const container = document.getElementById('canvas-container');
-    const overlay = document.getElementById('story-beat-card-overlay');
-    const storyBeatCardBody = document.getElementById('story-beat-card-body');
-    const storyBeatCardCloseButton = document.getElementById('story-beat-card-close-button');
+        const cardContainer = document.getElementById('card-container');
+        const container = document.getElementById('canvas-container');
+        const overlay = document.getElementById('story-beat-card-overlay');
+        const storyBeatCardBody = document.getElementById('story-beat-card-body');
 
-
-    // Pan, Zoom, and Mode state
+        // Pan, Zoom, and Mode state
         let scale = 1.0;
-    let originX = container.offsetWidth / 2;
-    let originY = container.offsetHeight / 2;
+        let originX = 0;
+        let originY = 0;
         let isPanning = false;
-    let isLinking = false;
-    let isMoving = false;
+        let isLinking = false;
+        let isMoving = false;
         let panStartX = 0;
         let panStartY = 0;
-    let moveStartX = 0;
-    let moveStartY = 0;
-    let activeOverlayCardId = null;
-    let linkSourceId = null;
+        let activeOverlayCardId = null;
+        let linkSourceId = null;
 
-    // --- Core Functions ---
+        // --- Core Functions ---
 
-    /**
-     * Draws the lines between parent and child quest cards.
-     */
-    const drawConnections = () => {
+        const updateContainerTransform = () => {
+            cardContainer.style.transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
+            drawConnections();
+        };
+
+        const drawConnections = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.translate(originX, originY);
             ctx.scale(scale, scale);
 
-        ctx.strokeStyle = '#94a3b8';
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
 
             quests.forEach(quest => {
-            if (quest.parentIds && quest.parentIds.length > 0) {
+                if (quest.parentIds && quest.parentIds.length > 0) {
                     quest.parentIds.forEach(parentId => {
-                    const parentQuest = quests.find(q => q.id === parentId);
-                    if (parentQuest) {
+                        const parentQuest = quests.find(q => q.id === parentId);
+                        if (parentQuest) {
                             ctx.beginPath();
-                        ctx.moveTo(parentQuest.x, parentQuest.y);
+                            ctx.moveTo(parentQuest.x, parentQuest.y);
                             ctx.lineTo(quest.x, quest.y);
                             ctx.stroke();
                         }
@@ -6606,761 +6604,373 @@ function displayToast(messageElement) {
                 }
             });
             ctx.restore();
-    };
+        };
 
-    /**
-     * Renders the HTML cards for each quest.
-     */
-    const renderCards = () => {
-        cardContainer.innerHTML = '';
+        const renderCards = () => {
+            cardContainer.innerHTML = ''; // Clear only when data changes
 
-        quests.forEach(quest => {
-            const card = document.createElement('div');
-            card.classList.add('card');
-            if (quest.id === selectedQuestId) {
-                card.classList.add('selected');
-            }
-            card.dataset.id = quest.id;
+            quests.forEach(quest => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                if (quest.id === selectedQuestId) {
+                    card.classList.add('selected');
+                }
+                card.dataset.id = quest.id;
 
-            // Bottom layer (map background)
-            const background = document.createElement('div');
-            background.classList.add('card-background');
-
-            if (quest.associatedMaps && quest.associatedMaps.length > 0) {
-                if (quest.associatedMaps.length === 1) {
+                const background = document.createElement('div');
+                background.classList.add('card-background');
+                if (quest.associatedMaps && quest.associatedMaps.length > 0) {
                     const mapData = detailedMapData.get(quest.associatedMaps[0]);
                     if (mapData && mapData.url) {
                         background.style.backgroundImage = `url('${mapData.url}')`;
                     }
-                } else {
-                    background.style.display = 'grid';
-                    background.style.gridTemplateColumns = `repeat(${Math.ceil(Math.sqrt(quest.associatedMaps.length))}, 1fr)`;
-                    quest.associatedMaps.forEach(mapName => {
-                        const mapData = detailedMapData.get(mapName);
-                        if (mapData && mapData.url) {
-                            const mapCell = document.createElement('div');
-                            mapCell.style.backgroundImage = `url('${mapData.url}')`;
-                            mapCell.style.backgroundSize = 'cover';
-                            mapCell.style.backgroundPosition = 'center';
-                            background.appendChild(mapCell);
-                        }
-                    });
                 }
-            }
-            card.appendChild(background);
+                card.appendChild(background);
 
-            // Top layer (text overlay)
-            const overlay = document.createElement('div');
-            overlay.classList.add('card-overlay');
+                const overlay = document.createElement('div');
+                overlay.classList.add('card-overlay');
 
-            // Title
-            const nameElement = document.createElement('h3');
-            nameElement.textContent = quest.name;
-            overlay.appendChild(nameElement);
+                const nameElement = document.createElement('h3');
+                nameElement.textContent = quest.name;
+                overlay.appendChild(nameElement);
 
-            // Subtitle (duration and rating)
-            const subtitle = document.createElement('div');
-            subtitle.classList.add('card-subtitle');
+                const subtitle = document.createElement('div');
+                subtitle.classList.add('card-subtitle');
+                const duration = document.createElement('span');
+                duration.textContent = quest.storyDuration || '';
+                subtitle.appendChild(duration);
+                const rating = document.createElement('span');
+                rating.classList.add('card-rating');
+                let stars = '';
+                for (let i = 0; i < 5; i++) {
+                    stars += i < quest.difficulty ? '★' : '☆';
+                }
+                rating.textContent = stars;
+                subtitle.appendChild(rating);
+                overlay.appendChild(subtitle);
 
-            const duration = document.createElement('span');
-            duration.textContent = quest.storyDuration || '';
-            subtitle.appendChild(duration);
+                card.appendChild(overlay);
 
-            const rating = document.createElement('span');
-            rating.classList.add('card-rating');
-            let stars = '';
-            for (let i = 0; i < 5; i++) {
-                stars += i < quest.difficulty ? '★' : '☆';
-            }
-            rating.textContent = stars;
-            subtitle.appendChild(rating);
+                card.style.left = `${quest.x}px`;
+                card.style.top = `${quest.y}px`;
+                // The main transform is now on the container, not individual cards
+                card.style.transform = `translate(-50%, -50%)`;
 
-            overlay.appendChild(subtitle);
-
-            // Linked Characters and Description
-            const content = document.createElement('div');
-            content.classList.add('card-content');
-
-            const charactersContainer = document.createElement('div');
-            charactersContainer.classList.add('card-characters');
-            if (quest.associatedNPCs && quest.associatedNPCs.length > 0) {
-                quest.associatedNPCs.forEach(npc => {
-                    const character = charactersData.find(c => c.id === npc.id);
-                    if (character) {
-                        const profile = document.createElement('div');
-                        profile.classList.add('card-character-profile');
-                        if (character.sheetData && character.sheetData.character_portrait) {
-                            profile.style.backgroundImage = `url('${character.sheetData.character_portrait}')`;
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isLinking) {
+                        handleLink(quest.id);
+                    } else {
+                        if (activeOverlayCardId === quest.id) {
+                            hideOverlay();
                         } else {
-                            profile.textContent = getInitials(character.name);
+                            populateAndShowStoryBeatCard(quest);
                         }
-                        charactersContainer.appendChild(profile);
+                        selectedQuestId = quest.id;
+                        document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+                        card.classList.add('selected');
                     }
                 });
-            }
-            content.appendChild(charactersContainer);
 
-            const description = document.createElement('p');
-            description.classList.add('card-description');
-            const fullDescription = quest.description || '';
-            const words = fullDescription.split(/\s+/);
-            if (words.length > 15) {
-                description.textContent = words.slice(0, 15).join(' ') + '...';
-            } else {
-                description.textContent = fullDescription;
-            }
-            content.appendChild(description);
-
-            overlay.appendChild(content);
-
-            // Rewards
-            const rewardsContainer = document.createElement('div');
-            rewardsContainer.classList.add('card-rewards');
-            if (quest.detailedRewards) {
-                const rewards = [];
-                if (quest.detailedRewards.xp) rewards.push(`XP: ${quest.detailedRewards.xp}`);
-                if (quest.detailedRewards.information) {
-                    const fullInfo = quest.detailedRewards.information;
-                    const infoWords = fullInfo.split(/\s+/);
-                    if (infoWords.length > 30) {
-                        rewards.push(infoWords.slice(0, 30).join(' ') + '...');
-                    } else {
-                        rewards.push(fullInfo);
-                    }
-                }
-                rewardsContainer.textContent = rewards.join(', ');
-            }
-            overlay.appendChild(rewardsContainer);
-
-            card.appendChild(overlay);
-
-
-            const x = originX + (quest.x * scale);
-            const y = originY + (quest.y * scale);
-            card.style.left = `${x}px`;
-            card.style.top = `${y}px`;
-            card.style.transform = `translate(-50%, -50%) scale(${scale})`;
-
-            card.addEventListener('click', (e) => {
-                e.stopPropagation();
-
-                if (isLinking) {
-                    handleLink(quest.id);
-                } else {
-                    if (activeOverlayCardId === quest.id) {
-                        hideOverlay();
-                    } else {
-                        populateAndShowStoryBeatCard(quest);
-                    }
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     selectedQuestId = quest.id;
                     document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
                     card.classList.add('selected');
-                }
-            });
-
-            card.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                selectedQuestId = quest.id;
-                document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-                createCardContextMenu(e, quest);
-            });
-
-            cardContainer.appendChild(card);
-
-            // Adjust font size to fit
-            const adjustFontSize = (element) => {
-                if (!element) return;
-                // Reset font size before calculating
-                element.style.fontSize = '';
-                let baseFontSize = parseFloat(window.getComputedStyle(element).fontSize);
-                const minFontSize = 8; // Minimum font size in pixels
-
-                // Use a temporary clone to avoid layout shifts during calculation
-                const clone = element.cloneNode(true);
-                clone.style.visibility = 'hidden';
-                clone.style.position = 'absolute';
-                clone.style.width = element.clientWidth + 'px';
-                clone.style.height = 'auto'; // Let height grow
-                document.body.appendChild(clone);
-
-                while (clone.scrollHeight > element.clientHeight && baseFontSize > minFontSize) {
-                    baseFontSize -= 0.5;
-                    clone.style.fontSize = baseFontSize + 'px';
-                }
-
-                element.style.fontSize = baseFontSize + 'px';
-                document.body.removeChild(clone);
-            };
-
-            adjustFontSize(description);
-            adjustFontSize(rewardsContainer);
-        });
-    };
-
-    /**
-     * Shows the quest details overlay.
-     * @param {object} quest The quest object to display.
-     */
-    const populateAndShowStoryBeatCard = (quest) => {
-        if (!quest) return;
-
-        const statusOptions = ['Unavailable', 'Available', 'Active', 'Completed', 'Failed', 'Abandoned'];
-        const mapOptions = Array.from(detailedMapData.keys());
-        const characterOptions = charactersData.map(c => ({ id: c.id, name: c.name }));
-
-        let finalQuestNote = '';
-        if (quest.id === 1) {
-            finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is the final Campaign quest and cannot be deleted.</p>`;
-        }
-
-        let parentLinks = quest.parentIds.map(pid => {
-            const parent = quests.find(q => q.id === pid);
-            return parent ? `<a href="#" class="quest-link" data-quest-id="${pid}">${parent.name}</a>` : 'Unknown';
-        }).join('<br>');
-        if (!parentLinks) parentLinks = 'None';
-
-        let childrenLinks = quests.filter(q => q.parentIds.includes(quest.id)).map(child => {
-            return `<a href="#" class="quest-link" data-quest-id="${child.id}">${child.name}</a>`;
-        }).join('<br>');
-        if (!childrenLinks) childrenLinks = 'None';
-
-        storyBeatCardBody.innerHTML = `
-            <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
-            ${finalQuestNote}
-
-            <h3>Description</h3>
-            <div contenteditable="true" id="quest-description" class="editable-div">${quest.description || ''}</div>
-
-            <h3>Quest Status</h3>
-            <select id="quest-status">
-                ${statusOptions.map(s => `<option value="${s}" ${quest.questStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
-            </select>
-
-            <h3>Quest Type</h3>
-            <input type="text" id="quest-type" value="${quest.questType.join(', ')}" placeholder="e.g., Main Story, Side Quest">
-
-            <h3>Story Duration</h3>
-            <input type="text" id="quest-story-duration" value="${quest.storyDuration || ''}" placeholder="e.g., 1 Session, 3 Hours">
-
-            <h3>Difficulty</h3>
-            <div id="quest-difficulty" class="difficulty-rating">
-                ${[1, 2, 3, 4, 5].map(i => `<span class="star" data-value="${i}">${i <= quest.difficulty ? '★' : '☆'}</span>`).join('')}
-            </div>
-
-            <h3>Starting Triggers</h3>
-            <div id="quest-starting-triggers">
-                ${quest.startingTriggers.map((trigger, index) => `
-                    <div class="trigger-row" data-index="${index}">
-                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
-                        <button class="remove-trigger-btn">X</button>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="add-starting-trigger-btn">+ Add Trigger</button>
-
-            <h3>Associated Maps</h3>
-            <select id="quest-associated-maps" multiple size="4">
-                ${mapOptions.map(m => `<option value="${m}" ${quest.associatedMaps.includes(m) ? 'selected' : ''}>${m}</option>`).join('')}
-            </select>
-
-            <h3>Associated NPCs</h3>
-            <div id="quest-associated-npcs">
-                ${quest.associatedNPCs.map((npc, index) => `
-                    <div class="npc-row" data-index="${index}">
-                        <select class="npc-select">
-                            <option value="">--Select NPC--</option>
-                            ${characterOptions.map(c => `<option value="${c.id}" ${npc.id === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
-                        </select>
-                        <input type="text" class="npc-role" value="${npc.role}" placeholder="Role (e.g., Quest Giver)">
-                        <button class="remove-npc-btn">X</button>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="add-npc-btn">+ Add NPC</button>
-
-            <h3>Story Steps</h3>
-            <div id="quest-story-steps">
-                ${quest.storySteps.map((step, index) => `
-                    <div class="story-step-row" data-index="${index}">
-                        <input type="checkbox" class="story-step-checkbox" ${step.completed ? 'checked' : ''}>
-                        <div contenteditable="true" class="editable-div story-step-text">${step.text}</div>
-                        <button class="remove-step-btn">X</button>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="add-story-step-btn">+ Add Step</button>
-
-            <h3>Success Triggers</h3>
-            <div id="quest-success-triggers">
-                ${quest.successTriggers.map((trigger, index) => `
-                    <div class="trigger-row" data-index="${index}">
-                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
-                        <button class="remove-trigger-btn">X</button>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="add-success-trigger-btn">+ Add Trigger</button>
-
-            <h3>Failure Triggers</h3>
-            <div id="quest-failure-triggers">
-                ${quest.failureTriggers.map((trigger, index) => `
-                    <div class="trigger-row" data-index="${index}">
-                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
-                        <button class="remove-trigger-btn">X</button>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="add-failure-trigger-btn">+ Add Trigger</button>
-
-            <h3>Rewards</h3>
-            <div class="rewards-grid">
-                <label for="reward-xp">XP:</label>
-                <input type="number" id="reward-xp" value="${quest.detailedRewards.xp || 0}">
-
-                <label for="reward-loot">Loot/Currency:</label>
-                <textarea id="reward-loot" rows="2">${quest.detailedRewards.loot || ''}</textarea>
-
-                <label for="reward-magic-items">Magic Items:</label>
-                <textarea id="reward-magic-items" rows="2">${quest.detailedRewards.magicItems || ''}</textarea>
-
-                <label for="reward-information">Information/Lore:</label>
-                <textarea id="reward-information" rows="2">${quest.detailedRewards.information || ''}</textarea>
-            </div>
-
-            <h3>Parent Quests</h3>
-            <div>${parentLinks}</div>
-            <h3>Child Quests</h3>
-            <div>${childrenLinks}</div>
-
-            <button id="save-quest-details-btn">Save All Changes</button>
-        `;
-
-        overlay.style.display = 'flex';
-        activeOverlayCardId = quest.id;
-
-        // --- Event Listeners for editing ---
-        const saveButton = document.getElementById('save-quest-details-btn');
-        saveButton.addEventListener('click', () => {
-            const questToUpdate = quests.find(q => q.id === quest.id);
-            if (!questToUpdate) {
-                alert("Fatal Error: Could not find the quest to update. Your changes cannot be saved.");
-                return;
-            }
-
-            // Save all fields to the object from the main quests array
-            questToUpdate.name = document.getElementById('quest-name').innerText;
-            questToUpdate.description = document.getElementById('quest-description').innerText;
-            questToUpdate.questStatus = document.getElementById('quest-status').value;
-            questToUpdate.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
-            questToUpdate.storyDuration = document.getElementById('quest-story-duration').value;
-
-            questToUpdate.startingTriggers = Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => div.innerText);
-            questToUpdate.successTriggers = Array.from(document.querySelectorAll('#quest-success-triggers .trigger-text')).map(div => div.innerText);
-            questToUpdate.failureTriggers = Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-text')).map(div => div.innerText);
-
-            const mapsSelect = document.getElementById('quest-associated-maps');
-            questToUpdate.associatedMaps = Array.from(mapsSelect.selectedOptions).map(opt => opt.value);
-
-            const npcRows = document.querySelectorAll('.npc-row');
-            questToUpdate.associatedNPCs = Array.from(npcRows).map(row => ({
-                id: parseInt(row.querySelector('.npc-select').value, 10),
-                role: row.querySelector('.npc-role').value
-            })).filter(npc => npc.id);
-
-            const stepRows = document.querySelectorAll('.story-step-row');
-            questToUpdate.storySteps = Array.from(stepRows).map(row => ({
-                text: row.querySelector('.story-step-text').innerText,
-                completed: row.querySelector('.story-step-checkbox').checked
-            }));
-
-            questToUpdate.difficulty = quest.difficulty; // Save difficulty from the temporary quest object
-            questToUpdate.detailedRewards = {
-                xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
-                loot: document.getElementById('reward-loot').value,
-                magicItems: document.getElementById('reward-magic-items').value,
-                information: document.getElementById('reward-information').value,
-            };
-
-            alert('Quest details saved!');
-            renderCards(); // Re-render cards to reflect name change
-            drawConnections(); // Redraw connections to reflect parentId changes
-        });
-
-        const addNpcBtn = document.getElementById('add-npc-btn');
-        addNpcBtn.addEventListener('click', () => {
-            const container = document.getElementById('quest-associated-npcs');
-            const newIndex = container.children.length;
-            const newRow = document.createElement('div');
-            newRow.className = 'npc-row';
-            newRow.dataset.index = newIndex;
-            newRow.innerHTML = `
-                <select class="npc-select">
-                    <option value="">--Select NPC--</option>
-                    ${characterOptions.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-                </select>
-                <input type="text" class="npc-role" placeholder="Role (e.g., Quest Giver)">
-                <button class="remove-npc-btn">X</button>
-            `;
-            container.appendChild(newRow);
-        });
-
-        const npcContainer = document.getElementById('quest-associated-npcs');
-        npcContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('remove-npc-btn')) {
-                e.target.closest('.npc-row').remove();
-            }
-        });
-
-        const difficultyContainer = document.getElementById('quest-difficulty');
-        difficultyContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('star')) {
-                const value = parseInt(e.target.dataset.value, 10);
-                quest.difficulty = value;
-                const stars = difficultyContainer.querySelectorAll('.star');
-                stars.forEach(star => {
-                    star.innerHTML = parseInt(star.dataset.value, 10) <= value ? '★' : '☆';
+                    createCardContextMenu(e, quest);
                 });
-            }
-        });
 
-        const addStoryStepBtn = document.getElementById('add-story-step-btn');
-        addStoryStepBtn.addEventListener('click', () => {
-            const container = document.getElementById('quest-story-steps');
-            const newIndex = container.children.length;
-            const newRow = document.createElement('div');
-            newRow.className = 'story-step-row';
-            newRow.dataset.index = newIndex;
-            newRow.innerHTML = `
-                <input type="checkbox" class="story-step-checkbox">
-                <div contenteditable="true" class="editable-div story-step-text">New Step</div>
-                <button class="remove-step-btn">X</button>
-            `;
-            container.appendChild(newRow);
-        });
-
-        const storyStepsContainer = document.getElementById('quest-story-steps');
-        storyStepsContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('remove-step-btn')) {
-                e.target.closest('.story-step-row').remove();
-            }
-        });
-
-        // Add/Remove Triggers
-        const setupTriggerList = (containerId, buttonId) => {
-            const container = document.getElementById(containerId);
-            const addButton = document.getElementById(buttonId);
-
-            addButton.addEventListener('click', () => {
-                const newIndex = container.children.length;
-                const newRow = document.createElement('div');
-                newRow.className = 'trigger-row';
-                newRow.dataset.index = newIndex;
-                newRow.innerHTML = `
-                    <div contenteditable="true" class="editable-div trigger-text">New Trigger</div>
-                    <button class="remove-trigger-btn">X</button>
-                `;
-                container.appendChild(newRow);
+                cardContainer.appendChild(card);
             });
+            updateContainerTransform(); // Apply initial transform
+        };
 
-            container.addEventListener('click', (e) => {
-                if (e.target.classList.contains('remove-trigger-btn')) {
-                    e.target.closest('.trigger-row').remove();
-                }
+        const populateAndShowStoryBeatCard = (quest) => {
+            if (!quest) return;
+            // (The rest of this function remains the same as it's for the overlay)
+            const statusOptions = ['Unavailable', 'Available', 'Active', 'Completed', 'Failed', 'Abandoned'];
+            const mapOptions = Array.from(detailedMapData.keys());
+            const characterOptions = charactersData.map(c => ({ id: c.id, name: c.name }));
+
+            let finalQuestNote = '';
+            if (quest.id === 1) {
+                finalQuestNote = `<p style="color: #a0b4c9; font-style: italic; font-size: 0.9em; margin-top: 5px;">This is the final Campaign quest and cannot be deleted.</p>`;
+            }
+
+            let parentLinks = quest.parentIds.map(pid => {
+                const parent = quests.find(q => q.id === pid);
+                return parent ? `<a href="#" class="quest-link" data-quest-id="${pid}">${parent.name}</a>` : 'Unknown';
+            }).join('<br>');
+            if (!parentLinks) parentLinks = 'None';
+
+            let childrenLinks = quests.filter(q => q.parentIds.includes(quest.id)).map(child => {
+                return `<a href="#" class="quest-link" data-quest-id="${child.id}">${child.name}</a>`;
+            }).join('<br>');
+            if (!childrenLinks) childrenLinks = 'None';
+
+            storyBeatCardBody.innerHTML = `
+                <h2 contenteditable="true" id="quest-name">${quest.name}</h2>
+                ${finalQuestNote}
+                <h3>Description</h3>
+                <div contenteditable="true" id="quest-description" class="editable-div">${quest.description || ''}</div>
+                <h3>Quest Status</h3>
+                <select id="quest-status">
+                    ${statusOptions.map(s => `<option value="${s}" ${quest.questStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+                <button id="save-quest-details-btn">Save All Changes</button>
+            `;
+
+            overlay.style.display = 'flex';
+            activeOverlayCardId = quest.id;
+
+            document.getElementById('save-quest-details-btn').addEventListener('click', () => {
+                const questToUpdate = quests.find(q => q.id === quest.id);
+                if (!questToUpdate) return;
+
+                questToUpdate.name = document.getElementById('quest-name').innerText;
+                questToUpdate.description = document.getElementById('quest-description').innerText;
+                questToUpdate.questStatus = document.getElementById('quest-status').value;
+
+                alert('Quest details saved!');
+                renderCards();
+                drawConnections();
             });
         };
 
-        setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn');
-        setupTriggerList('quest-success-triggers', 'add-success-trigger-btn');
-        setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn');
-    };
+        const hideOverlay = () => {
+            overlay.style.display = 'none';
+            activeOverlayCardId = null;
+            const currentlySelected = document.querySelector('.card.selected');
+            if (currentlySelected) {
+                currentlySelected.classList.remove('selected');
+            }
+        };
 
-    /**
-     * Hides the quest details overlay.
-     */
-    const hideOverlay = () => {
-        overlay.style.display = 'none';
-        activeOverlayCardId = null;
-        const currentlySelected = document.querySelector('.card.selected');
-        if (currentlySelected) {
-            currentlySelected.classList.remove('selected');
-        }
-    };
-
-    // --- Context Menu Logic ---
-
-    const createContextMenu = (e, options) => {
-        const existingMenu = document.querySelector('.story-tree-context-menu');
-        if (existingMenu) existingMenu.remove();
+        const createContextMenu = (e, options) => {
+        const existingMenu = document.querySelector('.context-menu');
+            if (existingMenu) existingMenu.remove();
 
             const menu = document.createElement('ul');
-        menu.classList.add('story-tree-context-menu');
+        menu.classList.add('context-menu');
             menu.style.left = `${e.clientX}px`;
             menu.style.top = `${e.clientY}px`;
 
-        options.forEach(option => {
-            const item = document.createElement('li');
-            item.textContent = option.label;
-            if (option.disabled) {
-                item.style.opacity = 0.5;
-                item.style.cursor = 'not-allowed';
-            } else {
-                item.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    option.action();
-                    menu.remove();
-                });
+            options.forEach(option => {
+                const item = document.createElement('li');
+                item.textContent = option.label;
+                if (option.disabled) {
+                    item.style.opacity = 0.5;
+                    item.style.cursor = 'not-allowed';
+                } else {
+                    item.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        option.action();
+                        menu.remove();
+                    });
                 }
-            menu.appendChild(item);
+                menu.appendChild(item);
             });
 
-        document.body.appendChild(menu);
-    };
+            document.body.appendChild(menu);
+        };
 
-    const createCanvasContextMenu = (e) => {
-        const options = [{
-            label: 'Add Quest',
-            action: () => {
-                const rect = container.getBoundingClientRect();
-                const newX = (e.clientX - rect.left - originX) / scale;
-                const newY = (e.clientY - rect.top - originY) / scale;
+        const createCanvasContextMenu = (e) => {
+            const rect = container.getBoundingClientRect();
+            // Convert click coordinates to the transformed space of the card container
+            const newX = (e.clientX - rect.left - originX) / scale;
+            const newY = (e.clientY - rect.top - originY) / scale;
 
-                const newQuest = {
-                    id: nextQuestId++,
-                    name: `New Quest ${nextQuestId - 1}`,
-                    parentIds: [],
-                    x: newX,
-                    y: newY,
-                    description: '',
-                    questStatus: 'Available',
-                    questType: [],
-                    startingTriggers: [],
-                    associatedMaps: [],
-                    associatedNPCs: [],
-                    failureTriggers: [],
-                    successTriggers: [],
-                    detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
-                    storyDuration: '',
-                    difficulty: 0,
-                    storySteps: [],
-                    status: 'active',
-                    prerequisites: [],
-                    rewards: [],
-                    recommendations: [],
-                    completionSteps: []
-                };
-                quests.push(newQuest);
-                selectedQuestId = newQuest.id;
-                drawConnections();
-                renderCards();
-            }
-        }];
-        createContextMenu(e, options);
-    };
-
-    const createCardContextMenu = (e, quest) => {
-        const options = [
-            {
-                label: 'Rename',
+            const options = [{
+                label: 'Add Quest',
                 action: () => {
-                    const newName = prompt('Enter a new name for the quest:', quest.name);
-                    if (newName !== null && newName.trim() !== '') {
-                        quest.name = newName.trim();
-                        renderCards();
+                    const newQuest = {
+                        id: nextQuestId++,
+                        name: `New Quest ${nextQuestId - 1}`,
+                        parentIds: [],
+                        x: newX,
+                        y: newY,
+                        description: '',
+                        questStatus: 'Available',
+                        questType: [],
+                        startingTriggers: [],
+                        associatedMaps: [],
+                        associatedNPCs: [],
+                        failureTriggers: [],
+                        successTriggers: [],
+                        detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                        storyDuration: '',
+                        difficulty: 0,
+                        storySteps: [],
+                    };
+                    quests.push(newQuest);
+                    selectedQuestId = newQuest.id;
+                    renderCards(); // Full re-render needed for new card
+                }
+            }];
+            createContextMenu(e, options);
+        };
+
+        const createCardContextMenu = (e, quest) => {
+            const options = [
+                {
+                    label: 'Rename',
+                    action: () => {
+                        const newName = prompt('Enter a new name for the quest:', quest.name);
+                        if (newName !== null && newName.trim() !== '') {
+                            quest.name = newName.trim();
+                            renderCards();
                         }
                     }
-            },
-            {
-                label: 'Delete',
-                disabled: quest.id === 1,
-                action: () => {
-                    if (quest.id === 1) return;
-
-                    quests = quests.filter(q => q.id !== quest.id);
-                    // Remove from parentIds of other quests
-                    quests.forEach(q => {
-                        if (q.parentIds) {
-                            q.parentIds = q.parentIds.filter(pid => pid !== quest.id);
-                        }
-                    });
-
-                    selectedQuestId = null;
-                    drawConnections();
-                    renderCards();
-                }
-            },
-            {
-                label: 'Link',
-                action: () => {
-                    isLinking = true;
-                    linkSourceId = quest.id;
-                    document.body.classList.add('linking-mode');
-                }
-            },
-            {
-                label: 'Move',
-                action: () => {
-                    isMoving = true;
-                    document.body.classList.add('moving-mode');
-                    selectedQuestId = quest.id;
-                }
-            }
-        ];
-        createContextMenu(e, options);
-    };
-
-    const handleLink = (targetId) => {
-        const sourceQuest = quests.find(q => q.id === linkSourceId);
-        const targetQuest = quests.find(q => q.id === targetId);
-
-        if (!sourceQuest || !targetQuest || sourceQuest.id === targetQuest.id) {
-            isLinking = false;
-            document.body.classList.remove('linking-mode');
-            return;
-            }
-
-        // Unlink if already linked
-        if (sourceQuest.parentIds.includes(targetId)) {
-            sourceQuest.parentIds = sourceQuest.parentIds.filter(id => id !== targetId);
-        } else {
-            // Check for circular dependencies
-            const isCircular = (source, target) => {
-                let toVisit = [...target.parentIds];
-                const visited = new Set();
-                while(toVisit.length > 0) {
-                    const currentId = toVisit.pop();
-                    if (currentId === source.id) return true;
-                    if (!visited.has(currentId)) {
-                        visited.add(currentId);
-                        const currentQuest = quests.find(q => q.id === currentId);
-                        if (currentQuest) {
-                            toVisit.push(...currentQuest.parentIds);
-                        }
+                },
+                {
+                    label: 'Delete',
+                    disabled: quest.id === 1,
+                    action: () => {
+                        if (quest.id === 1) return;
+                        quests = quests.filter(q => q.id !== quest.id);
+                        quests.forEach(q => {
+                            if (q.parentIds) {
+                                q.parentIds = q.parentIds.filter(pid => pid !== quest.id);
+                            }
+                        });
+                        selectedQuestId = null;
+                        renderCards(); // Full re-render needed
+                    }
+                },
+                {
+                    label: 'Link',
+                    action: () => {
+                        isLinking = true;
+                        linkSourceId = quest.id;
+                        document.body.classList.add('linking-mode');
+                    }
+                },
+                {
+                    label: 'Move',
+                    action: () => {
+                        isMoving = true;
+                        document.body.classList.add('moving-mode');
+                        selectedQuestId = quest.id;
                     }
                 }
-                return false;
-                };
+            ];
+            createContextMenu(e, options);
+        };
 
-            if (!isCircular(sourceQuest, targetQuest)) {
-                 if (!sourceQuest.parentIds.includes(targetId)) {
+        const handleLink = (targetId) => {
+            const sourceQuest = quests.find(q => q.id === linkSourceId);
+            const targetQuest = quests.find(q => q.id === targetId);
+
+            if (!sourceQuest || !targetQuest || sourceQuest.id === targetQuest.id) {
+                isLinking = false;
+                document.body.classList.remove('linking-mode');
+                return;
+            }
+
+            if (sourceQuest.parentIds.includes(targetId)) {
+                sourceQuest.parentIds = sourceQuest.parentIds.filter(id => id !== targetId);
+            } else {
+                if (!sourceQuest.parentIds.includes(targetId)) {
                     sourceQuest.parentIds.push(targetId);
                 }
-            } else {
-                alert("Cannot create a circular dependency.");
             }
-        }
+            isLinking = false;
+            linkSourceId = null;
+            document.body.classList.remove('linking-mode');
+            drawConnections(); // Just need to redraw connections
+        };
 
-        isLinking = false;
-        linkSourceId = null;
-        document.body.classList.remove('linking-mode');
+        const resizeHandler = () => {
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+            drawConnections();
+        };
+        window.addEventListener('resize', resizeHandler);
 
-        drawConnections();
-        renderCards();
-    };
-
-    /**
-     * Shows the quest details overlay, populating it with a specific quest's data.
-     * @param {object} quest The quest object to display.
-     */
-
-    // --- Event Listeners and Main Logic ---
-
-    const resizeCanvas = () => {
-        canvas.width = container.offsetWidth;
-        canvas.height = container.offsetHeight;
-        drawConnections();
-        renderCards();
-    };
-    window.addEventListener('resize', resizeCanvas);
-
-    container.addEventListener('mousedown', (e) => {
-        if (e.button === 0) { // Left click
-            if (isMoving) {
-                const questToMove = quests.find(q => q.id === selectedQuestId);
-                if (questToMove) {
-                    // No setup needed here as mousemove will handle it
-                }
-            } else {
+        container.addEventListener('mousedown', (e) => {
+            if (e.target !== container && e.target !== canvas) return;
+            if (e.button === 0) {
                 isPanning = true;
                 panStartX = e.clientX - originX;
                 panStartY = e.clientY - originY;
                 container.style.cursor = 'grabbing';
             }
-        }
-    });
-
-    container.addEventListener('mouseup', (e) => {
-        if (e.button === 0) {
-            isPanning = false;
-            if (isMoving) {
-                isMoving = false;
-                document.body.classList.remove('moving-mode');
-            }
-            container.style.cursor = 'grab';
-        }
-    });
-
-    container.addEventListener('mousemove', (e) => {
-        if (isMoving) {
-            const questToMove = quests.find(q => q.id === selectedQuestId);
-            if (questToMove) {
-                const rect = container.getBoundingClientRect();
-                const newX = (e.clientX - rect.left - originX) / scale;
-                const newY = (e.clientY - rect.top - originY) / scale;
-                questToMove.x = newX;
-                questToMove.y = newY;
-                drawConnections();
-                renderCards();
-            }
-        } else if (isPanning) {
-            originX = e.clientX - panStartX;
-            originY = e.clientY - panStartY;
-            drawConnections();
-            renderCards();
-        }
-    });
-
-    container.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const zoomAmount = -e.deltaY * 0.001;
-        const newScale = Math.min(Math.max(0.2, scale + zoomAmount), 2.0);
-
-        const rect = container.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        originX = originX - (mouseX - originX) * (newScale / scale - 1);
-        originY = originY - (mouseY - originY) * (newScale / scale - 1);
-
-        scale = newScale;
-        drawConnections();
-        renderCards();
-    });
-
-    container.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        createCanvasContextMenu(e);
-    });
-
-    // Remove context menu on window click
-    window.addEventListener('click', (e) => {
-        const menu = document.querySelector('.story-tree-context-menu');
-        if (menu) {
-            menu.remove();
-        }
-        if (isLinking) {
-            isLinking = false;
-            linkSourceId = null;
-            document.body.classList.remove('linking-mode');
-        }
-    });
-
-    const storyBeatCardBackButton = document.getElementById('story-beat-card-back-button');
-    if (storyBeatCardBackButton) {
-        storyBeatCardBackButton.addEventListener('click', () => {
-            hideOverlay();
         });
+
+        container.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                isPanning = false;
+                container.style.cursor = 'grab';
+            }
+        });
+
+        container.addEventListener('mouseleave', () => {
+             isPanning = false;
+             container.style.cursor = 'grab';
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (isMoving) {
+                const questToMove = quests.find(q => q.id === selectedQuestId);
+                if (questToMove) {
+                    const rect = container.getBoundingClientRect();
+                    const newX = (e.clientX - rect.left - originX) / scale;
+                    const newY = (e.clientY - rect.top - originY) / scale;
+                    questToMove.x = newX;
+                    questToMove.y = newY;
+
+                    const cardElement = cardContainer.querySelector(`.card[data-id='${questToMove.id}']`);
+                    if(cardElement) {
+                        cardElement.style.left = `${newX}px`;
+                        cardElement.style.top = `${newY}px`;
+                    }
+                    drawConnections();
+                }
+            } else if (isPanning) {
+                originX = e.clientX - panStartX;
+                originY = e.clientY - panStartY;
+                updateContainerTransform();
+            }
+        });
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomAmount = -e.deltaY * 0.001;
+            const newScale = Math.min(Math.max(0.2, scale + zoomAmount), 2.0);
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            originX = mouseX - (mouseX - originX) * (newScale / scale);
+            originY = mouseY - (mouseY - originY) * (newScale / scale);
+
+            scale = newScale;
+            updateContainerTransform();
+        });
+
+        container.addEventListener('contextmenu', (e) => {
+            if (e.target === container || e.target === canvas){
+                e.preventDefault();
+                createCanvasContextMenu(e);
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            const menu = document.querySelector('.story-tree-context-menu');
+            if (menu) menu.remove();
+            if (isLinking) {
+                isLinking = false;
+                linkSourceId = null;
+                document.body.classList.remove('linking-mode');
+            }
+        });
+
+        // Initial setup
+        originX = container.offsetWidth / 2;
+        originY = container.offsetHeight / 2;
+        resizeHandler();
+        renderCards();
     }
 
     if (storyBeatCardExportButton) {
