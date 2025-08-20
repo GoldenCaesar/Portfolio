@@ -1576,53 +1576,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    dmCanvas.addEventListener('mousedown', (event) => {
-        if (event.button !== 0) return;
-
-        const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
-        if (!imageCoords) return;
-
-        for (let i = initiativeTokens.length - 1; i >= 0; i--) {
-            const token = initiativeTokens[i];
-            if (isPointInToken(imageCoords, token)) {
-                isDraggingToken = true;
-                draggedToken = token;
-                dragStartX = imageCoords.x;
-                dragStartY = imageCoords.y;
-                event.preventDefault();
-                return;
-            }
-        }
-
-        if (isMovingPolygon && polygonBeingMoved) {
-            if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
-                x: p.x + currentDragOffsets.x,
-                y: p.y + currentDragOffsets.y
-            })))) {
-                moveStartPoint = imageCoords;
-                moveStartPoint.x -= currentDragOffsets.x;
-                moveStartPoint.y -= currentDragOffsets.y;
-                console.log("Dragging polygon started at:", imageCoords);
-                event.preventDefault();
-            }
-        } else if (isMovingNote && noteBeingMoved) {
-            if (isPointInNoteIcon(imageCoords, noteBeingMoved.overlayRef)) {
-                moveStartPoint = imageCoords;
-                moveStartPoint.x -= currentDragOffsets.x;
-                moveStartPoint.y -= currentDragOffsets.y;
-                console.log("Dragging note started at:", imageCoords);
-                event.preventDefault();
-            }
-        } else if (isMovingCharacter && characterBeingMoved) {
-            if (isPointInCharacterIcon(imageCoords, characterBeingMoved.overlayRef)) {
-                moveStartPoint = imageCoords;
-                moveStartPoint.x -= currentDragOffsets.x;
-                moveStartPoint.y -= currentDragOffsets.y;
-                console.log("Dragging character started at:", imageCoords);
-                event.preventDefault();
-            }
-        }
-    });
 
     dmCanvas.addEventListener('mousemove', (event) => {
         if (isDraggingToken && draggedToken) {
@@ -2076,7 +2029,55 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', debounce(resizeCanvas, 250));
 
         mapContainer.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // Only left-click
+            if (e.button !== 0) return;
+
+            const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+            if (!imageCoords) return;
+
+            // Priority 1: Check for token drag
+            for (let i = initiativeTokens.length - 1; i >= 0; i--) {
+                const token = initiativeTokens[i];
+                if (isPointInToken(imageCoords, token)) {
+                    isDraggingToken = true;
+                    draggedToken = token;
+                    dragStartX = imageCoords.x;
+                    dragStartY = imageCoords.y;
+                    e.preventDefault();
+                    return; // Token found, stop further processing
+                }
+            }
+
+            // Priority 2: Check for overlay move (polygons, notes, etc.)
+            if (isMovingPolygon && polygonBeingMoved) {
+                if (isPointInPolygon(imageCoords, polygonBeingMoved.originalPoints.map(p => ({
+                    x: p.x + currentDragOffsets.x,
+                    y: p.y + currentDragOffsets.y
+                })))) {
+                    moveStartPoint = imageCoords;
+                    moveStartPoint.x -= currentDragOffsets.x;
+                    moveStartPoint.y -= currentDragOffsets.y;
+                    e.preventDefault();
+                    return;
+                }
+            } else if (isMovingNote && noteBeingMoved) {
+                if (isPointInNoteIcon(imageCoords, noteBeingMoved.overlayRef)) {
+                    moveStartPoint = imageCoords;
+                    moveStartPoint.x -= currentDragOffsets.x;
+                    moveStartPoint.y -= currentDragOffsets.y;
+                    e.preventDefault();
+                    return;
+                }
+            } else if (isMovingCharacter && characterBeingMoved) {
+                if (isPointInCharacterIcon(imageCoords, characterBeingMoved.overlayRef)) {
+                    moveStartPoint = imageCoords;
+                    moveStartPoint.x -= currentDragOffsets.x;
+                    moveStartPoint.y -= currentDragOffsets.y;
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // If nothing else was clicked, start panning the map
             const mapData = detailedMapData.get(selectedMapFileName);
             if (!mapData) return;
 
@@ -2117,7 +2118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             displayMapOnCanvas(selectedMapFileName);
             sendMapTransformToPlayerView(transform);
         });
-        
+
         mapContainer.addEventListener('mousemove', (e) => {
             if (isPanning) {
                 const mapData = detailedMapData.get(selectedMapFileName);
@@ -3397,7 +3398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    dmCanvas.addEventListener('contextmenu', (event) => {
+    mapContainer.addEventListener('contextmenu', (event) => {
         event.preventDefault();
 
         if (isMovingPolygon) {
