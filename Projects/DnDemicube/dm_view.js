@@ -1577,52 +1577,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    dmCanvas.addEventListener('mousemove', (event) => {
-        if (isDraggingToken && draggedToken) {
-            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
-            if (imageCoords) {
-                const dx = imageCoords.x - dragStartX;
-                const dy = imageCoords.y - dragStartY;
-
-                draggedToken.x += dx;
-                draggedToken.y += dy;
-
-                dragStartX = imageCoords.x;
-                dragStartY = imageCoords.y;
-
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                }
-            }
-        } else if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
-            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
-            if (imageCoords) {
-                currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
-                currentDragOffsets.y = imageCoords.y - moveStartPoint.y;
-
-                const parentMapName = isMovingPolygon ? polygonBeingMoved.parentMapName : (isMovingNote ? noteBeingMoved.parentMapName : characterBeingMoved.parentMapName);
-
-                if (selectedMapFileName === parentMapName && currentMapDisplayData.img && currentMapDisplayData.img.complete) {
-                    const ctx = dmCanvas.getContext('2d');
-                    ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-                    ctx.drawImage(
-                        currentMapDisplayData.img, 0, 0,
-                        currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight,
-                        currentMapDisplayData.offsetX, currentMapDisplayData.offsetY,
-                        currentMapDisplayData.scaledWidth, currentMapDisplayData.scaledHeight
-                    );
-                    const mapData = detailedMapData.get(selectedMapFileName);
-                    if (mapData && mapData.overlays) {
-                        drawOverlays(mapData.overlays);
-                    }
-                } else if (selectedMapFileName === parentMapName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                }
-            }
-        } else {
-            handleMouseMoveOnCanvas(event);
-        }
-    });
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
@@ -2120,7 +2074,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         mapContainer.addEventListener('mousemove', (e) => {
-            if (isPanning) {
+            const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+
+            if (isDraggingToken && draggedToken) {
+                if (imageCoords) {
+                    const dx = imageCoords.x - dragStartX;
+                    const dy = imageCoords.y - dragStartY;
+                    draggedToken.x += dx;
+                    draggedToken.y += dy;
+                    dragStartX = imageCoords.x;
+                    dragStartY = imageCoords.y;
+                    if (selectedMapFileName) {
+                        displayMapOnCanvas(selectedMapFileName);
+                    }
+                }
+            } else if ((isMovingPolygon && polygonBeingMoved && moveStartPoint) || (isMovingNote && noteBeingMoved && moveStartPoint) || (isMovingCharacter && characterBeingMoved && moveStartPoint)) {
+                if (imageCoords) {
+                    currentDragOffsets.x = imageCoords.x - moveStartPoint.x;
+                    currentDragOffsets.y = imageCoords.y - moveStartPoint.y;
+                    if (selectedMapFileName) {
+                        displayMapOnCanvas(selectedMapFileName);
+                    }
+                }
+            } else if (isPanning) {
                 const mapData = detailedMapData.get(selectedMapFileName);
                 if (!mapData) return;
                 mapData.transform.originX = e.clientX - panStartX;

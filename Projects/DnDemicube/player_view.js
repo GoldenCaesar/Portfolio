@@ -88,6 +88,7 @@ let currentMapImage = null;
 let currentOverlays = [];
 let initiativeTokens = [];
 let currentMapTransform = { scale: 1, originX: 0, originY: 0 };
+const imageCache = new Map();
 let currentMapDisplayData = {
     img: null,
     ratio: 1,
@@ -213,8 +214,14 @@ function drawOverlays_PlayerView(overlays) {
             pCtx.fillText('👤', canvasX, canvasY);
 
             if (overlay.character_portrait) {
-                const img = new Image();
-                img.src = overlay.character_portrait;
+                let img = imageCache.get(overlay.character_portrait);
+                if (!img) {
+                    img = new Image();
+                    img.src = overlay.character_portrait;
+                    img.onload = () => drawMapAndOverlays();
+                    imageCache.set(overlay.character_portrait, img);
+                }
+
                 if (img.complete) {
                     pCtx.beginPath();
                     pCtx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
@@ -222,8 +229,6 @@ function drawOverlays_PlayerView(overlays) {
                     pCtx.clip();
                     pCtx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
                     pCtx.beginPath(); // Reset path after clipping
-                } else {
-                    img.onload = () => drawMapAndOverlays();
                 }
             }
         }
@@ -580,8 +585,14 @@ function drawToken(ctx, token) {
     ctx.clip();
 
     if (token.portrait) {
-        const img = new Image();
-        img.src = token.portrait;
+        let img = imageCache.get(token.portrait);
+        if (!img) {
+            img = new Image();
+            img.src = token.portrait;
+            img.onload = () => drawMapAndOverlays();
+            imageCache.set(token.portrait, img);
+        }
+
         if (img.complete) {
             ctx.drawImage(img, canvasX - size / 2, canvasY - size / 2, size, size);
         } else {
@@ -590,7 +601,6 @@ function drawToken(ctx, token) {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(token.initials, canvasX, canvasY);
-            img.onload = () => drawMapAndOverlays();
         }
     } else {
         ctx.fillStyle = '#e0e0e0';
