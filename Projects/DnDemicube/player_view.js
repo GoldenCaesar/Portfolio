@@ -265,11 +265,16 @@ window.addEventListener('message', (event) => {
                 playerMapContainer.style.display = 'flex';
 
                 if (data.mapDataUrl) {
-                    // console.log(`Player view received loadMap: ${data.mapDataUrl.substring(0,30)}...`);
                     const img = new Image();
                     img.onload = () => {
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
+                        if (data.transform) {
+                            const normalizedTransform = data.transform;
+                            currentMapTransform.scale = normalizedTransform.scale;
+                            currentMapTransform.originX = normalizedTransform.originXRatio * playerCanvas.width;
+                            currentMapTransform.originY = normalizedTransform.originYRatio * playerCanvas.height;
+                        }
                         console.log("Player view: Map image loaded, drawing map and overlays. Overlays received:", currentOverlays.length);
                         drawMapAndOverlays();
                     };
@@ -286,8 +291,11 @@ window.addEventListener('message', (event) => {
                 }
                 break;
             case 'mapTransformUpdate':
-                if (data.transform) {
-                    currentMapTransform = data.transform;
+                if (data.transform && data.dmCanvasSize) {
+                    const normalizedTransform = data.transform;
+                    currentMapTransform.scale = normalizedTransform.scale;
+                    currentMapTransform.originX = normalizedTransform.originXRatio * playerCanvas.width;
+                    currentMapTransform.originY = normalizedTransform.originYRatio * playerCanvas.height;
                     drawMapAndOverlays();
                 }
                 break;
