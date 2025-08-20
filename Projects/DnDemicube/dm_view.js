@@ -7006,8 +7006,6 @@ function displayToast(messageElement) {
 
     // Initial setup
     resizeCanvas(); // Set initial canvas size
-    drawConnections();
-    renderCards();
 
     if (saveJsonButton) {
         saveJsonButton.addEventListener('click', () => {
