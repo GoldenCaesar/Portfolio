@@ -2010,6 +2010,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         resetAllInteractiveStates();
                     }
                 } else {
+                    if (selectedMapFileName === clickedFileName) {
+                        // Re-clicked the same map, so reset the view
+                        const mapData = detailedMapData.get(clickedFileName);
+                        if (mapData && mapData.transform) {
+                            mapData.transform.initialized = false;
+                            displayMapOnCanvas(clickedFileName);
+                            if (mapData.mode === 'view') {
+                                sendMapToPlayerView(clickedFileName);
+                            }
+                        }
+                        return;
+                    }
+
                     if (selectedMapFileName !== null && selectedMapFileName !== clickedFileName) {
                         resetAllInteractiveStates();
                     }
@@ -2962,12 +2975,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                     return overlay;
                                 });
 
+                            const transform = mapData.transform;
+                            const viewRectangle = {
+                                x: (0 - transform.originX) / transform.scale,
+                                y: (0 - transform.originY) / transform.scale,
+                                width: dmCanvas.width / transform.scale,
+                                height: dmCanvas.height / transform.scale
+                            };
                             playerWindow.postMessage({
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
                                 overlays: JSON.parse(JSON.stringify(visibleOverlays)),
-                                transform: mapData.transform,
-                                dmCanvasSize: { width: dmCanvas.width, height: dmCanvas.height }
+                                viewRectangle: viewRectangle
                             }, '*');
                             console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
                         };
@@ -2999,10 +3018,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sendMapTransformToPlayerView(transform) {
         if (playerWindow && !playerWindow.closed) {
+            const viewRectangle = {
+                x: (0 - transform.originX) / transform.scale,
+                y: (0 - transform.originY) / transform.scale,
+                width: dmCanvas.width / transform.scale,
+                height: dmCanvas.height / transform.scale
+            };
             playerWindow.postMessage({
                 type: 'mapTransformUpdate',
-                transform: transform,
-                dmCanvasSize: { width: dmCanvas.width, height: dmCanvas.height }
+                viewRectangle: viewRectangle
             }, '*');
         }
     }
