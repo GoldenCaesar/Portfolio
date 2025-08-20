@@ -115,8 +115,9 @@ function drawMapAndOverlays() {
         return;
     }
 
-    // Canvas width and height are now set by the message listener.
-    // We just clear it.
+    playerCanvas.width = playerMapContainer.clientWidth;
+    playerCanvas.height = playerMapContainer.clientHeight;
+
     pCtx.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
     pCtx.save();
 
@@ -269,33 +270,39 @@ window.addEventListener('message', (event) => {
                     img.onload = () => {
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
-                        if (data.dmCanvasSize) {
-                            playerCanvas.width = data.dmCanvasSize.width;
-                            playerCanvas.height = data.dmCanvasSize.height;
+                        if (data.viewRectangle) {
+                            const viewRect = data.viewRectangle;
+                            const hScale = playerCanvas.width / viewRect.width;
+                            const vScale = playerCanvas.height / viewRect.height;
+                            const scale = Math.min(hScale, vScale);
+                            const renderedWidth = viewRect.width * scale;
+                            const renderedHeight = viewRect.height * scale;
+                            currentMapTransform.scale = scale;
+                            currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
+                            currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
                         }
-                        if (data.transform) {
-                            currentMapTransform = data.transform;
-                        }
-                        console.log("Player view: Map image loaded, drawing map and overlays. Overlays received:", currentOverlays.length);
                         drawMapAndOverlays();
                     };
                     img.onerror = () => {
-                        console.error(`Error loading image for player view (loadMap).`);
                         drawPlaceholder("Error loading map.");
                         currentMapImage = null;
-                        currentOverlays = [];
                     };
                     img.src = data.mapDataUrl;
                 } else {
-                    console.warn("loadMap message received without mapDataUrl.");
                     drawPlaceholder("Received invalid map data from DM.");
                 }
                 break;
             case 'mapTransformUpdate':
-                if (data.transform && data.dmCanvasSize) {
-                    playerCanvas.width = data.dmCanvasSize.width;
-                    playerCanvas.height = data.dmCanvasSize.height;
-                    currentMapTransform = data.transform;
+                if (data.viewRectangle) {
+                    const viewRect = data.viewRectangle;
+                    const hScale = playerCanvas.width / viewRect.width;
+                    const vScale = playerCanvas.height / viewRect.height;
+                    const scale = Math.min(hScale, vScale);
+                    const renderedWidth = viewRect.width * scale;
+                    const renderedHeight = viewRect.height * scale;
+                    currentMapTransform.scale = scale;
+                    currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
+                    currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
                     drawMapAndOverlays();
                 }
                 break;
