@@ -7060,7 +7060,6 @@ function displayToast(messageElement) {
             });
         });
     }
-    }
 
     if (storyBeatCardOverlay) {
         storyBeatCardOverlay.addEventListener('click', (e) => {
