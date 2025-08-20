@@ -128,6 +128,13 @@ function drawMapAndOverlays() {
 
     drawOverlays_PlayerView(currentOverlays);
 
+    // Draw initiative tokens on top of everything else, still within the transformed context
+    if (initiativeTokens.length > 0) {
+        initiativeTokens.forEach(token => {
+            drawToken(pCtx, token);
+        });
+    }
+
     pCtx.restore();
 
     const hRatio = playerCanvas.width / currentMapImage.width;
@@ -223,11 +230,7 @@ function drawOverlays_PlayerView(overlays) {
         });
     }
 
-    if (initiativeTokens.length > 0) {
-        initiativeTokens.forEach(token => {
-            drawToken(pCtx, token); // This will also be drawn in the transformed space
-        });
-    }
+    // The main drawMapAndOverlays function now handles drawing tokens.
 }
 
 window.addEventListener('message', (event) => {
