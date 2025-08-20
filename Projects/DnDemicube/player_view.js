@@ -207,16 +207,17 @@ function drawOverlays_PlayerView(overlays) {
 
             if (overlay.character_portrait) {
                 const img = new Image();
-                img.onload = function() {
-                    // Note: We don't save/restore here because the whole function does it.
+                img.src = overlay.character_portrait;
+                if (img.complete) {
                     pCtx.beginPath();
                     pCtx.arc(canvasX, canvasY, iconSize / 2, 0, Math.PI * 2, true);
                     pCtx.closePath();
                     pCtx.clip();
                     pCtx.drawImage(img, canvasX - iconSize / 2, canvasY - iconSize / 2, iconSize, iconSize);
                     pCtx.beginPath(); // Reset path after clipping
-                };
-                img.src = overlay.character_portrait;
+                } else {
+                    img.onload = () => drawMapAndOverlays();
+                }
             }
         }
         });
