@@ -214,7 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let characterEasyMDE = null;
 
     // Story Beats State Variables
-    let isStoryTreeInitialized = false;
     let quests = [
         {
             id: 1,
@@ -4103,10 +4102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 storyTreeContainer.style.display = 'flex';
                 storyTreeContainer.style.flexGrow = '1';
             }
-            if (!isStoryTreeInitialized) {
-                initStoryTree();
-                isStoryTreeInitialized = true;
-            }
+            initStoryTree();
         } else { // Default to DM Controls tab
             if (mapContainer) mapContainer.style.display = 'flex';
             resizeCanvas(); // Ensure map is resized correctly
@@ -7095,11 +7091,11 @@ function displayToast(messageElement) {
     // --- Context Menu Logic ---
 
     const createContextMenu = (e, options) => {
-        const existingMenu = document.querySelector('.context-menu');
+        const existingMenu = document.querySelector('.story-tree-context-menu');
         if (existingMenu) existingMenu.remove();
 
             const menu = document.createElement('ul');
-        menu.classList.add('context-menu');
+        menu.classList.add('story-tree-context-menu');
             menu.style.left = `${e.clientX}px`;
             menu.style.top = `${e.clientY}px`;
 
@@ -7349,7 +7345,7 @@ function displayToast(messageElement) {
 
     // Remove context menu on window click
     window.addEventListener('click', (e) => {
-        const menu = document.querySelector('.context-menu');
+        const menu = document.querySelector('.story-tree-context-menu');
         if (menu) {
             menu.remove();
         }
