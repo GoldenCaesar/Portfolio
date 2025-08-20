@@ -154,8 +154,6 @@ function drawMapAndOverlays() {
         offsetY: currentMapTransform.originY,
         scale: currentMapTransform.scale
     };
-
-    drawOverlays_PlayerView(currentOverlays);
 }
 
 function drawOverlays_PlayerView(overlays) {
