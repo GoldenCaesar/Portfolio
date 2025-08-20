@@ -2962,16 +2962,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                     return overlay;
                                 });
 
-                            const normalizedTransform = {
-                                scale: mapData.transform.scale,
-                                originXRatio: mapData.transform.originX / dmCanvas.width,
-                                originYRatio: mapData.transform.originY / dmCanvas.height
-                            };
                             playerWindow.postMessage({
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
                                 overlays: JSON.parse(JSON.stringify(visibleOverlays)),
-                                transform: normalizedTransform,
+                                transform: mapData.transform,
                                 dmCanvasSize: { width: dmCanvas.width, height: dmCanvas.height }
                             }, '*');
                             console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
@@ -3004,14 +2999,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sendMapTransformToPlayerView(transform) {
         if (playerWindow && !playerWindow.closed) {
-            const normalizedTransform = {
-                scale: transform.scale,
-                originXRatio: transform.originX / dmCanvas.width,
-                originYRatio: transform.originY / dmCanvas.height
-            };
             playerWindow.postMessage({
                 type: 'mapTransformUpdate',
-                transform: normalizedTransform,
+                transform: transform,
                 dmCanvasSize: { width: dmCanvas.width, height: dmCanvas.height }
             }, '*');
         }
