@@ -483,51 +483,53 @@
             <button class="footer-tab-button active" data-tab="footer-tools">Tools</button>
             <button class="footer-tab-button" data-tab="footer-quests">Quests</button>
         </div>
-        <div id="footer-tools" class="footer-tab-content active">
-            <div id="footer-content-wrapper">
-                <div id="footer-left">
-                    <h3 style="margin-top: 15px;">Campaign Controls</h3>
-                    <div id="footer-timer-audio-area">
-                        <div id="footer-timer-area">
-                            <span id="campaign-timer-display">00:00:00</span>
-                            <button id="campaign-timer-toggle">Resume Campaign</button>
-                        </div>
-                        <div id="audio-controls" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-                            <select id="audio-input-select" style="width: 100%; padding: 8px; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0; border-radius: 4px;"></select>
-                            <div style="display: flex; gap: 10px;">
-                                <button id="record-button" style="flex-grow: 1;">Record</button>
-                                <button id="test-audio-button" style="flex-grow: 1;">Test Audio</button>
+        <div class="footer-content-container">
+            <div id="footer-tools" class="footer-tab-content active">
+                <div id="footer-content-wrapper">
+                    <div id="footer-left">
+                        <h3 style="margin-top: 15px;">Campaign Controls</h3>
+                        <div id="footer-timer-audio-area">
+                            <div id="footer-timer-area">
+                                <span id="campaign-timer-display">00:00:00</span>
+                                <button id="campaign-timer-toggle">Resume Campaign</button>
                             </div>
-                            <audio id="test-audio-playback" controls style="display: none; width: 100%;"></audio>
+                            <div id="audio-controls" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                <select id="audio-input-select" style="width: 100%; padding: 8px; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0; border-radius: 4px;"></select>
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="record-button" style="flex-grow: 1;">Record</button>
+                                    <button id="test-audio-button" style="flex-grow: 1;">Test Audio</button>
+                                </div>
+                                <audio id="test-audio-playback" controls style="display: none; width: 100%;"></audio>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div id="footer-center">
-                    <h3>Campaign Notes</h3>
-                    <div id="footer-notes-area">
-                        <input type="text" id="dm-notes-input" placeholder="Type a quick note and press Enter...">
+                    <div id="footer-center">
+                        <h3>Campaign Notes</h3>
+                        <div id="footer-notes-area">
+                            <input type="text" id="dm-notes-input" placeholder="Type a quick note and press Enter...">
+                        </div>
+                        <h3 style="margin-top: 15px;">DM Tools</h3>
+                        <ul id="dm-tools-list">
+                            <li data-action="open-initiative-tracker">Initiative Tracker</li>
+                            <li data-action="open-dice-roller">Dice Roller</li>
+                            <li data-action="open-action-log">Action Log</li>
+                        </ul>
                     </div>
-                    <h3 style="margin-top: 15px;">DM Tools</h3>
-                    <ul id="dm-tools-list">
-                        <li data-action="open-initiative-tracker">Initiative Tracker</li>
-                        <li data-action="open-dice-roller">Dice Roller</li>
-                        <li data-action="open-action-log">Action Log</li>
-                    </ul>
                 </div>
             </div>
-        </div>
-        <div id="footer-quests" class="footer-tab-content" style="display: none;">
-            <div id="footer-quests-left" style="flex: 1; padding: 10px;">
-                <h3>Active Quests</h3>
-                <!-- Active quests content will go here -->
-            </div>
-            <div id="footer-quests-center" style="flex: 2; padding: 10px; border-left: 1px solid #4a5f7a; border-right: 1px solid #4a5f7a;">
-                <h3>Active Quest Story Steps</h3>
-                <!-- Story steps content will go here -->
-            </div>
-            <div id="footer-quests-right" style="flex: 1; padding: 10px;">
-                <h3>Available Quests</h3>
-                <!-- Available quests content will go here -->
+            <div id="footer-quests" class="footer-tab-content">
+                <div id="footer-quests-left" style="flex: 1; padding: 10px;">
+                    <h3>Active Quests</h3>
+                    <!-- Active quests content will go here -->
+                </div>
+                <div id="footer-quests-center" style="flex: 2; padding: 10px; border-left: 1px solid #4a5f7a; border-right: 1px solid #4a5f7a;">
+                    <h3>Active Quest Story Steps</h3>
+                    <!-- Story steps content will go here -->
+                </div>
+                <div id="footer-quests-right" style="flex: 1; padding: 10px;">
+                    <h3>Available Quests</h3>
+                    <!-- Available quests content will go here -->
+                </div>
             </div>
         </div>
     </footer>
