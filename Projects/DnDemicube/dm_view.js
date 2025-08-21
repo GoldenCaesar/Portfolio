@@ -7091,13 +7091,16 @@ function displayToast(messageElement) {
     // --- Context Menu Logic ---
 
     const createContextMenu = (e, options) => {
-        const existingMenu = document.querySelector('.story-tree-context-menu');
+        const existingMenu = document.querySelector('.context-menu');
         if (existingMenu) existingMenu.remove();
 
-            const menu = document.createElement('ul');
-        menu.classList.add('story-tree-context-menu');
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
+        const menu = document.createElement('div');
+        menu.classList.add('context-menu');
+        menu.style.left = `${e.clientX}px`;
+        menu.style.top = `${e.clientY}px`;
+
+        const ul = document.createElement('ul');
+        menu.appendChild(ul);
 
         options.forEach(option => {
             const item = document.createElement('li');
@@ -7112,7 +7115,7 @@ function displayToast(messageElement) {
                     menu.remove();
                 });
                 }
-            menu.appendChild(item);
+            ul.appendChild(item);
             });
 
         document.body.appendChild(menu);
