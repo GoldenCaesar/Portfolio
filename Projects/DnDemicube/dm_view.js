@@ -794,6 +794,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     populateAndShowStoryBeatCard(currentQuest);
                 }
             }
+
+            if (e.target.classList.contains('remove-trigger-btn')) {
+                const row = e.target.closest('.trigger-row');
+                if (!row) return;
+                const container = row.parentElement;
+                const triggerType = container.id.replace('quest-', '');
+                const index = parseInt(row.dataset.index, 10);
+                const currentQuest = quests.find(q => q.id === activeOverlayCardId);
+
+                if (currentQuest && currentQuest[triggerType] && currentQuest[triggerType][index]) {
+                    currentQuest[triggerType].splice(index, 1);
+                    populateAndShowStoryBeatCard(currentQuest);
+                }
+            }
         });
     }
 
@@ -7158,44 +7172,23 @@ function displayToast(messageElement) {
         });
 
         // Add/Remove Triggers
-        const setupTriggerList = (containerId, buttonId, isLinkable) => {
-            const container = document.getElementById(containerId);
+        const setupTriggerList = (containerId, buttonId, triggerType) => {
             const addButton = document.getElementById(buttonId);
-
             addButton.addEventListener('click', () => {
-                const newIndex = container.children.length;
-                const newRow = document.createElement('div');
-                newRow.className = 'trigger-row';
-                newRow.dataset.index = newIndex;
-
-                let linkHtml = '';
-                if (isLinkable) {
-                    const triggerType = containerId.replace('quest-', '');
-                    linkHtml = `
-                        <div class="trigger-link-container" data-trigger-type="${triggerType}" data-index="${newIndex}">
-                            <button class="link-trigger-btn" title="Link to another quest's starting trigger">🔗</button>
-                        </div>
-                    `;
-                }
-
-                newRow.innerHTML = `
-                    <div contenteditable="true" class="editable-div trigger-text">New Trigger</div>
-                    ${linkHtml}
-                    <button class="remove-trigger-btn">X</button>
-                `;
-                container.appendChild(newRow);
-            });
-
-            container.addEventListener('click', (e) => {
-                if (e.target.classList.contains('remove-trigger-btn')) {
-                    e.target.closest('.trigger-row').remove();
+                const currentQuest = quests.find(q => q.id === activeOverlayCardId);
+                if (currentQuest) {
+                    if (!currentQuest[triggerType]) {
+                        currentQuest[triggerType] = [];
+                    }
+                    currentQuest[triggerType].push({ text: 'New Trigger', linkedQuestId: null });
+                    populateAndShowStoryBeatCard(currentQuest);
                 }
             });
         };
 
-        setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn', false);
-        setupTriggerList('quest-success-triggers', 'add-success-trigger-btn', true);
-        setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn', true);
+        setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn', 'startingTriggers');
+        setupTriggerList('quest-success-triggers', 'add-success-trigger-btn', 'successTriggers');
+        setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn', 'failureTriggers');
     };
 
     /**
