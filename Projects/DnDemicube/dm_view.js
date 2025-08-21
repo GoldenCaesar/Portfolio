@@ -333,6 +333,94 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Debounce utility function
+    const getQuestDataFromOverlay = () => {
+        if (!activeOverlayCardId) return null;
+
+        const difficultyStars = document.querySelectorAll('#quest-difficulty .star');
+        let difficulty = 0;
+        difficultyStars.forEach(star => {
+            if (star.textContent === '★') {
+                difficulty = Math.max(difficulty, parseInt(star.dataset.value, 10));
+            }
+        });
+
+        const currentQuestData = {
+            id: activeOverlayCardId,
+            name: document.getElementById('quest-name').innerText,
+            description: document.getElementById('quest-description').innerText,
+            questStatus: document.getElementById('quest-status').value,
+            questType: document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean),
+            storyDuration: document.getElementById('quest-story-duration').value,
+            difficulty: difficulty,
+            startingTriggers: Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-row')).map((row, index) => {
+                const existingTrigger = originalQuestState.startingTriggers[index] || {};
+                return {
+                    text: row.querySelector('.trigger-text').innerText,
+                    linkedQuestId: existingTrigger.linkedQuestId || null
+                };
+            }),
+            associatedMaps: Array.from(document.getElementById('quest-associated-maps').selectedOptions).map(opt => opt.value),
+            associatedNPCs: Array.from(document.querySelectorAll('.npc-row')).map(row => ({
+                id: parseInt(row.querySelector('.npc-select').value, 10),
+                role: row.querySelector('.npc-role').value
+            })).filter(npc => npc.id),
+            storySteps: Array.from(document.querySelectorAll('.story-step-row')).map(row => ({
+                text: row.querySelector('.story-step-text').innerText,
+                completed: row.querySelector('.story-step-checkbox').checked
+            })),
+            successTriggers: Array.from(document.querySelectorAll('#quest-success-triggers .trigger-row')).map((row, index) => {
+                const existingTrigger = originalQuestState.successTriggers[index] || {};
+                return {
+                    text: row.querySelector('.trigger-text').innerText,
+                    linkedQuestId: existingTrigger.linkedQuestId || null
+                };
+            }),
+            failureTriggers: Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-row')).map((row, index) => {
+                const existingTrigger = originalQuestState.failureTriggers[index] || {};
+                return {
+                    text: row.querySelector('.trigger-text').innerText,
+                    linkedQuestId: existingTrigger.linkedQuestId || null
+                };
+            }),
+            detailedRewards: {
+                xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
+                loot: document.getElementById('reward-loot').value,
+                magicItems: document.getElementById('reward-magic-items').value,
+                information: document.getElementById('reward-information').value,
+            },
+            parentIds: originalQuestState.parentIds,
+            x: originalQuestState.x,
+            y: originalQuestState.y,
+            status: originalQuestState.status,
+            prerequisites: originalQuestState.prerequisites,
+            rewards: originalQuestState.rewards,
+            recommendations: originalQuestState.recommendations,
+            completionSteps: originalQuestState.completionSteps
+        };
+        return currentQuestData;
+    };
+
+    const areChangesUnsaved = () => {
+        if (!originalQuestState) return false;
+        const currentQuestState = getQuestDataFromOverlay();
+        return !isDeepEqual(originalQuestState, currentQuestState);
+    };
+
+    const hideOverlay = () => {
+        if (areChangesUnsaved()) {
+            if (confirm("You have unsaved changes. Do you want to save them before closing?")) {
+                document.getElementById('save-quest-details-btn').click();
+            }
+        }
+        overlay.style.display = 'none';
+        activeOverlayCardId = null;
+        originalQuestState = null;
+        const currentlySelected = document.querySelector('.card.selected');
+        if (currentlySelected) {
+            currentlySelected.classList.remove('selected');
+        }
+    };
+
     function debounce(func, delay) {
         let timeoutId;
         return function(...args) {
@@ -6855,69 +6943,6 @@ function displayToast(messageElement) {
         });
     };
 
-    const getQuestDataFromOverlay = () => {
-        if (!activeOverlayCardId) return null;
-
-        const difficultyStars = document.querySelectorAll('#quest-difficulty .star');
-        let difficulty = 0;
-        difficultyStars.forEach(star => {
-            if (star.textContent === '★') {
-                difficulty = Math.max(difficulty, parseInt(star.dataset.value, 10));
-            }
-        });
-
-        return {
-            id: activeOverlayCardId,
-            name: document.getElementById('quest-name').innerText,
-            description: document.getElementById('quest-description').innerText,
-            questStatus: document.getElementById('quest-status').value,
-            questType: document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean),
-            storyDuration: document.getElementById('quest-story-duration').value,
-            difficulty: difficulty,
-            startingTriggers: Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => ({ text: div.innerText, linkedQuestId: null })),
-            associatedMaps: Array.from(document.getElementById('quest-associated-maps').selectedOptions).map(opt => opt.value),
-            associatedNPCs: Array.from(document.querySelectorAll('.npc-row')).map(row => ({
-                id: parseInt(row.querySelector('.npc-select').value, 10),
-                role: row.querySelector('.npc-role').value
-            })).filter(npc => npc.id),
-            storySteps: Array.from(document.querySelectorAll('.story-step-row')).map(row => ({
-                text: row.querySelector('.story-step-text').innerText,
-                completed: row.querySelector('.story-step-checkbox').checked
-            })),
-            successTriggers: Array.from(document.querySelectorAll('#quest-success-triggers .trigger-row')).map((row, index) => {
-                const existingTrigger = originalQuestState.successTriggers[index] || {};
-                return {
-                    text: row.querySelector('.trigger-text').innerText,
-                    linkedQuestId: existingTrigger.linkedQuestId || null
-                };
-            }),
-            failureTriggers: Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-row')).map((row, index) => {
-                const existingTrigger = originalQuestState.failureTriggers[index] || {};
-                return {
-                    text: row.querySelector('.trigger-text').innerText,
-                    linkedQuestId: existingTrigger.linkedQuestId || null
-                };
-            }),
-            detailedRewards: {
-                xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
-                loot: document.getElementById('reward-loot').value,
-                magicItems: document.getElementById('reward-magic-items').value,
-                information: document.getElementById('reward-information').value,
-            },
-            // Fields not directly editable in this view but needed for comparison
-            parentIds: originalQuestState.parentIds,
-            x: originalQuestState.x,
-            y: originalQuestState.y,
-        };
-    };
-
-    const areChangesUnsaved = () => {
-        if (!originalQuestState) return false;
-        const currentQuestState = getQuestDataFromOverlay();
-        // A simple deep comparison
-        return JSON.stringify(originalQuestState) !== JSON.stringify(currentQuestState);
-    };
-
     /**
      * Shows the quest details overlay.
      * @param {object} quest The quest object to display.
@@ -7198,23 +7223,6 @@ function displayToast(messageElement) {
         setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn', 'failureTriggers');
     };
 
-    /**
-     * Hides the quest details overlay.
-     */
-    const hideOverlay = () => {
-        if (areChangesUnsaved()) {
-            if (confirm("You have unsaved changes. Do you want to save them before closing?")) {
-                document.getElementById('save-quest-details-btn').click();
-            }
-        }
-        overlay.style.display = 'none';
-        activeOverlayCardId = null;
-        originalQuestState = null;
-        const currentlySelected = document.querySelector('.card.selected');
-        if (currentlySelected) {
-            currentlySelected.classList.remove('selected');
-        }
-    };
 
     // --- Context Menu Logic ---
 
