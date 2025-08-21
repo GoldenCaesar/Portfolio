@@ -249,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     let nextQuestId = 2;
     let selectedQuestId = 1;
+    let activeOverlayCardId = null;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -6654,7 +6655,6 @@ function displayToast(messageElement) {
         let panStartY = 0;
     let moveStartX = 0;
     let moveStartY = 0;
-    let activeOverlayCardId = null;
     let linkSourceId = null;
 
     // --- Core Functions ---
