@@ -6748,11 +6748,11 @@ function displayToast(messageElement) {
         };
 
         const createContextMenu = (e, options) => {
-        const existingMenu = document.querySelector('.context-menu');
+            const existingMenu = document.querySelector('.context-menu');
             if (existingMenu) existingMenu.remove();
 
             const menu = document.createElement('ul');
-        menu.classList.add('context-menu');
+            menu.classList.add('context-menu');
             menu.style.left = `${e.clientX}px`;
             menu.style.top = `${e.clientY}px`;
 
@@ -6971,105 +6971,105 @@ function displayToast(messageElement) {
         originY = container.offsetHeight / 2;
         resizeHandler();
         renderCards();
-    }
 
-    if (storyBeatCardExportButton) {
-        storyBeatCardExportButton.addEventListener('click', () => {
-            const quest = quests.find(q => q.id === activeOverlayCardId);
-            if (quest) {
-                const exportQuest = {
-                    id: quest.id,
-                    name: quest.name || '',
-                    parentIds: quest.parentIds || [],
-                    x: quest.x || 0,
-                    y: quest.y || 0,
-                    description: quest.description || '',
-                    questStatus: quest.questStatus || 'Unavailable',
-                    questType: quest.questType || [],
-                    startingTriggers: quest.startingTriggers || [],
-                    associatedMaps: quest.associatedMaps || [],
-                    associatedNPCs: quest.associatedNPCs || [],
-                    failureTriggers: quest.failureTriggers || [],
-                    successTriggers: quest.successTriggers || [],
-                    detailedRewards: quest.detailedRewards || { xp: 0, loot: '', magicItems: '', information: '' },
-                    storyDuration: quest.storyDuration || '',
-                    difficulty: quest.difficulty || 0,
-                    storySteps: quest.storySteps || [],
-                };
-                jsonEditContent.value = JSON.stringify(exportQuest, null, 2); // Use value for textarea
-                jsonEditOverlay.style.display = 'flex';
-            } else {
-                alert("Could not find quest data to export. Please reopen the quest card and try again.");
-            }
-        });
-    }
-
-    // Initial setup
-    resizeCanvas(); // Set initial canvas size
-    drawConnections();
-    renderCards();
-
-    if (saveJsonButton) {
-        saveJsonButton.addEventListener('click', () => {
-            try {
-                const updatedQuestData = JSON.parse(jsonEditContent.value);
-                const questId = updatedQuestData.id;
-
-                if (!questId || !quests.some(q => q.id === questId)) {
-                    alert("JSON must have a valid 'id' matching the current quest.");
-                    return;
+        if (storyBeatCardExportButton) {
+            storyBeatCardExportButton.addEventListener('click', () => {
+                const quest = quests.find(q => q.id === activeOverlayCardId);
+                if (quest) {
+                    const exportQuest = {
+                        id: quest.id,
+                        name: quest.name || '',
+                        parentIds: quest.parentIds || [],
+                        x: quest.x || 0,
+                        y: quest.y || 0,
+                        description: quest.description || '',
+                        questStatus: quest.questStatus || 'Unavailable',
+                        questType: quest.questType || [],
+                        startingTriggers: quest.startingTriggers || [],
+                        associatedMaps: quest.associatedMaps || [],
+                        associatedNPCs: quest.associatedNPCs || [],
+                        failureTriggers: quest.failureTriggers || [],
+                        successTriggers: quest.successTriggers || [],
+                        detailedRewards: quest.detailedRewards || { xp: 0, loot: '', magicItems: '', information: '' },
+                        storyDuration: quest.storyDuration || '',
+                        difficulty: quest.difficulty || 0,
+                        storySteps: quest.storySteps || [],
+                    };
+                    jsonEditContent.value = JSON.stringify(exportQuest, null, 2); // Use value for textarea
+                    jsonEditOverlay.style.display = 'flex';
+                } else {
+                    alert("Could not find quest data to export. Please reopen the quest card and try again.");
                 }
-
-                // This is a temporary object to hold the changes.
-                // It will be used to repopulate the overlay.
-                const tempQuest = {
-                    ...quests.find(q => q.id === questId), // Start with existing data
-                    ...updatedQuestData // Overwrite with new data
-                };
-
-                // Repopulate the story beat card with the new data
-                populateAndShowStoryBeatCard(tempQuest);
-
-                alert("Quest details have been updated on the overlay. Click 'Save All Changes' to apply them to the story tree.");
-                jsonEditOverlay.style.display = 'none';
-
-            } catch (e) {
-                alert("Invalid JSON format. Please check the syntax and try again.");
-                console.error("Error parsing quest JSON:", e);
-            }
-        });
-    }
-
-
-    if (jsonEditCloseButton) {
-        jsonEditCloseButton.addEventListener('click', () => {
-            jsonEditOverlay.style.display = 'none';
-        });
-    }
-
-    if (copyJsonButton) {
-        copyJsonButton.addEventListener('click', () => {
-            navigator.clipboard.writeText(jsonEditContent.value).then(() => {
-                copyJsonButton.textContent = 'Copied!';
-                setTimeout(() => {
-                    copyJsonButton.textContent = 'Copy to Clipboard';
-                }, 2000);
-            }, (err) => {
-                console.error('Could not copy text: ', err);
-                alert('Failed to copy JSON.');
             });
-        });
-    }
+        }
 
-    if (storyBeatCardOverlay) {
-        storyBeatCardOverlay.addEventListener('click', (e) => {
-            if (e.target === storyBeatCardOverlay) {
-                storyBeatCardOverlay.style.display = 'none';
-                const currentlySelected = document.querySelector('.card.selected');
-                if (currentlySelected) {
-                    currentlySelected.classList.remove('selected');
+        // Initial setup
+        resizeCanvas(); // Set initial canvas size
+        drawConnections();
+        renderCards();
+
+        if (saveJsonButton) {
+            saveJsonButton.addEventListener('click', () => {
+                try {
+                    const updatedQuestData = JSON.parse(jsonEditContent.value);
+                    const questId = updatedQuestData.id;
+
+                    if (!questId || !quests.some(q => q.id === questId)) {
+                        alert("JSON must have a valid 'id' matching the current quest.");
+                        return;
+                    }
+
+                    // This is a temporary object to hold the changes.
+                    // It will be used to repopulate the overlay.
+                    const tempQuest = {
+                        ...quests.find(q => q.id === questId), // Start with existing data
+                        ...updatedQuestData // Overwrite with new data
+                    };
+
+                    // Repopulate the story beat card with the new data
+                    populateAndShowStoryBeatCard(tempQuest);
+
+                    alert("Quest details have been updated on the overlay. Click 'Save All Changes' to apply them to the story tree.");
+                    jsonEditOverlay.style.display = 'none';
+
+                } catch (e) {
+                    alert("Invalid JSON format. Please check the syntax and try again.");
+                    console.error("Error parsing quest JSON:", e);
                 }
-            }
-        });
+            });
+        }
+
+
+        if (jsonEditCloseButton) {
+            jsonEditCloseButton.addEventListener('click', () => {
+                jsonEditOverlay.style.display = 'none';
+            });
+        }
+
+        if (copyJsonButton) {
+            copyJsonButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(jsonEditContent.value).then(() => {
+                    copyJsonButton.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyJsonButton.textContent = 'Copy to Clipboard';
+                    }, 2000);
+                }, (err) => {
+                    console.error('Could not copy text: ', err);
+                    alert('Failed to copy JSON.');
+                });
+            });
+        }
+
+        if (storyBeatCardOverlay) {
+            storyBeatCardOverlay.addEventListener('click', (e) => {
+                if (e.target === storyBeatCardOverlay) {
+                    storyBeatCardOverlay.style.display = 'none';
+                    const currentlySelected = document.querySelector('.card.selected');
+                    if (currentlySelected) {
+                        currentlySelected.classList.remove('selected');
+                    }
+                }
+            });
+        }
     }
 });
