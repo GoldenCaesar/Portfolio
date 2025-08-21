@@ -7571,4 +7571,28 @@ function displayToast(messageElement) {
             }
         });
     }
+
+    const footerTabs = document.querySelector('.footer-tabs');
+    if (footerTabs) {
+        footerTabs.addEventListener('click', (event) => {
+            if (event.target.classList.contains('footer-tab-button')) {
+                const targetTab = event.target.dataset.tab;
+
+                document.querySelectorAll('.footer-tab-button').forEach(button => {
+                    button.classList.remove('active');
+                });
+                event.target.classList.add('active');
+
+                document.querySelectorAll('.footer-tab-content').forEach(content => {
+                    if (content.id === targetTab) {
+                        content.style.display = 'flex';
+                        content.classList.add('active');
+                    } else {
+                        content.style.display = 'none';
+                        content.classList.remove('active');
+                    }
+                });
+            }
+        });
+    }
 });
