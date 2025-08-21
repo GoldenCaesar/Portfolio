@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('save-quest-details-btn').click();
             }
         }
-        overlay.style.display = 'none';
+        storyBeatCardOverlay.style.display = 'none';
         activeOverlayCardId = null;
         originalQuestState = null;
         const currentlySelected = document.querySelector('.card.selected');
