@@ -225,11 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // New Fields
             questStatus: 'Active', // Unavailable, Available, Active, Completed, Failed, Abandoned
             questType: ['Main Story'], // Taggable field
-            startingTriggers: [], // List of strings
+            startingTriggers: [], // Now an array of objects: { text: "trigger text", linkedQuestId: null }
             associatedMaps: [], // List of map file names
             associatedNPCs: [], // List of objects: { id: characterId, role: 'Quest Giver' }
-            failureTriggers: [], // List of strings
-            successTriggers: [], // List of strings
+            failureTriggers: [], // Now an array of objects: { text: "trigger text", linkedQuestId: null }
+            successTriggers: [], // Now an array of objects: { text: "trigger text", linkedQuestId: null }
             detailedRewards: {
                 xp: 0,
                 loot: '',
@@ -750,6 +750,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 const quest = quests.find(q => q.id === questId);
                 if (quest) {
                     populateAndShowStoryBeatCard(quest);
+                }
+            }
+
+            if (e.target.classList.contains('link-trigger-btn')) {
+                const linkContainer = e.target.closest('.trigger-link-container');
+                if (!linkContainer) return;
+
+                const triggerType = linkContainer.dataset.triggerType;
+                const index = parseInt(linkContainer.dataset.index, 10);
+                const currentQuest = quests.find(q => q.id === activeOverlayCardId);
+
+                if (!currentQuest || !currentQuest[triggerType] || !currentQuest[triggerType][index]) return;
+
+                const questsToLink = quests.filter(q => q.id !== currentQuest.id);
+                if (questsToLink.length === 0) {
+                    alert("No other quests available to link to.");
+                    return;
+                }
+
+                const menuOptions = questsToLink.map(q => ({
+                    label: q.name,
+                    action: () => {
+                        currentQuest[triggerType][index].linkedQuestId = q.id;
+                        populateAndShowStoryBeatCard(currentQuest);
+                    }
+                }));
+
+                createContextMenu(e, menuOptions);
+            }
+
+            if (e.target.classList.contains('unlink-trigger-btn')) {
+                const linkContainer = e.target.closest('.trigger-link-container');
+                if (!linkContainer) return;
+
+                const triggerType = linkContainer.dataset.triggerType;
+                const index = parseInt(linkContainer.dataset.index, 10);
+                const currentQuest = quests.find(q => q.id === activeOverlayCardId);
+
+                if (currentQuest && currentQuest[triggerType] && currentQuest[triggerType][index]) {
+                    currentQuest[triggerType][index].linkedQuestId = null;
+                    populateAndShowStoryBeatCard(currentQuest);
                 }
             }
         });
@@ -2663,6 +2704,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (quest.storySteps === undefined) {
                             quest.storySteps = [];
                         }
+
+                        // Convert old string triggers to new object format
+                        ['startingTriggers', 'successTriggers', 'failureTriggers'].forEach(triggerType => {
+                            if (quest[triggerType] && quest[triggerType].length > 0 && typeof quest[triggerType][0] === 'string') {
+                                quest[triggerType] = quest[triggerType].map(triggerText => ({ text: triggerText, linkedQuestId: null }));
+                            }
+                        });
                     });
                 } else if (Object.keys(campaignData.storyTree).length > 0) { // Old fabric.js format
                     // Attempt to convert old data or notify user
@@ -6549,6 +6597,40 @@ function displayToast(messageElement) {
         });
     }
 
+    const createContextMenu = (e, options) => {
+        // Hide all static context menus
+        document.querySelectorAll('.context-menu[id]').forEach(menu => menu.style.display = 'none');
+        // Remove all dynamic context menus
+        document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
+
+
+        const menu = document.createElement('div');
+        menu.classList.add('context-menu', 'dynamic-context-menu');
+        menu.style.left = `${e.clientX}px`;
+        menu.style.top = `${e.clientY}px`;
+
+        const ul = document.createElement('ul');
+        menu.appendChild(ul);
+
+        options.forEach(option => {
+            const item = document.createElement('li');
+            item.textContent = option.label;
+            if (option.disabled) {
+                item.style.opacity = 0.5;
+                item.style.cursor = 'not-allowed';
+            } else {
+                item.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    option.action();
+                    menu.remove();
+                });
+                }
+            ul.appendChild(item);
+            });
+
+        document.body.appendChild(menu);
+    };
+
     function initStoryTree() {
     // UI Elements
     const canvas = document.getElementById('quest-canvas');
@@ -6838,7 +6920,7 @@ function displayToast(messageElement) {
             </select>
 
             <h3>Quest Type</h3>
-            <input type="text" id="quest-type" value="${quest.questType.join(', ')}" placeholder="e.g., Main Story, Side Quest">
+            <input type="text" id="quest-type" value="${(quest.questType || []).join(', ')}" placeholder="e.g., Main Story, Side Quest">
 
             <h3>Story Duration</h3>
             <input type="text" id="quest-story-duration" value="${quest.storyDuration || ''}" placeholder="e.g., 1 Session, 3 Hours">
@@ -6850,9 +6932,9 @@ function displayToast(messageElement) {
 
             <h3>Starting Triggers</h3>
             <div id="quest-starting-triggers">
-                ${quest.startingTriggers.map((trigger, index) => `
+                ${(quest.startingTriggers || []).map((trigger, index) => `
                     <div class="trigger-row" data-index="${index}">
-                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
+                        <div contenteditable="true" class="editable-div trigger-text">${trigger.text}</div>
                         <button class="remove-trigger-btn">X</button>
                     </div>
                 `).join('')}
@@ -6861,12 +6943,12 @@ function displayToast(messageElement) {
 
             <h3>Associated Maps</h3>
             <select id="quest-associated-maps" multiple size="4">
-                ${mapOptions.map(m => `<option value="${m}" ${quest.associatedMaps.includes(m) ? 'selected' : ''}>${m}</option>`).join('')}
+                ${mapOptions.map(m => `<option value="${m}" ${(quest.associatedMaps || []).includes(m) ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
 
             <h3>Associated NPCs</h3>
             <div id="quest-associated-npcs">
-                ${quest.associatedNPCs.map((npc, index) => `
+                ${(quest.associatedNPCs || []).map((npc, index) => `
                     <div class="npc-row" data-index="${index}">
                         <select class="npc-select">
                             <option value="">--Select NPC--</option>
@@ -6881,7 +6963,7 @@ function displayToast(messageElement) {
 
             <h3>Story Steps</h3>
             <div id="quest-story-steps">
-                ${quest.storySteps.map((step, index) => `
+                ${(quest.storySteps || []).map((step, index) => `
                     <div class="story-step-row" data-index="${index}">
                         <input type="checkbox" class="story-step-checkbox" ${step.completed ? 'checked' : ''}>
                         <div contenteditable="true" class="editable-div story-step-text">${step.text}</div>
@@ -6893,23 +6975,41 @@ function displayToast(messageElement) {
 
             <h3>Success Triggers</h3>
             <div id="quest-success-triggers">
-                ${quest.successTriggers.map((trigger, index) => `
+                ${(quest.successTriggers || []).map((trigger, index) => {
+                    const linkedQuest = trigger.linkedQuestId ? quests.find(q => q.id === trigger.linkedQuestId) : null;
+                    const linkHtml = linkedQuest
+                        ? `<a href="#" class="quest-link" data-quest-id="${linkedQuest.id}">${linkedQuest.name}</a><button class="unlink-trigger-btn" title="Unlink Quest">✖</button>`
+                        : `<button class="link-trigger-btn" title="Link to another quest's starting trigger">🔗</button>`;
+
+                    return `
                     <div class="trigger-row" data-index="${index}">
-                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
+                        <div contenteditable="true" class="editable-div trigger-text">${trigger.text}</div>
+                        <div class="trigger-link-container" data-trigger-type="successTriggers" data-index="${index}">
+                            ${linkHtml}
+                        </div>
                         <button class="remove-trigger-btn">X</button>
-                    </div>
-                `).join('')}
+                    </div>`;
+                }).join('')}
             </div>
             <button id="add-success-trigger-btn">+ Add Trigger</button>
 
             <h3>Failure Triggers</h3>
             <div id="quest-failure-triggers">
-                ${quest.failureTriggers.map((trigger, index) => `
+                 ${(quest.failureTriggers || []).map((trigger, index) => {
+                    const linkedQuest = trigger.linkedQuestId ? quests.find(q => q.id === trigger.linkedQuestId) : null;
+                    const linkHtml = linkedQuest
+                        ? `<a href="#" class="quest-link" data-quest-id="${linkedQuest.id}">${linkedQuest.name}</a><button class="unlink-trigger-btn" title="Unlink Quest">✖</button>`
+                        : `<button class="link-trigger-btn" title="Link to another quest's starting trigger">🔗</button>`;
+
+                    return `
                     <div class="trigger-row" data-index="${index}">
-                        <div contenteditable="true" class="editable-div trigger-text">${trigger}</div>
+                        <div contenteditable="true" class="editable-div trigger-text">${trigger.text}</div>
+                        <div class="trigger-link-container" data-trigger-type="failureTriggers" data-index="${index}">
+                            ${linkHtml}
+                        </div>
                         <button class="remove-trigger-btn">X</button>
-                    </div>
-                `).join('')}
+                    </div>`;
+                }).join('')}
             </div>
             <button id="add-failure-trigger-btn">+ Add Trigger</button>
 
@@ -6955,9 +7055,20 @@ function displayToast(messageElement) {
             questToUpdate.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
             questToUpdate.storyDuration = document.getElementById('quest-story-duration').value;
 
-            questToUpdate.startingTriggers = Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => div.innerText);
-            questToUpdate.successTriggers = Array.from(document.querySelectorAll('#quest-success-triggers .trigger-text')).map(div => div.innerText);
-            questToUpdate.failureTriggers = Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-text')).map(div => div.innerText);
+            questToUpdate.startingTriggers = Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => ({ text: div.innerText, linkedQuestId: null }));
+
+            const getUpdatedTriggers = (type) => {
+                return Array.from(document.querySelectorAll(`#quest-${type}-triggers .trigger-row`)).map((row, index) => {
+                    const existingTrigger = questToUpdate[type + 'Triggers'][index] || {};
+                    return {
+                        text: row.querySelector('.trigger-text').innerText,
+                        linkedQuestId: existingTrigger.linkedQuestId || null
+                    };
+                });
+            };
+
+            questToUpdate.successTriggers = getUpdatedTriggers('success');
+            questToUpdate.failureTriggers = getUpdatedTriggers('failure');
 
             const mapsSelect = document.getElementById('quest-associated-maps');
             questToUpdate.associatedMaps = Array.from(mapsSelect.selectedOptions).map(opt => opt.value);
@@ -7047,7 +7158,7 @@ function displayToast(messageElement) {
         });
 
         // Add/Remove Triggers
-        const setupTriggerList = (containerId, buttonId) => {
+        const setupTriggerList = (containerId, buttonId, isLinkable) => {
             const container = document.getElementById(containerId);
             const addButton = document.getElementById(buttonId);
 
@@ -7056,8 +7167,20 @@ function displayToast(messageElement) {
                 const newRow = document.createElement('div');
                 newRow.className = 'trigger-row';
                 newRow.dataset.index = newIndex;
+
+                let linkHtml = '';
+                if (isLinkable) {
+                    const triggerType = containerId.replace('quest-', '');
+                    linkHtml = `
+                        <div class="trigger-link-container" data-trigger-type="${triggerType}" data-index="${newIndex}">
+                            <button class="link-trigger-btn" title="Link to another quest's starting trigger">🔗</button>
+                        </div>
+                    `;
+                }
+
                 newRow.innerHTML = `
                     <div contenteditable="true" class="editable-div trigger-text">New Trigger</div>
+                    ${linkHtml}
                     <button class="remove-trigger-btn">X</button>
                 `;
                 container.appendChild(newRow);
@@ -7070,9 +7193,9 @@ function displayToast(messageElement) {
             });
         };
 
-        setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn');
-        setupTriggerList('quest-success-triggers', 'add-success-trigger-btn');
-        setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn');
+        setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn', false);
+        setupTriggerList('quest-success-triggers', 'add-success-trigger-btn', true);
+        setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn', true);
     };
 
     /**
@@ -7088,40 +7211,6 @@ function displayToast(messageElement) {
     };
 
     // --- Context Menu Logic ---
-
-    const createContextMenu = (e, options) => {
-        // Hide all static context menus
-        document.querySelectorAll('.context-menu[id]').forEach(menu => menu.style.display = 'none');
-        // Remove all dynamic context menus
-        document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
-
-
-        const menu = document.createElement('div');
-        menu.classList.add('context-menu', 'dynamic-context-menu');
-        menu.style.left = `${e.clientX}px`;
-        menu.style.top = `${e.clientY}px`;
-
-        const ul = document.createElement('ul');
-        menu.appendChild(ul);
-
-        options.forEach(option => {
-            const item = document.createElement('li');
-            item.textContent = option.label;
-            if (option.disabled) {
-                item.style.opacity = 0.5;
-                item.style.cursor = 'not-allowed';
-            } else {
-                item.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    option.action();
-                    menu.remove();
-                });
-                }
-            ul.appendChild(item);
-            });
-
-        document.body.appendChild(menu);
-    };
 
     const createCanvasContextMenu = (e) => {
         const options = [{
