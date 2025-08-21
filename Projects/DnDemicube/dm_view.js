@@ -7293,6 +7293,26 @@ function displayToast(messageElement) {
         setupTriggerList('quest-starting-triggers', 'add-starting-trigger-btn', 'startingTriggers');
         setupTriggerList('quest-success-triggers', 'add-success-trigger-btn', 'successTriggers');
         setupTriggerList('quest-failure-triggers', 'add-failure-trigger-btn', 'failureTriggers');
+
+        const storyStepsContainer = document.getElementById('quest-story-steps');
+        if (storyStepsContainer) {
+            storyStepsContainer.addEventListener('change', (e) => {
+                if (e.target.classList.contains('story-step-checkbox')) {
+                    const sIndex = parseInt(e.target.closest('.story-step-row').dataset.index, 10);
+                    const questToUpdate = quests.find(q => q.id === activeOverlayCardId);
+
+                    if (questToUpdate && questToUpdate.storySteps[sIndex]) {
+                        questToUpdate.storySteps[sIndex].completed = e.target.checked;
+
+                        // Sync with footer
+                        const footerCheckbox = document.querySelector(`#footer-quests-left .quest-steps-list input[data-quest-id="${activeOverlayCardId}"][data-step-index="${sIndex}"]`);
+                        if (footerCheckbox) {
+                            footerCheckbox.checked = e.target.checked;
+                        }
+                    }
+                }
+            });
+        }
     };
 
 
@@ -7702,6 +7722,14 @@ function displayToast(messageElement) {
                                 const targetQuest = quests.find(q => q.id === qId);
                                 if (targetQuest && targetQuest.storySteps[sIndex]) {
                                     targetQuest.storySteps[sIndex].completed = e.target.checked;
+
+                                    // Sync with open story beat card overlay
+                                    if (storyBeatCardOverlay.style.display === 'flex' && activeOverlayCardId === qId) {
+                                        const overlayCheckbox = storyBeatCardOverlay.querySelector(`.story-step-row[data-index="${sIndex}"] .story-step-checkbox`);
+                                        if (overlayCheckbox) {
+                                            overlayCheckbox.checked = e.target.checked;
+                                        }
+                                    }
                                 }
                             });
 
