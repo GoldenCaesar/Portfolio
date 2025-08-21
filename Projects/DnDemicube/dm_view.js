@@ -3391,6 +3391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         noteContextMenu.style.display = 'none';
         characterContextMenu.style.display = 'none';
         mapToolsContextMenu.style.display = 'none';
+        document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
 
@@ -3531,28 +3532,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 dmFloatingFooter.classList.remove('visible');
             }
         }
-        if (polygonContextMenu.style.display === 'block') {
-            if (!polygonContextMenu.contains(event.target)) {
-                polygonContextMenu.style.display = 'none';
-                selectedPolygonForContextMenu = null;
-            }
-        }
-        if (noteContextMenu.style.display === 'block') {
-            if (!noteContextMenu.contains(event.target)) {
-                noteContextMenu.style.display = 'none';
-                selectedNoteForContextMenu = null;
-            }
-        }
-        if (characterContextMenu.style.display === 'block') {
-            if (!characterContextMenu.contains(event.target)) {
-                characterContextMenu.style.display = 'none';
-                selectedCharacterForContextMenu = null;
-            }
-        }
-        if (mapToolsContextMenu.style.display === 'block') {
-            if (!mapToolsContextMenu.contains(event.target)) {
-                mapToolsContextMenu.style.display = 'none';
-            }
+        // Unified handler to close all context menus (static and dynamic) when clicking outside of any of them.
+        const clickInsideAnyMenu =
+            (polygonContextMenu.style.display === 'block' && polygonContextMenu.contains(event.target)) ||
+            (noteContextMenu.style.display === 'block' && noteContextMenu.contains(event.target)) ||
+            (characterContextMenu.style.display === 'block' && characterContextMenu.contains(event.target)) ||
+            (mapToolsContextMenu.style.display === 'block' && mapToolsContextMenu.contains(event.target)) ||
+            Array.from(document.querySelectorAll('.dynamic-context-menu')).some(menu => menu.contains(event.target));
+
+
+        if (!clickInsideAnyMenu) {
+            polygonContextMenu.style.display = 'none';
+            noteContextMenu.style.display = 'none';
+            characterContextMenu.style.display = 'none';
+            mapToolsContextMenu.style.display = 'none';
+            document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
+
+            // Reset selection states
+            selectedPolygonForContextMenu = null;
+            selectedNoteForContextMenu = null;
+            selectedCharacterForContextMenu = null;
         }
 
         if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
@@ -7091,11 +7090,14 @@ function displayToast(messageElement) {
     // --- Context Menu Logic ---
 
     const createContextMenu = (e, options) => {
-        const existingMenu = document.querySelector('.context-menu');
-        if (existingMenu) existingMenu.remove();
+        // Hide all static context menus
+        document.querySelectorAll('.context-menu[id]').forEach(menu => menu.style.display = 'none');
+        // Remove all dynamic context menus
+        document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
+
 
         const menu = document.createElement('div');
-        menu.classList.add('context-menu');
+        menu.classList.add('context-menu', 'dynamic-context-menu');
         menu.style.left = `${e.clientX}px`;
         menu.style.top = `${e.clientY}px`;
 
@@ -7348,11 +7350,15 @@ function displayToast(messageElement) {
 
     // Remove context menu on window click
     window.addEventListener('click', (e) => {
-        const menu = document.querySelector('.story-tree-context-menu');
-        if (menu) {
-            menu.remove();
+        // The main document click listener now handles closing all context menus.
+        // This listener is just for story-tree specific "click outside" logic.
+
+        // If the click was inside any context menu, don't cancel linking mode.
+        if (e.target.closest('.context-menu')) {
+            return;
         }
-        if (isLinking) {
+
+        if (isLinking && !e.target.closest('.card')) {
             isLinking = false;
             linkSourceId = null;
             document.body.classList.remove('linking-mode');
