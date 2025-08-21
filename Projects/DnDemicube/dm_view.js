@@ -250,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let nextQuestId = 2;
     let selectedQuestId = 1;
     let activeOverlayCardId = null;
+    let originalQuestState = null;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -754,46 +755,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            if (e.target.classList.contains('link-trigger-btn')) {
-                const linkContainer = e.target.closest('.trigger-link-container');
-                if (!linkContainer) return;
-
-                const triggerType = linkContainer.dataset.triggerType;
-                const index = parseInt(linkContainer.dataset.index, 10);
-                const currentQuest = quests.find(q => q.id === activeOverlayCardId);
-
-                if (!currentQuest || !currentQuest[triggerType] || !currentQuest[triggerType][index]) return;
-
-                const questsToLink = quests.filter(q => q.id !== currentQuest.id);
-                if (questsToLink.length === 0) {
-                    alert("No other quests available to link to.");
-                    return;
-                }
-
-                const menuOptions = questsToLink.map(q => ({
-                    label: q.name,
-                    action: () => {
-                        currentQuest[triggerType][index].linkedQuestId = q.id;
-                        populateAndShowStoryBeatCard(currentQuest);
-                    }
-                }));
-
-                createContextMenu(e, menuOptions);
-            }
-
-            if (e.target.classList.contains('unlink-trigger-btn')) {
-                const linkContainer = e.target.closest('.trigger-link-container');
-                if (!linkContainer) return;
-
-                const triggerType = linkContainer.dataset.triggerType;
-                const index = parseInt(linkContainer.dataset.index, 10);
-                const currentQuest = quests.find(q => q.id === activeOverlayCardId);
-
-                if (currentQuest && currentQuest[triggerType] && currentQuest[triggerType][index]) {
-                    currentQuest[triggerType][index].linkedQuestId = null;
-                    populateAndShowStoryBeatCard(currentQuest);
-                }
-            }
 
             if (e.target.classList.contains('remove-trigger-btn')) {
                 const row = e.target.closest('.trigger-row');
@@ -6894,6 +6855,69 @@ function displayToast(messageElement) {
         });
     };
 
+    const getQuestDataFromOverlay = () => {
+        if (!activeOverlayCardId) return null;
+
+        const difficultyStars = document.querySelectorAll('#quest-difficulty .star');
+        let difficulty = 0;
+        difficultyStars.forEach(star => {
+            if (star.textContent === '★') {
+                difficulty = Math.max(difficulty, parseInt(star.dataset.value, 10));
+            }
+        });
+
+        return {
+            id: activeOverlayCardId,
+            name: document.getElementById('quest-name').innerText,
+            description: document.getElementById('quest-description').innerText,
+            questStatus: document.getElementById('quest-status').value,
+            questType: document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean),
+            storyDuration: document.getElementById('quest-story-duration').value,
+            difficulty: difficulty,
+            startingTriggers: Array.from(document.querySelectorAll('#quest-starting-triggers .trigger-text')).map(div => ({ text: div.innerText, linkedQuestId: null })),
+            associatedMaps: Array.from(document.getElementById('quest-associated-maps').selectedOptions).map(opt => opt.value),
+            associatedNPCs: Array.from(document.querySelectorAll('.npc-row')).map(row => ({
+                id: parseInt(row.querySelector('.npc-select').value, 10),
+                role: row.querySelector('.npc-role').value
+            })).filter(npc => npc.id),
+            storySteps: Array.from(document.querySelectorAll('.story-step-row')).map(row => ({
+                text: row.querySelector('.story-step-text').innerText,
+                completed: row.querySelector('.story-step-checkbox').checked
+            })),
+            successTriggers: Array.from(document.querySelectorAll('#quest-success-triggers .trigger-row')).map((row, index) => {
+                const existingTrigger = originalQuestState.successTriggers[index] || {};
+                return {
+                    text: row.querySelector('.trigger-text').innerText,
+                    linkedQuestId: existingTrigger.linkedQuestId || null
+                };
+            }),
+            failureTriggers: Array.from(document.querySelectorAll('#quest-failure-triggers .trigger-row')).map((row, index) => {
+                const existingTrigger = originalQuestState.failureTriggers[index] || {};
+                return {
+                    text: row.querySelector('.trigger-text').innerText,
+                    linkedQuestId: existingTrigger.linkedQuestId || null
+                };
+            }),
+            detailedRewards: {
+                xp: parseInt(document.getElementById('reward-xp').value, 10) || 0,
+                loot: document.getElementById('reward-loot').value,
+                magicItems: document.getElementById('reward-magic-items').value,
+                information: document.getElementById('reward-information').value,
+            },
+            // Fields not directly editable in this view but needed for comparison
+            parentIds: originalQuestState.parentIds,
+            x: originalQuestState.x,
+            y: originalQuestState.y,
+        };
+    };
+
+    const areChangesUnsaved = () => {
+        if (!originalQuestState) return false;
+        const currentQuestState = getQuestDataFromOverlay();
+        // A simple deep comparison
+        return JSON.stringify(originalQuestState) !== JSON.stringify(currentQuestState);
+    };
+
     /**
      * Shows the quest details overlay.
      * @param {object} quest The quest object to display.
@@ -6989,41 +7013,23 @@ function displayToast(messageElement) {
 
             <h3>Success Triggers</h3>
             <div id="quest-success-triggers">
-                ${(quest.successTriggers || []).map((trigger, index) => {
-                    const linkedQuest = trigger.linkedQuestId ? quests.find(q => q.id === trigger.linkedQuestId) : null;
-                    const linkHtml = linkedQuest
-                        ? `<a href="#" class="quest-link" data-quest-id="${linkedQuest.id}">${linkedQuest.name}</a><button class="unlink-trigger-btn" title="Unlink Quest">✖</button>`
-                        : `<button class="link-trigger-btn" title="Link to another quest's starting trigger">🔗</button>`;
-
-                    return `
+                ${(quest.successTriggers || []).map((trigger, index) => `
                     <div class="trigger-row" data-index="${index}">
                         <div contenteditable="true" class="editable-div trigger-text">${trigger.text}</div>
-                        <div class="trigger-link-container" data-trigger-type="successTriggers" data-index="${index}">
-                            ${linkHtml}
-                        </div>
                         <button class="remove-trigger-btn">X</button>
-                    </div>`;
-                }).join('')}
+                    </div>
+                `).join('')}
             </div>
             <button id="add-success-trigger-btn">+ Add Trigger</button>
 
             <h3>Failure Triggers</h3>
             <div id="quest-failure-triggers">
-                 ${(quest.failureTriggers || []).map((trigger, index) => {
-                    const linkedQuest = trigger.linkedQuestId ? quests.find(q => q.id === trigger.linkedQuestId) : null;
-                    const linkHtml = linkedQuest
-                        ? `<a href="#" class="quest-link" data-quest-id="${linkedQuest.id}">${linkedQuest.name}</a><button class="unlink-trigger-btn" title="Unlink Quest">✖</button>`
-                        : `<button class="link-trigger-btn" title="Link to another quest's starting trigger">🔗</button>`;
-
-                    return `
+                ${(quest.failureTriggers || []).map((trigger, index) => `
                     <div class="trigger-row" data-index="${index}">
                         <div contenteditable="true" class="editable-div trigger-text">${trigger.text}</div>
-                        <div class="trigger-link-container" data-trigger-type="failureTriggers" data-index="${index}">
-                            ${linkHtml}
-                        </div>
                         <button class="remove-trigger-btn">X</button>
-                    </div>`;
-                }).join('')}
+                    </div>
+                `).join('')}
             </div>
             <button id="add-failure-trigger-btn">+ Add Trigger</button>
 
@@ -7050,6 +7056,7 @@ function displayToast(messageElement) {
             <button id="save-quest-details-btn">Save All Changes</button>
         `;
 
+        originalQuestState = JSON.parse(JSON.stringify(quest));
         overlay.style.display = 'flex';
         activeOverlayCardId = quest.id;
 
@@ -7195,8 +7202,14 @@ function displayToast(messageElement) {
      * Hides the quest details overlay.
      */
     const hideOverlay = () => {
+        if (areChangesUnsaved()) {
+            if (confirm("You have unsaved changes. Do you want to save them before closing?")) {
+                document.getElementById('save-quest-details-btn').click();
+            }
+        }
         overlay.style.display = 'none';
         activeOverlayCardId = null;
+        originalQuestState = null;
         const currentlySelected = document.querySelector('.card.selected');
         if (currentlySelected) {
             currentlySelected.classList.remove('selected');
@@ -7546,11 +7559,7 @@ function displayToast(messageElement) {
     if (storyBeatCardOverlay) {
         storyBeatCardOverlay.addEventListener('click', (e) => {
             if (e.target === storyBeatCardOverlay) {
-                storyBeatCardOverlay.style.display = 'none';
-                const currentlySelected = document.querySelector('.card.selected');
-                if (currentlySelected) {
-                    currentlySelected.classList.remove('selected');
-                }
+                hideOverlay();
             }
         });
     }
