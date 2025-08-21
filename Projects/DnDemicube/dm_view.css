@@ -471,6 +471,45 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+.quest-footer-card {
+    padding: 8px 12px;
+    background-color: #3a4f6a;
+    color: #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 5px;
+    text-align: center;
+}
+
+.quest-footer-card:hover {
+    background-color: #4a5f7a;
+}
+
+.quest-footer-card.selected {
+    border: 1px solid #b6cae1;
+    box-shadow: 0 0 5px #b6cae1;
+}
+
+.footer-placeholder {
+    color: #a0b4c9;
+    font-style: italic;
+    padding: 10px;
+    text-align: center;
+}
+
+.quest-steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.quest-steps-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+}
+
 /* Footer Tabs */
 .footer-tabs {
     display: flex;
@@ -511,6 +550,11 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 #footer-quests {
     width: 100%;
     justify-content: space-between;
+}
+
+#footer-quests-left, #footer-quests-right, #footer-quests-center {
+    overflow-y: auto;
+    max-height: 150px;
 }
 
 /* JSON Export Modal Styles */
