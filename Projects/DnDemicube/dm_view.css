@@ -534,6 +534,9 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 
 .footer-content-container {
     display: grid;
+    flex-grow: 1;
+    min-height: 0;
+    padding: 10px;
 }
 
 .footer-tab-content {
@@ -541,6 +544,7 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     width: 100%;
     visibility: hidden;
     display: flex; /* Keep flex for internal layout */
+    min-height: 0;
 }
 
 .footer-tab-content.active {
@@ -550,11 +554,14 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 #footer-quests {
     width: 100%;
     justify-content: space-between;
+    gap: 10px;
 }
 
 #footer-quests-left, #footer-quests-right, #footer-quests-center {
     overflow-y: auto;
-    max-height: 150px;
+    padding: 10px;
+    background-color: #15191e;
+    border-radius: 4px;
 }
 
 /* JSON Export Modal Styles */
@@ -855,6 +862,9 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     z-index: 1002;
     transition: transform 0.3s ease-in-out;
     transform: translateY(100%); /* Initially hidden */
+    display: flex;
+    flex-direction: column;
+    height: 30vh;
 }
 
 #dm-floating-footer.visible {
@@ -868,6 +878,8 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     padding: 15px;
     padding-right: 100px; /* Space for the floating d20 icon */
     box-sizing: border-box;
+    flex-grow: 1;
+    min-height: 0;
 }
 
 #footer-left {
