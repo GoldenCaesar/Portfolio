@@ -493,12 +493,19 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #b6cae1;
 }
 
+.footer-content-container {
+    display: grid;
+}
+
 .footer-tab-content {
-    display: none;
+    grid-area: 1 / 1;
+    width: 100%;
+    visibility: hidden;
+    display: flex; /* Keep flex for internal layout */
 }
 
 .footer-tab-content.active {
-    display: flex; /* Use flex to layout the content */
+    visibility: visible;
 }
 
 #footer-quests {
