@@ -471,6 +471,41 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+/* Footer Tabs */
+.footer-tabs {
+    display: flex;
+    background-color: #20262d;
+    border-bottom: 1px solid #3f4c5a;
+}
+
+.footer-tab-button {
+    background: none;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: #e0e0e0;
+    font-size: 14px;
+    border-bottom: 2px solid transparent;
+}
+
+.footer-tab-button.active {
+    border-bottom-color: #b6cae1;
+    color: #b6cae1;
+}
+
+.footer-tab-content {
+    display: none;
+}
+
+.footer-tab-content.active {
+    display: flex; /* Use flex to layout the content */
+}
+
+#footer-quests {
+    width: 100%;
+    justify-content: space-between;
+}
+
 /* JSON Export Modal Styles */
 #json-export-overlay {
     /* This will use the .modal class, but we can override if needed */
