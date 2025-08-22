@@ -7145,6 +7145,7 @@ function displayToast(messageElement) {
             alert('Quest details saved!');
             renderCards(); // Re-render cards to reflect name change
             drawConnections(); // Redraw connections to reflect parentId changes
+            renderActiveQuestsInFooter(); // Update the footer as well
         });
 
         const addNpcBtn = document.getElementById('add-npc-btn');
@@ -7595,7 +7596,212 @@ function displayToast(messageElement) {
                 if (targetContent) {
                     targetContent.classList.add('active');
                 }
+                if (targetTabId === 'footer-quests') {
+                    renderActiveQuestsInFooter();
+                }
             }
         });
     }
+
+    let selectedFooterQuestId = null;
+
+    function renderActiveQuestsInFooter() {
+        const activeQuestsList = document.getElementById('footer-active-quests-list');
+        const activeQuestDetails = document.getElementById('footer-active-quest-details');
+        if (!activeQuestsList || !activeQuestDetails) return;
+
+        const activeQuests = quests.filter(q => q.questStatus === 'Active');
+        activeQuestsList.innerHTML = '';
+
+        if (activeQuests.length === 0) {
+            activeQuestsList.innerHTML = '<p class="footer-placeholder">No active quests.</p>';
+            activeQuestDetails.innerHTML = '<p class="footer-placeholder">Select an active quest to see details.</p>';
+            selectedFooterQuestId = null;
+            return;
+        }
+
+        // If no quest is selected, or the selected one is no longer active, select the first one.
+        if (!selectedFooterQuestId || !activeQuests.some(q => q.id === selectedFooterQuestId)) {
+            selectedFooterQuestId = activeQuests[0].id;
+        }
+
+        activeQuests.forEach(quest => {
+            const card = document.createElement('div');
+            card.className = 'quest-footer-card';
+            card.dataset.questId = quest.id;
+            if (quest.id === selectedFooterQuestId) {
+                card.classList.add('selected');
+            }
+
+            const difficultyStars = ('★'.repeat(quest.difficulty || 0)) + ('☆'.repeat(5 - (quest.difficulty || 0)));
+            card.innerHTML = `
+                <h4>${quest.name}</h4>
+                <p>Duration: ${quest.storyDuration || 'N/A'}</p>
+                <p>Difficulty: ${difficultyStars}</p>
+            `;
+
+            card.addEventListener('click', () => {
+                selectedFooterQuestId = quest.id;
+                renderActiveQuestsInFooter(); // Re-render both panels
+            });
+
+            activeQuestsList.appendChild(card);
+        });
+
+        renderActiveQuestDetailsInFooter(selectedFooterQuestId);
+    }
+
+    function renderActiveQuestDetailsInFooter(questId) {
+        const detailsContainer = document.getElementById('footer-active-quest-details');
+        if (!detailsContainer) return;
+
+        const quest = quests.find(q => q.id === questId);
+
+        if (!quest) {
+            detailsContainer.innerHTML = '<p class="footer-placeholder">Select an active quest to see details.</p>';
+            return;
+        }
+
+        let html = ``;
+
+        // Starting Triggers
+        html += `<h4>Starting Triggers</h4>`;
+        if (quest.startingTriggers && quest.startingTriggers.length > 0) {
+            html += `<ul class="quest-triggers-list">`;
+            quest.startingTriggers.forEach(trigger => {
+                html += `<li>${trigger.text}</li>`;
+            });
+            html += `</ul>`;
+        } else {
+            html += `<p class="footer-placeholder">None</p>`;
+        }
+
+        // Description
+        html += `<h4>Description</h4>`;
+        html += `<p style="font-size: 0.9em;">${quest.description || 'No description provided.'}</p>`;
+
+        // Story Steps
+        html += `<h4>Story Steps</h4>`;
+        if (quest.storySteps && quest.storySteps.length > 0) {
+            html += `<ul class="quest-steps-list">`;
+            quest.storySteps.forEach((step, index) => {
+                html += `
+                    <li>
+                        <input type="checkbox" id="footer-step-${quest.id}-${index}" data-quest-id="${quest.id}" data-step-index="${index}" ${step.completed ? 'checked' : ''}>
+                        <label for="footer-step-${quest.id}-${index}" class="${step.completed ? 'completed' : ''}">${step.text}</label>
+                    </li>
+                `;
+            });
+            html += `</ul>`;
+        } else {
+            html += `<p class="footer-placeholder">No story steps defined.</p>`;
+        }
+
+        // Success Triggers
+        html += `<h4>Success Triggers</h4>`;
+        if (quest.successTriggers && quest.successTriggers.length > 0) {
+            html += `<ul class="quest-triggers-list">`;
+            quest.successTriggers.forEach(trigger => {
+                html += `<li>${trigger.text}</li>`;
+            });
+            html += `</ul>`;
+        } else {
+            html += `<p class="footer-placeholder">None</p>`;
+        }
+
+        // Failure Triggers
+        html += `<h4>Failure Triggers</h4>`;
+        if (quest.failureTriggers && quest.failureTriggers.length > 0) {
+            html += `<ul class="quest-triggers-list">`;
+            quest.failureTriggers.forEach(trigger => {
+                html += `<li>${trigger.text}</li>`;
+            });
+            html += `</ul>`;
+        } else {
+            html += `<p class="footer-placeholder">None</p>`;
+        }
+
+        detailsContainer.innerHTML = html;
+
+        // Add event listeners for the checkboxes to ensure data synchronization
+        detailsContainer.querySelectorAll('.quest-steps-list input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (event) => {
+                const questIdToUpdate = parseInt(event.target.dataset.questId, 10);
+                const stepIndex = parseInt(event.target.dataset.stepIndex, 10);
+                const isChecked = event.target.checked;
+
+                const questToUpdate = quests.find(q => q.id === questIdToUpdate);
+                if (questToUpdate && questToUpdate.storySteps[stepIndex]) {
+                    questToUpdate.storySteps[stepIndex].completed = isChecked;
+
+                    // Re-render the details to update the UI (e.g., strikethrough)
+                    renderActiveQuestDetailsInFooter(questIdToUpdate);
+
+                    // If the main story beat card is open for this quest, we should update it too.
+                    if (activeOverlayCardId === questIdToUpdate) {
+                        populateAndShowStoryBeatCard(questToUpdate);
+                    }
+                }
+            });
+        });
+
+        // --- Successor Quests Logic ---
+        const successorQuestsContainer = document.createElement('div');
+        successorQuestsContainer.className = 'successor-quests-container';
+
+        let successorHtml = `<h4>Successor Quests</h4>`;
+        const successorQuests = quests.filter(q => q.parentIds.includes(quest.id));
+
+        if (successorQuests.length > 0) {
+            successorQuests.forEach(succQuest => {
+                const difficultyStars = ('★'.repeat(succQuest.difficulty || 0)) + ('☆'.repeat(5 - (succQuest.difficulty || 0)));
+                const startingTriggerText = succQuest.startingTriggers && succQuest.startingTriggers.length > 0 ? succQuest.startingTriggers[0].text : 'No trigger specified';
+                successorHtml += `
+                    <div class="quest-footer-card successor-quest-card" data-successor-quest-id="${succQuest.id}">
+                        <h4>${succQuest.name}</h4>
+                        <p>Duration: ${succQuest.storyDuration || 'N/A'} | Difficulty: ${difficultyStars}</p>
+                        <p style="font-size: 0.8em; font-style: italic;">Trigger: ${startingTriggerText}</p>
+                    </div>
+                `;
+            });
+        } else {
+            successorHtml += `<p class="footer-placeholder">No successor quests defined.</p>`;
+        }
+        successorQuestsContainer.innerHTML = successorHtml;
+        detailsContainer.appendChild(successorQuestsContainer);
+
+        // Add event listeners for successor quest cards
+        detailsContainer.querySelectorAll('.successor-quest-card').forEach(card => {
+            card.addEventListener('click', (event) => {
+                const successorQuestId = parseInt(event.currentTarget.dataset.successorQuestId, 10);
+                const currentQuestId = quest.id;
+
+                const successorQuest = quests.find(q => q.id === successorQuestId);
+                const currentQuest = quests.find(q => q.id === currentQuestId);
+
+                if (successorQuest && currentQuest) {
+                    // Update statuses
+                    currentQuest.questStatus = 'Completed';
+                    successorQuest.questStatus = 'Active';
+
+                    // Make parents of the new active quest available
+                    if (successorQuest.parentIds && successorQuest.parentIds.length > 0) {
+                        successorQuest.parentIds.forEach(parentId => {
+                            const parentQuest = quests.find(q => q.id === parentId);
+                            if (parentQuest) {
+                                parentQuest.questStatus = 'Available';
+                            }
+                        });
+                    }
+
+                    // Set the new quest as selected and re-render everything
+                    selectedFooterQuestId = successorQuest.id;
+                    renderActiveQuestsInFooter();
+                }
+            });
+        });
+    }
+
+    // Initial call to populate footer
+    renderActiveQuestsInFooter();
 });
