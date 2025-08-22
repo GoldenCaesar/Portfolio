@@ -62,6 +62,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const displayedFileNames = new Set();
 
+    // Shadow tool elements
+    const shadowToolsContainer = document.getElementById('shadow-tools-container');
+    const btnDrawWalls = document.getElementById('btn-draw-walls');
+    const btnDrawDoors = document.getElementById('btn-draw-doors');
+    const btnShadowDone = document.getElementById('btn-shadow-done');
+
     // Token Stat Block Elements
     const tokenStatBlock = document.getElementById('token-stat-block');
     const tokenStatBlockCharName = document.getElementById('token-stat-block-char-name');
@@ -295,6 +301,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let characterBeingMoved = null;
     let moveStartPoint = null; // Added: {x, y} image-relative coords for drag start
     let currentDragOffsets = {x: 0, y: 0};
+
+    // Shadow tool state
+    let isShadowMode = false;
+    let isDrawingWalls = false;
+    let isDrawingDoors = false;
+    let currentWallPoints = [];
+    let currentDoorPoints = [];
 
     // Campaign Timer State
     let campaignTimerInterval = null;
@@ -1129,6 +1142,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     img.src = character.sheetData.character_portrait;
                 }
+            } else if (overlay.type === 'wall' && overlay.points) {
+                if (isPlayerViewContext) return; // Don't show walls in player view for now
+                drawingCtx.beginPath();
+                drawingCtx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                drawingCtx.lineWidth = 5; // Thicker line
+                drawingCtx.lineCap = 'round';
+                overlay.points.forEach((point, index) => {
+                    const canvasX = (point.x * scale) + originX;
+                    const canvasY = (point.y * scale) + originY;
+                    if (index === 0) {
+                        drawingCtx.moveTo(canvasX, canvasY);
+                    } else {
+                        drawingCtx.lineTo(canvasX, canvasY);
+                    }
+                });
+                drawingCtx.stroke();
+            } else if (overlay.type === 'door' && overlay.points) {
+                if (isPlayerViewContext && overlay.isOpen) {
+                    return; // Don't draw open doors for players
+                }
+                drawingCtx.beginPath();
+                // In DM view, show open doors as semi-transparent
+                const doorColor = isPlayerViewContext ? 'rgba(0, 0, 0, 1)' : (overlay.isOpen ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 1)');
+                drawingCtx.strokeStyle = doorColor;
+                drawingCtx.lineWidth = 8; // Even thicker for doors
+                drawingCtx.lineCap = 'round';
+                const p1 = overlay.points[0];
+                const p2 = overlay.points[1];
+                const p1CanvasX = (p1.x * scale) + originX;
+                const p1CanvasY = (p1.y * scale) + originY;
+                const p2CanvasX = (p2.x * scale) + originX;
+                const p2CanvasY = (p2.y * scale) + originY;
+                drawingCtx.moveTo(p1CanvasX, p1CanvasY);
+                drawingCtx.lineTo(p2CanvasX, p2CanvasY);
+                drawingCtx.stroke();
             }
             });
         }
@@ -1138,6 +1186,11 @@ document.addEventListener('DOMContentLoaded', () => {
             initiativeTokens.forEach(token => {
                 drawToken(drawingCtx, token);
             });
+        }
+
+        // Draw the wall currently being created
+        if (isDrawingWalls) {
+            drawCurrentWall();
         }
     }
 
@@ -1228,17 +1281,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    drawingCanvas.addEventListener('click', (event) => {
-        if (!isLinkingChildMap && !isRedrawingPolygon) return;
+function drawCurrentWall() {
+    if (currentWallPoints.length === 0 || !currentMapDisplayData.img) return;
 
+    const ctx = drawingCanvas.getContext('2d');
+    const mapData = detailedMapData.get(selectedMapFileName);
+    if (!mapData || !mapData.transform) return;
+    const { scale, originX, originY } = mapData.transform;
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(50, 50, 50, 0.9)'; // Dark color for temporary wall
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+
+    currentWallPoints.forEach((point, index) => {
+        const canvasX = (point.x * scale) + originX;
+        const canvasY = (point.y * scale) + originY;
+        if (index === 0) {
+            ctx.moveTo(canvasX, canvasY);
+        } else {
+            ctx.lineTo(canvasX, canvasY);
+        }
+    });
+
+    ctx.stroke();
+
+    // Draw points to see where you've clicked
+    ctx.fillStyle = 'orange';
+    currentWallPoints.forEach(point => {
+        const canvasX = (point.x * scale) + originX;
+        const canvasY = (point.y * scale) + originY;
+        ctx.fillRect(canvasX - 3, canvasY - 3, 6, 6);
+    });
+}
+
+
+    drawingCanvas.addEventListener('click', (event) => {
         const canvasX = event.offsetX;
         const canvasY = event.offsetY;
         const imageCoords = getRelativeCoords(canvasX, canvasY);
-
         if (!imageCoords) return;
 
         const selectedMapData = detailedMapData.get(selectedMapFileName);
         if (!selectedMapData || selectedMapData.mode !== 'edit') return;
+
+    if (isDrawingWalls) {
+        currentWallPoints.push(imageCoords);
+        drawOverlays(selectedMapData.overlays); // Redraw to show the current wall line
+        return;
+    }
+
+    if (isDrawingDoors) {
+        currentDoorPoints.push(imageCoords);
+        if (currentDoorPoints.length === 2) {
+            const newOverlay = {
+                type: 'door',
+                points: [...currentDoorPoints],
+                isOpen: false
+            };
+            selectedMapData.overlays.push(newOverlay);
+            currentDoorPoints = [];
+            // Keep drawing doors until user selects another tool or 'Done'
+            drawOverlays(selectedMapData.overlays);
+        }
+        return;
+    }
+
+    if (!isLinkingChildMap && !isRedrawingPolygon) return;
 
         if (!polygonDrawingComplete) {
             const clickThreshold = 10 / currentMapDisplayData.ratio;
@@ -1373,7 +1482,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedMapData.mode === 'view' && selectedMapData.overlays) {
             for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
                 const overlay = selectedMapData.overlays[i];
-                if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+            if (overlay.type === 'door' && isPointOnDoor(imageCoords, overlay)) {
+                overlay.isOpen = !overlay.isOpen;
+                displayMapOnCanvas(selectedMapFileName);
+                sendMapToPlayerView(selectedMapFileName);
+                return;
+            } else if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
                     console.log("Clicked on child map link:", overlay);
                     const childMapName = overlay.linkedMapName;
                     const childMapData = detailedMapData.get(childMapName);
@@ -1480,6 +1594,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const dy = point.y - token.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return distance <= tokenRadius;
+    }
+
+    function isPointOnDoor(point, doorOverlay) {
+        if (!doorOverlay || !doorOverlay.points || doorOverlay.points.length < 2) return false;
+        const p1 = doorOverlay.points[0];
+        const p2 = doorOverlay.points[1];
+        const clickX = point.x;
+        const clickY = point.y;
+
+        // Use a larger threshold for clicking on lines
+        const threshold = 10 / (currentMapDisplayData.scale || 1);
+
+        const distSq = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
+        if (distSq == 0) { // The "door" is just a point
+            return (clickX - p1.x)**2 + (clickY - p1.y)**2 <= threshold**2;
+        }
+
+        let t = ((clickX - p1.x) * (p2.x - p1.x) + (clickY - p1.y) * (p2.y - p1.y)) / distSq;
+        t = Math.max(0, Math.min(1, t));
+
+        const closestX = p1.x + t * (p2.x - p1.x);
+        const closestY = p1.y + t * (p2.y - p1.y);
+
+        const distanceSq = (clickX - closestX)**2 + (clickY - closestY)**2;
+        return distanceSq <= threshold**2;
     }
 
     function handleMouseMoveOnCanvas(event) {
@@ -1683,7 +1822,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (btnDrawWalls) {
+        btnDrawWalls.addEventListener('click', () => {
+            isDrawingWalls = true;
+            isDrawingDoors = false;
+            btnDrawWalls.classList.add('active');
+            btnDrawDoors.classList.remove('active');
+            drawingCanvas.style.pointerEvents = 'auto';
+            dmCanvas.style.cursor = 'crosshair';
+        });
+    }
 
+    if (btnDrawDoors) {
+        btnDrawDoors.addEventListener('click', () => {
+            isDrawingDoors = true;
+            isDrawingWalls = false;
+            btnDrawDoors.classList.add('active');
+            btnDrawWalls.classList.remove('active');
+            drawingCanvas.style.pointerEvents = 'auto';
+            dmCanvas.style.cursor = 'crosshair';
+        });
+    }
+
+    if (btnShadowDone) {
+        btnShadowDone.addEventListener('click', () => {
+            isShadowMode = false;
+            shadowToolsContainer.style.display = 'none';
+            // reset all shadow drawing states
+            isDrawingWalls = false;
+            isDrawingDoors = false;
+            currentWallPoints = [];
+            currentDoorPoints = [];
+            btnDrawWalls.classList.remove('active');
+            btnDrawDoors.classList.remove('active');
+            drawingCanvas.style.pointerEvents = 'none';
+            dmCanvas.style.cursor = 'auto';
+        });
+    }
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
@@ -3494,6 +3669,21 @@ document.addEventListener('DOMContentLoaded', () => {
     mapContainer.addEventListener('contextmenu', (event) => {
         event.preventDefault();
 
+        if (isDrawingWalls && currentWallPoints.length > 0) {
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (selectedMapData) {
+                const newOverlay = {
+                    type: 'wall',
+                    points: [...currentWallPoints],
+                };
+                selectedMapData.overlays.push(newOverlay);
+                currentWallPoints = [];
+                drawOverlays(selectedMapData.overlays);
+            }
+            // Prevent context menu from appearing while drawing walls
+            return;
+        }
+
         if (isMovingPolygon) {
             resetAllInteractiveStates();
             alert("Polygon move cancelled.");
@@ -3689,7 +3879,10 @@ document.addEventListener('DOMContentLoaded', () => {
         event.stopPropagation();
         const action = event.target.dataset.action;
 
-        if (action) {
+        if (action === 'shadow-tool') {
+            isShadowMode = true;
+            shadowToolsContainer.style.display = 'flex';
+        } else if (action) {
             const button = document.getElementById(`btn-${action.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
             if (button) {
                 button.click();

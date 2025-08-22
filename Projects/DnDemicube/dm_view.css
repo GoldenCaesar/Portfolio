@@ -489,6 +489,19 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+#shadow-tools-container {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: rgba(42, 49, 56, 0.8);
+    border-radius: 5px;
+}
+
+#shadow-tools-container button.active {
+    background-color: #a0b4c9;
+    box-shadow: 0 0 8px rgba(182, 202, 225, 0.7);
+}
+
 /* Automation View Styles */
 #automation-container {
     display: flex;
