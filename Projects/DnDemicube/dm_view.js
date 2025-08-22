@@ -1204,10 +1204,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Draw the wall currently being created
-        if (isDrawingWalls) {
-            drawCurrentWall();
-        }
 
         // Draw eraser circle
         if (activeShadowTool === 'erase' && eraserPositionForDraw) {
@@ -3940,20 +3936,6 @@ document.addEventListener('DOMContentLoaded', () => {
     mapContainer.addEventListener('contextmenu', (event) => {
         event.preventDefault();
 
-        if (isDrawingWalls && currentWallPoints.length > 0) {
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            if (selectedMapData) {
-                const newOverlay = {
-                    type: 'wall',
-                    points: [...currentWallPoints],
-                };
-                selectedMapData.overlays.push(newOverlay);
-                currentWallPoints = [];
-                drawOverlays(selectedMapData.overlays);
-            }
-            // Prevent context menu from appearing while drawing walls
-            return;
-        }
 
         if (isMovingPolygon) {
             resetAllInteractiveStates();
