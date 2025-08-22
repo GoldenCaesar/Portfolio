@@ -6764,6 +6764,9 @@ function displayToast(messageElement) {
             if (quest.id === selectedQuestId) {
                 card.classList.add('selected');
             }
+            if (quest.questStatus) {
+                card.classList.add(`status-${quest.questStatus.toLowerCase()}`);
+            }
             card.dataset.id = quest.id;
 
             // Bottom layer (map background)

@@ -81,19 +81,6 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
     z-index: 1;
 }
 
-.card-glow-layer {
-    position: absolute;
-    top: -2%;
-    left: -2%;
-    width: 104%;
-    height: 104%;
-    background-color: transparent;
-    border-radius: 12px;
-    z-index: 0;
-    pointer-events: none;
-    transition: box-shadow 0.3s ease-in-out;
-}
-
 .card-overlay {
     position: absolute;
     top: 0;
@@ -110,29 +97,28 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
 }
 
 /* Status-based Glows */
-.card.status-unavailable .card-glow-layer {
-    box-shadow: 0 0 15px 5px rgba(255, 0, 0, 0.5); /* 50% red */
+.card.status-unavailable {
+    box-shadow: 0 0 15px 5px rgba(128, 128, 128, 0.7); /* Grey glow */
 }
-.card.status-available .card-glow-layer {
-    box-shadow: 0 0 15px 5px rgba(0, 0, 255, 0.5); /* 50% blue */
+.card.status-available {
+    box-shadow: 0 0 15px 5px rgba(0, 0, 255, 0.7); /* Blue glow */
 }
-.card.status-active .card-glow-layer {
-    box-shadow: 0 0 15px 5px #FFD700; /* 100% gold */
+.card.status-active {
+    box-shadow: 0 0 15px 5px #FFD700; /* Gold glow */
 }
-.card.status-completed .card-glow-layer {
-    box-shadow: 0 0 15px 5px #008000; /* 100% green */
+.card.status-completed {
+    box-shadow: 0 0 15px 5px #008000; /* Green glow */
 }
-.card.status-failed .card-glow-layer {
-    box-shadow: 0 0 15px 5px #8B0000; /* 100% blood red */
+.card.status-failed {
+    box-shadow: 0 0 15px 5px #8B0000; /* Blood red glow */
 }
-.card.status-abandoned .card-glow-layer {
-    box-shadow: 0 0 15px 5px #663399; /* 100% royal purple */
+.card.status-abandoned {
+    box-shadow: 0 0 15px 5px #483D8B; /* Dark Royal Purple glow */
 }
 
 .card:hover {
     transform: scale(1.05);
     border-color: #b6cae1; /* Highlight border on hover */
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
 }
 
 .card.selected {
