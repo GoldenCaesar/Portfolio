@@ -130,10 +130,12 @@ function animateShadows() {
     if (!shadowAnimationId) return;
 
     const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
-    const tokenLightSources = initiativeTokens.map(token => ({
-        type: 'lightSource',
-        position: { x: token.x, y: token.y },
-        radius: 60 // Default vision radius for tokens
+    const tokenLightSources = initiativeTokens
+        .filter(token => token.isDetailsVisible !== false) // Only visible tokens are light sources
+        .map(token => ({
+            type: 'lightSource',
+            position: { x: token.x, y: token.y },
+            radius: 60 // Default vision radius for tokens
     }));
 
     const lightSources = [...dmLightSources, ...tokenLightSources];

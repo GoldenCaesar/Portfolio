@@ -6725,7 +6725,8 @@ function displayToast(messageElement) {
                         name: character.name,
                         playerName: character.sheetData.player_name,
                         portrait: character.sheetData.character_portrait,
-                        initials: getInitials(character.name)
+                        initials: getInitials(character.name),
+                        isDetailsVisible: character.isDetailsVisible
                     };
                     initiativeTokens.push(token);
                     tokenX += tokenPixelSize + 10;
@@ -6824,7 +6825,8 @@ function displayToast(messageElement) {
                         name: character.name,
                         playerName: character.sheetData.player_name,
                         portrait: character.sheetData.character_portrait,
-                        initials: getInitials(character.name)
+                        initials: getInitials(character.name),
+                        isDetailsVisible: character.isDetailsVisible
                     };
                     initiativeTokens.push(token);
                     tokenX += tokenPixelSize + 10;
