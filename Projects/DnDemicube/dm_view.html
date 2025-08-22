@@ -23,6 +23,7 @@
                     <label for="upload-maps-input">Upload Map Files:</label>
                     <input type="file" id="upload-maps-input" accept="image/*" multiple>
                 </div>
+                <button id="create-map-button" style="margin-top: 10px;">Create Map</button>
                 <ul id="maps-list" style="list-style-type: none; padding-left: 0; margin-top: 10px; overflow-y: auto; max-height: 150px;">
                     <!-- Map files will be listed here -->
                 </ul>
@@ -103,6 +104,12 @@
     <div id="map-container">
         <canvas id="dm-canvas"></canvas>
         <canvas id="drawing-canvas"></canvas>
+    </div>
+    <div id="map-creation-container" style="display: none; position: relative; width: 100%; height: 100%;">
+        <canvas id="map-creation-canvas" style="border: 1px solid #ccc;"></canvas>
+        <div id="upload-or-choose-bg-container" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <button id="upload-or-choose-bg-button">Upload or Choose Background Image</button>
+        </div>
     </div>
     <div id="automation-container" style="display: none; width: 100%;">
         <div id="modules-sidebar">
@@ -562,6 +569,25 @@
             <div style="margin-top: 10px;">
                 <button id="save-json-button">Save</button>
                 <button id="copy-json-button">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-map-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="create-map-modal-close-button">&times;</span>
+            <h3>Create New Map</h3>
+            <p>Choose a background image for your new map.</p>
+            <div id="create-map-options-container">
+                <button id="upload-new-image-button">Upload New Image</button>
+                <button id="choose-existing-image-button">Choose From Existing</button>
+                <input type="file" id="new-map-image-upload" accept="image/*" style="display: none;">
+            </div>
+            <div id="existing-maps-selection-container" style="display: none; margin-top: 15px;">
+                <h4>Select an existing map image:</h4>
+                <ul id="existing-maps-list-for-creation" style="list-style-type: none; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid #ccc;">
+                    <!-- Existing maps will be listed here -->
+                </ul>
             </div>
         </div>
     </div>
