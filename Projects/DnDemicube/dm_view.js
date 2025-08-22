@@ -2816,6 +2816,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             alert("Campaign data merged successfully!");
+            updateActiveQuestsFooter();
 
         } catch (error) {
             console.error("Error merging campaign data:", error);
@@ -2920,6 +2921,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         alert("Legacy campaign loaded. Please re-upload map and character files manually.");
+        updateActiveQuestsFooter();
     }
 
     function renderMapsList() {
@@ -7145,6 +7147,7 @@ function displayToast(messageElement) {
             alert('Quest details saved!');
             renderCards(); // Re-render cards to reflect name change
             drawConnections(); // Redraw connections to reflect parentId changes
+            updateActiveQuestsFooter();
         });
 
         const addNpcBtn = document.getElementById('add-npc-btn');
@@ -7265,6 +7268,7 @@ function displayToast(messageElement) {
                 selectedQuestId = newQuest.id;
                 drawConnections();
                 renderCards();
+                updateActiveQuestsFooter();
             }
         }];
         createContextMenu(e, options);
@@ -7299,6 +7303,7 @@ function displayToast(messageElement) {
                     selectedQuestId = null;
                     drawConnections();
                     renderCards();
+                    updateActiveQuestsFooter();
                 }
             },
             {
@@ -7598,4 +7603,67 @@ function displayToast(messageElement) {
             }
         });
     }
+
+    function updateActiveQuestsFooter() {
+        const activeQuests = quests.filter(q => q.questStatus === 'Active');
+        const footerLeft = document.getElementById('footer-quests-left');
+        const footerCenter = document.getElementById('footer-quests-center');
+        const footerRight = document.getElementById('footer-quests-right');
+
+        if (!footerLeft || !footerCenter || !footerRight) {
+            console.error("Footer quest elements not found!");
+            return;
+        }
+
+        // Clear existing content and ensure ul exists
+        footerLeft.innerHTML = '<ul></ul>';
+        footerCenter.innerHTML = '<ul></ul>';
+        footerRight.innerHTML = '<ul></ul>';
+
+        const leftList = footerLeft.querySelector('ul');
+        const centerList = footerCenter.querySelector('ul');
+        const rightList = footerRight.querySelector('ul');
+
+        if (activeQuests.length === 0) {
+            centerList.innerHTML = '<li>No Active Quests</li>';
+            return;
+        }
+
+        const columns = [leftList, centerList, rightList];
+        activeQuests.forEach((quest, index) => {
+            const listItem = document.createElement('li');
+            listItem.textContent = quest.name;
+            listItem.dataset.questId = quest.id;
+            listItem.classList.add('footer-quest-item'); // for styling and event delegation
+            columns[index % 3].appendChild(listItem);
+        });
+    }
+
+    const dmControlsFooter = document.getElementById('dm-controls-footer');
+    if (dmControlsFooter) {
+        dmControlsFooter.addEventListener('click', (event) => {
+            if (event.target.classList.contains('footer-quest-item')) {
+                const questId = parseInt(event.target.dataset.questId, 10);
+                if (isNaN(questId)) return;
+
+                const quest = quests.find(q => q.id === questId);
+                if (quest) {
+                    switchTab('tab-story-beats');
+                    // Use a timeout to ensure the tab switch and rendering is complete
+                    setTimeout(() => {
+                        const card = document.querySelector(`.card[data-id='${quest.id}']`);
+                        if (card) {
+                            // The card click handler already opens the overlay, so just click it.
+                            card.click();
+                        } else {
+                            console.warn(`Card for quest ID ${questId} not found after tab switch.`);
+                        }
+                    }, 150); // A small delay to allow tab content to render
+                }
+            }
+        });
+    }
+
+    // Initial population of the footer
+    updateActiveQuestsFooter();
 });
