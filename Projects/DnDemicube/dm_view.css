@@ -582,6 +582,10 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #e0e0e0;
 }
 
+#automation-canvas .module-card {
+    cursor: default;
+}
+
 .quest-footer-card {
     padding: 8px 12px;
     background-color: #3a4f6a;

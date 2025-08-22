@@ -262,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedQuestId = 1;
     let activeOverlayCardId = null;
     let originalQuestState = null;
+    let automationCanvasData = [];
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -3002,10 +3003,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 8. Handle Story Beats
             if (saveStoryBeatsCheckbox.checked) {
+                const automationCanvas = document.getElementById('automation-canvas');
+                if (automationCanvas) {
+                    automationCanvasData = Array.from(automationCanvas.children).map(card => {
+                        return {
+                            textContent: card.textContent,
+                            cardClass: card.className
+                        };
+                    });
+                }
+
                 campaignData.storyTree = {
                     quests: quests,
                     nextQuestId: nextQuestId,
-                    selectedQuestId: selectedQuestId
+                    selectedQuestId: selectedQuestId,
+                    automationCanvasData: automationCanvasData
                 };
             }
 
@@ -3351,6 +3363,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     quests = campaignData.storyTree.quests;
                     nextQuestId = campaignData.storyTree.nextQuestId;
                     selectedQuestId = campaignData.storyTree.selectedQuestId;
+                    automationCanvasData = campaignData.storyTree.automationCanvasData || [];
+                    renderAutomationCanvasFromData();
 
                     // Backward compatibility for quests missing new fields
                     quests.forEach(quest => {
@@ -3507,19 +3521,32 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreInitiativeState(campaignData);
 
         if (campaignData.storyTree) {
-            // Attempt to convert old data or notify user
-            console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
-            alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
-            // Reset to default state
-            quests = [{
-                id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
-                questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
-                associatedNPCs: [], failureTriggers: [], successTriggers: [],
-                detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
-                status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
-            }];
-            nextQuestId = 2;
-            selectedQuestId = 1;
+            if (campaignData.storyTree.quests) { // New format check
+                quests = campaignData.storyTree.quests;
+                nextQuestId = campaignData.storyTree.nextQuestId;
+                selectedQuestId = campaignData.storyTree.selectedQuestId;
+                automationCanvasData = campaignData.storyTree.automationCanvasData || [];
+                renderAutomationCanvasFromData();
+            } else {
+                // Attempt to convert old data or notify user
+                console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
+                alert("Your campaign contains an old version of the Story Beats data that cannot be automatically upgraded. You will need to recreate it manually.");
+                // Reset to default state
+                quests = [{
+                    id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
+                    questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
+                    associatedNPCs: [], failureTriggers: [], successTriggers: [],
+                    detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                    status: 'active', prerequisites: [], rewards: [], recommendations: [], completionSteps: []
+                }];
+                nextQuestId = 2;
+                selectedQuestId = 1;
+                automationCanvasData = [];
+                renderAutomationCanvasFromData();
+            }
+        } else {
+            automationCanvasData = [];
+            renderAutomationCanvasFromData();
         }
 
         let loadedMapIconSize = campaignData.mapIconSize || 40;
@@ -7370,6 +7397,18 @@ function displayToast(messageElement) {
         });
     }
 
+    function renderAutomationCanvasFromData() {
+        const automationCanvas = document.getElementById('automation-canvas');
+        if (!automationCanvas) return;
+        automationCanvas.innerHTML = '';
+        automationCanvasData.forEach(cardData => {
+            const card = document.createElement('div');
+            card.className = cardData.cardClass;
+            card.textContent = cardData.textContent;
+            automationCanvas.appendChild(card);
+        });
+    }
+
     function initializeAutomationSidebar() {
         const moduleCardsContainer = document.getElementById('module-cards-container');
         const automationCanvas = document.getElementById('automation-canvas');
@@ -7388,10 +7427,10 @@ function displayToast(messageElement) {
             card.className = 'module-card';
             card.textContent = cardName;
             card.addEventListener('click', () => {
-                const item = document.createElement('div');
-                item.className = 'automation-canvas-item';
-                item.textContent = cardName;
-                automationCanvas.appendChild(item);
+                const newCard = document.createElement('div');
+                newCard.className = card.className;
+                newCard.textContent = card.textContent;
+                automationCanvas.appendChild(newCard);
             });
             moduleCardsContainer.appendChild(card);
         });
