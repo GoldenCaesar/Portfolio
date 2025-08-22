@@ -137,7 +137,7 @@ function animateShadows() {
     }));
 
     const lightSources = [...dmLightSources, ...tokenLightSources];
-    const shadowLines = currentOverlays.filter(o => o.type === 'wall' || o.type === 'door');
+    const shadowLines = currentOverlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
 
     const shadowCtx = shadowCanvas.getContext('2d');
     shadowCanvas.width = playerCanvas.width;
