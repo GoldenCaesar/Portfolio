@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
+    const shadowCanvas = document.getElementById('shadow-canvas');
     const drawingCanvas = document.getElementById('drawing-canvas');
     const mapContainer = document.getElementById('map-container');
     const noteEditorContainer = document.getElementById('note-editor-container'); // New container for the editor
@@ -64,9 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Shadow tool elements
     const shadowToolsContainer = document.getElementById('shadow-tools-container');
-    const btnDrawWalls = document.getElementById('btn-draw-walls');
-    const btnDrawDoors = document.getElementById('btn-draw-doors');
-    const btnEraseShadows = document.getElementById('btn-erase-shadows');
+    const btnShadowWall = document.getElementById('btn-shadow-wall');
+    const btnShadowDoor = document.getElementById('btn-shadow-door');
+    const btnAddLightSource = document.getElementById('btn-add-light-source');
+    const btnShadowErase = document.getElementById('btn-shadow-erase');
     const btnShadowDone = document.getElementById('btn-shadow-done');
 
     // Token Stat Block Elements
@@ -305,13 +307,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Shadow tool state
     let isShadowMode = false;
-    let isDrawingWalls = false;
-    let isDrawingDoors = false;
-    let isErasing = false;
-    let isEraserDragging = false;
-    let eraserPosition = null;
-    let currentWallPoints = [];
-    let currentDoorPoints = [];
+    let activeShadowTool = null; // 'wall', 'door', 'erase'
+    let isDrawing = false; // Generic drawing flag for wall tool
+    let lastX = 0;
+    let lastY = 0;
+    let lineStartPoint = null; // For door tool
+    let isDraggingLightSource = false;
+    let draggedLightSource = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
 
     // Campaign Timer State
     let campaignTimerInterval = null;
@@ -585,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
-        if (dmCanvas && drawingCanvas && mapContainer) {
+        if (dmCanvas && shadowCanvas && drawingCanvas && mapContainer) {
             const style = window.getComputedStyle(mapContainer);
             const paddingLeft = parseFloat(style.paddingLeft) || 0;
             const paddingRight = parseFloat(style.paddingRight) || 0;
@@ -602,9 +606,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentMapDisplayData.img = null;
             }
 
-            // Apply new dimensions to both canvases
+            // Apply new dimensions to all canvases
             dmCanvas.width = canvasWidth;
             dmCanvas.height = canvasHeight;
+            shadowCanvas.width = canvasWidth;
+            shadowCanvas.height = canvasHeight;
             drawingCanvas.width = canvasWidth;
             drawingCanvas.height = canvasHeight;
 
@@ -620,11 +626,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayMapOnCanvas(fileName) {
-        if (!dmCanvas || !drawingCanvas || !mapContainer) {
+        if (!dmCanvas || !shadowCanvas || !drawingCanvas || !mapContainer) {
             console.error("One or more canvas elements or map container not found!");
             return;
         }
 
+        const shadowCtx = shadowCanvas.getContext('2d');
+        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
         const drawingCtx = drawingCanvas.getContext('2d');
         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
@@ -1146,11 +1154,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     img.src = character.sheetData.character_portrait;
                 }
-            } else if (overlay.type === 'wall' && overlay.points) {
-                if (isPlayerViewContext) return; // Don't show walls in player view for now
+            } else if (overlay.type === 'lightSource' && overlay.position) {
+                const canvasX = (overlay.position.x * scale) + originX;
+                const canvasY = (overlay.position.y * scale) + originY;
+                const radius = (overlay.radius || 15) * scale;
+                drawingCtx.fillStyle = 'rgba(255, 255, 0, 0.7)';
                 drawingCtx.beginPath();
-                drawingCtx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-                drawingCtx.lineWidth = 5; // Thicker line
+                drawingCtx.arc(canvasX, canvasY, radius, 0, Math.PI * 2);
+                drawingCtx.fill();
+            } else if (overlay.type === 'wall' && overlay.points) {
+                if (isPlayerViewContext) return;
+                drawingCtx.beginPath();
+                drawingCtx.strokeStyle = 'rgba(0, 0, 255, 0.7)';
+                drawingCtx.lineWidth = 5;
                 drawingCtx.lineCap = 'round';
                 overlay.points.forEach((point, index) => {
                     const canvasX = (point.x * scale) + originX;
@@ -1163,14 +1179,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 drawingCtx.stroke();
             } else if (overlay.type === 'door' && overlay.points) {
-                if (isPlayerViewContext && overlay.isOpen) {
-                    return; // Don't draw open doors for players
-                }
+                if (isPlayerViewContext) return;
                 drawingCtx.beginPath();
-                // In DM view, show open doors as semi-transparent
-                const doorColor = isPlayerViewContext ? 'rgba(0, 0, 0, 1)' : (overlay.isOpen ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 1)');
-                drawingCtx.strokeStyle = doorColor;
-                drawingCtx.lineWidth = 8; // Even thicker for doors
+                drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+                drawingCtx.lineWidth = 5;
                 drawingCtx.lineCap = 'round';
                 const p1 = overlay.points[0];
                 const p2 = overlay.points[1];
@@ -1198,8 +1210,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Draw eraser circle
-        if (isErasing && eraserPosition) {
-            drawEraserCircle();
+        if (activeShadowTool === 'erase' && eraserPositionForDraw) {
+            const radius = 15; // Eraser radius in pixels
+            drawingCtx.beginPath();
+            drawingCtx.arc(eraserPositionForDraw.canvasX, eraserPositionForDraw.canvasY, radius, 0, Math.PI * 2, false);
+            drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+            drawingCtx.lineWidth = 2;
+            drawingCtx.stroke();
         }
     }
 
@@ -1222,6 +1239,255 @@ document.addEventListener('DOMContentLoaded', () => {
                 characterSheetIframe.contentWindow.postMessage({ type: 'requestSheetDataForView' }, '*');
             }
         });
+    }
+
+    function getLineIntersection(p1, p2) {
+        const dX = p1.x2 - p1.x1;
+        const dY = p1.y2 - p1.y1;
+        const dX2 = p2.x2 - p2.x1;
+        const dY2 = p2.y2 - p2.y1;
+        const denominator = dX * dY2 - dY * dX2;
+
+        if (denominator === 0) return null;
+
+        const t = ((p2.x1 - p1.x1) * dY2 - (p2.y1 - p1.y1) * dX2) / denominator;
+        const u = -((p1.x1 - p2.x1) * dY - (p1.y1 - p2.y1) * dX) / denominator;
+
+        if (t >= 0 && u >= 0 && u <= 1) {
+            return { x: p1.x1 + t * dX, y: p1.y1 + t * dY };
+        }
+
+        return null;
+    }
+
+    let shadowAnimationId = null;
+
+    function animateShadows() {
+        if (!shadowAnimationId) return; // Stop if animation is cancelled
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || mapData.mode !== 'view') {
+            const shadowCtx = shadowCanvas.getContext('2d');
+            shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+            return; // Stop animation if not in view mode
+        }
+
+        const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
+        const shadowLines = mapData.overlays.filter(o => o.type === 'wall' || o.type === 'door');
+
+        const shadowCtx = shadowCanvas.getContext('2d');
+        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+        // TODO: For player view, this should be rgba(0, 0, 0, 1) for 100% opacity
+        shadowCtx.fillStyle = 'rgba(0, 0, 0, 0.33)'; // 33% opacity for DM
+        shadowCtx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+        const { scale, originX, originY } = mapData.transform;
+
+        const allSegments = shadowLines.map(line => {
+            if (line.type === 'wall') { // It's an array of points
+                const segments = [];
+                for (let i = 0; i < line.points.length - 1; i++) {
+                    segments.push({ x1: line.points[i].x, y1: line.points[i].y, x2: line.points[i+1].x, y2: line.points[i+1].y });
+                }
+                return segments;
+            } else { // It's a door with two points
+                 return [{ x1: line.points[0].x, y1: line.points[0].y, x2: line.points[1].x, y2: line.points[1].y }];
+            }
+        }).flat();
+
+
+        // Add canvas boundaries as segments
+        const canvasImageWidth = currentMapDisplayData.imgWidth;
+        const canvasImageHeight = currentMapDisplayData.imgHeight;
+        allSegments.push({ x1: 0, y1: 0, x2: canvasImageWidth, y2: 0 });
+        allSegments.push({ x1: canvasImageWidth, y1: 0, x2: canvasImageWidth, y2: canvasImageHeight });
+        allSegments.push({ x1: canvasImageWidth, y1: canvasImageHeight, x2: 0, y2: canvasImageHeight });
+        allSegments.push({ x1: 0, y1: canvasImageHeight, x2: 0, y2: 0 });
+
+
+        lightSources.forEach(light => {
+            const visiblePoints = [];
+            const allVertices = [];
+
+            shadowLines.forEach(line => {
+                line.points.forEach(p => allVertices.push({x: p.x, y: p.y}));
+            });
+
+            // Add canvas corners as vertices
+            allVertices.push({ x: 0, y: 0 });
+            allVertices.push({ x: canvasImageWidth, y: 0 });
+            allVertices.push({ x: canvasImageWidth, y: canvasImageHeight });
+            allVertices.push({ x: 0, y: canvasImageHeight });
+
+            const angles = new Set();
+            allVertices.forEach(vertex => {
+                const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
+                angles.add(angle);
+                angles.add(angle - 0.0001);
+                angles.add(angle + 0.0001);
+            });
+
+            const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+
+            sortedAngles.forEach(angle => {
+                const ray = {
+                    x1: light.position.x,
+                    y1: light.position.y,
+                    x2: light.position.x + 10000 * Math.cos(angle),
+                    y2: light.position.y + 10000 * Math.sin(angle)
+                };
+
+                let closestIntersection = null;
+                let minDistance = Infinity;
+
+                allSegments.forEach(segment => {
+                    const intersection = getLineIntersection(ray, segment);
+                    if (intersection) {
+                        const distance = Math.sqrt((intersection.x - light.position.x) ** 2 + (intersection.y - light.position.y) ** 2);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestIntersection = intersection;
+                        }
+                    }
+                });
+
+                if (closestIntersection) {
+                    visiblePoints.push(closestIntersection);
+                }
+            });
+
+            shadowCtx.save();
+            shadowCtx.globalCompositeOperation = 'destination-out';
+            shadowCtx.beginPath();
+            if (visiblePoints.length > 0) {
+                const firstPoint = visiblePoints[0];
+                const firstCanvasX = (firstPoint.x * scale) + originX;
+                const firstCanvasY = (firstPoint.y * scale) + originY;
+                shadowCtx.moveTo(firstCanvasX, firstCanvasY);
+                visiblePoints.forEach(point => {
+                    const canvasX = (point.x * scale) + originX;
+                    const canvasY = (point.y * scale) + originY;
+                    shadowCtx.lineTo(canvasX, canvasY);
+                });
+                shadowCtx.closePath();
+                shadowCtx.fill();
+            }
+            shadowCtx.restore();
+        });
+
+        requestAnimationFrame(animateShadows);
+    }
+
+    function toggleShadowAnimation(start) {
+        if (start && !shadowAnimationId) {
+            shadowAnimationId = requestAnimationFrame(animateShadows);
+        } else if (!start && shadowAnimationId) {
+            cancelAnimationFrame(shadowAnimationId);
+            shadowAnimationId = null;
+            const shadowCtx = shadowCanvas.getContext('2d');
+            shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+        }
+    }
+
+    function handleShadowMouseDown(e) {
+        const { x: mouseX, y: mouseY } = getRelativeCoords(e.offsetX, e.offsetY);
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData) return;
+
+        if (!activeShadowTool) {
+            const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
+            for (let i = lightSources.length - 1; i >= 0; i--) {
+                const light = lightSources[i];
+                const lightRadius = (light.radius || 15) / (currentMapDisplayData.scale || 1);
+                const distance = Math.sqrt((mouseX - light.position.x) ** 2 + (mouseY - light.position.y) ** 2);
+                if (distance < lightRadius) {
+                    isDraggingLightSource = true;
+                    draggedLightSource = light;
+                    dragOffsetX = mouseX - light.position.x;
+                    dragOffsetY = mouseY - light.position.y;
+                    return;
+                }
+            }
+        }
+
+        if (activeShadowTool === 'wall') {
+            isDrawing = true;
+            lastX = mouseX;
+            lastY = mouseY;
+            const newWall = { type: 'wall', points: [{x: mouseX, y: mouseY}] };
+            mapData.overlays.push(newWall);
+        } else if (activeShadowTool === 'door') {
+            if (lineStartPoint) {
+                const newDoor = { type: 'door', points: [lineStartPoint, {x: mouseX, y: mouseY}] };
+                mapData.overlays.push(newDoor);
+                lineStartPoint = null;
+            } else {
+                lineStartPoint = { x: mouseX, y: mouseY };
+            }
+        } else if (activeShadowTool === 'erase') {
+            isDrawing = true;
+        }
+    }
+
+    let eraserPositionForDraw = null;
+    function handleShadowMouseMove(e) {
+        const { x: mouseX, y: mouseY } = getRelativeCoords(e.offsetX, e.offsetY);
+        eraserPositionForDraw = { canvasX: e.offsetX, canvasY: e.offsetY };
+
+        if (isDraggingLightSource) {
+            draggedLightSource.position.x = mouseX - dragOffsetX;
+            draggedLightSource.position.y = mouseY - dragOffsetY;
+            drawOverlays(detailedMapData.get(selectedMapFileName).overlays);
+            return;
+        }
+
+        if (isDrawing && activeShadowTool === 'wall') {
+            const mapData = detailedMapData.get(selectedMapFileName);
+            const currentWall = mapData.overlays[mapData.overlays.length - 1];
+            currentWall.points.push({x: mouseX, y: mouseY});
+            drawOverlays(mapData.overlays);
+        } else if (activeShadowTool === 'erase') {
+            const drawingCtx = drawingCanvas.getContext('2d');
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            const radius = 15;
+            drawingCtx.beginPath();
+            drawingCtx.arc(e.offsetX, e.offsetY, radius, 0, Math.PI * 2, false);
+            drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+            drawingCtx.lineWidth = 2;
+            drawingCtx.stroke();
+            if(isDrawing) {
+                const mapData = detailedMapData.get(selectedMapFileName);
+                if (!mapData) return;
+                const eraserRadius = 15 / (currentMapDisplayData.scale || 1);
+                let changed = false;
+                for (let i = mapData.overlays.length - 1; i >= 0; i--) {
+                    const overlay = mapData.overlays[i];
+                    if (overlay.type === 'wall' && overlay.points.length > 1) {
+                        for (let j = 0; j < overlay.points.length - 1; j++) {
+                            if (checkLineCircleCollision(overlay.points[j], overlay.points[j+1], {x: mouseX, y: mouseY}, eraserRadius)) {
+                                mapData.overlays.splice(i, 1);
+                                changed = true;
+                                break;
+                            }
+                        }
+                    } else if (overlay.type === 'door' && overlay.points.length > 1) {
+                        if (checkLineCircleCollision(overlay.points[0], overlay.points[1], {x: mouseX, y: mouseY}, eraserRadius)) {
+                            mapData.overlays.splice(i, 1);
+                            changed = true;
+                        }
+                    }
+                }
+                if(changed) {
+                    drawOverlays(mapData.overlays);
+                }
+            }
+        }
+    }
+
+    function stopShadowInteraction() {
+        isDrawing = false;
+        isDraggingLightSource = false;
+        draggedLightSource = null;
     }
 
     function getRelativeCoords(canvasX, canvasY) {
@@ -1290,39 +1556,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-function drawCurrentWall() {
-    if (currentWallPoints.length === 0 || !currentMapDisplayData.img) return;
-
-    const ctx = drawingCanvas.getContext('2d');
-    const mapData = detailedMapData.get(selectedMapFileName);
-    if (!mapData || !mapData.transform) return;
-    const { scale, originX, originY } = mapData.transform;
-
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(50, 50, 50, 0.9)'; // Dark color for temporary wall
-    ctx.lineWidth = 6;
-    ctx.lineCap = 'round';
-
-    currentWallPoints.forEach((point, index) => {
-        const canvasX = (point.x * scale) + originX;
-        const canvasY = (point.y * scale) + originY;
-        if (index === 0) {
-            ctx.moveTo(canvasX, canvasY);
-        } else {
-            ctx.lineTo(canvasX, canvasY);
-        }
-    });
-
-    ctx.stroke();
-
-    // Draw points to see where you've clicked
-    ctx.fillStyle = 'orange';
-    currentWallPoints.forEach(point => {
-        const canvasX = (point.x * scale) + originX;
-        const canvasY = (point.y * scale) + originY;
-        ctx.fillRect(canvasX - 3, canvasY - 3, 6, 6);
-    });
-}
 
 
     drawingCanvas.addEventListener('click', (event) => {
@@ -1334,27 +1567,6 @@ function drawCurrentWall() {
         const selectedMapData = detailedMapData.get(selectedMapFileName);
         if (!selectedMapData || selectedMapData.mode !== 'edit') return;
 
-    if (isDrawingWalls) {
-        currentWallPoints.push(imageCoords);
-        drawOverlays(selectedMapData.overlays); // Redraw to show the current wall line
-        return;
-    }
-
-    if (isDrawingDoors) {
-        currentDoorPoints.push(imageCoords);
-        if (currentDoorPoints.length === 2) {
-            const newOverlay = {
-                type: 'door',
-                points: [...currentDoorPoints],
-                isOpen: false
-            };
-            selectedMapData.overlays.push(newOverlay);
-            currentDoorPoints = [];
-            // Keep drawing doors until user selects another tool or 'Done'
-            drawOverlays(selectedMapData.overlays);
-        }
-        return;
-    }
 
     if (!isLinkingChildMap && !isRedrawingPolygon) return;
 
@@ -1605,30 +1817,6 @@ function drawCurrentWall() {
         return distance <= tokenRadius;
     }
 
-    function isPointOnDoor(point, doorOverlay) {
-        if (!doorOverlay || !doorOverlay.points || doorOverlay.points.length < 2) return false;
-        const p1 = doorOverlay.points[0];
-        const p2 = doorOverlay.points[1];
-        const clickX = point.x;
-        const clickY = point.y;
-
-        // Use a larger threshold for clicking on lines
-        const threshold = 10 / (currentMapDisplayData.scale || 1);
-
-        const distSq = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
-        if (distSq == 0) { // The "door" is just a point
-            return (clickX - p1.x)**2 + (clickY - p1.y)**2 <= threshold**2;
-        }
-
-        let t = ((clickX - p1.x) * (p2.x - p1.x) + (clickY - p1.y) * (p2.y - p1.y)) / distSq;
-        t = Math.max(0, Math.min(1, t));
-
-        const closestX = p1.x + t * (p2.x - p1.x);
-        const closestY = p1.y + t * (p2.y - p1.y);
-
-        const distanceSq = (clickX - closestX)**2 + (clickY - closestY)**2;
-        return distanceSq <= threshold**2;
-    }
 
     function checkLineCircleCollision(p1, p2, circleCenter, radius) {
         // Check if either endpoint is inside the circle
@@ -1851,60 +2039,73 @@ function drawCurrentWall() {
         });
     }
 
-    if (btnDrawWalls) {
-        btnDrawWalls.addEventListener('click', () => {
-            isDrawingWalls = true;
-            isDrawingDoors = false;
-            isErasing = false;
-            btnDrawWalls.classList.add('active');
-            btnDrawDoors.classList.remove('active');
-            btnEraseShadows.classList.remove('active');
-            drawingCanvas.style.pointerEvents = 'auto';
-            dmCanvas.style.cursor = 'crosshair';
+    if (shadowCanvas) {
+        shadowCanvas.addEventListener('mousedown', handleShadowMouseDown);
+        shadowCanvas.addEventListener('mousemove', handleShadowMouseMove);
+        shadowCanvas.addEventListener('mouseup', stopShadowInteraction);
+        shadowCanvas.addEventListener('mouseout', stopShadowInteraction);
+    }
+
+    function setShadowTool(tool) {
+        if (activeShadowTool === tool) {
+            activeShadowTool = null;
+        } else {
+            activeShadowTool = tool;
+        }
+
+        if (activeShadowTool !== 'erase') {
+            const drawingCtx = drawingCanvas.getContext('2d');
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        }
+
+        // Update button styles
+        btnShadowWall.classList.toggle('active', activeShadowTool === 'wall');
+        btnShadowDoor.classList.toggle('active', activeShadowTool === 'door');
+        btnShadowErase.classList.toggle('active', activeShadowTool === 'erase');
+
+        // Enable pointer events on shadow canvas if any tool is active
+        shadowCanvas.style.pointerEvents = activeShadowTool ? 'auto' : 'none';
+        dmCanvas.style.cursor = activeShadowTool ? 'crosshair' : 'auto';
+    }
+
+    if (btnShadowWall) {
+        btnShadowWall.addEventListener('click', () => setShadowTool('wall'));
+    }
+
+    if (btnShadowDoor) {
+        btnShadowDoor.addEventListener('click', () => setShadowTool('door'));
+    }
+
+    if (btnAddLightSource) {
+        btnAddLightSource.addEventListener('click', () => {
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (!mapData) return;
+            const newLight = {
+                type: 'lightSource',
+                position: { x: currentMapDisplayData.imgWidth / 2, y: currentMapDisplayData.imgHeight / 2 },
+                radius: 15
+            };
+            mapData.overlays.push(newLight);
+            drawOverlays(mapData.overlays);
         });
     }
 
-    if (btnDrawDoors) {
-        btnDrawDoors.addEventListener('click', () => {
-            isDrawingDoors = true;
-            isDrawingWalls = false;
-            isErasing = false;
-            btnDrawDoors.classList.add('active');
-            btnDrawWalls.classList.remove('active');
-            btnEraseShadows.classList.remove('active');
-            drawingCanvas.style.pointerEvents = 'auto';
-            dmCanvas.style.cursor = 'crosshair';
-        });
-    }
-
-    if (btnEraseShadows) {
-        btnEraseShadows.addEventListener('click', () => {
-            isErasing = true;
-            isDrawingWalls = false;
-            isDrawingDoors = false;
-            btnEraseShadows.classList.add('active');
-            btnDrawWalls.classList.remove('active');
-            btnDrawDoors.classList.remove('active');
-            drawingCanvas.style.pointerEvents = 'auto';
-            dmCanvas.style.cursor = 'none'; // Hide default cursor for eraser
-        });
+    if (btnShadowErase) {
+        btnShadowErase.addEventListener('click', () => setShadowTool('erase'));
     }
 
     if (btnShadowDone) {
         btnShadowDone.addEventListener('click', () => {
             isShadowMode = false;
             shadowToolsContainer.style.display = 'none';
-            // reset all shadow drawing states
-            isDrawingWalls = false;
-            isDrawingDoors = false;
-            isErasing = false;
-            currentWallPoints = [];
-            currentDoorPoints = [];
-            btnDrawWalls.classList.remove('active');
-            btnDrawDoors.classList.remove('active');
-            btnEraseShadows.classList.remove('active');
-            drawingCanvas.style.pointerEvents = 'none';
+            activeShadowTool = null;
+            lineStartPoint = null;
+            shadowCanvas.style.pointerEvents = 'none';
             dmCanvas.style.cursor = 'auto';
+            // Redraw overlays without tool-specific highlights
+            if(selectedMapFileName) {
+                drawOverlays(detailedMapData.get(selectedMapFileName).overlays);
+            }
         });
     }
 
@@ -2297,8 +2498,10 @@ function drawCurrentWall() {
                 updateButtonStates();
                 if (selectedMapData.mode === 'view') {
                     sendMapToPlayerView(selectedMapFileName);
+                    toggleShadowAnimation(true);
                 } else {
                     triggerSlideshow();
+                    toggleShadowAnimation(false);
                 }
             }
         });
@@ -2423,43 +2626,6 @@ function drawCurrentWall() {
     }
 
         mapContainer.addEventListener('mousemove', (e) => {
-        if (isErasing) {
-            eraserPosition = { canvasX: e.offsetX, canvasY: e.offsetY };
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            if (selectedMapData) {
-                if (isEraserDragging) {
-                    const eraserImageCoords = getRelativeCoords(e.offsetX, e.offsetY);
-                    if (eraserImageCoords) {
-                        const eraserRadius = 15 / (currentMapDisplayData.scale || 1);
-                        let changed = false;
-
-                        for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
-                            const overlay = selectedMapData.overlays[i];
-                            let collision = false;
-                            if (overlay.type === 'wall' && overlay.points.length > 1) {
-                                for (let j = 0; j < overlay.points.length - 1; j++) {
-                                    if (checkLineCircleCollision(overlay.points[j], overlay.points[j+1], eraserImageCoords, eraserRadius)) {
-                                        collision = true;
-                                        break;
-                                    }
-                                }
-                            } else if (overlay.type === 'door' && overlay.points.length > 1) {
-                                if (checkLineCircleCollision(overlay.points[0], overlay.points[1], eraserImageCoords, eraserRadius)) {
-                                    collision = true;
-                                }
-                            }
-
-                            if (collision) {
-                                selectedMapData.overlays.splice(i, 1);
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-                // Redraw overlays to show the eraser circle and any deletions
-                drawOverlays(selectedMapData.overlays);
-            }
-        }
 
             const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
 
