@@ -237,7 +237,7 @@ body.moving-mode {
     flex-direction: column; /* To make #note-editor-area inside it grow */
 }
 
-#dm-canvas, #drawing-canvas {
+#dm-canvas, #drawing-canvas, #shadow-canvas {
     position: absolute;
     max-width: 100%;
     max-height: 100%;
@@ -249,9 +249,15 @@ body.moving-mode {
     z-index: 1; /* Base canvas */
 }
 
+#shadow-canvas {
+    background-color: transparent;
+    z-index: 2; /* Shadow canvas on top of map */
+    pointer-events: none; /* Clicks pass through unless a shadow tool is active */
+}
+
 #drawing-canvas {
     background-color: transparent;
-    z-index: 2; /* Drawing canvas on top */
+    z-index: 3; /* UI/drawing canvas on top of shadows */
     pointer-events: none; /* Allows clicks to pass through to the dm-canvas */
 }
 button, input[type="file"] {
