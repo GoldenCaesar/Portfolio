@@ -1008,28 +1008,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!mapData || !mapData.transform) return;
         const { scale, originX, originY } = mapData.transform;
 
-    // Detect and draw shadow polygons for the DM's view
-    if (!isPlayerViewContext) {
-        const shadowPolygons = detectShadowPolygons(overlays);
-        if (shadowPolygons.length > 0) {
-            drawingCtx.fillStyle = 'rgba(0, 0, 0, 0.33)';
-            shadowPolygons.forEach(polygon => {
-                drawingCtx.beginPath();
-                polygon.forEach((point, index) => {
-                    const canvasX = (point.x * scale) + originX;
-                    const canvasY = (point.y * scale) + originY;
-                    if (index === 0) {
-                        drawingCtx.moveTo(canvasX, canvasY);
-                    } else {
-                        drawingCtx.lineTo(canvasX, canvasY);
-                    }
-                });
-                drawingCtx.closePath();
-                drawingCtx.fill();
-            });
-        }
-    }
-
         if(overlays){
             overlays.forEach(overlay => {
             if (overlay.type === 'childMapLink' && overlay.polygon) {
@@ -1672,83 +1650,6 @@ function drawCurrentWall() {
         return dist_sq <= radius**2;
     }
 
-    function detectShadowPolygons(overlays) {
-        const adj = new Map();
-        const pointMap = new Map();
-        const pointPrecision = 1; // Snap to nearest pixel
-
-        function getPointId(p) {
-            const x = Math.round(p.x / pointPrecision) * pointPrecision;
-            const y = Math.round(p.y / pointPrecision) * pointPrecision;
-            return `${x},${y}`;
-        }
-
-        // 1. Build Graph from wall and non-open door segments
-        overlays.forEach(overlay => {
-            if ((overlay.type === 'wall' || (overlay.type === 'door' && !overlay.isOpen)) && overlay.points.length > 1) {
-                for (let i = 0; i < overlay.points.length - 1; i++) {
-                    const p1 = overlay.points[i];
-                    const p2 = overlay.points[i+1];
-                    const p1Id = getPointId(p1);
-                    const p2Id = getPointId(p2);
-
-                    if (!pointMap.has(p1Id)) {
-                        pointMap.set(p1Id, { x: p1.x, y: p1.y });
-                        adj.set(p1Id, []);
-                    }
-                    if (!pointMap.has(p2Id)) {
-                        pointMap.set(p2Id, { x: p2.x, y: p2.y });
-                        adj.set(p2Id, []);
-                    }
-
-                    adj.get(p1Id).push(p2Id);
-                    adj.get(p2Id).push(p1Id);
-                }
-            }
-        });
-
-        const polygons = [];
-        const visitedNodes = new Set();
-
-        // 2. Find Cycles (simple DFS-based approach)
-        for (const startNodeId of adj.keys()) {
-            if (!visitedNodes.has(startNodeId)) {
-                const stack = [[startNodeId, null, [startNodeId]]]; // [current, parent, path]
-
-                while (stack.length > 0) {
-                    const [currentNodeId, parentNodeId, path] = stack.pop();
-                    visitedNodes.add(currentNodeId);
-
-                    for (const neighborId of adj.get(currentNodeId)) {
-                        if (neighborId === parentNodeId) {
-                            continue; // Don't go immediately back
-                        }
-
-                        const existingPathIndex = path.indexOf(neighborId);
-
-                        if (existingPathIndex !== -1) {
-                            // Cycle detected
-                            const cyclePath = path.slice(existingPathIndex);
-                            const polygonPoints = cyclePath.map(id => pointMap.get(id));
-
-                            // Basic check to avoid adding the same polygon twice in reverse
-                            const sortedCycleIds = cyclePath.sort().join(',');
-                            if (!polygons.some(p => p.sortedIds === sortedCycleIds)) {
-                                polygons.push({ points: polygonPoints, sortedIds: sortedCycleIds });
-                            }
-                        } else {
-                            stack.push([neighborId, currentNodeId, [...path, neighborId]]);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Return just the points array for each polygon
-        return polygons.map(p => p.points);
-    }
-
-
     function handleMouseMoveOnCanvas(event) {
         if (!currentMapDisplayData.img || !hoverLabel) return;
 
@@ -1959,7 +1860,7 @@ function drawCurrentWall() {
             btnDrawDoors.classList.remove('active');
             btnEraseShadows.classList.remove('active');
             drawingCanvas.style.pointerEvents = 'auto';
-            dmCanvas.style.cursor = 'default';
+            dmCanvas.style.cursor = 'crosshair';
         });
     }
 
@@ -1972,7 +1873,7 @@ function drawCurrentWall() {
             btnDrawWalls.classList.remove('active');
             btnEraseShadows.classList.remove('active');
             drawingCanvas.style.pointerEvents = 'auto';
-            dmCanvas.style.cursor = 'default';
+            dmCanvas.style.cursor = 'crosshair';
         });
     }
 
@@ -3455,16 +3356,13 @@ function drawCurrentWall() {
                                 width: dmCanvas.width / transform.scale,
                                 height: dmCanvas.height / transform.scale
                             };
-                        const shadowPolygons = detectShadowPolygons(mapData.overlays);
-
                             playerWindow.postMessage({
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
                                 overlays: JSON.parse(JSON.stringify(visibleOverlays)),
-                            shadowPolygons: JSON.parse(JSON.stringify(shadowPolygons)),
                                 viewRectangle: viewRectangle
                             }, '*');
-                        console.log(`Sent map "${mapFileName}", ${visibleOverlays.length} visible overlays, and ${shadowPolygons.length} shadow polygons to player view.`);
+                            console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
                         };
                         reader.onerror = () => {
                             console.error(`Error converting map "${mapFileName}" to data URL for player view.`);

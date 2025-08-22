@@ -86,7 +86,6 @@ function animateSlideshow() {
 
 let currentMapImage = null;
 let currentOverlays = [];
-let currentShadowPolygons = [];
 let initiativeTokens = [];
 let currentMapTransform = { scale: 1, originX: 0, originY: 0 };
 const imageCache = new Map();
@@ -128,9 +127,6 @@ function drawMapAndOverlays() {
     pCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
 
     pCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
-
-    // Draw solid black shadow polygons underneath other overlays
-    drawShadowPolygons_PlayerView(currentShadowPolygons);
 
     drawOverlays_PlayerView(currentOverlays);
 
@@ -241,26 +237,6 @@ function drawOverlays_PlayerView(overlays) {
     // The main drawMapAndOverlays function now handles drawing tokens.
 }
 
-function drawShadowPolygons_PlayerView(polygons) {
-    if (!pCtx || !polygons || polygons.length === 0) return;
-
-    pCtx.fillStyle = 'rgba(0, 0, 0, 1)'; // Solid black for player view
-    polygons.forEach(polygon => {
-        pCtx.beginPath();
-        polygon.forEach((point, index) => {
-            const canvasX = point.x;
-            const canvasY = point.y;
-            if (index === 0) {
-                pCtx.moveTo(canvasX, canvasY);
-            } else {
-                pCtx.lineTo(canvasX, canvasY);
-            }
-        });
-        pCtx.closePath();
-        pCtx.fill();
-    });
-}
-
 window.addEventListener('message', (event) => {
     // Basic security: check origin if DM view is on a different domain in production.
     // Example: if (event.origin !== "https://your-dm-view-domain.com") return;
@@ -301,7 +277,6 @@ window.addEventListener('message', (event) => {
                     img.onload = () => {
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
-                        currentShadowPolygons = data.shadowPolygons || [];
                         if (data.viewRectangle) {
                             const viewRect = data.viewRectangle;
                             const hScale = playerCanvas.width / viewRect.width;
