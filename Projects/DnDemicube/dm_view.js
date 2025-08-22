@@ -161,6 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyBeatsTab = document.getElementById('tab-story-beats');
     const modifyQuotesButton = document.getElementById('modify-quotes-button');
     const viewStoryTreeButton = document.getElementById('view-story-tree-button');
+    const automationButton = document.getElementById('automation-button');
+    const automationContainer = document.getElementById('automation-container');
     const storyTreeContainer = document.getElementById('canvas-container');
     const storyTreeCanvas = document.getElementById('quest-canvas');
     const storyTreeCardContainer = document.getElementById('card-container');
@@ -4162,6 +4164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (characterSheetContainer) characterSheetContainer.style.display = 'none';
         if (storyTreeContainer) storyTreeContainer.style.display = 'none';
         if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
+        if (automationContainer) automationContainer.style.display = 'none';
 
         // Toggle active state for tab buttons and sidebar content
         tabButtons.forEach(btn => {
@@ -6658,6 +6661,19 @@ function displayToast(messageElement) {
     if (viewStoryTreeButton) {
         viewStoryTreeButton.addEventListener('click', () => {
             switchTab('tab-story-beats');
+        });
+    }
+
+    if (automationButton) {
+        automationButton.addEventListener('click', () => {
+            // Hide all other main content containers
+            if (mapContainer) mapContainer.style.display = 'none';
+            if (noteEditorContainer) noteEditorContainer.style.display = 'none';
+            if (characterSheetContainer) characterSheetContainer.style.display = 'none';
+            if (storyTreeContainer) storyTreeContainer.style.display = 'none';
+            if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
+            // Show the automation container
+            if (automationContainer) automationContainer.style.display = 'flex';
         });
     }
 

@@ -489,6 +489,41 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+/* Automation View Styles */
+#automation-container {
+    display: flex;
+    flex-grow: 1;
+    height: 100%;
+}
+
+#modules-sidebar {
+    width: 200px;
+    background-color: #20262d;
+    border-right: 1px solid #3f4c5a;
+}
+
+#automation-canvas-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    padding: 10px;
+}
+
+#automation-canvas {
+    width: 33%;
+    height: 100%;
+    background-color: #2a3138;
+    border: 1px solid #3f4c5a;
+}
+
+#details-sidebar {
+    width: 200px;
+    background-color: #20262d;
+    border-left: 1px solid #3f4c5a;
+}
+
 .quest-footer-card {
     padding: 8px 12px;
     background-color: #3a4f6a;
