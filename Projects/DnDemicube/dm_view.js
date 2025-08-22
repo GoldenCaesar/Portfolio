@@ -7640,9 +7640,17 @@ function displayToast(messageElement) {
                 <p>Difficulty: ${difficultyStars}</p>
             `;
 
-            card.addEventListener('click', () => {
+            card.addEventListener('click', (event) => {
+                event.stopPropagation(); // Prevent the click from bubbling up to the document listener
+
+                const listContainer = event.currentTarget.parentNode;
+                // Remove 'selected' from all sibling cards
+                listContainer.querySelectorAll('.quest-footer-card').forEach(c => c.classList.remove('selected'));
+                // Add 'selected' to the clicked card
+                event.currentTarget.classList.add('selected');
+
                 selectedFooterQuestId = quest.id;
-                renderActiveQuestsInFooter(); // Re-render both panels
+                renderActiveQuestDetailsInFooter(quest.id);
             });
 
             activeQuestsList.appendChild(card);
@@ -7745,57 +7753,58 @@ function displayToast(messageElement) {
             });
         });
 
-        // --- Successor Quests Logic ---
-        const successorQuestsContainer = document.createElement('div');
-        successorQuestsContainer.className = 'successor-quests-container';
+        // --- Parent Quests Logic ---
+        const parentQuestsContainer = document.createElement('div');
+        parentQuestsContainer.className = 'successor-quests-container'; // Keep class for styling
 
-        let successorHtml = `<h4>Successor Quests</h4>`;
-        const successorQuests = quests.filter(q => q.parentIds.includes(quest.id));
+        let parentHtml = `<h4>Parent Quests</h4>`;
+        // Find quests that are parents of the current quest
+        const parentQuests = quests.filter(p => quest.parentIds.includes(p.id));
 
-        if (successorQuests.length > 0) {
-            successorQuests.forEach(succQuest => {
-                const difficultyStars = ('★'.repeat(succQuest.difficulty || 0)) + ('☆'.repeat(5 - (succQuest.difficulty || 0)));
-                const startingTriggerText = succQuest.startingTriggers && succQuest.startingTriggers.length > 0 ? succQuest.startingTriggers[0].text : 'No trigger specified';
-                successorHtml += `
-                    <div class="quest-footer-card successor-quest-card" data-successor-quest-id="${succQuest.id}">
-                        <h4>${succQuest.name}</h4>
-                        <p>Duration: ${succQuest.storyDuration || 'N/A'} | Difficulty: ${difficultyStars}</p>
+        if (parentQuests.length > 0) {
+            parentQuests.forEach(pQuest => {
+                const difficultyStars = ('★'.repeat(pQuest.difficulty || 0)) + ('☆'.repeat(5 - (pQuest.difficulty || 0)));
+                const startingTriggerText = pQuest.startingTriggers && pQuest.startingTriggers.length > 0 ? pQuest.startingTriggers[0].text : 'No trigger specified';
+                parentHtml += `
+                    <div class="quest-footer-card parent-quest-card" data-parent-quest-id="${pQuest.id}">
+                        <h4>${pQuest.name}</h4>
+                        <p>Duration: ${pQuest.storyDuration || 'N/A'} | Difficulty: ${difficultyStars}</p>
                         <p style="font-size: 0.8em; font-style: italic;">Trigger: ${startingTriggerText}</p>
                     </div>
                 `;
             });
         } else {
-            successorHtml += `<p class="footer-placeholder">No successor quests defined.</p>`;
+            parentHtml += `<p class="footer-placeholder">No parent quests defined.</p>`;
         }
-        successorQuestsContainer.innerHTML = successorHtml;
-        detailsContainer.appendChild(successorQuestsContainer);
+        parentQuestsContainer.innerHTML = parentHtml;
+        detailsContainer.appendChild(parentQuestsContainer);
 
-        // Add event listeners for successor quest cards
-        detailsContainer.querySelectorAll('.successor-quest-card').forEach(card => {
+        // Add event listeners for parent quest cards
+        detailsContainer.querySelectorAll('.parent-quest-card').forEach(card => {
             card.addEventListener('click', (event) => {
-                const successorQuestId = parseInt(event.currentTarget.dataset.successorQuestId, 10);
+                const clickedParentQuestId = parseInt(event.currentTarget.dataset.parentQuestId, 10);
                 const currentQuestId = quest.id;
 
-                const successorQuest = quests.find(q => q.id === successorQuestId);
+                const clickedParentQuest = quests.find(q => q.id === clickedParentQuestId);
                 const currentQuest = quests.find(q => q.id === currentQuestId);
 
-                if (successorQuest && currentQuest) {
-                    // Update statuses
+                if (clickedParentQuest && currentQuest) {
+                    // Update statuses as per user's logic
                     currentQuest.questStatus = 'Completed';
-                    successorQuest.questStatus = 'Active';
+                    clickedParentQuest.questStatus = 'Active';
 
-                    // Make parents of the new active quest available
-                    if (successorQuest.parentIds && successorQuest.parentIds.length > 0) {
-                        successorQuest.parentIds.forEach(parentId => {
-                            const parentQuest = quests.find(q => q.id === parentId);
-                            if (parentQuest) {
-                                parentQuest.questStatus = 'Available';
+                    // Make parents of the new active quest ("Available")
+                    if (clickedParentQuest.parentIds && clickedParentQuest.parentIds.length > 0) {
+                        clickedParentQuest.parentIds.forEach(parentId => {
+                            const parentOfNewActive = quests.find(q => q.id === parentId);
+                            if (parentOfNewActive) {
+                                parentOfNewActive.questStatus = 'Available';
                             }
                         });
                     }
 
                     // Set the new quest as selected and re-render everything
-                    selectedFooterQuestId = successorQuest.id;
+                    selectedFooterQuestId = clickedParentQuest.id;
                     renderActiveQuestsInFooter();
                 }
             });
