@@ -1181,9 +1181,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (overlay.type === 'door' && overlay.points) {
                 if (isPlayerViewContext) return;
                 drawingCtx.beginPath();
-                drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+                drawingCtx.strokeStyle = overlay.isOpen ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)';
                 drawingCtx.lineWidth = 5;
                 drawingCtx.lineCap = 'round';
+                if (overlay.isOpen) {
+                    drawingCtx.setLineDash([10, 10]);
+                }
                 const p1 = overlay.points[0];
                 const p2 = overlay.points[1];
                 const p1CanvasX = (p1.x * scale) + originX;
@@ -1193,6 +1196,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawingCtx.moveTo(p1CanvasX, p1CanvasY);
                 drawingCtx.lineTo(p2CanvasX, p2CanvasY);
                 drawingCtx.stroke();
+                drawingCtx.setLineDash([]); // Reset line dash
             }
             });
         }
@@ -1260,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
-        const shadowLines = mapData.overlays.filter(o => o.type === 'wall' || o.type === 'door');
+        const shadowLines = mapData.overlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
 
         const shadowCtx = shadowCanvas.getContext('2d');
         shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
@@ -1409,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mapData.overlays.push(newWall);
         } else if (activeShadowTool === 'door') {
             if (lineStartPoint) {
-                const newDoor = { type: 'door', points: [lineStartPoint, {x: mouseX, y: mouseY}] };
+                const newDoor = { type: 'door', points: [lineStartPoint, {x: mouseX, y: mouseY}], isOpen: false };
                 mapData.overlays.push(newDoor);
                 lineStartPoint = null;
                 drawOverlays(mapData.overlays);
@@ -1741,6 +1745,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayMapOnCanvas(selectedMapFileName);
                 sendMapToPlayerView(selectedMapFileName);
                 return;
+            } else if (overlay.type === 'door' && isPointOnDoor(imageCoords, overlay)) {
+                overlay.isOpen = !overlay.isOpen;
+                displayMapOnCanvas(selectedMapFileName);
+                sendMapToPlayerView(selectedMapFileName);
+                return;
             } else if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
                     console.log("Clicked on child map link:", overlay);
                     const childMapName = overlay.linkedMapName;
@@ -1848,6 +1857,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const dy = point.y - token.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return distance <= tokenRadius;
+    }
+
+    function isPointOnDoor(point, doorOverlay) {
+        const p1 = doorOverlay.points[0];
+        const p2 = doorOverlay.points[1];
+        const { x, y } = point;
+
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+
+        if (dx === 0 && dy === 0) return false;
+
+        const t = ((x - p1.x) * dx + (y - p1.y) * dy) / (dx * dx + dy * dy);
+
+        let closestX, closestY;
+        if (t < 0) {
+            closestX = p1.x;
+            closestY = p1.y;
+        } else if (t > 1) {
+            closestX = p2.x;
+            closestY = p2.y;
+        } else {
+            closestX = p1.x + t * dx;
+            closestY = p1.y + t * dy;
+        }
+
+        const distance = Math.sqrt((x - closestX)**2 + (y - closestY)**2);
+
+        const clickThreshold = 5 / currentMapDisplayData.scale;
+        return distance < clickThreshold;
     }
 
 
