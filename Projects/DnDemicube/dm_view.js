@@ -7748,6 +7748,108 @@ function displayToast(messageElement) {
                         placeholder.className = 'footer-placeholder';
                         stepsContainer.appendChild(placeholder);
                     }
+
+                    // Render Success Triggers
+                    const successTriggersTitle = document.createElement('h4');
+                    successTriggersTitle.textContent = 'Success Triggers';
+                    stepsContainer.appendChild(successTriggersTitle);
+
+                    if (quest.successTriggers && quest.successTriggers.length > 0) {
+                        const successList = document.createElement('ul');
+                        successList.className = 'quest-triggers-list';
+                        quest.successTriggers.forEach(trigger => {
+                            const listItem = document.createElement('li');
+                            listItem.textContent = trigger.text;
+                            successList.appendChild(listItem);
+                        });
+                        stepsContainer.appendChild(successList);
+                    } else {
+                        const placeholder = document.createElement('p');
+                        placeholder.textContent = 'No success triggers.';
+                        placeholder.className = 'footer-placeholder';
+                        stepsContainer.appendChild(placeholder);
+                    }
+
+                    // Render Failure Triggers
+                    const failureTriggersTitle = document.createElement('h4');
+                    failureTriggersTitle.textContent = 'Failure Triggers';
+                    stepsContainer.appendChild(failureTriggersTitle);
+
+                    if (quest.failureTriggers && quest.failureTriggers.length > 0) {
+                        const failureList = document.createElement('ul');
+                        failureList.className = 'quest-triggers-list';
+                        quest.failureTriggers.forEach(trigger => {
+                            const listItem = document.createElement('li');
+                            listItem.textContent = trigger.text;
+                            failureList.appendChild(listItem);
+                        });
+                        stepsContainer.appendChild(failureList);
+                    } else {
+                        const placeholder = document.createElement('p');
+                        placeholder.textContent = 'No failure triggers.';
+                        placeholder.className = 'footer-placeholder';
+                        stepsContainer.appendChild(placeholder);
+                    }
+
+                    // Render Parent Quests
+                    const parentQuestsTitle = document.createElement('h4');
+                    parentQuestsTitle.textContent = 'Parent Quests';
+                    stepsContainer.appendChild(parentQuestsTitle);
+
+                    const parentQuests = quests.filter(q => quest.parentIds.includes(q.id));
+
+                    if (parentQuests.length > 0) {
+                        parentQuests.forEach(parentQuest => {
+                            const button = document.createElement('button');
+                            button.textContent = parentQuest.name;
+                            button.className = 'parent-quest-button';
+                            button.dataset.parentQuestId = parentQuest.id;
+                            button.dataset.currentQuestId = quest.id;
+                            stepsContainer.appendChild(button);
+
+                            if (parentQuest.startingTriggers && parentQuest.startingTriggers.length > 0) {
+                                const triggerList = document.createElement('ul');
+                                triggerList.className = 'quest-triggers-list';
+                                parentQuest.startingTriggers.forEach(trigger => {
+                                    const listItem = document.createElement('li');
+                                    listItem.textContent = trigger.text;
+                                    triggerList.appendChild(listItem);
+                                });
+                                stepsContainer.appendChild(triggerList);
+                            }
+                        });
+                    } else {
+                        const placeholder = document.createElement('p');
+                        placeholder.textContent = 'No parent quests.';
+                        placeholder.className = 'footer-placeholder';
+                        stepsContainer.appendChild(placeholder);
+                    }
+                }
+            }
+        });
+    }
+
+    const activeQuestStepsContainer = document.getElementById('footer-quests-center');
+    if (activeQuestStepsContainer) {
+        activeQuestStepsContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('parent-quest-button')) {
+                const parentQuestId = parseInt(event.target.dataset.parentQuestId, 10);
+                const currentQuestId = parseInt(event.target.dataset.currentQuestId, 10);
+
+                const parentQuest = quests.find(q => q.id === parentQuestId);
+                const currentQuest = quests.find(q => q.id === currentQuestId);
+
+                if (parentQuest && currentQuest) {
+                    parentQuest.questStatus = 'Active';
+                    currentQuest.questStatus = 'Completed';
+
+                    renderQuestFooter();
+
+                    const activeQuestsContainer = document.getElementById('footer-quests-left');
+                    const newActiveCard = activeQuestsContainer.querySelector(`.quest-footer-card[data-quest-id="${parentQuestId}"]`);
+                    if (newActiveCard) {
+                        newActiveCard.click();
+                    }
                 }
             }
         });

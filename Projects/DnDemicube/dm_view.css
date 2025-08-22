@@ -510,6 +510,17 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     padding: 5px 0;
 }
 
+.quest-triggers-list {
+    list-style: disc;
+    padding-left: 20px;
+    margin: 0 0 10px 0;
+}
+
+.parent-quest-button {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
 /* Footer Tabs */
 .footer-tabs {
     display: flex;
