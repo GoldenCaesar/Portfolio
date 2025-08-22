@@ -49,17 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const uploadMapsInput = document.getElementById('upload-maps-input');
     const mapsList = document.getElementById('maps-list');
-    const createMapButton = document.getElementById('create-map-button');
-    const mapCreationContainer = document.getElementById('map-creation-container');
-    const mapCreationCanvas = document.getElementById('map-creation-canvas');
-    const uploadOrChooseBgButton = document.getElementById('upload-or-choose-bg-button');
-    const createMapModal = document.getElementById('create-map-modal');
-    const createMapModalCloseButton = document.getElementById('create-map-modal-close-button');
-    const uploadNewImageButton = document.getElementById('upload-new-image-button');
-    const chooseExistingImageButton = document.getElementById('choose-existing-image-button');
-    const newMapImageUpload = document.getElementById('new-map-image-upload');
-    const existingMapsSelectionContainer = document.getElementById('existing-maps-selection-container');
-    const existingMapsListForCreation = document.getElementById('existing-maps-list-for-creation');
     const openPlayerViewButton = document.getElementById('open-player-view-button'); // Added for player view
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
@@ -579,20 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
-        if (mapCreationCanvas && mapCreationContainer.style.display !== 'none') {
-            const style = window.getComputedStyle(mapCreationContainer);
-            const paddingLeft = parseFloat(style.paddingLeft) || 0;
-            const paddingRight = parseFloat(style.paddingRight) || 0;
-            const paddingTop = parseFloat(style.paddingTop) || 0;
-            const paddingBottom = parseFloat(style.paddingBottom) || 0;
-
-            const canvasWidth = mapCreationContainer.clientWidth - paddingLeft - paddingRight;
-            const canvasHeight = mapCreationContainer.clientHeight - paddingTop - paddingBottom;
-
-            mapCreationCanvas.width = canvasWidth;
-            mapCreationCanvas.height = canvasHeight;
-        }
-
         if (dmCanvas && drawingCanvas && mapContainer) {
             const style = window.getComputedStyle(mapContainer);
             const paddingLeft = parseFloat(style.paddingLeft) || 0;
@@ -2087,106 +2062,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-
-    if (createMapButton) {
-        createMapButton.addEventListener('click', () => {
-            mapContainer.style.display = 'none';
-            mapCreationContainer.style.display = 'block';
-            resizeCanvas();
-        });
-    }
-
-    if (uploadOrChooseBgButton) {
-        uploadOrChooseBgButton.addEventListener('click', () => {
-            createMapModal.style.display = 'block';
-        });
-    }
-
-    if (createMapModalCloseButton) {
-        createMapModalCloseButton.addEventListener('click', () => {
-            createMapModal.style.display = 'none';
-        });
-    }
-
-    if (uploadNewImageButton) {
-        uploadNewImageButton.addEventListener('click', () => {
-            newMapImageUpload.click();
-        });
-    }
-
-    if (newMapImageUpload) {
-        newMapImageUpload.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                handleNewMapCreation(file.name, URL.createObjectURL(file));
-                createMapModal.style.display = 'none';
-            }
-        });
-    }
-
-    if (chooseExistingImageButton) {
-        chooseExistingImageButton.addEventListener('click', () => {
-            existingMapsListForCreation.innerHTML = '';
-            detailedMapData.forEach((mapData, mapName) => {
-                const listItem = document.createElement('li');
-                listItem.textContent = mapName;
-                listItem.dataset.mapName = mapName;
-                listItem.style.cursor = 'pointer';
-                existingMapsListForCreation.appendChild(listItem);
-            });
-            existingMapsSelectionContainer.style.display = 'block';
-        });
-    }
-
-    if (existingMapsListForCreation) {
-        existingMapsListForCreation.addEventListener('click', (event) => {
-            const mapName = event.target.dataset.mapName;
-            if (mapName) {
-                const mapData = detailedMapData.get(mapName);
-                if (mapData) {
-                    handleNewMapCreation(mapName, mapData.url, true);
-                    createMapModal.style.display = 'none';
-                    existingMapsSelectionContainer.style.display = 'none';
-                }
-            }
-        });
-    }
-
-    function handleNewMapCreation(baseName, url, isFromExisting = false) {
-        let newMapName = isFromExisting ? `${baseName} (copy)` : baseName;
-        let counter = 1;
-        while (detailedMapData.has(newMapName)) {
-            newMapName = isFromExisting ? `${baseName} (copy ${counter})` : `${baseName.split('.')[0]} (${counter}).${baseName.split('.')[1] || ''}`;
-            counter++;
-        }
-
-        detailedMapData.set(newMapName, {
-            url: url,
-            name: newMapName,
-            overlays: [],
-            mode: 'edit',
-            transform: { scale: 1, originX: 0, originY: 0, initialized: false }
-        });
-        displayedFileNames.add(newMapName);
-        renderMapsList();
-
-        mapCreationContainer.style.display = 'none';
-        mapContainer.style.display = 'block';
-
-        // Select and display the new map
-        selectedMapFileName = newMapName;
-        clearAllSelections();
-        const mapItems = mapsList.querySelectorAll('li');
-        mapItems.forEach(li => {
-            if (li.dataset.fileName === newMapName) {
-                li.classList.add('selected-map-item');
-            }
-        });
-        displayMapOnCanvas(newMapName);
-        updateButtonStates();
-        modeToggleSwitch.checked = false;
-        modeToggleSwitch.disabled = false;
-    }
 
     if (modeToggleSwitch) {
         modeToggleSwitch.addEventListener('change', () => {
