@@ -1381,6 +1381,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const mapData = detailedMapData.get(selectedMapFileName);
         if (!mapData) return;
 
+        if (activeShadowTool) {
+            e.stopPropagation();
+        }
+
         if (!activeShadowTool) {
             const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
             for (let i = lightSources.length - 1; i >= 0; i--) {
@@ -1989,6 +1993,11 @@ document.addEventListener('DOMContentLoaded', () => {
         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
         drawingCanvas.style.pointerEvents = 'none';
         dmCanvas.style.cursor = 'auto';
+
+        if (activeShadowTool) {
+            setShadowTool(null);
+        }
+
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
         selectedCharacterForContextMenu = null;
@@ -2524,6 +2533,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayMapOnCanvas(selectedMapFileName);
                 updateButtonStates();
                 if (selectedMapData.mode === 'view') {
+                    if (activeShadowTool) {
+                        setShadowTool(null);
+                    }
                     sendMapToPlayerView(selectedMapFileName);
                     toggleShadowAnimation(true);
                 } else {
