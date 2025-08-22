@@ -548,20 +548,30 @@ window.addEventListener('message', (event) => {
                 const diceDialogueRecord = document.getElementById('dice-dialogue-record');
                 if (diceDialogueRecord) {
                     diceDialogueRecord.style.display = data.isOpen ? 'flex' : 'none';
-                    if(data.isOpen) {
+                    if (data.isOpen) {
                         diceDialogueRecord.classList.add('persistent-log');
-                        diceDialogueRecord.innerHTML = data.content;
-                         if (!document.getElementById('action-log-minimize-button')) {
+                        diceDialogueRecord.innerHTML = ''; // Clear content
+
+                        if (!diceDialogueRecord.querySelector('.overlay-minimize-button')) {
                             const minimizeButton = document.createElement('button');
-                            minimizeButton.id = 'action-log-minimize-button';
+                            minimizeButton.className = 'overlay-minimize-button';
                             minimizeButton.textContent = '—';
                             minimizeButton.onclick = () => {
                                 diceDialogueRecord.classList.remove('persistent-log');
                                 diceDialogueRecord.style.display = 'none';
-                                const btn = document.getElementById('action-log-minimize-button');
-                                if(btn) btn.remove();
                             };
                             diceDialogueRecord.prepend(minimizeButton);
+                        }
+
+                        if (data.history) {
+                            data.history.forEach(logEntry => {
+                                const card = createLogCard(logEntry);
+                                if (diceDialogueRecord.firstChild) {
+                                    diceDialogueRecord.insertBefore(card, diceDialogueRecord.firstChild.nextSibling);
+                                } else {
+                                    diceDialogueRecord.appendChild(card);
+                                }
+                            });
                         }
                     } else {
                         diceDialogueRecord.classList.remove('persistent-log');

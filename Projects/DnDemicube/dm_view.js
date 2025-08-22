@@ -587,6 +587,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return content.replace(/\[dm\](.*?)\[\/dm\]/gs, '');
     }
 
+    function censorCharacterDataForPlayerView(character) {
+        const rootCharacter = charactersData.find(c => c.id === character.id || c.id === character.characterId);
+        const isVisible = rootCharacter ? rootCharacter.isDetailsVisible : (character.isDetailsVisible !== false);
+
+        if (isVisible) {
+            return character;
+        }
+
+        const censoredCharacter = JSON.parse(JSON.stringify(character));
+
+        censoredCharacter.name = '???';
+        if ('playerName' in censoredCharacter) {
+            censoredCharacter.playerName = '???';
+        }
+        if ('initials' in censoredCharacter) {
+            censoredCharacter.initials = '??';
+        }
+        if ('portrait' in censoredCharacter) {
+            censoredCharacter.portrait = null;
+        }
+        if (censoredCharacter.sheetData) {
+            const originalSheet = censoredCharacter.sheetData;
+            censoredCharacter.sheetData = {
+                char_name: '???',
+                player_name: '???',
+                hp_current: '??',
+                hp_max: '??',
+                ac: '??',
+            };
+            for (const key in originalSheet) {
+                if (censoredCharacter.sheetData[key] === undefined) {
+                    censoredCharacter.sheetData[key] = '??';
+                }
+            }
+        }
+
+        return censoredCharacter;
+    }
+
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
         if (dmCanvas && shadowCanvas && drawingCanvas && mapContainer) {
@@ -3684,31 +3723,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function sendActionLogStateToPlayerView(isOpen, content) {
+    function sendActionLogStateToPlayerView(isOpen) {
         if (playerWindow && !playerWindow.closed) {
-            playerWindow.postMessage({ type: 'actionLogState', isOpen: isOpen, content: content }, '*');
+            const censoredHistory = diceRollHistory.map(logEntry => {
+                let censoredEntry = { ...logEntry };
+                if (censoredEntry.characterId) {
+                    const character = charactersData.find(c => c.id === censoredEntry.characterId);
+                    if (character && !character.isDetailsVisible) {
+                        censoredEntry.characterName = '???';
+                        censoredEntry.playerName = '???';
+                        censoredEntry.characterPortrait = null;
+                        censoredEntry.characterInitials = '??';
+                    }
+                }
+                return censoredEntry;
+            });
+            playerWindow.postMessage({ type: 'actionLogState', isOpen: isOpen, history: censoredHistory }, '*');
         }
     }
 
     function sendToastToPlayerView(rollData) {
         if (playerWindow && !playerWindow.closed) {
-            playerWindow.postMessage({ type: 'toast', rollData: rollData }, '*');
+            let censoredRollData = JSON.parse(JSON.stringify(rollData));
+            if (censoredRollData.characterId) {
+                const character = charactersData.find(c => c.id === censoredRollData.characterId);
+                if (character && !character.isDetailsVisible) {
+                    censoredRollData.characterName = '???';
+                    censoredRollData.playerName = '???';
+                    censoredRollData.characterPortrait = null;
+                    censoredRollData.characterInitials = '??';
+                }
+            }
+            playerWindow.postMessage({ type: 'toast', rollData: censoredRollData }, '*');
         }
     }
 
     function sendInitiativeDataToPlayerView() {
         if (playerWindow && !playerWindow.closed) {
-            // Cloning the character objects to avoid issues with circular references if any
-            const clonedActiveInitiative = JSON.parse(JSON.stringify(activeInitiative));
-            const clonedInitiativeTokens = JSON.parse(JSON.stringify(initiativeTokens));
+            const censoredActiveInitiative = activeInitiative.map(censorCharacterDataForPlayerView);
+            const censoredInitiativeTokens = initiativeTokens.map(censorCharacterDataForPlayerView);
 
             playerWindow.postMessage({
                 type: 'initiativeDataUpdate',
-                activeInitiative: clonedActiveInitiative,
+                activeInitiative: censoredActiveInitiative,
                 initiativeTurn: initiativeTurn,
                 initiativeRound: initiativeRound,
                 gameTime: gameTime,
-                initiativeTokens: clonedInitiativeTokens
+                initiativeTokens: censoredInitiativeTokens
             }, '*');
         }
     }
@@ -3716,8 +3777,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function sendTokenStatBlockStateToPlayerView(show, token, position) {
         if (playerWindow && !playerWindow.closed) {
             const character = token ? activeInitiative.find(c => c.uniqueId === token.uniqueId) : null;
-            const clonedCharacter = character ? JSON.parse(JSON.stringify(character)) : null;
-            playerWindow.postMessage({ type: 'tokenStatBlockState', show: show, character: clonedCharacter, position: position }, '*');
+            let characterToSend = null;
+            if (character) {
+                characterToSend = censorCharacterDataForPlayerView(character);
+            }
+            playerWindow.postMessage({ type: 'tokenStatBlockState', show: show, character: characterToSend, position: position }, '*');
         }
     }
 
@@ -4003,6 +4067,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 } else {
                     addLogEntry({
+                        characterId: character.id,
                         characterName: character.name,
                         playerName: character.sheetData.player_name || 'DM',
                         roll: detailsMessage,
@@ -5617,6 +5682,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const total = d20Roll + parseInt(modifier);
 
             const rollData = {
+                characterId: selectedCharacterId,
                 characterName: characterName,
                 playerName: playerName,
                 roll: `d20(${d20Roll}) + ${parseInt(modifier)} for ${rollName}`,
@@ -5900,7 +5966,7 @@ function displayToast(messageElement) {
     sendToastToPlayerView(data);
 
         if (diceDialogueRecord.classList.contains('persistent-log')) {
-            sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+        sendActionLogStateToPlayerView(true);
         }
     }
 
@@ -6264,7 +6330,7 @@ function displayToast(messageElement) {
                                     content.prepend(messageElement);
                                 });
                             }
-                            sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                            sendActionLogStateToPlayerView(true);
                         }
                         break;
                 }
@@ -6302,6 +6368,7 @@ function displayToast(messageElement) {
         const characterInitials = getInitials(characterName);
 
         const rollData = {
+            characterId: character.id,
             characterName: characterName,
             playerName: playerName,
             roll: `d20(${roll}) + ${initiativeBonus} for Initiative`,
@@ -6885,7 +6952,7 @@ function displayToast(messageElement) {
                     diceRollHistory.splice(historyIndex, 1);
                     messageElement.remove();
                     if (diceDialogueRecord.classList.contains('persistent-log')) {
-                       sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                       sendActionLogStateToPlayerView(true);
                     }
                 }
             } else if (target.classList.contains('edit-log')) {
@@ -6921,7 +6988,7 @@ function displayToast(messageElement) {
                 }
 
                 if (diceDialogueRecord.classList.contains('persistent-log')) {
-                   sendActionLogStateToPlayerView(true, diceDialogueRecord.innerHTML);
+                   sendActionLogStateToPlayerView(true);
                 }
             }
         });
