@@ -7482,8 +7482,11 @@ function displayToast(messageElement) {
      * Draws the lines between parent and child quest cards.
      */
     const drawConnections = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // No more save/translate/scale/restore, the transform is on the canvas element
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(originX, originY);
+            ctx.scale(scale, scale);
+
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 3;
         ctx.lineCap = 'round';
@@ -7502,6 +7505,7 @@ function displayToast(messageElement) {
                     });
                 }
             });
+            ctx.restore();
     };
 
     /**
@@ -7634,11 +7638,11 @@ function displayToast(messageElement) {
             card.appendChild(overlay);
 
 
-            // The container is now transformed, so cards are positioned relative to the container's 0,0
-            card.style.left = `${quest.x}px`;
-            card.style.top = `${quest.y}px`;
-            // The scale is also on the container, so individual cards are not scaled.
-            card.style.transform = `translate(-50%, -50%)`;
+            const x = originX + (quest.x * scale);
+            const y = originY + (quest.y * scale);
+            card.style.left = `${x}px`;
+            card.style.top = `${y}px`;
+            card.style.transform = `translate(-50%, -50%) scale(${scale})`;
 
             card.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -8170,22 +8174,18 @@ function displayToast(messageElement) {
             const questToMove = quests.find(q => q.id === selectedQuestId);
             if (questToMove) {
                 const rect = container.getBoundingClientRect();
-                // To calculate the new position in the tree's coordinate space,
-                // we need to account for the container's transform.
                 const newX = (e.clientX - rect.left - originX) / scale;
                 const newY = (e.clientY - rect.top - originY) / scale;
                 questToMove.x = newX;
                 questToMove.y = newY;
-                // We only need to re-render, not change the transform of the container
                 drawConnections();
                 renderCards();
             }
         } else if (isPanning) {
             originX = e.clientX - panStartX;
             originY = e.clientY - panStartY;
-            // Apply the transform directly to the containers for performance
-            canvas.style.transform = `translate(${originX}px, ${originY}px)`;
-            cardContainer.style.transform = `translate(${originX}px, ${originY}px)`;
+            drawConnections();
+            renderCards();
         }
     });
 
@@ -8200,14 +8200,9 @@ function displayToast(messageElement) {
 
         originX = originX - (mouseX - originX) * (newScale / scale - 1);
         originY = originY - (mouseY - originY) * (newScale / scale - 1);
+
         scale = newScale;
-
-        // Apply combined transform for pan and zoom
-        const transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
-        canvas.style.transform = transform;
-        cardContainer.style.transform = transform;
-
-        // Re-render cards to adjust for new scale (e.g., font sizes, etc.)
+        drawConnections();
         renderCards();
     });
 
