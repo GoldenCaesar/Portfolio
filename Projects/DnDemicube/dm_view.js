@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const shadowToolsContainer = document.getElementById('shadow-tools-container');
     const btnDrawWalls = document.getElementById('btn-draw-walls');
     const btnDrawDoors = document.getElementById('btn-draw-doors');
+    const btnEraseShadows = document.getElementById('btn-erase-shadows');
     const btnShadowDone = document.getElementById('btn-shadow-done');
 
     // Token Stat Block Elements
@@ -306,6 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isShadowMode = false;
     let isDrawingWalls = false;
     let isDrawingDoors = false;
+    let isErasing = false;
+    let isEraserDragging = false;
+    let eraserPosition = null;
     let currentWallPoints = [];
     let currentDoorPoints = [];
 
@@ -1192,6 +1196,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDrawingWalls) {
             drawCurrentWall();
         }
+
+        // Draw eraser circle
+        if (isErasing && eraserPosition) {
+            drawEraserCircle();
+        }
     }
 
     const characterPreviewClose = document.getElementById('character-preview-close');
@@ -1621,6 +1630,26 @@ function drawCurrentWall() {
         return distanceSq <= threshold**2;
     }
 
+    function checkLineCircleCollision(p1, p2, circleCenter, radius) {
+        // Check if either endpoint is inside the circle
+        if (Math.sqrt((p1.x - circleCenter.x)**2 + (p1.y - circleCenter.y)**2) <= radius) return true;
+        if (Math.sqrt((p2.x - circleCenter.x)**2 + (p2.y - circleCenter.y)**2) <= radius) return true;
+
+        // Check for intersection with the line segment
+        const len_sq = (p2.x - p1.x)**2 + (p2.y - p1.y)**2;
+        if (len_sq === 0) return false; // Line segment is a point, already checked
+
+        let t = ((circleCenter.x - p1.x) * (p2.x - p1.x) + (circleCenter.y - p1.y) * (p2.y - p1.y)) / len_sq;
+        t = Math.max(0, Math.min(1, t));
+
+        const closestX = p1.x + t * (p2.x - p1.x);
+        const closestY = p1.y + t * (p2.y - p1.y);
+
+        const dist_sq = (closestX - circleCenter.x)**2 + (closestY - circleCenter.y)**2;
+
+        return dist_sq <= radius**2;
+    }
+
     function handleMouseMoveOnCanvas(event) {
         if (!currentMapDisplayData.img || !hoverLabel) return;
 
@@ -1826,8 +1855,10 @@ function drawCurrentWall() {
         btnDrawWalls.addEventListener('click', () => {
             isDrawingWalls = true;
             isDrawingDoors = false;
+            isErasing = false;
             btnDrawWalls.classList.add('active');
             btnDrawDoors.classList.remove('active');
+            btnEraseShadows.classList.remove('active');
             drawingCanvas.style.pointerEvents = 'auto';
             dmCanvas.style.cursor = 'crosshair';
         });
@@ -1837,10 +1868,25 @@ function drawCurrentWall() {
         btnDrawDoors.addEventListener('click', () => {
             isDrawingDoors = true;
             isDrawingWalls = false;
+            isErasing = false;
             btnDrawDoors.classList.add('active');
             btnDrawWalls.classList.remove('active');
+            btnEraseShadows.classList.remove('active');
             drawingCanvas.style.pointerEvents = 'auto';
             dmCanvas.style.cursor = 'crosshair';
+        });
+    }
+
+    if (btnEraseShadows) {
+        btnEraseShadows.addEventListener('click', () => {
+            isErasing = true;
+            isDrawingWalls = false;
+            isDrawingDoors = false;
+            btnEraseShadows.classList.add('active');
+            btnDrawWalls.classList.remove('active');
+            btnDrawDoors.classList.remove('active');
+            drawingCanvas.style.pointerEvents = 'auto';
+            dmCanvas.style.cursor = 'none'; // Hide default cursor for eraser
         });
     }
 
@@ -1851,10 +1897,12 @@ function drawCurrentWall() {
             // reset all shadow drawing states
             isDrawingWalls = false;
             isDrawingDoors = false;
+            isErasing = false;
             currentWallPoints = [];
             currentDoorPoints = [];
             btnDrawWalls.classList.remove('active');
             btnDrawDoors.classList.remove('active');
+            btnEraseShadows.classList.remove('active');
             drawingCanvas.style.pointerEvents = 'none';
             dmCanvas.style.cursor = 'auto';
         });
@@ -2267,6 +2315,12 @@ function drawCurrentWall() {
         mapContainer.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
 
+            if (isErasing) {
+                isEraserDragging = true;
+                e.preventDefault(); // Prevent other actions like panning
+                return;
+            }
+
             const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
             if (!imageCoords) return;
 
@@ -2325,6 +2379,9 @@ function drawCurrentWall() {
 
         mapContainer.addEventListener('mouseup', (e) => {
             if (e.button !== 0) return;
+            if (isErasing) {
+                isEraserDragging = false;
+            }
             isPanning = false;
             mapContainer.style.cursor = 'grab';
         });
@@ -2355,7 +2412,55 @@ function drawCurrentWall() {
             sendMapTransformToPlayerView(transform);
         });
 
+    function drawEraserCircle() {
+        const ctx = drawingCanvas.getContext('2d');
+        const radius = 15; // Eraser radius in pixels
+        ctx.beginPath();
+        ctx.arc(eraserPosition.canvasX, eraserPosition.canvasY, radius, 0, Math.PI * 2, false);
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
         mapContainer.addEventListener('mousemove', (e) => {
+        if (isErasing) {
+            eraserPosition = { canvasX: e.offsetX, canvasY: e.offsetY };
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (selectedMapData) {
+                if (isEraserDragging) {
+                    const eraserImageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+                    if (eraserImageCoords) {
+                        const eraserRadius = 15 / (currentMapDisplayData.scale || 1);
+                        let changed = false;
+
+                        for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                            const overlay = selectedMapData.overlays[i];
+                            let collision = false;
+                            if (overlay.type === 'wall' && overlay.points.length > 1) {
+                                for (let j = 0; j < overlay.points.length - 1; j++) {
+                                    if (checkLineCircleCollision(overlay.points[j], overlay.points[j+1], eraserImageCoords, eraserRadius)) {
+                                        collision = true;
+                                        break;
+                                    }
+                                }
+                            } else if (overlay.type === 'door' && overlay.points.length > 1) {
+                                if (checkLineCircleCollision(overlay.points[0], overlay.points[1], eraserImageCoords, eraserRadius)) {
+                                    collision = true;
+                                }
+                            }
+
+                            if (collision) {
+                                selectedMapData.overlays.splice(i, 1);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+                // Redraw overlays to show the eraser circle and any deletions
+                drawOverlays(selectedMapData.overlays);
+            }
+        }
+
             const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
 
             if (isDraggingToken && draggedToken) {
