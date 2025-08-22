@@ -7782,6 +7782,7 @@ function displayToast(messageElement) {
         // Add event listeners for parent quest cards
         detailsContainer.querySelectorAll('.parent-quest-card').forEach(card => {
             card.addEventListener('click', (event) => {
+                event.stopPropagation(); // Prevent the click from bubbling up and closing the footer
                 const clickedParentQuestId = parseInt(event.currentTarget.dataset.parentQuestId, 10);
                 const currentQuestId = quest.id;
 
