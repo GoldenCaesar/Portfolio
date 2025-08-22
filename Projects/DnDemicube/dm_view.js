@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
             y: 0,
             description: '',
             // New Fields
-            questStatus: 'Unavailable', // Unavailable, Available, Active, Completed, Failed, Abandoned
+            questStatus: 'Active', // Unavailable, Available, Active, Completed, Failed, Abandoned
             questType: ['Main Story'], // Taggable field
             startingTriggers: [], // Now an array of objects: { text: "trigger text", linkedQuestId: null }
             associatedMaps: [], // List of map file names
@@ -2736,7 +2736,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         // New fields for backward compatibility
                         if (quest.questStatus === undefined) {
-                            quest.questStatus = quest.status || 'Unavailable';
+                            quest.questStatus = quest.status || 'Active';
                         }
                         if (quest.questType === undefined) {
                             quest.questType = [];
@@ -2783,7 +2783,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Reset to default state
                     quests = [{
                         id: 1, name: 'Final Quest', parentIds: [], x: 0, y: 0, description: '',
-                        questStatus: 'Unavailable', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
+                        questStatus: 'Active', questType: ['Main Story'], startingTriggers: [], associatedMaps: [],
                         associatedNPCs: [], failureTriggers: [], successTriggers: [],
                         detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
                         storyDuration: '1 Session', difficulty: 3, storySteps: [],
@@ -2827,7 +2827,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMapsList();
         renderNotesList();
         renderCharactersList();
-        renderQuestFooter();
     }
 
     async function loadFromJson(file) {
@@ -3946,76 +3945,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (upIcon) upIcon.style.display = (index === 0 || items.length === 1) ? 'none' : 'inline-block';
             if (downIcon) downIcon.style.display = (index === items.length - 1 || items.length === 1) ? 'none' : 'inline-block';
         });
-    }
-
-    function renderQuestFooter() {
-        const activeQuestsContainer = document.getElementById('footer-quests-left');
-        const availableQuestsContainer = document.getElementById('footer-quests-right');
-        const activeQuestStepsContainer = document.getElementById('footer-quests-center');
-
-        if (!activeQuestsContainer || !availableQuestsContainer || !activeQuestStepsContainer) {
-            console.error("Quest footer containers not found!");
-            return;
-        }
-
-        const selectedQuestCard = activeQuestsContainer.querySelector('.selected');
-        const selectedQuestId = selectedQuestCard ? parseInt(selectedQuestCard.dataset.questId, 10) : null;
-
-        activeQuestsContainer.innerHTML = '<h3>Active Quests</h3>';
-        availableQuestsContainer.innerHTML = '<h3>Available Quests</h3>';
-
-        const activeQuests = quests.filter(q => q.questStatus === 'Active');
-        const availableQuests = quests.filter(q => q.questStatus === 'Available');
-
-        if (activeQuests.length === 0) {
-            const placeholder = document.createElement('p');
-            placeholder.textContent = 'No active quests.';
-            placeholder.className = 'footer-placeholder';
-            activeQuestsContainer.appendChild(placeholder);
-            activeQuestStepsContainer.innerHTML = '<h3>Active Quest Story Steps</h3><p class="footer-placeholder">Select an active quest to see its steps.</p>';
-        } else {
-            activeQuests.forEach(quest => {
-                const card = document.createElement('div');
-                card.className = 'quest-footer-card active-quest-card';
-                card.dataset.questId = quest.id;
-                card.textContent = quest.name;
-                if (quest.id === selectedQuestId) {
-                    card.classList.add('selected');
-                }
-                activeQuestsContainer.appendChild(card);
-            });
-        }
-
-        if (availableQuests.length === 0) {
-            const placeholder = document.createElement('p');
-            placeholder.textContent = 'No available quests.';
-            placeholder.className = 'footer-placeholder';
-            availableQuestsContainer.appendChild(placeholder);
-        } else {
-            availableQuests.forEach(quest => {
-                const card = document.createElement('div');
-                card.className = 'quest-footer-card available-quest-card';
-                card.dataset.questId = quest.id;
-                card.textContent = quest.name;
-                card.addEventListener('click', () => {
-                    const clickedQuest = quests.find(q => q.id === quest.id);
-                    if (clickedQuest) {
-                        clickedQuest.questStatus = 'Active';
-                        renderQuestFooter();
-                        if (document.getElementById('tab-story-beats').classList.contains('active')) {
-                            // This function is not defined here, but in initStoryTree.
-                            // I should probably call initStoryTree() again, or just renderCards().
-                            // renderCards() is what I need.
-                            const storyTreeCardContainer = document.getElementById('card-container');
-                            if(storyTreeCardContainer) {
-                                initStoryTree(); // Re-init to get renderCards()
-                            }
-                        }
-                    }
-                });
-                availableQuestsContainer.appendChild(card);
-            });
-        }
     }
 
     function handleCreateNewNote() {
@@ -6835,12 +6764,7 @@ function displayToast(messageElement) {
             if (quest.id === selectedQuestId) {
                 card.classList.add('selected');
             }
-            card.classList.add(`status-${quest.questStatus.toLowerCase()}`);
             card.dataset.id = quest.id;
-
-            const glowLayer = document.createElement('div');
-            glowLayer.classList.add('card-glow-layer');
-            card.appendChild(glowLayer);
 
             // Bottom layer (map background)
             const background = document.createElement('div');
@@ -7218,7 +7142,6 @@ function displayToast(messageElement) {
             alert('Quest details saved!');
             renderCards(); // Re-render cards to reflect name change
             drawConnections(); // Redraw connections to reflect parentId changes
-            renderQuestFooter();
         });
 
         const addNpcBtn = document.getElementById('add-npc-btn');
@@ -7279,24 +7202,6 @@ function displayToast(messageElement) {
                 e.target.closest('.story-step-row').remove();
             }
         });
-
-            if (storyStepsContainer) {
-                storyStepsContainer.addEventListener('change', (e) => {
-                    if (e.target.classList.contains('story-step-checkbox')) {
-                        const sIndex = parseInt(e.target.closest('.story-step-row').dataset.index, 10);
-                        const questToUpdate = quests.find(q => q.id === activeOverlayCardId);
-
-                        if (questToUpdate && questToUpdate.storySteps[sIndex]) {
-                            questToUpdate.storySteps[sIndex].completed = e.target.checked;
-
-                            const footerCheckbox = document.querySelector(`#footer-quests-center .quest-steps-list input[data-quest-id="${activeOverlayCardId}"][data-step-index="${sIndex}"]`);
-                            if (footerCheckbox) {
-                                footerCheckbox.checked = e.target.checked;
-                            }
-                        }
-                    }
-                });
-            }
 
         // Add/Remove Triggers
         const setupTriggerList = (containerId, buttonId, triggerType) => {
@@ -7686,177 +7591,6 @@ function displayToast(messageElement) {
                 const targetContent = document.getElementById(targetTabId);
                 if (targetContent) {
                     targetContent.classList.add('active');
-                }
-            }
-        });
-    }
-    renderQuestFooter();
-
-    function displayQuestDetailsInFooter(questId) {
-        const quest = quests.find(q => q.id === questId);
-        const activeQuestsContainer = document.getElementById('footer-quests-left');
-
-        const allCards = activeQuestsContainer.querySelectorAll('.quest-footer-card');
-        allCards.forEach(c => c.classList.remove('selected'));
-
-        const cardToSelect = activeQuestsContainer.querySelector(`.quest-footer-card[data-quest-id="${questId}"]`);
-        if (cardToSelect) {
-            cardToSelect.classList.add('selected');
-        }
-
-        if (quest) {
-            const stepsContainer = document.getElementById('footer-quests-center');
-            stepsContainer.innerHTML = '<h3>Active Quest Story Steps</h3>';
-
-            if (quest.storySteps && quest.storySteps.length > 0) {
-                const list = document.createElement('ul');
-                list.className = 'quest-steps-list';
-                quest.storySteps.forEach((step, index) => {
-                    const listItem = document.createElement('li');
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.checked = step.completed;
-                    checkbox.dataset.questId = quest.id;
-                    checkbox.dataset.stepIndex = index;
-
-                    checkbox.addEventListener('change', (e) => {
-                        const qId = parseInt(e.target.dataset.questId, 10);
-                        const sIndex = parseInt(e.target.dataset.stepIndex, 10);
-                        const targetQuest = quests.find(q => q.id === qId);
-                        if (targetQuest && targetQuest.storySteps[sIndex]) {
-                            targetQuest.storySteps[sIndex].completed = e.target.checked;
-
-                            if (storyBeatCardOverlay.style.display === 'flex' && activeOverlayCardId === qId) {
-                                const overlayCheckbox = storyBeatCardOverlay.querySelector(`#quest-story-steps .story-step-row[data-index="${sIndex}"] .story-step-checkbox`);
-                                if (overlayCheckbox) {
-                                    overlayCheckbox.checked = e.target.checked;
-                                }
-                            }
-                        }
-                    });
-
-                    const label = document.createElement('label');
-                    label.textContent = step.text;
-                    label.htmlFor = `quest-step-${quest.id}-${index}`;
-                    checkbox.id = `quest-step-${quest.id}-${index}`;
-
-                    listItem.appendChild(checkbox);
-                    listItem.appendChild(label);
-                    list.appendChild(listItem);
-                });
-                stepsContainer.appendChild(list);
-            } else {
-                const placeholder = document.createElement('p');
-                placeholder.textContent = 'This quest has no steps.';
-                placeholder.className = 'footer-placeholder';
-                stepsContainer.appendChild(placeholder);
-            }
-
-            // Render Success Triggers
-            const successTriggersTitle = document.createElement('h4');
-            successTriggersTitle.textContent = 'Success Triggers';
-            stepsContainer.appendChild(successTriggersTitle);
-
-            if (quest.successTriggers && quest.successTriggers.length > 0) {
-                const successList = document.createElement('ul');
-                successList.className = 'quest-triggers-list';
-                quest.successTriggers.forEach(trigger => {
-                    const listItem = document.createElement('li');
-                    listItem.textContent = trigger.text;
-                    successList.appendChild(listItem);
-                });
-                stepsContainer.appendChild(successList);
-            } else {
-                const placeholder = document.createElement('p');
-                placeholder.textContent = 'No success triggers.';
-                placeholder.className = 'footer-placeholder';
-                stepsContainer.appendChild(placeholder);
-            }
-
-            // Render Failure Triggers
-            const failureTriggersTitle = document.createElement('h4');
-            failureTriggersTitle.textContent = 'Failure Triggers';
-            stepsContainer.appendChild(failureTriggersTitle);
-
-            if (quest.failureTriggers && quest.failureTriggers.length > 0) {
-                const failureList = document.createElement('ul');
-                failureList.className = 'quest-triggers-list';
-                quest.failureTriggers.forEach(trigger => {
-                    const listItem = document.createElement('li');
-                    listItem.textContent = trigger.text;
-                    failureList.appendChild(listItem);
-                });
-                stepsContainer.appendChild(failureList);
-            } else {
-                const placeholder = document.createElement('p');
-                placeholder.textContent = 'No failure triggers.';
-                placeholder.className = 'footer-placeholder';
-                stepsContainer.appendChild(placeholder);
-            }
-
-            // Render Parent Quests
-            const parentQuestsTitle = document.createElement('h4');
-            parentQuestsTitle.textContent = 'Parent Quests';
-            stepsContainer.appendChild(parentQuestsTitle);
-
-            const parentQuests = quests.filter(q => quest.parentIds.includes(q.id));
-
-            if (parentQuests.length > 0) {
-                parentQuests.forEach(parentQuest => {
-                    const button = document.createElement('button');
-                    button.textContent = parentQuest.name;
-                    button.className = 'parent-quest-button';
-                    button.dataset.parentQuestId = parentQuest.id;
-                    button.dataset.currentQuestId = quest.id;
-                    stepsContainer.appendChild(button);
-
-                    if (parentQuest.startingTriggers && parentQuest.startingTriggers.length > 0) {
-                        const triggerList = document.createElement('ul');
-                        triggerList.className = 'quest-triggers-list';
-                        parentQuest.startingTriggers.forEach(trigger => {
-                            const listItem = document.createElement('li');
-                            listItem.textContent = trigger.text;
-                            triggerList.appendChild(listItem);
-                        });
-                        stepsContainer.appendChild(triggerList);
-                    }
-                });
-            } else {
-                const placeholder = document.createElement('p');
-                placeholder.textContent = 'No parent quests.';
-                placeholder.className = 'footer-placeholder';
-                stepsContainer.appendChild(placeholder);
-            }
-        }
-    }
-
-    const activeQuestsContainer = document.getElementById('footer-quests-left');
-    if (activeQuestsContainer) {
-        activeQuestsContainer.addEventListener('click', (event) => {
-            if (event.target.classList.contains('active-quest-card')) {
-                const questId = parseInt(event.target.dataset.questId, 10);
-                displayQuestDetailsInFooter(questId);
-            }
-        });
-    }
-
-    const activeQuestStepsContainer = document.getElementById('footer-quests-center');
-    if (activeQuestStepsContainer) {
-        activeQuestStepsContainer.addEventListener('click', (event) => {
-            if (event.target.classList.contains('parent-quest-button')) {
-                const parentQuestId = parseInt(event.target.dataset.parentQuestId, 10);
-                const currentQuestId = parseInt(event.target.dataset.currentQuestId, 10);
-
-                const parentQuest = quests.find(q => q.id === parentQuestId);
-                const currentQuest = quests.find(q => q.id === currentQuestId);
-
-                if (parentQuest && currentQuest) {
-                    parentQuest.questStatus = 'Active';
-                    currentQuest.questStatus = 'Completed';
-
-                    renderQuestFooter();
-
-                    displayQuestDetailsInFooter(parentQuestId);
                 }
             }
         });
