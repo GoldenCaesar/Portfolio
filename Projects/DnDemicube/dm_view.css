@@ -489,6 +489,92 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+.quest-footer-card {
+    padding: 8px 12px;
+    background-color: #3a4f6a;
+    color: #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 5px;
+    border: 1px solid #5f6a7a;
+}
+
+.quest-footer-card:hover {
+    background-color: #4a5f7a;
+}
+
+.quest-footer-card.selected {
+    border-color: #b6cae1;
+    box-shadow: 0 0 5px rgba(182, 202, 225, 0.5);
+}
+
+.quest-footer-card h4 {
+    margin: 0 0 5px 0;
+    font-size: 1.1em;
+}
+
+.quest-footer-card p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #a0b4c9;
+}
+
+.footer-placeholder {
+    color: #a0b4c9;
+    font-style: italic;
+    padding: 10px;
+    text-align: center;
+}
+
+#footer-active-quest-details h4 {
+    margin-top: 15px;
+    border-bottom: 1px solid #3f4c5a;
+    padding-bottom: 5px;
+}
+
+#footer-active-quest-details h4:first-child {
+    margin-top: 0;
+}
+
+.quest-steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.quest-steps-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    font-size: 0.95em;
+}
+
+.quest-steps-list input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.quest-steps-list label.completed {
+    text-decoration: line-through;
+    color: #8c96a2;
+}
+
+.quest-triggers-list {
+    list-style: disc;
+    padding-left: 20px;
+    margin: 0 0 10px 0;
+    font-size: 0.9em;
+    color: #a0b4c9;
+}
+
+.successor-quests-container {
+    margin-top: 15px;
+    border-top: 1px solid #3f4c5a;
+    padding-top: 10px;
+}
+
 /* Footer Tabs */
 .footer-tabs {
     display: flex;
