@@ -1497,8 +1497,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                     } else if (overlay.type === 'lightSource') {
+                        const lightRadius = (overlay.radius || 15) / (currentMapDisplayData.scale || 1);
                         const distance = Math.sqrt((mouseX - overlay.position.x)**2 + (mouseY - overlay.position.y)**2);
-                        if (distance < eraserRadius) {
+                        if (distance < eraserRadius + lightRadius) {
                             mapData.overlays.splice(i, 1);
                             changed = true;
                         }
@@ -2544,8 +2545,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mapContainer.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
 
-            if (isErasing) {
-                isEraserDragging = true;
+            if (activeShadowTool === 'erase') {
+                isDrawing = true;
                 e.preventDefault(); // Prevent other actions like panning
                 return;
             }
@@ -2608,8 +2609,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         mapContainer.addEventListener('mouseup', (e) => {
             if (e.button !== 0) return;
-            if (isErasing) {
-                isEraserDragging = false;
+            if (activeShadowTool === 'erase') {
+                isDrawing = false;
             }
             isPanning = false;
             mapContainer.style.cursor = 'grab';
