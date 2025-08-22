@@ -71,6 +71,19 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
     justify-content: center;
 }
 
+.card-glow-layer {
+    position: absolute;
+    top: -2%;
+    left: -2%;
+    width: 104%;
+    height: 104%;
+    background-color: transparent;
+    border-radius: 12px;
+    z-index: 0;
+    pointer-events: none;
+    transition: box-shadow 0.3s ease-in-out;
+}
+
 .card-background {
     position: absolute;
     top: 0;
@@ -95,6 +108,26 @@ body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh
     padding: 1rem;
     box-sizing: border-box;
     text-align: center;
+}
+
+/* Status-based Glows */
+.card.status-unavailable .card-glow-layer {
+    box-shadow: 0 0 15px 5px rgba(255, 0, 0, 0.5); /* 50% red */
+}
+.card.status-available .card-glow-layer {
+    box-shadow: 0 0 15px 5px rgba(0, 0, 255, 0.5); /* 50% blue */
+}
+.card.status-active .card-glow-layer {
+    box-shadow: 0 0 15px 5px #FFD700; /* 100% gold */
+}
+.card.status-completed .card-glow-layer {
+    box-shadow: 0 0 15px 5px #008000; /* 100% green */
+}
+.card.status-failed .card-glow-layer {
+    box-shadow: 0 0 15px 5px #8B0000; /* 100% blood red */
+}
+.card.status-abandoned .card-glow-layer {
+    box-shadow: 0 0 15px 5px #663399; /* 100% royal purple */
 }
 
 .card:hover {
