@@ -1205,15 +1205,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
 
-        // Draw eraser circle
-        if (activeShadowTool === 'erase' && eraserPositionForDraw) {
-            const radius = 15; // Eraser radius in pixels
-            drawingCtx.beginPath();
-            drawingCtx.arc(eraserPositionForDraw.canvasX, eraserPositionForDraw.canvasY, radius, 0, Math.PI * 2, false);
-            drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-            drawingCtx.lineWidth = 2;
-            drawingCtx.stroke();
-        }
     }
 
     const characterPreviewClose = document.getElementById('character-preview-close');
@@ -1417,11 +1408,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newDoor = { type: 'door', points: [lineStartPoint, {x: mouseX, y: mouseY}] };
                 mapData.overlays.push(newDoor);
                 lineStartPoint = null;
+                drawOverlays(mapData.overlays);
             } else {
                 lineStartPoint = { x: mouseX, y: mouseY };
             }
         } else if (activeShadowTool === 'erase') {
             isDrawing = true;
+        } else if (activeShadowTool === 'lightSource') {
+            const newLight = {
+                type: 'lightSource',
+                position: { x: mouseX, y: mouseY },
+                radius: 15 // Default radius
+            };
+            mapData.overlays.push(newLight);
+            drawOverlays(mapData.overlays);
+            // After placing, deactivate the tool to prevent placing more on subsequent clicks
+            setShadowTool(null);
         }
     }
 
@@ -1442,23 +1444,51 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentWall = mapData.overlays[mapData.overlays.length - 1];
             currentWall.points.push({x: mouseX, y: mouseY});
             drawOverlays(mapData.overlays);
+        } else if (activeShadowTool === 'door' && lineStartPoint) {
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (mapData) {
+                // Redraw all existing overlays first to clear old temp line
+                drawOverlays(mapData.overlays);
+
+                // Now draw the temporary line on top
+                const drawingCtx = drawingCanvas.getContext('2d');
+                const { scale, originX, originY } = mapData.transform;
+                drawingCtx.beginPath();
+                drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.9)'; // Bright red for temp door
+                drawingCtx.lineWidth = 5;
+                drawingCtx.lineCap = 'round';
+
+                const startCanvasX = (lineStartPoint.x * scale) + originX;
+                const startCanvasY = (lineStartPoint.y * scale) + originY;
+                const currentCanvasX = (mouseX * scale) + originX;
+                const currentCanvasY = (mouseY * scale) + originY;
+
+                drawingCtx.moveTo(startCanvasX, startCanvasY);
+                drawingCtx.lineTo(currentCanvasX, currentCanvasY);
+                drawingCtx.stroke();
+            }
         } else if (activeShadowTool === 'erase') {
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (!mapData) return;
+
+            // Redraw existing overlays to prevent flicker
+            drawOverlays(mapData.overlays);
+
+            // Draw the eraser circle on top
             const drawingCtx = drawingCanvas.getContext('2d');
-            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-            const radius = 15;
+            const radius = 15; // Eraser radius in canvas pixels
             drawingCtx.beginPath();
             drawingCtx.arc(e.offsetX, e.offsetY, radius, 0, Math.PI * 2, false);
             drawingCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
             drawingCtx.lineWidth = 2;
             drawingCtx.stroke();
-            if(isDrawing) {
-                const mapData = detailedMapData.get(selectedMapFileName);
-                if (!mapData) return;
-                const eraserRadius = 15 / (currentMapDisplayData.scale || 1);
+
+            if (isDrawing) {
+                const eraserRadius = 15 / (currentMapDisplayData.scale || 1); // Eraser radius in image pixels
                 let changed = false;
                 for (let i = mapData.overlays.length - 1; i >= 0; i--) {
                     const overlay = mapData.overlays[i];
-                    if (overlay.type === 'wall' && overlay.points.length > 1) {
+                    if ((overlay.type === 'wall' || overlay.type === 'door') && overlay.points && overlay.points.length > 1) {
                         for (let j = 0; j < overlay.points.length - 1; j++) {
                             if (checkLineCircleCollision(overlay.points[j], overlay.points[j+1], {x: mouseX, y: mouseY}, eraserRadius)) {
                                 mapData.overlays.splice(i, 1);
@@ -1466,14 +1496,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 break;
                             }
                         }
-                    } else if (overlay.type === 'door' && overlay.points.length > 1) {
-                        if (checkLineCircleCollision(overlay.points[0], overlay.points[1], {x: mouseX, y: mouseY}, eraserRadius)) {
+                    } else if (overlay.type === 'lightSource') {
+                        const distance = Math.sqrt((mouseX - overlay.position.x)**2 + (mouseY - overlay.position.y)**2);
+                        if (distance < eraserRadius) {
                             mapData.overlays.splice(i, 1);
                             changed = true;
                         }
                     }
                 }
-                if(changed) {
+                if (changed) {
+                    // Redraw again to show the erased items have disappeared
                     drawOverlays(mapData.overlays);
                 }
             }
@@ -2049,19 +2081,27 @@ document.addEventListener('DOMContentLoaded', () => {
             activeShadowTool = tool;
         }
 
-        if (activeShadowTool !== 'erase') {
-            const drawingCtx = drawingCanvas.getContext('2d');
-            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        // When deselecting a tool, redraw overlays to clear any temporary drawings (like the door line)
+        if (!activeShadowTool) {
+            lineStartPoint = null; // Also reset the start point for the door tool
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (mapData) {
+                drawOverlays(mapData.overlays);
+            }
         }
 
         // Update button styles
         btnShadowWall.classList.toggle('active', activeShadowTool === 'wall');
         btnShadowDoor.classList.toggle('active', activeShadowTool === 'door');
+        btnAddLightSource.classList.toggle('active', activeShadowTool === 'lightSource');
         btnShadowErase.classList.toggle('active', activeShadowTool === 'erase');
 
-        // Enable pointer events on shadow canvas if any tool is active
+        // Set cursor style and enable pointer events on the interactive canvas
+        const cursorStyle = activeShadowTool ? 'crosshair' : 'auto';
         shadowCanvas.style.pointerEvents = activeShadowTool ? 'auto' : 'none';
-        dmCanvas.style.cursor = activeShadowTool ? 'crosshair' : 'auto';
+        shadowCanvas.style.cursor = cursorStyle;
+        dmCanvas.style.cursor = cursorStyle; // Also set on underlying canvases for consistency
+        drawingCanvas.style.cursor = cursorStyle;
     }
 
     if (btnShadowWall) {
@@ -2073,17 +2113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (btnAddLightSource) {
-        btnAddLightSource.addEventListener('click', () => {
-            const mapData = detailedMapData.get(selectedMapFileName);
-            if (!mapData) return;
-            const newLight = {
-                type: 'lightSource',
-                position: { x: currentMapDisplayData.imgWidth / 2, y: currentMapDisplayData.imgHeight / 2 },
-                radius: 15
-            };
-            mapData.overlays.push(newLight);
-            drawOverlays(mapData.overlays);
-        });
+        btnAddLightSource.addEventListener('click', () => setShadowTool('lightSource'));
     }
 
     if (btnShadowErase) {
@@ -3522,7 +3552,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
                                 overlays: JSON.parse(JSON.stringify(visibleOverlays)),
-                                viewRectangle: viewRectangle
+                                viewRectangle: viewRectangle,
+                                active: mapData.mode === 'view'
                             }, '*');
                             console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
                         };

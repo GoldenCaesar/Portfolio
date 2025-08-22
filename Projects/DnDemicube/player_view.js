@@ -1,4 +1,5 @@
 const playerCanvas = document.getElementById('player-canvas');
+const shadowCanvas = document.getElementById('player-shadow-canvas');
 const playerMapContainer = document.getElementById('player-map-container');
 const pCtx = playerCanvas ? playerCanvas.getContext('2d') : null;
 
@@ -101,6 +102,149 @@ let currentMapDisplayData = {
 };
 let activeInitiative = [];
 let initiativeTurn = -1;
+
+let shadowAnimationId = null;
+
+function getLineIntersection(line1, line2) {
+    const x1 = line1.x1, y1 = line1.y1, x2 = line1.x2, y2 = line1.y2;
+    const x3 = line2.x1, y3 = line2.y1, x4 = line2.x2, y4 = line2.y2;
+
+    const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (den === 0) {
+        return null; // Parallel lines
+    }
+
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+
+    if (t > 0 && t < 1 && u > 0 && u < 1) {
+        return {
+            x: x1 + t * (x2 - x1),
+            y: y1 + t * (y2 - y1)
+        };
+    }
+    return null;
+}
+
+function animateShadows() {
+    if (!shadowAnimationId) return;
+
+    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
+    const tokenLightSources = initiativeTokens.map(token => ({
+        type: 'lightSource',
+        position: { x: token.x, y: token.y },
+        radius: 60 // Default vision radius for tokens
+    }));
+
+    const lightSources = [...dmLightSources, ...tokenLightSources];
+    const shadowLines = currentOverlays.filter(o => o.type === 'wall' || o.type === 'door');
+
+    const shadowCtx = shadowCanvas.getContext('2d');
+    shadowCanvas.width = playerCanvas.width;
+    shadowCanvas.height = playerCanvas.height;
+    shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+    if (lightSources.length === 0) {
+        requestAnimationFrame(animateShadows);
+        return;
+    }
+
+    shadowCtx.fillStyle = 'rgba(0, 0, 0, 1)'; // 100% opacity for player
+    shadowCtx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+    const { scale, originX, originY } = currentMapTransform;
+
+    const allSegments = shadowLines.map(line => {
+        if (line.type === 'wall') {
+            const segments = [];
+            for (let i = 0; i < line.points.length - 1; i++) {
+                segments.push({ x1: line.points[i].x, y1: line.points[i].y, x2: line.points[i+1].x, y2: line.points[i+1].y });
+            }
+            return segments;
+        } else {
+             return [{ x1: line.points[0].x, y1: line.points[0].y, x2: line.points[1].x, y2: line.points[1].y }];
+        }
+    }).flat();
+
+    const canvasImageWidth = currentMapDisplayData.imgWidth;
+    const canvasImageHeight = currentMapDisplayData.imgHeight;
+    allSegments.push({ x1: 0, y1: 0, x2: canvasImageWidth, y2: 0 });
+    allSegments.push({ x1: canvasImageWidth, y1: 0, x2: canvasImageWidth, y2: canvasImageHeight });
+    allSegments.push({ x1: canvasImageWidth, y1: canvasImageHeight, x2: 0, y2: canvasImageHeight });
+    allSegments.push({ x1: 0, y1: canvasImageHeight, x2: 0, y2: 0 });
+
+    lightSources.forEach(light => {
+        const visiblePoints = [];
+        const allVertices = [];
+        shadowLines.forEach(line => line.points.forEach(p => allVertices.push({x: p.x, y: p.y})));
+        allVertices.push({ x: 0, y: 0 }, { x: canvasImageWidth, y: 0 }, { x: canvasImageWidth, y: canvasImageHeight }, { x: 0, y: canvasImageHeight });
+
+        const angles = new Set();
+        allVertices.forEach(vertex => {
+            const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
+            angles.add(angle);
+            angles.add(angle - 0.0001);
+            angles.add(angle + 0.0001);
+        });
+
+        const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+
+        sortedAngles.forEach(angle => {
+            const ray = {
+                x1: light.position.x,
+                y1: light.position.y,
+                x2: light.position.x + 10000 * Math.cos(angle),
+                y2: light.position.y + 10000 * Math.sin(angle)
+            };
+            let closestIntersection = null;
+            let minDistance = Infinity;
+            allSegments.forEach(segment => {
+                const intersection = getLineIntersection(ray, segment);
+                if (intersection) {
+                    const distance = Math.sqrt((intersection.x - light.position.x) ** 2 + (intersection.y - light.position.y) ** 2);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestIntersection = intersection;
+                    }
+                }
+            });
+            if (closestIntersection) {
+                visiblePoints.push(closestIntersection);
+            }
+        });
+
+        shadowCtx.save();
+        shadowCtx.globalCompositeOperation = 'destination-out';
+        shadowCtx.beginPath();
+        if (visiblePoints.length > 0) {
+            const firstPoint = visiblePoints[0];
+            const firstCanvasX = (firstPoint.x * scale) + originX;
+            const firstCanvasY = (firstPoint.y * scale) + originY;
+            shadowCtx.moveTo(firstCanvasX, firstCanvasY);
+            visiblePoints.forEach(point => {
+                const canvasX = (point.x * scale) + originX;
+                const canvasY = (point.y * scale) + originY;
+                shadowCtx.lineTo(canvasX, canvasY);
+            });
+            shadowCtx.closePath();
+            shadowCtx.fill();
+        }
+        shadowCtx.restore();
+    });
+
+    requestAnimationFrame(animateShadows);
+}
+
+function toggleShadowAnimation(start) {
+    if (start && !shadowAnimationId) {
+        shadowAnimationId = requestAnimationFrame(animateShadows);
+    } else if (!start && shadowAnimationId) {
+        cancelAnimationFrame(shadowAnimationId);
+        shadowAnimationId = null;
+        const shadowCtx = shadowCanvas.getContext('2d');
+        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+    }
+}
 
 function drawMapAndOverlays() {
     console.log('drawMapAndOverlays called. Transform:', JSON.stringify(currentMapTransform));
@@ -289,14 +433,17 @@ window.addEventListener('message', (event) => {
                             currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
                         }
                         drawMapAndOverlays();
+                        toggleShadowAnimation(data.active);
                     };
                     img.onerror = () => {
                         drawPlaceholder("Error loading map.");
                         currentMapImage = null;
+                        toggleShadowAnimation(false);
                     };
                     img.src = data.mapDataUrl;
                 } else {
                     drawPlaceholder("Received invalid map data from DM.");
+                    toggleShadowAnimation(false);
                 }
                 break;
             case 'mapTransformUpdate':
