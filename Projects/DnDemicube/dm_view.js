@@ -317,6 +317,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragOffsetX = 0;
     let dragOffsetY = 0;
 
+    // Rendering optimization state
+    let lightMapCanvas = null;
+    let lightMapCtx = null;
+    let isLightMapDirty = true;
+    let dmRenderQuality = 0.5; // Default quality for DM view (0.1 to 1.0)
+    let playerRenderQuality = 0.5; // Default quality for Player view
+
     // Campaign Timer State
     let campaignTimerInterval = null;
     let campaignTime = 0; // Total elapsed seconds
@@ -756,6 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mapData.overlays) {
                 drawOverlays(mapData.overlays);
             }
+            isLightMapDirty = true;
 
             if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapFileName === fileName) {
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -894,6 +902,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const countSpan = button.querySelector('.dice-count');
             if (countSpan) {
                 countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    const dmRenderQualitySlider = document.getElementById('dm-render-quality-slider');
+    const dmRenderQualityValue = document.getElementById('dm-render-quality-value');
+    const playerRenderQualitySlider = document.getElementById('player-render-quality-slider');
+    const playerRenderQualityValue = document.getElementById('player-render-quality-value');
+
+    if (dmRenderQualitySlider && dmRenderQualityValue) {
+        dmRenderQualitySlider.addEventListener('input', (e) => {
+            dmRenderQuality = parseFloat(e.target.value);
+            dmRenderQualityValue.textContent = dmRenderQuality.toFixed(1);
+            isLightMapDirty = true; // Recalculate our own light map
+        });
+    }
+
+    if (playerRenderQualitySlider && playerRenderQualityValue) {
+        playerRenderQualitySlider.addEventListener('input', (e) => {
+            playerRenderQuality = parseFloat(e.target.value);
+            playerRenderQualityValue.textContent = playerRenderQuality.toFixed(1);
+            if (playerWindow && !playerWindow.closed) {
+                playerWindow.postMessage({ type: 'renderQualityUpdate', quality: playerRenderQuality }, '*');
             }
         });
     }
@@ -1292,48 +1323,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let shadowAnimationId = null;
 
-    function animateShadows() {
-        if (!shadowAnimationId) return; // Stop if animation is cancelled
+    function recalculateLightMap() {
+        if (!isLightMapDirty) return;
 
         const mapData = detailedMapData.get(selectedMapFileName);
-        if (!mapData || mapData.mode !== 'view') {
-            const shadowCtx = shadowCanvas.getContext('2d');
-            shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-            return; // Stop animation if not in view mode
+        if (!mapData || mapData.mode !== 'view' || !currentMapDisplayData.img) {
+            if (lightMapCtx) {
+                lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+            }
+            isLightMapDirty = false; // Mark as clean even if we did nothing
+            return;
+        }
+
+        const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * dmRenderQuality);
+        const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * dmRenderQuality);
+
+        if (!lightMapCanvas || lightMapCanvas.width !== requiredWidth || lightMapCanvas.height !== requiredHeight) {
+            lightMapCanvas = document.createElement('canvas');
+            lightMapCanvas.width = requiredWidth;
+            lightMapCanvas.height = requiredHeight;
+            lightMapCtx = lightMapCanvas.getContext('2d');
         }
 
         const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
         const shadowLines = mapData.overlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
 
-        const shadowCtx = shadowCanvas.getContext('2d');
-        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-        // TODO: For player view, this should be rgba(0, 0, 0, 1) for 100% opacity
-        shadowCtx.fillStyle = 'rgba(0, 0, 0, 0.33)'; // 33% opacity for DM
-        shadowCtx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+        lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        lightMapCtx.fillStyle = 'rgba(0, 0, 0, 0.33)';
+        lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
 
-        const { scale, originX, originY } = mapData.transform;
+        const lightScale = dmRenderQuality;
 
         const allSegments = shadowLines.map(line => {
-            if (line.type === 'wall') { // It's an array of points
+            if (line.type === 'wall') {
                 const segments = [];
                 for (let i = 0; i < line.points.length - 1; i++) {
                     segments.push({ x1: line.points[i].x, y1: line.points[i].y, x2: line.points[i+1].x, y2: line.points[i+1].y });
                 }
                 return segments;
-            } else { // It's a door with two points
+            } else {
                  return [{ x1: line.points[0].x, y1: line.points[0].y, x2: line.points[1].x, y2: line.points[1].y }];
             }
         }).flat();
 
-
-        // Add canvas boundaries as segments
-        const canvasImageWidth = currentMapDisplayData.imgWidth;
-        const canvasImageHeight = currentMapDisplayData.imgHeight;
-        allSegments.push({ x1: 0, y1: 0, x2: canvasImageWidth, y2: 0 });
-        allSegments.push({ x1: canvasImageWidth, y1: 0, x2: canvasImageWidth, y2: canvasImageHeight });
-        allSegments.push({ x1: canvasImageWidth, y1: canvasImageHeight, x2: 0, y2: canvasImageHeight });
-        allSegments.push({ x1: 0, y1: canvasImageHeight, x2: 0, y2: 0 });
-
+        const imgWidth = currentMapDisplayData.imgWidth;
+        const imgHeight = currentMapDisplayData.imgHeight;
+        allSegments.push({ x1: 0, y1: 0, x2: imgWidth, y2: 0 });
+        allSegments.push({ x1: imgWidth, y1: 0, x2: imgWidth, y2: imgHeight });
+        allSegments.push({ x1: imgWidth, y1: imgHeight, x2: 0, y2: imgHeight });
+        allSegments.push({ x1: 0, y1: imgHeight, x2: 0, y2: 0 });
 
         lightSources.forEach(light => {
             const visiblePoints = [];
@@ -1343,11 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 line.points.forEach(p => allVertices.push({x: p.x, y: p.y}));
             });
 
-            // Add canvas corners as vertices
-            allVertices.push({ x: 0, y: 0 });
-            allVertices.push({ x: canvasImageWidth, y: 0 });
-            allVertices.push({ x: canvasImageWidth, y: canvasImageHeight });
-            allVertices.push({ x: 0, y: canvasImageHeight });
+            allVertices.push({ x: 0, y: 0 }, { x: imgWidth, y: 0 }, { x: imgWidth, y: imgHeight }, { x: 0, y: imgHeight });
 
             const angles = new Set();
             allVertices.forEach(vertex => {
@@ -1363,8 +1397,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ray = {
                     x1: light.position.x,
                     y1: light.position.y,
-                    x2: light.position.x + 10000 * Math.cos(angle),
-                    y2: light.position.y + 10000 * Math.sin(angle)
+                    x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
+                    y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
                 };
 
                 let closestIntersection = null;
@@ -1386,29 +1420,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            shadowCtx.save();
-            shadowCtx.globalCompositeOperation = 'destination-out';
-            shadowCtx.beginPath();
+            lightMapCtx.save();
+            lightMapCtx.globalCompositeOperation = 'destination-out';
+            lightMapCtx.beginPath();
             if (visiblePoints.length > 0) {
                 const firstPoint = visiblePoints[0];
-                const firstCanvasX = (firstPoint.x * scale) + originX;
-                const firstCanvasY = (firstPoint.y * scale) + originY;
-                shadowCtx.moveTo(firstCanvasX, firstCanvasY);
+                lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
                 visiblePoints.forEach(point => {
-                    const canvasX = (point.x * scale) + originX;
-                    const canvasY = (point.y * scale) + originY;
-                    shadowCtx.lineTo(canvasX, canvasY);
+                    lightMapCtx.lineTo(point.x * lightScale, point.y * lightScale);
                 });
-                shadowCtx.closePath();
-                shadowCtx.fill();
+                lightMapCtx.closePath();
+                lightMapCtx.fill();
             }
-            shadowCtx.restore();
+            lightMapCtx.restore();
         });
+
+        isLightMapDirty = false;
+        console.log("Light map recalculated.");
+    }
+
+    function animateShadows() {
+        if (!shadowAnimationId) return;
+
+        if (isLightMapDirty) {
+            recalculateLightMap();
+        }
+
+        const shadowCtx = shadowCanvas.getContext('2d');
+        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (mapData && mapData.mode === 'view' && lightMapCanvas) {
+            const { scale, originX, originY } = mapData.transform;
+            shadowCtx.save();
+            shadowCtx.translate(originX, originY);
+            shadowCtx.scale(scale, scale);
+            // Use nearest-neighbor scaling for performance and sharp pixels
+            shadowCtx.imageSmoothingEnabled = false;
+            shadowCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+            shadowCtx.restore();
+        }
 
         requestAnimationFrame(animateShadows);
     }
 
     function toggleShadowAnimation(start) {
+        isLightMapDirty = true;
         if (start && !shadowAnimationId) {
             shadowAnimationId = requestAnimationFrame(animateShadows);
         } else if (!start && shadowAnimationId) {
@@ -1450,6 +1507,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastY = mouseY;
             const newWall = { type: 'wall', points: [{x: mouseX, y: mouseY}] };
             mapData.overlays.push(newWall);
+            isLightMapDirty = true;
         } else if (activeShadowTool === 'door') {
             if (lineStartPoint) {
                 const newDoor = { type: 'door', points: [lineStartPoint, {x: mouseX, y: mouseY}], isOpen: false };
@@ -1468,6 +1526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 radius: 15 // Default radius
             };
             mapData.overlays.push(newLight);
+            isLightMapDirty = true;
             drawOverlays(mapData.overlays);
             // After placing, deactivate the tool to prevent placing more on subsequent clicks
             setShadowTool(null);
@@ -1490,6 +1549,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const mapData = detailedMapData.get(selectedMapFileName);
             const currentWall = mapData.overlays[mapData.overlays.length - 1];
             currentWall.points.push({x: mouseX, y: mouseY});
+            isLightMapDirty = true;
             drawOverlays(mapData.overlays);
         } else if (activeShadowTool === 'door' && lineStartPoint) {
             const mapData = detailedMapData.get(selectedMapFileName);
@@ -1553,6 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 if (changed) {
+                    isLightMapDirty = true;
                     // Redraw again to show the erased items have disappeared
                     drawOverlays(mapData.overlays);
                 }
@@ -1561,6 +1622,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopShadowInteraction() {
+        if(isDrawing || isDraggingLightSource) {
+            isLightMapDirty = true;
+        }
         isDrawing = false;
         isDraggingLightSource = false;
         draggedLightSource = null;
@@ -1781,11 +1845,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const overlay = selectedMapData.overlays[i];
             if (overlay.type === 'door' && isPointOnDoor(imageCoords, overlay)) {
                 overlay.isOpen = !overlay.isOpen;
+                isLightMapDirty = true;
                 displayMapOnCanvas(selectedMapFileName);
                 sendMapToPlayerView(selectedMapFileName);
                 return;
             } else if (overlay.type === 'door' && isPointOnDoor(imageCoords, overlay)) {
                 overlay.isOpen = !overlay.isOpen;
+                isLightMapDirty = true;
                 displayMapOnCanvas(selectedMapFileName);
                 sendMapToPlayerView(selectedMapFileName);
                 return;
@@ -2728,6 +2794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             transform.originY = mouseY - (mouseY - transform.originY) * (newScale / transform.scale);
             transform.scale = newScale;
 
+            isLightMapDirty = true;
             displayMapOnCanvas(selectedMapFileName);
             sendMapTransformToPlayerView(transform);
         });
@@ -2754,6 +2821,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     draggedToken.y += dy;
                     dragStartX = imageCoords.x;
                     dragStartY = imageCoords.y;
+                    // Set dirty flag because token positions affect player view lighting
+                    isLightMapDirty = true;
                     const mapData = detailedMapData.get(selectedMapFileName);
                     if (mapData) {
                         drawOverlays(mapData.overlays);
@@ -2774,6 +2843,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!mapData) return;
                 mapData.transform.originX = e.clientX - panStartX;
                 mapData.transform.originY = e.clientY - panStartY;
+                isLightMapDirty = true;
                 displayMapOnCanvas(selectedMapFileName);
                 sendMapTransformToPlayerView(mapData.transform);
             } else {
@@ -2943,6 +3013,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (saveQuotesCheckbox.checked && quoteMap) {
                 campaignData.quoteMap = quoteMap;
             }
+
+            // 10. Handle Settings
+            campaignData.settings = {
+                dmRenderQuality: dmRenderQuality,
+                playerRenderQuality: playerRenderQuality,
+                mapIconSize: mapIconSize // Also save this here
+            };
 
             const campaignJSON = JSON.stringify(campaignData, null, 2);
             zip.file("campaign.json", campaignJSON);
@@ -3364,6 +3441,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 quoteMap = campaignData.quoteMap;
                 console.log("Custom character quotes loaded from campaign file.");
             }
+
+            // Merge Settings
+            if (campaignData.settings) {
+                dmRenderQuality = campaignData.settings.dmRenderQuality || 0.5;
+                playerRenderQuality = campaignData.settings.playerRenderQuality || 0.5;
+                mapIconSize = campaignData.settings.mapIconSize || 5;
+
+                if (dmRenderQualitySlider) dmRenderQualitySlider.value = dmRenderQuality;
+                if (dmRenderQualityValue) dmRenderQualityValue.textContent = dmRenderQuality.toFixed(1);
+                if (playerRenderQualitySlider) playerRenderQualitySlider.value = playerRenderQuality;
+                if (playerRenderQualityValue) playerRenderQualityValue.textContent = playerRenderQuality.toFixed(1);
+                if (mapIconSizeSlider) mapIconSizeSlider.value = mapIconSize;
+                if (mapIconSizeValue) mapIconSizeValue.textContent = `${mapIconSize}%`;
+
+                isLightMapDirty = true; // Mark as dirty to apply new quality settings
+            }
+
 
             // Final UI updates
             renderAllLists();
@@ -7388,11 +7482,8 @@ function displayToast(messageElement) {
      * Draws the lines between parent and child quest cards.
      */
     const drawConnections = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.translate(originX, originY);
-            ctx.scale(scale, scale);
-
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // No more save/translate/scale/restore, the transform is on the canvas element
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 3;
         ctx.lineCap = 'round';
@@ -7411,7 +7502,6 @@ function displayToast(messageElement) {
                     });
                 }
             });
-            ctx.restore();
     };
 
     /**
@@ -7544,11 +7634,11 @@ function displayToast(messageElement) {
             card.appendChild(overlay);
 
 
-            const x = originX + (quest.x * scale);
-            const y = originY + (quest.y * scale);
-            card.style.left = `${x}px`;
-            card.style.top = `${y}px`;
-            card.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            // The container is now transformed, so cards are positioned relative to the container's 0,0
+            card.style.left = `${quest.x}px`;
+            card.style.top = `${quest.y}px`;
+            // The scale is also on the container, so individual cards are not scaled.
+            card.style.transform = `translate(-50%, -50%)`;
 
             card.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -8080,18 +8170,22 @@ function displayToast(messageElement) {
             const questToMove = quests.find(q => q.id === selectedQuestId);
             if (questToMove) {
                 const rect = container.getBoundingClientRect();
+                // To calculate the new position in the tree's coordinate space,
+                // we need to account for the container's transform.
                 const newX = (e.clientX - rect.left - originX) / scale;
                 const newY = (e.clientY - rect.top - originY) / scale;
                 questToMove.x = newX;
                 questToMove.y = newY;
+                // We only need to re-render, not change the transform of the container
                 drawConnections();
                 renderCards();
             }
         } else if (isPanning) {
             originX = e.clientX - panStartX;
             originY = e.clientY - panStartY;
-            drawConnections();
-            renderCards();
+            // Apply the transform directly to the containers for performance
+            canvas.style.transform = `translate(${originX}px, ${originY}px)`;
+            cardContainer.style.transform = `translate(${originX}px, ${originY}px)`;
         }
     });
 
@@ -8106,9 +8200,14 @@ function displayToast(messageElement) {
 
         originX = originX - (mouseX - originX) * (newScale / scale - 1);
         originY = originY - (mouseY - originY) * (newScale / scale - 1);
-
         scale = newScale;
-        drawConnections();
+
+        // Apply combined transform for pan and zoom
+        const transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
+        canvas.style.transform = transform;
+        cardContainer.style.transform = transform;
+
+        // Re-render cards to adjust for new scale (e.g., font sizes, etc.)
         renderCards();
     });
 

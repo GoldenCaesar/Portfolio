@@ -103,6 +103,12 @@ let currentMapDisplayData = {
 let activeInitiative = [];
 let initiativeTurn = -1;
 
+// Rendering optimization state
+let lightMapCanvas = null;
+let lightMapCtx = null;
+let isLightMapDirty = true;
+let renderQuality = 0.5; // Default quality, will be updated by DM
+
 let shadowAnimationId = null;
 
 function getLineIntersection(line1, line2) {
@@ -117,7 +123,7 @@ function getLineIntersection(line1, line2) {
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
     const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
 
-    if (t > 0 && t < 1 && u > 0 && u < 1) {
+    if (t > 0 && u >= 0 && u <= 1) { // Adjusted to handle intersections on the edge of the ray
         return {
             x: x1 + t * (x2 - x1),
             y: y1 + t * (y2 - y1)
@@ -126,35 +132,47 @@ function getLineIntersection(line1, line2) {
     return null;
 }
 
-function animateShadows() {
-    if (!shadowAnimationId) return;
+function recalculateLightMap_Player() {
+    if (!isLightMapDirty) return;
 
-    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
-    const tokenLightSources = initiativeTokens
-        .filter(token => token.isDetailsVisible !== false) // Only visible tokens are light sources
-        .map(token => ({
-            type: 'lightSource',
-            position: { x: token.x, y: token.y },
-            radius: 60 // Default vision radius for tokens
-    }));
-
-    const lightSources = [...dmLightSources, ...tokenLightSources];
-    const shadowLines = currentOverlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
-
-    const shadowCtx = shadowCanvas.getContext('2d');
-    shadowCanvas.width = playerCanvas.width;
-    shadowCanvas.height = playerCanvas.height;
-    shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-
-    if (lightSources.length === 0) {
-        requestAnimationFrame(animateShadows);
+    if (!currentMapDisplayData.img) {
+        if (lightMapCtx) {
+            lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        }
+        isLightMapDirty = false;
         return;
     }
 
-    shadowCtx.fillStyle = 'rgba(0, 0, 0, 1)'; // 100% opacity for player
-    shadowCtx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+    const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * renderQuality);
+    const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * renderQuality);
 
-    const { scale, originX, originY } = currentMapTransform;
+    if (!lightMapCanvas || lightMapCanvas.width !== requiredWidth || lightMapCanvas.height !== requiredHeight) {
+        lightMapCanvas = document.createElement('canvas');
+        lightMapCanvas.width = requiredWidth;
+        lightMapCanvas.height = requiredHeight;
+        lightMapCtx = lightMapCanvas.getContext('2d');
+    }
+
+    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
+    const tokenLightSources = initiativeTokens
+        .filter(token => token.isDetailsVisible !== false)
+        .map(token => ({
+            type: 'lightSource',
+            position: { x: token.x, y: token.y },
+        }));
+    const lightSources = [...dmLightSources, ...tokenLightSources];
+    const shadowLines = currentOverlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
+
+    lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+    if (lightSources.length === 0) {
+        isLightMapDirty = false;
+        return; // Nothing to draw, so leave it clear
+    }
+
+    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)';
+    lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+
+    const lightScale = renderQuality;
 
     const allSegments = shadowLines.map(line => {
         if (line.type === 'wall') {
@@ -168,18 +186,18 @@ function animateShadows() {
         }
     }).flat();
 
-    const canvasImageWidth = currentMapDisplayData.imgWidth;
-    const canvasImageHeight = currentMapDisplayData.imgHeight;
-    allSegments.push({ x1: 0, y1: 0, x2: canvasImageWidth, y2: 0 });
-    allSegments.push({ x1: canvasImageWidth, y1: 0, x2: canvasImageWidth, y2: canvasImageHeight });
-    allSegments.push({ x1: canvasImageWidth, y1: canvasImageHeight, x2: 0, y2: canvasImageHeight });
-    allSegments.push({ x1: 0, y1: canvasImageHeight, x2: 0, y2: 0 });
+    const imgWidth = currentMapDisplayData.imgWidth;
+    const imgHeight = currentMapDisplayData.imgHeight;
+    allSegments.push({ x1: 0, y1: 0, x2: imgWidth, y2: 0 });
+    allSegments.push({ x1: imgWidth, y1: 0, x2: imgWidth, y2: imgHeight });
+    allSegments.push({ x1: imgWidth, y1: imgHeight, x2: 0, y2: imgHeight });
+    allSegments.push({ x1: 0, y1: imgHeight, x2: 0, y2: 0 });
 
     lightSources.forEach(light => {
         const visiblePoints = [];
         const allVertices = [];
         shadowLines.forEach(line => line.points.forEach(p => allVertices.push({x: p.x, y: p.y})));
-        allVertices.push({ x: 0, y: 0 }, { x: canvasImageWidth, y: 0 }, { x: canvasImageWidth, y: canvasImageHeight }, { x: 0, y: canvasImageHeight });
+        allVertices.push({ x: 0, y: 0 }, { x: imgWidth, y: 0 }, { x: imgWidth, y: imgHeight }, { x: 0, y: imgHeight });
 
         const angles = new Set();
         allVertices.forEach(vertex => {
@@ -195,8 +213,8 @@ function animateShadows() {
             const ray = {
                 x1: light.position.x,
                 y1: light.position.y,
-                x2: light.position.x + 10000 * Math.cos(angle),
-                y2: light.position.y + 10000 * Math.sin(angle)
+                x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
+                y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
             };
             let closestIntersection = null;
             let minDistance = Infinity;
@@ -215,24 +233,45 @@ function animateShadows() {
             }
         });
 
-        shadowCtx.save();
-        shadowCtx.globalCompositeOperation = 'destination-out';
-        shadowCtx.beginPath();
+        lightMapCtx.save();
+        lightMapCtx.globalCompositeOperation = 'destination-out';
+        lightMapCtx.beginPath();
         if (visiblePoints.length > 0) {
             const firstPoint = visiblePoints[0];
-            const firstCanvasX = (firstPoint.x * scale) + originX;
-            const firstCanvasY = (firstPoint.y * scale) + originY;
-            shadowCtx.moveTo(firstCanvasX, firstCanvasY);
+            lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
             visiblePoints.forEach(point => {
-                const canvasX = (point.x * scale) + originX;
-                const canvasY = (point.y * scale) + originY;
-                shadowCtx.lineTo(canvasX, canvasY);
+                lightMapCtx.lineTo(point.x * lightScale, point.y * lightScale);
             });
-            shadowCtx.closePath();
-            shadowCtx.fill();
+            lightMapCtx.closePath();
+            lightMapCtx.fill();
         }
-        shadowCtx.restore();
+        lightMapCtx.restore();
     });
+    isLightMapDirty = false;
+}
+
+
+function animateShadows() {
+    if (!shadowAnimationId) return;
+
+    if (isLightMapDirty) {
+        recalculateLightMap_Player();
+    }
+
+    const shadowCtx = shadowCanvas.getContext('2d');
+    shadowCanvas.width = playerCanvas.width;
+    shadowCanvas.height = playerCanvas.height;
+    shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+    if (lightMapCanvas) {
+        const { scale, originX, originY } = currentMapTransform;
+        shadowCtx.save();
+        shadowCtx.translate(originX, originY);
+        shadowCtx.scale(scale, scale);
+        shadowCtx.imageSmoothingEnabled = false;
+        shadowCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+        shadowCtx.restore();
+    }
 
     requestAnimationFrame(animateShadows);
 }
@@ -435,6 +474,7 @@ window.addEventListener('message', (event) => {
                             currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
                         }
                         drawMapAndOverlays();
+                        isLightMapDirty = true;
                         toggleShadowAnimation(data.active);
                     };
                     img.onerror = () => {
@@ -459,6 +499,7 @@ window.addEventListener('message', (event) => {
                     currentMapTransform.scale = scale;
                     currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
                     currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
+                    isLightMapDirty = true;
                     drawMapAndOverlays();
                 }
                 break;
@@ -587,6 +628,7 @@ window.addEventListener('message', (event) => {
                 activeInitiative = data.activeInitiative || [];
                 initiativeTurn = data.initiativeTurn ?? -1;
                 initiativeTokens = data.initiativeTokens || [];
+                isLightMapDirty = true;
 
                 const gameTimeTimer = document.getElementById('game-time-timer');
                 if(gameTimeTimer) gameTimeTimer.textContent = `${data.gameTime || 0}s`;
@@ -602,6 +644,13 @@ window.addEventListener('message', (event) => {
                     if (tokenStatBlock) {
                         tokenStatBlock.style.display = 'none';
                     }
+                }
+                break;
+            case 'renderQualityUpdate':
+                if (typeof data.quality === 'number') {
+                    renderQuality = data.quality;
+                    isLightMapDirty = true; // Recalculate with new quality
+                    console.log(`Player view render quality updated to: ${renderQuality}`);
                 }
                 break;
             default:
