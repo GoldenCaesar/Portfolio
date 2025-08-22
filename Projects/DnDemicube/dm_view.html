@@ -105,9 +105,21 @@
         <canvas id="drawing-canvas"></canvas>
     </div>
     <div id="automation-container" style="display: none; width: 100%;">
-        <div id="modules-sidebar"></div>
+        <div id="modules-sidebar">
+            <div class="mode-toggle-container" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span class="mode-label">DM Only</span>
+                <label class="switch">
+                    <input type="checkbox" id="automation-mode-toggle-switch">
+                    <span class="slider round"></span>
+                </label>
+                <span class="mode-label">Both</span>
+            </div>
+            <div id="module-cards-container">
+                <!-- Module cards will be dynamically added here -->
+            </div>
+        </div>
         <div id="automation-canvas-container">
-            <canvas id="automation-canvas"></canvas>
+            <div id="automation-canvas"></div>
         </div>
         <div id="details-sidebar"></div>
     </div>
