@@ -6674,7 +6674,55 @@ function displayToast(messageElement) {
             if (quoteEditorContainer) quoteEditorContainer.style.display = 'none';
             // Show the automation container
             if (automationContainer) automationContainer.style.display = 'flex';
+            initializeAutomationSidebar();
         });
+    }
+
+    function initializeAutomationSidebar() {
+        const moduleCardsContainer = document.getElementById('module-cards-container');
+        const automationCanvas = document.getElementById('automation-canvas');
+        const toggleSwitch = document.getElementById('automation-mode-toggle-switch');
+
+        const cardButtons = [
+            'Story Beat', 'Note', 'Character', 'Map', 'Wander', 'Initiative', 'Roll'
+        ];
+
+        // Clear existing cards to prevent duplication
+        moduleCardsContainer.innerHTML = '';
+
+        // Create and append cards
+        cardButtons.forEach(cardName => {
+            const card = document.createElement('div');
+            card.className = 'module-card';
+            card.textContent = cardName;
+            card.addEventListener('click', () => {
+                const item = document.createElement('div');
+                item.className = 'automation-canvas-item';
+                item.textContent = cardName;
+                automationCanvas.appendChild(item);
+            });
+            moduleCardsContainer.appendChild(card);
+        });
+
+        // Set initial card colors
+        updateCardColors(toggleSwitch.checked);
+
+        // Add event listener to toggle switch
+        toggleSwitch.addEventListener('change', () => {
+            updateCardColors(toggleSwitch.checked);
+        });
+
+        function updateCardColors(isBothMode) {
+            const cards = moduleCardsContainer.querySelectorAll('.module-card');
+            cards.forEach(card => {
+                card.classList.remove('module-card-dm', 'module-card-both');
+                if (isBothMode) {
+                    card.classList.add('module-card-both');
+                } else {
+                    card.classList.add('module-card-dm');
+                }
+            });
+        }
     }
 
     const createContextMenu = (e, options) => {

@@ -496,32 +496,71 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     height: 100%;
 }
 
-#modules-sidebar {
-    width: 200px;
+#modules-sidebar, #details-sidebar {
+    width: 33.33%;
     background-color: #20262d;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#modules-sidebar {
     border-right: 1px solid #3f4c5a;
 }
 
+#details-sidebar {
+    border-left: 1px solid #3f4c5a;
+}
+
 #automation-canvas-container {
-    flex-grow: 1;
+    width: 33.33%;
     display: flex;
     justify-content: center;
-    align-items: center;
-    overflow: hidden;
+    align-items: flex-start; /* Align to top */
+    overflow-y: auto; /* Allow scrolling */
     padding: 10px;
+    background-color: #2a3138;
+    border-left: 1px solid #3f4c5a;
+    border-right: 1px solid #3f4c5a;
 }
 
 #automation-canvas {
-    width: 33%;
-    height: 100%;
-    background-color: #2a3138;
-    border: 1px solid #3f4c5a;
+    width: 100%;
+    height: auto; /* Let content define height */
+    background-color: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-#details-sidebar {
-    width: 200px;
-    background-color: #20262d;
-    border-left: 1px solid #3f4c5a;
+.module-card {
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #3f4c5a;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: pointer;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.module-card:hover {
+    border-color: #b6cae1;
+}
+
+.module-card-dm {
+    background-color: #4a5f7a; /* A blue-ish grey for DM only */
+    color: #e0e0e0;
+}
+
+.module-card-both {
+    background-color: #3a6a4f; /* A green-ish color for Both */
+    color: #e0e0e0;
 }
 
 .quest-footer-card {
