@@ -291,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
     let selectedNoteForContextMenu = null;
     let selectedCharacterForContextMenu = null;
+let linkingNoteForAutomationCard = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
     let preservedLinkedMapNameForRedraw = null; // Added: To store linked map name during redraw
@@ -3009,7 +3010,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     automationCanvasData = Array.from(automationCanvas.children).map(card => {
                         return {
                             innerHTML: card.innerHTML,
-                            cardClass: card.className
+                            cardClass: card.className,
+                            dataset: { ...card.dataset }
                         };
                     });
                 }
@@ -4854,7 +4856,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     handleMoveNote(noteId, 'down');
                 }
             } else if (!actionIcon) {
-                if (selectedNoteForContextMenu) {
+                if (linkingNoteForAutomationCard) {
+                    const cardElement = linkingNoteForAutomationCard;
+                    const linkedNotes = JSON.parse(cardElement.dataset.linkedNotes || '[]');
+                    if (!linkedNotes.includes(noteId)) {
+                        linkedNotes.push(noteId);
+                    }
+                    cardElement.dataset.linkedNotes = JSON.stringify(linkedNotes);
+
+                    alert(`Note linked successfully to card ${cardElement.querySelector('.automation-card-label').textContent}.`);
+
+                    linkingNoteForAutomationCard = null;
+                    if (automationButton) automationButton.click();
+                    displayNoteCardDetails(cardElement);
+
+                } else if (selectedNoteForContextMenu) {
                     const { overlay, parentMapName, source } = selectedNoteForContextMenu;
                     overlay.linkedNoteId = noteId;
                     alert(`Note linked successfully.`);
@@ -7404,11 +7420,33 @@ function displayToast(messageElement) {
         automationCanvas.innerHTML = '';
         automationCardCounters = {}; // Reset counters
 
-        automationCanvasData.forEach(cardData => {
+        (automationCanvasData || []).forEach(cardData => {
             const card = document.createElement('div');
-            card.className = cardData.cardClass;
-            card.innerHTML = cardData.innerHTML;
+
+            // Handle multiple formats for backward compatibility
+            if (typeof cardData === 'string') {
+                // Very old format: just innerHTML string
+                card.innerHTML = cardData;
+                card.classList.add('module-card');
+            } else if (cardData && typeof cardData === 'object') {
+                // Standard and new format
+                card.className = cardData.cardClass || 'module-card'; // Default class
+                card.innerHTML = cardData.innerHTML || '';
+                if (cardData.dataset) {
+                    for (const key in cardData.dataset) {
+                        card.dataset[key] = cardData.dataset[key];
+                    }
+                }
+            }
+
             automationCanvas.appendChild(card);
+
+            // Re-attach listener for note cards after loading
+            if (card.dataset.cardType === 'note') {
+                card.addEventListener('click', () => {
+                    displayNoteCardDetails(card);
+                });
+            }
 
             // Update counters based on loaded data
             const labelSpan = card.querySelector('.automation-card-label');
@@ -7425,6 +7463,80 @@ function displayToast(messageElement) {
             }
         });
     }
+
+function displayNoteCardDetails(cardElement) {
+    const detailsSidebar = document.getElementById('details-sidebar');
+    detailsSidebar.innerHTML = ''; // Clear previous content
+
+    const cardId = cardElement.querySelector('.automation-card-label').textContent;
+    const title = cardElement.dataset.title || 'Note';
+    const linkedNotes = JSON.parse(cardElement.dataset.linkedNotes || '[]');
+
+    const titleEl = document.createElement('h3');
+    titleEl.contentEditable = true;
+    titleEl.textContent = title;
+    titleEl.addEventListener('blur', () => {
+        cardElement.dataset.title = titleEl.textContent;
+    });
+
+    const subtitleEl = document.createElement('p');
+    subtitleEl.textContent = cardId;
+    subtitleEl.style.color = '#a0b4c9';
+    subtitleEl.style.fontStyle = 'italic';
+    subtitleEl.style.marginTop = '-5px';
+
+    const linkButton = document.createElement('button');
+    linkButton.textContent = 'Link Note';
+    linkButton.style.marginTop = '10px';
+    linkButton.addEventListener('click', () => {
+        linkingNoteForAutomationCard = cardElement;
+        switchTab('tab-notes');
+        alert('Select a note from the list to link it.');
+    });
+
+    const linkedNotesHeader = document.createElement('h4');
+    linkedNotesHeader.textContent = 'Linked Notes';
+    linkedNotesHeader.style.marginTop = '20px';
+
+    const linkedNotesList = document.createElement('ol');
+    linkedNotesList.style.paddingLeft = '20px';
+
+    if (linkedNotes.length > 0) {
+        linkedNotes.forEach(noteId => {
+            const note = notesData.find(n => n.id === noteId);
+            if (note) {
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = note.title;
+                link.dataset.noteId = noteId;
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                    const notePreviewBody = document.getElementById('note-preview-body');
+                    if (notePreviewOverlay && notePreviewBody && easyMDE) {
+                        const renderedHTML = easyMDE.options.previewRender(note.content);
+                        notePreviewBody.innerHTML = renderedHTML;
+                        notePreviewOverlay.style.display = 'flex';
+                    }
+                });
+                listItem.appendChild(link);
+                linkedNotesList.appendChild(listItem);
+            }
+        });
+    } else {
+        const placeholder = document.createElement('p');
+        placeholder.textContent = 'No notes linked yet.';
+        placeholder.style.color = '#a0b4c9';
+        linkedNotesList.appendChild(placeholder);
+    }
+
+    detailsSidebar.appendChild(titleEl);
+    detailsSidebar.appendChild(subtitleEl);
+    detailsSidebar.appendChild(linkButton);
+    detailsSidebar.appendChild(linkedNotesHeader);
+    detailsSidebar.appendChild(linkedNotesList);
+}
 
     function initializeAutomationSidebar() {
         const moduleCardsContainer = document.getElementById('module-cards-container');
@@ -7459,6 +7571,17 @@ function displayToast(messageElement) {
                 label.className = 'automation-card-label';
                 label.textContent = labelText;
                 newCard.appendChild(label);
+
+                // Add interaction for Note cards
+                if (cardName === 'Note') {
+                    newCard.dataset.cardType = 'note';
+                    newCard.dataset.title = 'Note'; // Default title
+                    newCard.dataset.linkedNotes = '[]'; // Default empty array
+
+                    newCard.addEventListener('click', () => {
+                        displayNoteCardDetails(newCard);
+                    });
+                }
 
                 automationCanvas.appendChild(newCard);
             });
