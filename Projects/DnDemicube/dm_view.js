@@ -263,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeOverlayCardId = null;
     let originalQuestState = null;
     let automationCanvasData = [];
+    let automationCardCounters = {};
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -3007,7 +3008,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (automationCanvas) {
                     automationCanvasData = Array.from(automationCanvas.children).map(card => {
                         return {
-                            textContent: card.textContent,
+                            innerHTML: card.innerHTML,
                             cardClass: card.className
                         };
                     });
@@ -7401,11 +7402,27 @@ function displayToast(messageElement) {
         const automationCanvas = document.getElementById('automation-canvas');
         if (!automationCanvas) return;
         automationCanvas.innerHTML = '';
+        automationCardCounters = {}; // Reset counters
+
         automationCanvasData.forEach(cardData => {
             const card = document.createElement('div');
             card.className = cardData.cardClass;
-            card.textContent = cardData.textContent;
+            card.innerHTML = cardData.innerHTML;
             automationCanvas.appendChild(card);
+
+            // Update counters based on loaded data
+            const labelSpan = card.querySelector('.automation-card-label');
+            if (labelSpan) {
+                const labelText = labelSpan.textContent;
+                const match = labelText.match(/^(.*)_(\d+)$/);
+                if (match) {
+                    const baseName = match[1];
+                    const number = parseInt(match[2], 10);
+                    if (!automationCardCounters[baseName] || automationCardCounters[baseName] < number) {
+                        automationCardCounters[baseName] = number;
+                    }
+                }
+            }
         });
     }
 
@@ -7418,27 +7435,38 @@ function displayToast(messageElement) {
             'Story Beat', 'Note', 'Character', 'Map', 'Wander', 'Initiative', 'Roll'
         ];
 
-        // Clear existing cards to prevent duplication
         moduleCardsContainer.innerHTML = '';
+        automationCardCounters = {}; // Reset counters on initialization
 
-        // Create and append cards
         cardButtons.forEach(cardName => {
             const card = document.createElement('div');
             card.className = 'module-card';
             card.textContent = cardName;
             card.addEventListener('click', () => {
                 const newCard = document.createElement('div');
-                newCard.className = card.className;
-                newCard.textContent = card.textContent;
+                // Explicitly copy all classes from the source card to ensure color is transferred.
+                card.classList.forEach(c => newCard.classList.add(c));
+
+                const cardTitle = document.createElement('span');
+                cardTitle.textContent = card.textContent;
+                newCard.appendChild(cardTitle);
+
+                const baseName = cardName.toLowerCase().replace(/\s+/g, '_');
+                automationCardCounters[baseName] = (automationCardCounters[baseName] || 0) + 1;
+                const labelText = `${baseName}_${automationCardCounters[baseName]}`;
+
+                const label = document.createElement('span');
+                label.className = 'automation-card-label';
+                label.textContent = labelText;
+                newCard.appendChild(label);
+
                 automationCanvas.appendChild(newCard);
             });
             moduleCardsContainer.appendChild(card);
         });
 
-        // Set initial card colors
         updateCardColors(toggleSwitch.checked);
 
-        // Add event listener to toggle switch
         toggleSwitch.addEventListener('change', () => {
             updateCardColors(toggleSwitch.checked);
         });
