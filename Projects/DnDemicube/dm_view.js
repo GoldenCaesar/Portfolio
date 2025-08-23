@@ -60,7 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const polygonContextMenu = document.getElementById('polygon-context-menu');
     const noteContextMenu = document.getElementById('note-context-menu');
     const characterContextMenu = document.getElementById('character-context-menu');
-    const tokenContextMenu = document.getElementById('token-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const displayedFileNames = new Set();
 
@@ -292,7 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
     let selectedNoteForContextMenu = null;
     let selectedCharacterForContextMenu = null;
-    let selectedTokenForContextMenu = null;
 let linkingNoteForAutomationCard = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
@@ -4262,12 +4260,10 @@ function propagateCharacterUpdate(characterId) {
         polygonContextMenu.style.display = 'none';
         noteContextMenu.style.display = 'none';
         characterContextMenu.style.display = 'none';
-        tokenContextMenu.style.display = 'none';
         mapToolsContextMenu.style.display = 'none';
         document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
-        selectedTokenForContextMenu = null;
 
         if (!selectedMapFileName) {
             return;
@@ -4279,25 +4275,18 @@ function propagateCharacterUpdate(characterId) {
 
         if (!imageCoords) return;
 
-        let overlayClicked = false;
-
         if (initiativeTokens.length > 0) {
             for (const token of initiativeTokens) {
                 if (isPointInToken(imageCoords, token)) {
-                    selectedTokenForContextMenu = token;
-                    const character = charactersData.find(c => c.id === token.characterId);
-
-                    if (character) {
-                        const checkbox = document.getElementById('token-context-menu-visibility-checkbox');
-                        checkbox.checked = character.isDetailsVisible;
+                    if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
+                        tokenStatBlock.style.display = 'none';
+                        selectedTokenForStatBlock = null;
+                        sendTokenStatBlockStateToPlayerView(false);
+                    } else {
+                        selectedTokenForStatBlock = token;
+                        populateAndShowStatBlock(token, event.pageX, event.pageY);
                     }
-
-                    tokenContextMenu.style.left = `${event.pageX}px`;
-                    tokenContextMenu.style.top = `${event.pageY}px`;
-                    tokenContextMenu.style.display = 'block';
-
-                    overlayClicked = true;
-                    return;
+                    return; // Token was clicked, don't show other context menus
                 }
             }
         }
@@ -5750,42 +5739,6 @@ function propagateCharacterUpdate(characterId) {
             }
             characterContextMenu.style.display = 'none';
         });
-    }
-
-    if (tokenContextMenu) {
-        tokenContextMenu.addEventListener('click', (event) => {
-            const action = event.target.dataset.action;
-            if (action === 'view-stat-block') {
-                if (selectedTokenForContextMenu) {
-                    populateAndShowStatBlock(selectedTokenForContextMenu, parseInt(tokenContextMenu.style.left, 10), parseInt(tokenContextMenu.style.top, 10));
-                }
-            }
-            // This hides the menu for any action, including just clicking on the checkbox label area.
-            // We only stop propagation for the checkbox itself.
-            if (event.target.id !== 'token-context-menu-visibility-checkbox' && event.target.parentElement.tagName !== 'LABEL') {
-                 tokenContextMenu.style.display = 'none';
-                 selectedTokenForContextMenu = null;
-            }
-        });
-
-        const visibilityCheckbox = document.getElementById('token-context-menu-visibility-checkbox');
-        if (visibilityCheckbox) {
-            visibilityCheckbox.addEventListener('change', () => {
-                if (selectedTokenForContextMenu) {
-                    const character = charactersData.find(c => c.id === selectedTokenForContextMenu.characterId);
-                    if (character) {
-                        character.isDetailsVisible = visibilityCheckbox.checked;
-                        propagateCharacterUpdate(character.id);
-
-                        if (selectedCharacterId === character.id && characterSheetIframe.contentWindow) {
-                             characterSheetIframe.contentWindow.postMessage({ type: 'characterDetailsVisibilityChange', isDetailsVisible: character.isDetailsVisible }, '*');
-                        }
-                    }
-                }
-                tokenContextMenu.style.display = 'none';
-                selectedTokenForContextMenu = null;
-            });
-        }
     }
 
     window.addEventListener('message', (event) => {
