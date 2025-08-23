@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const polygonContextMenu = document.getElementById('polygon-context-menu');
     const noteContextMenu = document.getElementById('note-context-menu');
     const characterContextMenu = document.getElementById('character-context-menu');
+    const tokenContextMenu = document.getElementById('token-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const displayedFileNames = new Set();
 
@@ -89,30 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const tokenStatBlockAddRollModifier = document.getElementById('token-stat-block-add-roll-modifier');
     const tokenStatBlockSaveRollBtn = document.getElementById('token-stat-block-save-roll-btn');
     let tokenStatBlockDiceCounts = {};
-
-    const tokenStatBlockVisibilityCheckbox = document.getElementById('token-stat-block-visibility-checkbox');
-    if (tokenStatBlockVisibilityCheckbox) {
-        tokenStatBlockVisibilityCheckbox.addEventListener('change', () => {
-            if (!selectedTokenForStatBlock) return;
-
-            const characterInInitiative = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
-            if (!characterInInitiative) return;
-
-            const rootCharacter = charactersData.find(c => c.id === characterInInitiative.id);
-
-            if (rootCharacter) {
-                rootCharacter.isDetailsVisible = tokenStatBlockVisibilityCheckbox.checked;
-
-                // Also update the character in the active initiative list to keep it in sync
-                characterInInitiative.isDetailsVisible = rootCharacter.isDetailsVisible;
-
-                // Propagate changes to player view
-                sendInitiativeDataToPlayerView();
-                // If the stat block is open for this character on the player view, we need to update it.
-                sendTokenStatBlockStateToPlayerView(true, selectedTokenForStatBlock, { left: parseInt(tokenStatBlock.style.left), top: parseInt(tokenStatBlock.style.top) });
-            }
-        });
-    }
 
     // Dice Roller Elements
     const diceRollerIcon = document.getElementById('dice-roller-icon');
@@ -315,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
     let selectedNoteForContextMenu = null;
     let selectedCharacterForContextMenu = null;
+    let selectedTokenForContextMenu = null;
 let linkingNoteForAutomationCard = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
@@ -657,8 +635,49 @@ let linkingNoteForAutomationCard = null;
             }
         }
 
+    // Ensure the visibility flag is correctly set for the player view's logic
+    if ('isDetailsVisible' in censoredCharacter) {
+        censoredCharacter.isDetailsVisible = false;
+    }
+
         return censoredCharacter;
     }
+
+function propagateCharacterUpdate(characterId) {
+    const masterCharacter = charactersData.find(c => c.id === characterId);
+    if (!masterCharacter) {
+        console.warn(`propagateCharacterUpdate: Could not find master character with ID ${characterId}`);
+        return;
+    }
+
+    // 1. Propagate changes to all instances in the active initiative list
+    activeInitiative.forEach(activeChar => {
+        if (activeChar.id === characterId) {
+            // Update properties from the master character
+            activeChar.name = masterCharacter.name;
+            activeChar.isDetailsVisible = masterCharacter.isDetailsVisible;
+            activeChar.sheetData = masterCharacter.sheetData;
+        }
+    });
+
+    // 2. Propagate changes to any active tokens on the map
+    initiativeTokens.forEach(token => {
+        if (token.characterId === characterId) {
+            token.name = masterCharacter.name;
+            token.playerName = masterCharacter.sheetData.player_name;
+            token.portrait = masterCharacter.sheetData.character_portrait;
+            token.initials = getInitials(masterCharacter.name);
+            token.isDetailsVisible = masterCharacter.isDetailsVisible;
+        }
+    });
+
+    // 3. Re-render UI elements and synchronize with the player view
+    renderActiveInitiativeList();
+    if (selectedMapFileName) {
+        displayMapOnCanvas(selectedMapFileName); // This will redraw the tokens
+    }
+    sendInitiativeDataToPlayerView();
+}
 
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
@@ -1048,12 +1067,6 @@ let linkingNoteForAutomationCard = null;
         tokenStatBlockPlayerName.textContent = `(${character.sheetData.player_name || 'N/A'})`;
         tokenStatBlockHp.value = character.sheetData.hp_current || 0;
         tokenStatBlockMaxHp.textContent = `/ ${character.sheetData.hp_max || 'N/A'}`;
-
-        const visibilityCheckbox = document.getElementById('token-stat-block-visibility-checkbox');
-        const rootCharacter = charactersData.find(c => c.id === character.id);
-        if (visibilityCheckbox && rootCharacter) {
-            visibilityCheckbox.checked = rootCharacter.isDetailsVisible;
-        }
 
         // Render saved rolls
         tokenStatBlockRollsList.innerHTML = '';
@@ -4249,10 +4262,12 @@ let linkingNoteForAutomationCard = null;
         polygonContextMenu.style.display = 'none';
         noteContextMenu.style.display = 'none';
         characterContextMenu.style.display = 'none';
+        tokenContextMenu.style.display = 'none';
         mapToolsContextMenu.style.display = 'none';
         document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
+        selectedTokenForContextMenu = null;
 
         if (!selectedMapFileName) {
             return;
@@ -4264,18 +4279,25 @@ let linkingNoteForAutomationCard = null;
 
         if (!imageCoords) return;
 
+        let overlayClicked = false;
+
         if (initiativeTokens.length > 0) {
             for (const token of initiativeTokens) {
                 if (isPointInToken(imageCoords, token)) {
-                    if (selectedTokenForStatBlock && selectedTokenForStatBlock.uniqueId === token.uniqueId) {
-                        tokenStatBlock.style.display = 'none';
-                        selectedTokenForStatBlock = null;
-                        sendTokenStatBlockStateToPlayerView(false);
-                    } else {
-                        selectedTokenForStatBlock = token;
-                        populateAndShowStatBlock(token, event.pageX, event.pageY);
+                    selectedTokenForContextMenu = token;
+                    const character = charactersData.find(c => c.id === token.characterId);
+
+                    if (character) {
+                        const checkbox = document.getElementById('token-context-menu-visibility-checkbox');
+                        checkbox.checked = character.isDetailsVisible;
                     }
-                    return; // Token was clicked, don't show other context menus
+
+                    tokenContextMenu.style.left = `${event.pageX}px`;
+                    tokenContextMenu.style.top = `${event.pageY}px`;
+                    tokenContextMenu.style.display = 'block';
+
+                    overlayClicked = true;
+                    return;
                 }
             }
         }
@@ -4283,7 +4305,6 @@ let linkingNoteForAutomationCard = null;
         const selectedMapData = detailedMapData.get(selectedMapFileName);
         if (!selectedMapData) return;
 
-        let overlayClicked = false;
         if (selectedMapData.overlays) {
             for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
                 const overlay = selectedMapData.overlays[i];
@@ -5245,6 +5266,7 @@ let linkingNoteForAutomationCard = null;
             if (character.id === selectedCharacterId && characterNameInput) {
                 characterNameInput.value = character.name;
             }
+            propagateCharacterUpdate(characterId);
         }
     }
 
@@ -5729,6 +5751,42 @@ let linkingNoteForAutomationCard = null;
         });
     }
 
+    if (tokenContextMenu) {
+        tokenContextMenu.addEventListener('click', (event) => {
+            const action = event.target.dataset.action;
+            if (action === 'view-stat-block') {
+                if (selectedTokenForContextMenu) {
+                    populateAndShowStatBlock(selectedTokenForContextMenu, parseInt(tokenContextMenu.style.left, 10), parseInt(tokenContextMenu.style.top, 10));
+                }
+            }
+            // This hides the menu for any action, including just clicking on the checkbox label area.
+            // We only stop propagation for the checkbox itself.
+            if (event.target.id !== 'token-context-menu-visibility-checkbox' && event.target.parentElement.tagName !== 'LABEL') {
+                 tokenContextMenu.style.display = 'none';
+                 selectedTokenForContextMenu = null;
+            }
+        });
+
+        const visibilityCheckbox = document.getElementById('token-context-menu-visibility-checkbox');
+        if (visibilityCheckbox) {
+            visibilityCheckbox.addEventListener('change', () => {
+                if (selectedTokenForContextMenu) {
+                    const character = charactersData.find(c => c.id === selectedTokenForContextMenu.characterId);
+                    if (character) {
+                        character.isDetailsVisible = visibilityCheckbox.checked;
+                        propagateCharacterUpdate(character.id);
+
+                        if (selectedCharacterId === character.id && characterSheetIframe.contentWindow) {
+                             characterSheetIframe.contentWindow.postMessage({ type: 'characterDetailsVisibilityChange', isDetailsVisible: character.isDetailsVisible }, '*');
+                        }
+                    }
+                }
+                tokenContextMenu.style.display = 'none';
+                selectedTokenForContextMenu = null;
+            });
+        }
+    }
+
     window.addEventListener('message', (event) => {
         if (event.source !== characterSheetIframe.contentWindow) {
             return;
@@ -5739,20 +5797,7 @@ let linkingNoteForAutomationCard = null;
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.sheetData = event.data.data;
-
-                    // Propagate changes to any instance of this character in the active initiative
-                    activeInitiative.forEach(activeChar => {
-                        if (activeChar.id === selectedCharacterId) {
-                            activeChar.sheetData = character.sheetData;
-                        }
-                    });
-
-                    // Rerender lists and tokens to show updated info
-                    renderActiveInitiativeList();
-                    if (selectedMapFileName) {
-                        displayMapOnCanvas(selectedMapFileName);
-                    }
-                    sendInitiativeDataToPlayerView();
+                    propagateCharacterUpdate(selectedCharacterId);
                 }
             }
         } else if (event.data.type === 'characterSheetReady') {
@@ -5764,6 +5809,7 @@ let linkingNoteForAutomationCard = null;
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.isDetailsVisible = event.data.isDetailsVisible;
+                    propagateCharacterUpdate(selectedCharacterId);
                 }
             }
         } else if (event.data.type === 'sheetDataForView') {
