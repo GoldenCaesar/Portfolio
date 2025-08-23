@@ -1137,10 +1137,12 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 
 #footer-left {
     flex-basis: 30%;
+    overflow-y: auto;
 }
 
 #footer-center {
     flex-basis: 60%;
+    overflow-y: auto;
 }
 
 #dm-tools-list {
