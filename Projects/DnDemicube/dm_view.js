@@ -7875,6 +7875,186 @@ function displayCardDetails(cardElement) {
             availableMapsContainer.appendChild(noMapsPlaceholder);
         }
         detailsSidebar.appendChild(availableMapsContainer);
+    } else if (cardElement.dataset.cardType === 'initiative' || cardElement.dataset.cardType === 'wander') {
+        // --- Encounter Setup ---
+        const encounterHeader = document.createElement('div');
+        encounterHeader.style.display = 'flex';
+        encounterHeader.style.justifyContent = 'space-between';
+        encounterHeader.style.alignItems = 'center';
+
+        const growingListHeader = document.createElement('h4');
+        growingListHeader.textContent = 'Encounter Participants';
+        encounterHeader.appendChild(growingListHeader);
+
+        const startButton = document.createElement('button');
+        startButton.textContent = 'Start';
+        startButton.id = 'automation-start-encounter-btn';
+        encounterHeader.appendChild(startButton);
+
+        detailsSidebar.appendChild(encounterHeader);
+
+        const growingList = document.createElement('div');
+        growingList.id = 'automation-encounter-list';
+        growingList.style.minHeight = '50px';
+        growingList.style.border = '1px solid #4a5f7a';
+        growingList.style.padding = '5px';
+        detailsSidebar.appendChild(growingList);
+
+
+        // --- Available Characters ---
+        const availableCharsHeader = document.createElement('h4');
+        availableCharsHeader.textContent = 'Add Character';
+        detailsSidebar.appendChild(availableCharsHeader);
+
+        const availableCharsContainer = document.createElement('div');
+        availableCharsContainer.className = 'available-notes-container'; // Reuse class
+        charactersData.forEach(character => {
+            const charItem = document.createElement('div');
+            charItem.textContent = character.name;
+            charItem.className = 'available-note-item';
+            charItem.dataset.characterId = character.id;
+            charItem.dataset.characterName = character.name; // Store name for adding to list
+            availableCharsContainer.appendChild(charItem);
+        });
+        detailsSidebar.appendChild(availableCharsContainer);
+
+        // --- Available Saved Initiatives ---
+        const savedInitiativesHeader = document.createElement('h4');
+        savedInitiativesHeader.textContent = 'Add Saved Initiative';
+        detailsSidebar.appendChild(savedInitiativesHeader);
+
+        const savedInitiativesContainer = document.createElement('div');
+        savedInitiativesContainer.className = 'available-notes-container'; // Reuse class
+         Object.keys(savedInitiatives).forEach(name => {
+            const initiativeItem = document.createElement('div');
+            initiativeItem.textContent = name;
+            initiativeItem.className = 'available-note-item';
+            initiativeItem.dataset.initiativeName = name;
+            savedInitiativesContainer.appendChild(initiativeItem);
+        });
+        detailsSidebar.appendChild(savedInitiativesContainer);
+
+        // --- Logic for the growing list ---
+        const renderEncounterList = () => {
+            growingList.innerHTML = '';
+            const participants = JSON.parse(cardElement.dataset.participants || '[]');
+            participants.forEach((participant, index) => {
+                const item = document.createElement('div');
+                item.className = 'encounter-participant-item';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = participant.name;
+                item.appendChild(nameSpan);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = '×';
+                removeBtn.className = 'remove-participant-btn';
+                removeBtn.addEventListener('click', () => {
+                    participants.splice(index, 1);
+                    cardElement.dataset.participants = JSON.stringify(participants);
+                    renderEncounterList();
+                });
+                item.appendChild(removeBtn);
+                growingList.appendChild(item);
+            });
+        };
+
+        const addParticipant = (participant) => {
+            const participants = JSON.parse(cardElement.dataset.participants || '[]');
+            participants.push(participant);
+            cardElement.dataset.participants = JSON.stringify(participants);
+            renderEncounterList();
+        };
+
+        availableCharsContainer.addEventListener('click', (e) => {
+            if (e.target.matches('.available-note-item')) {
+                addParticipant({
+                    type: 'character',
+                    id: e.target.dataset.characterId,
+                    name: e.target.dataset.characterName
+                });
+            }
+        });
+
+        savedInitiativesContainer.addEventListener('click', (e) => {
+            if (e.target.matches('.available-note-item')) {
+                addParticipant({
+                    type: 'initiative',
+                    name: e.target.dataset.initiativeName
+                });
+            }
+        });
+
+        // Initial render
+        renderEncounterList();
+
+        startButton.addEventListener('click', () => {
+            const participants = JSON.parse(cardElement.dataset.participants || '[]');
+            if (participants.length === 0) {
+                alert("Please add at least one character or saved initiative to the encounter.");
+                return;
+            }
+
+            // 1. Clear and populate the active initiative list
+            activeInitiative = [];
+            participants.forEach(participant => {
+                if (participant.type === 'character') {
+                    const characterData = charactersData.find(c => c.id == participant.id);
+                    if (characterData) {
+                        // Deep copy and add a unique ID for this instance in the initiative
+                        activeInitiative.push({ ...JSON.parse(JSON.stringify(characterData)), initiative: null, uniqueId: Date.now() + Math.random() });
+                    }
+                } else if (participant.type === 'initiative') {
+                    const savedInit = savedInitiatives[participant.name];
+                    if (savedInit) {
+                        savedInit.forEach(characterData => {
+                            // Deep copy and add a unique ID
+                            activeInitiative.push({ ...JSON.parse(JSON.stringify(characterData)), initiative: null, uniqueId: Date.now() + Math.random() });
+                        });
+                    }
+                }
+            });
+
+            // 2. Open the main initiative tracker overlay
+            if (initiativeTrackerOverlay) {
+                initiativeTrackerOverlay.style.display = 'flex';
+                renderActiveInitiativeList(); // Render the new list
+                sendInitiativeTrackerStateToPlayerView(true);
+            }
+
+            // 3. Set map mode based on card's interaction mode
+            const interactionMode = cardElement.dataset.interactionMode || 'dm-only';
+            if (modeToggleSwitch) {
+                const isPlayerVisible = interactionMode === 'both';
+                if (modeToggleSwitch.checked !== isPlayerVisible) {
+                    modeToggleSwitch.click(); // This will trigger the change event to handle slideshow/map view
+                } else {
+                    // If the state is already correct, we might need to manually trigger the player view update
+                    if(isPlayerVisible && selectedMapFileName) {
+                        sendMapToPlayerView(selectedMapFileName);
+                    } else {
+                        triggerSlideshow();
+                    }
+                }
+            }
+
+            // 4. Start the encounter
+            const cardType = cardElement.dataset.cardType;
+            if (cardType === 'wander') {
+                if (wanderButton) wanderButton.click();
+            } else if (cardType === 'initiative') {
+                if (startInitiativeButton) startInitiativeButton.click();
+                // Auto-roll initiative after a short delay to ensure the start process has completed
+                if (autoInitiativeButton) {
+                    setTimeout(() => {
+                        autoInitiativeButton.click();
+                    }, 100);
+                }
+            }
+
+            // 5. Switch to the DM Controls tab to see the map
+            switchTab('tab-dm-controls');
+        });
     }
 
 
