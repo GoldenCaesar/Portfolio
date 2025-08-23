@@ -5960,7 +5960,23 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
 | **Flaws** | ${sheetData.flaws || ''} |
 `;
     }
-    return easyMDE.options.previewRender(md);
+
+    if (easyMDE && easyMDE.options.previewRender) {
+        return easyMDE.options.previewRender(md);
+    }
+    // Fallback for when the main notes editor hasn't been initialized
+    const dummyTextarea = document.createElement('textarea');
+    let html;
+    try {
+        const tempMDE = new EasyMDE({ element: dummyTextarea });
+        html = tempMDE.options.previewRender(md);
+        tempMDE.toTextArea(); // Clean up the instance
+    } catch (e) {
+        console.error("Failed to create temporary EasyMDE instance for markdown rendering:", e);
+        // Basic fallback if EasyMDE fails completely, to prevent app crash
+        html = md.replace(/\n/g, '<br>');
+    }
+    return html;
 }
 
 let activeToastTimers = [];
