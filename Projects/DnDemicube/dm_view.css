@@ -500,6 +500,10 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     transform: scale(1.05);
 }
 
+#automation-canvas .module-card.dragging {
+    opacity: 0.5;
+}
+
 #shadow-tools-container {
     display: flex;
     gap: 10px;

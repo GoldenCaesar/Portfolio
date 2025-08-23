@@ -7446,6 +7446,14 @@ function displayToast(messageElement) {
                 displayCardDetails(card);
             });
 
+            card.draggable = true;
+            card.addEventListener('dragstart', () => {
+                card.classList.add('dragging');
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+            });
+
             // Update counters based on loaded data
             const labelSpan = card.querySelector('.automation-card-label');
             if (labelSpan) {
@@ -7570,6 +7578,20 @@ function displayCardDetails(cardElement) {
     detailsSidebar.appendChild(deleteButton);
 }
 
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.module-card:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
     function initializeAutomationSidebar() {
         const moduleCardsContainer = document.getElementById('module-cards-container');
         const automationCanvas = document.getElementById('automation-canvas');
@@ -7614,9 +7636,30 @@ function displayCardDetails(cardElement) {
                     displayCardDetails(newCard);
                 });
 
+                newCard.draggable = true;
+                newCard.addEventListener('dragstart', () => {
+                    newCard.classList.add('dragging');
+                });
+                newCard.addEventListener('dragend', () => {
+                    newCard.classList.remove('dragging');
+                });
+
                 automationCanvas.appendChild(newCard);
             });
             moduleCardsContainer.appendChild(card);
+        });
+
+        automationCanvas.addEventListener('dragover', event => {
+            event.preventDefault();
+            const afterElement = getDragAfterElement(automationCanvas, event.clientY);
+            const draggingCard = document.querySelector('#automation-canvas .module-card.dragging');
+            if (draggingCard) {
+                if (afterElement == null) {
+                    automationCanvas.appendChild(draggingCard);
+                } else {
+                    automationCanvas.insertBefore(draggingCard, afterElement);
+                }
+            }
         });
 
         updateCardColors(toggleSwitch.checked);
