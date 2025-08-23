@@ -7710,6 +7710,126 @@ function displayCardDetails(cardElement) {
             availableCharsContainer.appendChild(noCharsPlaceholder);
         }
         detailsSidebar.appendChild(availableCharsContainer);
+    } else if (cardElement.dataset.cardType === 'map') {
+        let linkedMaps = JSON.parse(cardElement.dataset.linkedMaps || '[]');
+
+        // --- 1. Display Linked Maps ---
+        const linkedMapsHeader = document.createElement('h4');
+        linkedMapsHeader.textContent = 'Linked Maps';
+        linkedMapsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(linkedMapsHeader);
+
+        const linkedMapsList = document.createElement('ol');
+        linkedMapsList.className = 'automation-linked-maps-list'; // Reusing class for consistency
+        if (linkedMaps.length > 0) {
+            linkedMaps.forEach((mapLink, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'linked-map-item';
+
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = `${mapLink.mapName} (${mapLink.mode})`;
+                link.dataset.mapName = mapLink.mapName;
+                link.dataset.mode = mapLink.mode;
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const mapName = e.target.dataset.mapName;
+                    const mode = e.target.dataset.mode;
+                    const targetMapData = detailedMapData.get(mapName);
+
+                    if (targetMapData) {
+                        switchTab('tab-dm-controls');
+                        selectedMapFileName = mapName;
+                        targetMapData.mode = mode === 'DM Only' ? 'edit' : 'view';
+                        modeToggleSwitch.checked = targetMapData.mode === 'view';
+                        modeToggleSwitch.disabled = false;
+
+                        clearAllSelections();
+                        const mapItems = mapsList.querySelectorAll('li');
+                        mapItems.forEach(li => {
+                            if (li.dataset.fileName === mapName) {
+                                li.classList.add('selected-map-item');
+                            }
+                        });
+
+                        displayMapOnCanvas(mapName);
+                        updateButtonStates();
+                        if (targetMapData.mode === 'view') {
+                            sendMapToPlayerView(mapName);
+                        }
+                    } else {
+                        alert(`Map "${mapName}" not found.`);
+                    }
+                });
+
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = '×';
+                removeBtn.className = 'remove-map-link-btn';
+                removeBtn.title = 'Remove this map link';
+                removeBtn.addEventListener('click', () => {
+                    linkedMaps.splice(index, 1);
+                    cardElement.dataset.linkedMaps = JSON.stringify(linkedMaps);
+                    displayCardDetails(cardElement); // Refresh sidebar
+                });
+
+                listItem.appendChild(link);
+                listItem.appendChild(removeBtn);
+                linkedMapsList.appendChild(listItem);
+            });
+        } else {
+            const placeholder = document.createElement('p');
+            placeholder.textContent = 'No maps linked yet.';
+            placeholder.className = 'sidebar-placeholder';
+            linkedMapsList.appendChild(placeholder);
+        }
+        detailsSidebar.appendChild(linkedMapsList);
+
+        // --- 2. Form to Add New Map Link ---
+        const addMapHeader = document.createElement('h4');
+        addMapHeader.textContent = 'Add Map Link';
+        addMapHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(addMapHeader);
+
+        const addMapForm = document.createElement('div');
+        addMapForm.className = 'add-map-link-form';
+
+        const mapSelect = document.createElement('select');
+        mapSelect.id = 'automation-map-select';
+        Array.from(detailedMapData.keys()).forEach(mapName => {
+            const option = document.createElement('option');
+            option.value = mapName;
+            option.textContent = mapName;
+            mapSelect.appendChild(option);
+        });
+
+        const modeSelect = document.createElement('select');
+        modeSelect.id = 'automation-map-mode-select';
+        ['DM Only', 'Both'].forEach(modeName => {
+            const option = document.createElement('option');
+            option.value = modeName;
+            option.textContent = modeName;
+            modeSelect.appendChild(option);
+        });
+
+        const addLinkBtn = document.createElement('button');
+        addLinkBtn.textContent = 'Add Link';
+        addLinkBtn.addEventListener('click', () => {
+            const selectedMap = mapSelect.value;
+            const selectedMode = modeSelect.value;
+
+            if (selectedMap && !linkedMaps.some(m => m.mapName === selectedMap)) {
+                linkedMaps.push({ mapName: selectedMap, mode: selectedMode });
+                cardElement.dataset.linkedMaps = JSON.stringify(linkedMaps);
+                displayCardDetails(cardElement); // Refresh sidebar
+            } else if (linkedMaps.some(m => m.mapName === selectedMap)) {
+                alert(`Map "${selectedMap}" is already linked.`);
+            }
+        });
+
+        addMapForm.appendChild(mapSelect);
+        addMapForm.appendChild(modeSelect);
+        addMapForm.appendChild(addLinkBtn);
+        detailsSidebar.appendChild(addMapForm);
     }
 
 
@@ -7781,6 +7901,8 @@ function getDragAfterElement(container, y) {
                     newCard.dataset.linkedNotes = '[]';
                 } else if (cardName === 'Character') {
                     newCard.dataset.linkedCharacters = '[]';
+                } else if (cardName === 'Map') {
+                    newCard.dataset.linkedMaps = '[]';
                 }
 
                 newCard.addEventListener('click', () => {
