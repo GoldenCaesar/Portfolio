@@ -4305,6 +4305,7 @@ function propagateCharacterUpdate(characterId) {
         const selectedMapData = detailedMapData.get(selectedMapFileName);
         if (!selectedMapData) return;
 
+        let overlayClicked = false;
         if (selectedMapData.overlays) {
             for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
                 const overlay = selectedMapData.overlays[i];
