@@ -633,6 +633,11 @@ let linkingNoteForAutomationCard = null;
             }
         }
 
+    // Ensure the visibility flag is correctly set for the player view's logic
+    if ('isDetailsVisible' in censoredCharacter) {
+        censoredCharacter.isDetailsVisible = false;
+    }
+
         return censoredCharacter;
     }
 
