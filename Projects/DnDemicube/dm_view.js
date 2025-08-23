@@ -7596,6 +7596,98 @@ function displayCardDetails(cardElement) {
             availableNotesContainer.appendChild(noNotesPlaceholder);
         }
         detailsSidebar.appendChild(availableNotesContainer);
+    } else if (cardElement.dataset.cardType === 'character') {
+        let linkedCharacters = JSON.parse(cardElement.dataset.linkedCharacters || '[]');
+
+        // --- 1. Display Linked Characters ---
+        const linkedCharsHeader = document.createElement('h4');
+        linkedCharsHeader.textContent = 'Linked Characters';
+        linkedCharsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(linkedCharsHeader);
+
+        const linkedCharsList = document.createElement('ol');
+        linkedCharsList.className = 'automation-linked-notes-list'; // Reuse class
+        if (linkedCharacters.length > 0) {
+            linkedCharacters.forEach((charId, index) => {
+                const character = charactersData.find(c => c.id === charId);
+                if (character) {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'linked-note-item'; // Reuse class
+
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.textContent = character.name;
+                    link.dataset.characterId = charId;
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const charPreviewOverlay = document.getElementById('character-preview-overlay');
+                        const charPreviewBody = document.getElementById('character-preview-body');
+                        if (charPreviewOverlay && charPreviewBody) {
+                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
+                            charPreviewBody.innerHTML = markdown;
+                            charPreviewOverlay.style.display = 'flex';
+                        }
+                    });
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.className = 'remove-note-link-btn'; // Reuse class
+                    removeBtn.title = 'Remove this character';
+                    removeBtn.addEventListener('click', () => {
+                        linkedCharacters.splice(index, 1);
+                        cardElement.dataset.linkedCharacters = JSON.stringify(linkedCharacters);
+                        displayCardDetails(cardElement); // Refresh
+                    });
+
+                    listItem.appendChild(link);
+                    listItem.appendChild(removeBtn);
+                    linkedCharsList.appendChild(listItem);
+                }
+            });
+        } else {
+            const placeholder = document.createElement('p');
+            placeholder.textContent = 'No characters linked yet.';
+            placeholder.className = 'sidebar-placeholder';
+            linkedCharsList.appendChild(placeholder);
+        }
+        detailsSidebar.appendChild(linkedCharsList);
+
+        // --- 2. Display Available Characters to Link ---
+        const availableCharsHeader = document.createElement('h4');
+        availableCharsHeader.textContent = 'Add Character to Link';
+        availableCharsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(availableCharsHeader);
+
+        const availableCharsContainer = document.createElement('div');
+        availableCharsContainer.className = 'available-notes-container'; // Reuse class
+
+        charactersData.forEach(character => {
+            if (!linkedCharacters.includes(character.id)) {
+                const charItem = document.createElement('div');
+                charItem.textContent = character.name;
+                charItem.className = 'available-note-item'; // Reuse class
+                charItem.title = `Click to link "${character.name}"`;
+                charItem.addEventListener('click', () => {
+                    linkedCharacters.push(character.id);
+                    cardElement.dataset.linkedCharacters = JSON.stringify(linkedCharacters);
+                    displayCardDetails(cardElement); // Refresh
+                });
+                availableCharsContainer.appendChild(charItem);
+            }
+        });
+
+        if (availableCharsContainer.children.length === 0 && charactersData.length > 0) {
+             const allLinkedPlaceholder = document.createElement('p');
+             allLinkedPlaceholder.textContent = 'All available characters are linked.';
+             allLinkedPlaceholder.className = 'sidebar-placeholder';
+             availableCharsContainer.appendChild(allLinkedPlaceholder);
+        } else if (charactersData.length === 0) {
+            const noCharsPlaceholder = document.createElement('p');
+            noCharsPlaceholder.textContent = 'No characters exist. Create one in the Characters tab.';
+            noCharsPlaceholder.className = 'sidebar-placeholder';
+            availableCharsContainer.appendChild(noCharsPlaceholder);
+        }
+        detailsSidebar.appendChild(availableCharsContainer);
     }
 
 
@@ -7665,6 +7757,8 @@ function getDragAfterElement(container, y) {
                 newCard.dataset.title = cardName;
                 if (cardName === 'Note') {
                     newCard.dataset.linkedNotes = '[]';
+                } else if (cardName === 'Character') {
+                    newCard.dataset.linkedCharacters = '[]';
                 }
 
                 newCard.addEventListener('click', () => {
