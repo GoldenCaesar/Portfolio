@@ -7711,7 +7711,16 @@ function displayCardDetails(cardElement) {
         }
         detailsSidebar.appendChild(availableCharsContainer);
     } else if (cardElement.dataset.cardType === 'map') {
-        let linkedMaps = JSON.parse(cardElement.dataset.linkedMaps || '[]');
+        let linkedMapsRaw = JSON.parse(cardElement.dataset.linkedMaps || '[]');
+
+        // --- Backward compatibility check and conversion ---
+        const isOldFormat = linkedMapsRaw.length > 0 && typeof linkedMapsRaw[0] === 'object' && linkedMapsRaw[0] !== null && linkedMapsRaw[0].hasOwnProperty('mapName');
+        let linkedMaps = isOldFormat ? linkedMapsRaw.map(item => item.mapName) : linkedMapsRaw;
+
+        // If conversion happened, update the dataset to the new format for future saves.
+        if (isOldFormat) {
+            cardElement.dataset.linkedMaps = JSON.stringify(linkedMaps);
+        }
 
         // --- 1. Display Linked Maps ---
         const linkedMapsHeader = document.createElement('h4');
@@ -7720,27 +7729,29 @@ function displayCardDetails(cardElement) {
         detailsSidebar.appendChild(linkedMapsHeader);
 
         const linkedMapsList = document.createElement('ol');
-        linkedMapsList.className = 'automation-linked-maps-list'; // Reusing class for consistency
+        linkedMapsList.className = 'automation-linked-maps-list';
         if (linkedMaps.length > 0) {
-            linkedMaps.forEach((mapLink, index) => {
+            linkedMaps.forEach((mapName, index) => {
                 const listItem = document.createElement('li');
                 listItem.className = 'linked-map-item';
 
                 const link = document.createElement('a');
                 link.href = '#';
-                link.textContent = `${mapLink.mapName} (${mapLink.mode})`;
-                link.dataset.mapName = mapLink.mapName;
-                link.dataset.mode = mapLink.mode;
+                link.textContent = mapName;
+                link.dataset.mapName = mapName;
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
                     const mapName = e.target.dataset.mapName;
-                    const mode = e.target.dataset.mode;
+                    // The card's mode determines behavior. Default to 'dm-only' if not set.
+                    const interactionMode = cardElement.dataset.interactionMode || 'dm-only';
+                    const targetMapMode = interactionMode === 'both' ? 'view' : 'edit';
+
                     const targetMapData = detailedMapData.get(mapName);
 
                     if (targetMapData) {
                         switchTab('tab-dm-controls');
                         selectedMapFileName = mapName;
-                        targetMapData.mode = mode === 'DM Only' ? 'edit' : 'view';
+                        targetMapData.mode = targetMapMode;
                         modeToggleSwitch.checked = targetMapData.mode === 'view';
                         modeToggleSwitch.disabled = false;
 
@@ -7769,7 +7780,7 @@ function displayCardDetails(cardElement) {
                 removeBtn.addEventListener('click', () => {
                     linkedMaps.splice(index, 1);
                     cardElement.dataset.linkedMaps = JSON.stringify(linkedMaps);
-                    displayCardDetails(cardElement); // Refresh sidebar
+                    displayCardDetails(cardElement);
                 });
 
                 listItem.appendChild(link);
@@ -7784,52 +7795,42 @@ function displayCardDetails(cardElement) {
         }
         detailsSidebar.appendChild(linkedMapsList);
 
-        // --- 2. Form to Add New Map Link ---
-        const addMapHeader = document.createElement('h4');
-        addMapHeader.textContent = 'Add Map Link';
-        addMapHeader.style.marginTop = '20px';
-        detailsSidebar.appendChild(addMapHeader);
+        // --- 2. Display Available Maps to Link ---
+        const availableMapsHeader = document.createElement('h4');
+        availableMapsHeader.textContent = 'Add Map to Link';
+        availableMapsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(availableMapsHeader);
 
-        const addMapForm = document.createElement('div');
-        addMapForm.className = 'add-map-link-form';
+        const availableMapsContainer = document.createElement('div');
+        availableMapsContainer.className = 'available-notes-container';
 
-        const mapSelect = document.createElement('select');
-        mapSelect.id = 'automation-map-select';
         Array.from(detailedMapData.keys()).forEach(mapName => {
-            const option = document.createElement('option');
-            option.value = mapName;
-            option.textContent = mapName;
-            mapSelect.appendChild(option);
-        });
-
-        const modeSelect = document.createElement('select');
-        modeSelect.id = 'automation-map-mode-select';
-        ['DM Only', 'Both'].forEach(modeName => {
-            const option = document.createElement('option');
-            option.value = modeName;
-            option.textContent = modeName;
-            modeSelect.appendChild(option);
-        });
-
-        const addLinkBtn = document.createElement('button');
-        addLinkBtn.textContent = 'Add Link';
-        addLinkBtn.addEventListener('click', () => {
-            const selectedMap = mapSelect.value;
-            const selectedMode = modeSelect.value;
-
-            if (selectedMap && !linkedMaps.some(m => m.mapName === selectedMap)) {
-                linkedMaps.push({ mapName: selectedMap, mode: selectedMode });
-                cardElement.dataset.linkedMaps = JSON.stringify(linkedMaps);
-                displayCardDetails(cardElement); // Refresh sidebar
-            } else if (linkedMaps.some(m => m.mapName === selectedMap)) {
-                alert(`Map "${selectedMap}" is already linked.`);
+            if (!linkedMaps.includes(mapName)) {
+                const mapItem = document.createElement('div');
+                mapItem.textContent = mapName;
+                mapItem.className = 'available-note-item';
+                mapItem.title = `Click to link "${mapName}"`;
+                mapItem.addEventListener('click', () => {
+                    linkedMaps.push(mapName);
+                    cardElement.dataset.linkedMaps = JSON.stringify(linkedMaps);
+                    displayCardDetails(cardElement);
+                });
+                availableMapsContainer.appendChild(mapItem);
             }
         });
 
-        addMapForm.appendChild(mapSelect);
-        addMapForm.appendChild(modeSelect);
-        addMapForm.appendChild(addLinkBtn);
-        detailsSidebar.appendChild(addMapForm);
+        if (availableMapsContainer.children.length === 0 && detailedMapData.size > 0) {
+             const allLinkedPlaceholder = document.createElement('p');
+             allLinkedPlaceholder.textContent = 'All available maps are linked.';
+             allLinkedPlaceholder.className = 'sidebar-placeholder';
+             availableMapsContainer.appendChild(allLinkedPlaceholder);
+        } else if (detailedMapData.size === 0) {
+            const noMapsPlaceholder = document.createElement('p');
+            noMapsPlaceholder.textContent = 'No maps exist. Upload one in the DM Controls tab.';
+            noMapsPlaceholder.className = 'sidebar-placeholder';
+            availableMapsContainer.appendChild(noMapsPlaceholder);
+        }
+        detailsSidebar.appendChild(availableMapsContainer);
     }
 
 
@@ -7897,6 +7898,7 @@ function getDragAfterElement(container, y) {
 
                 newCard.dataset.cardType = baseName;
                 newCard.dataset.title = cardName;
+                newCard.dataset.interactionMode = toggleSwitch.checked ? 'both' : 'dm-only';
                 if (cardName === 'Note') {
                     newCard.dataset.linkedNotes = '[]';
                 } else if (cardName === 'Character') {
