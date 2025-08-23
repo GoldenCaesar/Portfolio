@@ -641,6 +641,42 @@ let linkingNoteForAutomationCard = null;
         return censoredCharacter;
     }
 
+function propagateCharacterUpdate(characterId) {
+    const masterCharacter = charactersData.find(c => c.id === characterId);
+    if (!masterCharacter) {
+        console.warn(`propagateCharacterUpdate: Could not find master character with ID ${characterId}`);
+        return;
+    }
+
+    // 1. Propagate changes to all instances in the active initiative list
+    activeInitiative.forEach(activeChar => {
+        if (activeChar.id === characterId) {
+            // Update properties from the master character
+            activeChar.name = masterCharacter.name;
+            activeChar.isDetailsVisible = masterCharacter.isDetailsVisible;
+            activeChar.sheetData = masterCharacter.sheetData;
+        }
+    });
+
+    // 2. Propagate changes to any active tokens on the map
+    initiativeTokens.forEach(token => {
+        if (token.characterId === characterId) {
+            token.name = masterCharacter.name;
+            token.playerName = masterCharacter.sheetData.player_name;
+            token.portrait = masterCharacter.sheetData.character_portrait;
+            token.initials = getInitials(masterCharacter.name);
+            token.isDetailsVisible = masterCharacter.isDetailsVisible;
+        }
+    });
+
+    // 3. Re-render UI elements and synchronize with the player view
+    renderActiveInitiativeList();
+    if (selectedMapFileName) {
+        displayMapOnCanvas(selectedMapFileName); // This will redraw the tokens
+    }
+    sendInitiativeDataToPlayerView();
+}
+
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
         if (dmCanvas && shadowCanvas && drawingCanvas && mapContainer) {
@@ -5220,6 +5256,7 @@ let linkingNoteForAutomationCard = null;
             if (character.id === selectedCharacterId && characterNameInput) {
                 characterNameInput.value = character.name;
             }
+            propagateCharacterUpdate(characterId);
         }
     }
 
@@ -5714,20 +5751,7 @@ let linkingNoteForAutomationCard = null;
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.sheetData = event.data.data;
-
-                    // Propagate changes to any instance of this character in the active initiative
-                    activeInitiative.forEach(activeChar => {
-                        if (activeChar.id === selectedCharacterId) {
-                            activeChar.sheetData = character.sheetData;
-                        }
-                    });
-
-                    // Rerender lists and tokens to show updated info
-                    renderActiveInitiativeList();
-                    if (selectedMapFileName) {
-                        displayMapOnCanvas(selectedMapFileName);
-                    }
-                    sendInitiativeDataToPlayerView();
+                    propagateCharacterUpdate(selectedCharacterId);
                 }
             }
         } else if (event.data.type === 'characterSheetReady') {
@@ -5739,6 +5763,7 @@ let linkingNoteForAutomationCard = null;
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.isDetailsVisible = event.data.isDetailsVisible;
+                    propagateCharacterUpdate(selectedCharacterId);
                 }
             }
         } else if (event.data.type === 'sheetDataForView') {
