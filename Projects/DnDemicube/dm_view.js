@@ -5964,8 +5964,12 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     if (easyMDE && easyMDE.options.previewRender) {
         return easyMDE.options.previewRender(md);
     }
+
     // Fallback for when the main notes editor hasn't been initialized
     const dummyTextarea = document.createElement('textarea');
+    dummyTextarea.style.display = 'none'; // Ensure it's not visible
+    document.body.appendChild(dummyTextarea); // Append to DOM temporarily
+
     let html;
     try {
         const tempMDE = new EasyMDE({ element: dummyTextarea });
@@ -5975,6 +5979,8 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
         console.error("Failed to create temporary EasyMDE instance for markdown rendering:", e);
         // Basic fallback if EasyMDE fails completely, to prevent app crash
         html = md.replace(/\n/g, '<br>');
+    } finally {
+        document.body.removeChild(dummyTextarea); // Always remove the dummy element
     }
     return html;
 }
