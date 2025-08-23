@@ -7463,6 +7463,15 @@ function displayToast(messageElement) {
     }
 
 function displayCardDetails(cardElement) {
+    // Clear previous selection
+    const automationCanvas = document.getElementById('automation-canvas');
+    if (automationCanvas) {
+        const allCards = automationCanvas.querySelectorAll('.module-card');
+        allCards.forEach(card => card.classList.remove('automation-card-selected'));
+    }
+    // Add selection to current card
+    cardElement.classList.add('automation-card-selected');
+
     const detailsSidebar = document.getElementById('details-sidebar');
     detailsSidebar.innerHTML = ''; // Clear previous content
 
