@@ -7552,9 +7552,22 @@ function displayCardDetails(cardElement) {
                         e.preventDefault();
                         const notePreviewOverlay = document.getElementById('note-preview-overlay');
                         const notePreviewBody = document.getElementById('note-preview-body');
+                        const interactionMode = cardElement.dataset.interactionMode;
+
                         if (notePreviewOverlay && notePreviewBody && easyMDE) {
+                            // Show DM preview regardless of mode
                             notePreviewBody.innerHTML = easyMDE.options.previewRender(note.content);
                             notePreviewOverlay.style.display = 'flex';
+
+                            // If mode is 'both', also send to player
+                            if (interactionMode === 'both' && playerWindow && !playerWindow.closed) {
+                                const playerNoteContent = filterPlayerContent(note.content);
+                                const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
+                                playerWindow.postMessage({
+                                    type: 'showNotePreview',
+                                    content: playerRenderedHTML
+                                }, '*');
+                            }
                         }
                     });
 
@@ -7644,10 +7657,22 @@ function displayCardDetails(cardElement) {
                         e.preventDefault();
                         const charPreviewOverlay = document.getElementById('character-preview-overlay');
                         const charPreviewBody = document.getElementById('character-preview-body');
+                        const interactionMode = cardElement.dataset.interactionMode;
+
                         if (charPreviewOverlay && charPreviewBody) {
-                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
-                            charPreviewBody.innerHTML = markdown;
+                            // Show DM preview regardless of mode
+                            const dmMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
+                            charPreviewBody.innerHTML = dmMarkdown;
                             charPreviewOverlay.style.display = 'flex';
+
+                            // If mode is 'both', also send to player
+                            if (interactionMode === 'both' && playerWindow && !playerWindow.closed) {
+                                const playerMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, true, character.isDetailsVisible);
+                                playerWindow.postMessage({
+                                    type: 'showCharacterPreview',
+                                    content: playerMarkdown
+                                }, '*');
+                            }
                         }
                     });
 
