@@ -7471,23 +7471,21 @@ function displayToast(messageElement) {
     }
 
 function displayCardDetails(cardElement) {
-    // Clear previous selection
-    const automationCanvas = document.getElementById('automation-canvas');
-    if (automationCanvas) {
-        const allCards = automationCanvas.querySelectorAll('.module-card');
-        allCards.forEach(card => card.classList.remove('automation-card-selected'));
-    }
-    // Add selection to current card
-    cardElement.classList.add('automation-card-selected');
-
     const detailsSidebar = document.getElementById('details-sidebar');
     detailsSidebar.innerHTML = ''; // Clear previous content
 
+    // Clear previous selection and select the current card
+    const automationCanvas = document.getElementById('automation-canvas');
+    if (automationCanvas) {
+        automationCanvas.querySelectorAll('.module-card').forEach(card => card.classList.remove('automation-card-selected'));
+    }
+    cardElement.classList.add('automation-card-selected');
+
+    // --- Card Header ---
     const cardId = cardElement.querySelector('.automation-card-label').textContent;
     const cardTitleSpan = cardElement.querySelector('span:not(.automation-card-label)');
     const title = cardElement.dataset.title || (cardTitleSpan ? cardTitleSpan.textContent : 'Card');
 
-    // --- Sidebar Title ---
     const titleEl = document.createElement('h3');
     titleEl.contentEditable = true;
     titleEl.textContent = title;
@@ -7499,41 +7497,31 @@ function displayCardDetails(cardElement) {
         }
     });
 
-    // --- Sidebar Subtitle (ID) ---
     const subtitleEl = document.createElement('p');
     subtitleEl.textContent = cardId;
-    subtitleEl.style.color = '#a0b4c9';
-    subtitleEl.style.fontStyle = 'italic';
-    subtitleEl.style.marginTop = '-5px';
-
+    subtitleEl.style.cssText = 'color: #a0b4c9; font-style: italic; margin-top: -5px;';
     detailsSidebar.appendChild(titleEl);
     detailsSidebar.appendChild(subtitleEl);
 
     // --- Note-specific section ---
     if (cardElement.dataset.cardType === 'note') {
-        const linkedNotes = JSON.parse(cardElement.dataset.linkedNotes || '[]');
+        let linkedNotes = JSON.parse(cardElement.dataset.linkedNotes || '[]');
 
-        const linkButton = document.createElement('button');
-        linkButton.textContent = 'Link Note';
-        linkButton.style.marginTop = '10px';
-        linkButton.addEventListener('click', () => {
-            linkingNoteForAutomationCard = cardElement;
-            switchTab('tab-notes');
-            alert('Select a note from the list to link it.');
-        });
-
+        // --- 1. Display Linked Notes ---
         const linkedNotesHeader = document.createElement('h4');
         linkedNotesHeader.textContent = 'Linked Notes';
         linkedNotesHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(linkedNotesHeader);
 
         const linkedNotesList = document.createElement('ol');
-        linkedNotesList.style.paddingLeft = '20px';
-
+        linkedNotesList.className = 'automation-linked-notes-list';
         if (linkedNotes.length > 0) {
-            linkedNotes.forEach(noteId => {
+            linkedNotes.forEach((noteId, index) => {
                 const note = notesData.find(n => n.id === noteId);
                 if (note) {
                     const listItem = document.createElement('li');
+                    listItem.className = 'linked-note-item';
+
                     const link = document.createElement('a');
                     link.href = '#';
                     link.textContent = note.title;
@@ -7543,31 +7531,78 @@ function displayCardDetails(cardElement) {
                         const notePreviewOverlay = document.getElementById('note-preview-overlay');
                         const notePreviewBody = document.getElementById('note-preview-body');
                         if (notePreviewOverlay && notePreviewBody && easyMDE) {
-                            const renderedHTML = easyMDE.options.previewRender(note.content);
-                            notePreviewBody.innerHTML = renderedHTML;
+                            notePreviewBody.innerHTML = easyMDE.options.previewRender(note.content);
                             notePreviewOverlay.style.display = 'flex';
                         }
                     });
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.className = 'remove-note-link-btn';
+                    removeBtn.title = 'Remove this note';
+                    removeBtn.addEventListener('click', () => {
+                        linkedNotes.splice(index, 1);
+                        cardElement.dataset.linkedNotes = JSON.stringify(linkedNotes);
+                        displayCardDetails(cardElement); // Refresh the sidebar
+                    });
+
                     listItem.appendChild(link);
+                    listItem.appendChild(removeBtn);
                     linkedNotesList.appendChild(listItem);
                 }
             });
         } else {
             const placeholder = document.createElement('p');
             placeholder.textContent = 'No notes linked yet.';
-            placeholder.style.color = '#a0b4c9';
+            placeholder.className = 'sidebar-placeholder';
             linkedNotesList.appendChild(placeholder);
         }
-
-        detailsSidebar.appendChild(linkButton);
-        detailsSidebar.appendChild(linkedNotesHeader);
         detailsSidebar.appendChild(linkedNotesList);
+
+        // --- 2. Display Available Notes to Link ---
+        const availableNotesHeader = document.createElement('h4');
+        availableNotesHeader.textContent = 'Add Note to Link';
+        availableNotesHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(availableNotesHeader);
+
+        const availableNotesContainer = document.createElement('div');
+        availableNotesContainer.className = 'available-notes-container';
+
+        notesData.forEach(note => {
+            // Only show notes that are not already linked
+            if (!linkedNotes.includes(note.id)) {
+                const noteItem = document.createElement('div');
+                noteItem.textContent = note.title;
+                noteItem.className = 'available-note-item';
+                noteItem.title = `Click to link "${note.title}"`;
+                noteItem.addEventListener('click', () => {
+                    linkedNotes.push(note.id);
+                    cardElement.dataset.linkedNotes = JSON.stringify(linkedNotes);
+                    displayCardDetails(cardElement); // Refresh the sidebar
+                });
+                availableNotesContainer.appendChild(noteItem);
+            }
+        });
+
+        if (availableNotesContainer.children.length === 0 && notesData.length > 0) {
+             const allLinkedPlaceholder = document.createElement('p');
+             allLinkedPlaceholder.textContent = 'All available notes are linked.';
+             allLinkedPlaceholder.className = 'sidebar-placeholder';
+             availableNotesContainer.appendChild(allLinkedPlaceholder);
+        } else if (notesData.length === 0) {
+            const noNotesPlaceholder = document.createElement('p');
+            noNotesPlaceholder.textContent = 'No notes exist. Create one in the Notes tab.';
+            noNotesPlaceholder.className = 'sidebar-placeholder';
+            availableNotesContainer.appendChild(noNotesPlaceholder);
+        }
+        detailsSidebar.appendChild(availableNotesContainer);
     }
+
 
     // --- Delete Button (for all cards) ---
     const deleteButton = document.createElement('button');
     deleteButton.textContent = 'Delete Card';
-    deleteButton.style.marginTop = '20px';
+    deleteButton.style.marginTop = 'auto'; // Pushes to the bottom
     deleteButton.style.backgroundColor = '#992222';
     deleteButton.addEventListener('click', () => {
         if (confirm(`Are you sure you want to delete the card "${cardId}"?`)) {

@@ -495,6 +495,78 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ffffff !important;
 }
 
+/* Styles for Automation Note Linking in Details Sidebar */
+.available-notes-container {
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    border-radius: 4px;
+    padding: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.available-note-item {
+    padding: 8px;
+    margin: 2px 0;
+    background-color: #2a3138;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.available-note-item:hover {
+    background-color: #3f4c5a;
+    color: #b6cae1;
+}
+
+.automation-linked-notes-list {
+    list-style-type: decimal; /* Use numbers for the ordered list */
+    padding-left: 20px; /* Standard padding for ordered lists */
+    margin-top: 5px;
+}
+
+.linked-note-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    margin-bottom: 2px;
+}
+
+.linked-note-item a {
+    color: #8ab4f8;
+    text-decoration: none;
+    flex-grow: 1;
+}
+
+.linked-note-item a:hover {
+    text-decoration: underline;
+}
+
+.remove-note-link-btn {
+    background: none;
+    border: none;
+    color: #ff4d4d;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+}
+
+.remove-note-link-btn:hover {
+    color: #ff8a8a;
+}
+
+.sidebar-placeholder {
+    color: #8c96a2;
+    font-style: italic;
+    font-size: 0.9em;
+    padding: 10px;
+    text-align: center;
+}
+
 .module-card.automation-card-selected {
     box-shadow: 0 0 0 3px #4A90E2, 0 5px 15px rgba(0,0,0,0.3);
     transform: scale(1.05);
