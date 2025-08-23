@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh; background-color: #15191e; color: #e0e0e0; padding-bottom: 60px; /* Added to prevent footer overlap */ }
+body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh; background-color: #15191e; color: #e0e0e0; }
 #sidebar { width: 250px; background-color: #20262d; padding: 15px; border-right: 1px solid #3f4c5a; display: flex; flex-direction: column; gap: 10px; }
 .sidebar-section { margin-bottom: 20px; border-top: 1px solid #3f4c5a; padding-top: 10px; }
 .sidebar-section h3, .sidebar-section h4 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
