@@ -1107,21 +1107,23 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 /* New Floating Footer Styles */
 #dm-floating-footer {
     position: fixed;
-    bottom: -30vh; /* Initially hidden */
+    bottom: 0;
     left: 0;
     width: 100%;
     background-color: #20262d;
     border-top: 1px solid #3f4c5a;
     box-sizing: border-box;
     z-index: 1002;
-    transition: bottom 0.3s ease-in-out;
+    transition: transform 0.3s ease-in-out;
     display: flex;
     flex-direction: column;
-    height: 30vh;
+    max-height: 45vh;
+    transform: translateY(100%);
+    overflow: hidden;
 }
 
 #dm-floating-footer.visible {
-    bottom: 0;
+    transform: translateY(0);
 }
 
 #footer-content-wrapper {
