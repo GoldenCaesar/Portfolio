@@ -7554,15 +7554,34 @@ function displayCardDetails(cardElement) {
                         const notePreviewBody = document.getElementById('note-preview-body');
                         const interactionMode = cardElement.dataset.interactionMode;
 
-                        if (notePreviewOverlay && notePreviewBody && easyMDE) {
+                        if (notePreviewOverlay && notePreviewBody) {
+                            // Use existing EasyMDE if available, otherwise create a temporary one for rendering.
+                            const render = (content) => {
+                                if (easyMDE && easyMDE.options.previewRender) {
+                                    return easyMDE.options.previewRender(content);
+                                }
+                                // Fallback renderer
+                                const dummyTextarea = document.createElement('textarea');
+                                let html;
+                                try {
+                                    const tempMDE = new EasyMDE({ element: dummyTextarea, autoDownloadFontAwesome: false });
+                                    html = tempMDE.options.previewRender(content);
+                                    tempMDE.toTextArea();
+                                } catch (err) {
+                                    console.error("Fallback EasyMDE render failed:", err);
+                                    html = content.replace(/\n/g, '<br>'); // Basic fallback
+                                }
+                                return html;
+                            };
+
                             // Show DM preview regardless of mode
-                            notePreviewBody.innerHTML = easyMDE.options.previewRender(note.content);
+                            notePreviewBody.innerHTML = render(note.content);
                             notePreviewOverlay.style.display = 'flex';
 
                             // If mode is 'both', also send to player
                             if (interactionMode === 'both' && playerWindow && !playerWindow.closed) {
                                 const playerNoteContent = filterPlayerContent(note.content);
-                                const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
+                                const playerRenderedHTML = render(playerNoteContent);
                                 playerWindow.postMessage({
                                     type: 'showNotePreview',
                                     content: playerRenderedHTML
