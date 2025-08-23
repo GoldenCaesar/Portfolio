@@ -7811,6 +7811,8 @@ function displayCardDetails(cardElement) {
                         updateButtonStates();
                         if (targetMapData.mode === 'view') {
                             sendMapToPlayerView(mapName);
+                        } else {
+                            triggerSlideshow();
                         }
                     } else {
                         alert(`Map "${mapName}" not found.`);
