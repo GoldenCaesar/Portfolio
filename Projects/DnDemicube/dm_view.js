@@ -7876,7 +7876,14 @@ function displayCardDetails(cardElement) {
         }
         detailsSidebar.appendChild(availableMapsContainer);
     } else if (cardElement.dataset.cardType === 'initiative' || cardElement.dataset.cardType === 'wander') {
-        // --- Encounter Setup ---
+        detailsSidebar.style.overflowY = 'auto';
+        detailsSidebar.style.display = 'flex';
+        detailsSidebar.style.flexDirection = 'column';
+
+        // --- Section 1: Encounter Participants (Growing List) ---
+        const encounterSection = document.createElement('div');
+        encounterSection.className = 'sidebar-section';
+
         const encounterHeader = document.createElement('div');
         encounterHeader.style.display = 'flex';
         encounterHeader.style.justifyContent = 'space-between';
@@ -7884,6 +7891,7 @@ function displayCardDetails(cardElement) {
 
         const growingListHeader = document.createElement('h4');
         growingListHeader.textContent = 'Encounter Participants';
+        growingListHeader.style.borderBottom = 'none'; // Remove double border
         encounterHeader.appendChild(growingListHeader);
 
         const startButton = document.createElement('button');
@@ -7891,40 +7899,44 @@ function displayCardDetails(cardElement) {
         startButton.id = 'automation-start-encounter-btn';
         encounterHeader.appendChild(startButton);
 
-        detailsSidebar.appendChild(encounterHeader);
+        encounterSection.appendChild(encounterHeader);
 
         const growingList = document.createElement('div');
         growingList.id = 'automation-encounter-list';
-        growingList.style.minHeight = '50px';
-        growingList.style.border = '1px solid #4a5f7a';
-        growingList.style.padding = '5px';
-        detailsSidebar.appendChild(growingList);
+        growingList.className = 'available-notes-container'; // Reuse for style
+        growingList.style.minHeight = '80px'; // Give it some base height
+        encounterSection.appendChild(growingList);
+        detailsSidebar.appendChild(encounterSection);
 
-
-        // --- Available Characters ---
+        // --- Section 2: Available Characters ---
+        const charsSection = document.createElement('div');
+        charsSection.className = 'sidebar-section';
         const availableCharsHeader = document.createElement('h4');
         availableCharsHeader.textContent = 'Add Character';
-        detailsSidebar.appendChild(availableCharsHeader);
+        charsSection.appendChild(availableCharsHeader);
 
         const availableCharsContainer = document.createElement('div');
-        availableCharsContainer.className = 'available-notes-container'; // Reuse class
+        availableCharsContainer.className = 'available-notes-container';
         charactersData.forEach(character => {
             const charItem = document.createElement('div');
             charItem.textContent = character.name;
             charItem.className = 'available-note-item';
             charItem.dataset.characterId = character.id;
-            charItem.dataset.characterName = character.name; // Store name for adding to list
+            charItem.dataset.characterName = character.name;
             availableCharsContainer.appendChild(charItem);
         });
-        detailsSidebar.appendChild(availableCharsContainer);
+        charsSection.appendChild(availableCharsContainer);
+        detailsSidebar.appendChild(charsSection);
 
-        // --- Available Saved Initiatives ---
+        // --- Section 3: Available Saved Initiatives ---
+        const savedInitSection = document.createElement('div');
+        savedInitSection.className = 'sidebar-section';
         const savedInitiativesHeader = document.createElement('h4');
         savedInitiativesHeader.textContent = 'Add Saved Initiative';
-        detailsSidebar.appendChild(savedInitiativesHeader);
+        savedInitSection.appendChild(savedInitiativesHeader);
 
         const savedInitiativesContainer = document.createElement('div');
-        savedInitiativesContainer.className = 'available-notes-container'; // Reuse class
+        savedInitiativesContainer.className = 'available-notes-container';
          Object.keys(savedInitiatives).forEach(name => {
             const initiativeItem = document.createElement('div');
             initiativeItem.textContent = name;
@@ -7932,31 +7944,36 @@ function displayCardDetails(cardElement) {
             initiativeItem.dataset.initiativeName = name;
             savedInitiativesContainer.appendChild(initiativeItem);
         });
-        detailsSidebar.appendChild(savedInitiativesContainer);
+        savedInitSection.appendChild(savedInitiativesContainer);
+        detailsSidebar.appendChild(savedInitSection);
 
         // --- Logic for the growing list ---
         const renderEncounterList = () => {
             growingList.innerHTML = '';
             const participants = JSON.parse(cardElement.dataset.participants || '[]');
-            participants.forEach((participant, index) => {
-                const item = document.createElement('div');
-                item.className = 'encounter-participant-item';
+            if (participants.length === 0) {
+                growingList.innerHTML = `<p class="sidebar-placeholder">Add participants below.</p>`;
+            } else {
+                participants.forEach((participant, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'encounter-participant-item';
 
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = participant.name;
-                item.appendChild(nameSpan);
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = participant.name;
+                    item.appendChild(nameSpan);
 
-                const removeBtn = document.createElement('button');
-                removeBtn.textContent = '×';
-                removeBtn.className = 'remove-participant-btn';
-                removeBtn.addEventListener('click', () => {
-                    participants.splice(index, 1);
-                    cardElement.dataset.participants = JSON.stringify(participants);
-                    renderEncounterList();
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.className = 'remove-participant-btn';
+                    removeBtn.addEventListener('click', () => {
+                        participants.splice(index, 1);
+                        cardElement.dataset.participants = JSON.stringify(participants);
+                        renderEncounterList();
+                    });
+                    item.appendChild(removeBtn);
+                    growingList.appendChild(item);
                 });
-                item.appendChild(removeBtn);
-                growingList.appendChild(item);
-            });
+            }
         };
 
         const addParticipant = (participant) => {
@@ -8001,14 +8018,12 @@ function displayCardDetails(cardElement) {
                 if (participant.type === 'character') {
                     const characterData = charactersData.find(c => c.id == participant.id);
                     if (characterData) {
-                        // Deep copy and add a unique ID for this instance in the initiative
                         activeInitiative.push({ ...JSON.parse(JSON.stringify(characterData)), initiative: null, uniqueId: Date.now() + Math.random() });
                     }
                 } else if (participant.type === 'initiative') {
                     const savedInit = savedInitiatives[participant.name];
                     if (savedInit) {
                         savedInit.forEach(characterData => {
-                            // Deep copy and add a unique ID
                             activeInitiative.push({ ...JSON.parse(JSON.stringify(characterData)), initiative: null, uniqueId: Date.now() + Math.random() });
                         });
                     }
@@ -8027,9 +8042,8 @@ function displayCardDetails(cardElement) {
             if (modeToggleSwitch) {
                 const isPlayerVisible = interactionMode === 'both';
                 if (modeToggleSwitch.checked !== isPlayerVisible) {
-                    modeToggleSwitch.click(); // This will trigger the change event to handle slideshow/map view
+                    modeToggleSwitch.click();
                 } else {
-                    // If the state is already correct, we might need to manually trigger the player view update
                     if(isPlayerVisible && selectedMapFileName) {
                         sendMapToPlayerView(selectedMapFileName);
                     } else {
@@ -8044,7 +8058,6 @@ function displayCardDetails(cardElement) {
                 if (wanderButton) wanderButton.click();
             } else if (cardType === 'initiative') {
                 if (startInitiativeButton) startInitiativeButton.click();
-                // Auto-roll initiative after a short delay to ensure the start process has completed
                 if (autoInitiativeButton) {
                     setTimeout(() => {
                         autoInitiativeButton.click();

@@ -559,6 +559,32 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     color: #ff8a8a;
 }
 
+.encounter-participant-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 8px;
+    margin-bottom: 3px;
+    background-color: #2a3138;
+    border-radius: 3px;
+    border: 1px solid #3f4c5a;
+}
+
+.remove-participant-btn {
+    background: none;
+    border: none;
+    color: #ff4d4d;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+}
+
+.remove-participant-btn:hover {
+    color: #ff8a8a;
+}
+
 .sidebar-placeholder {
     color: #8c96a2;
     font-style: italic;
