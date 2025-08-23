@@ -198,18 +198,6 @@
         </ul>
     </div>
 
-    <div id="token-context-menu" class="context-menu">
-        <ul>
-            <li data-action="view-stat-block">View Stat Block</li>
-            <li>
-                <label>
-                    <input type="checkbox" id="token-context-menu-visibility-checkbox">
-                    Show Details to Players
-                </label>
-            </li>
-        </ul>
-    </div>
-
     <div id="map-tools-context-menu" class="context-menu" style="display: none; position: absolute;">
         <ul>
             <li data-action="link-child-map">Link to Child Map</li>
@@ -218,15 +206,6 @@
             <li data-action="link-trigger">Link Trigger</li>
             <li data-action="remove-links">Remove Links</li>
             <li data-action="shadow-tool">Shadows</li>
-        </ul>
-    </div>
-
-    <div id="character-context-menu" class="context-menu" style="display: none; position: absolute;">
-        <ul>
-            <li data-action="link-to-character">Link to Character</li>
-            <li data-action="move-character">Move Character</li>
-            <li data-action="delete-link">Delete Link</li>
-            <li data-action="toggle-player-visibility">Toggle Player Visibility</li>
         </ul>
     </div>
 
@@ -486,6 +465,12 @@
                 <label for="token-stat-block-hp">HP:</label>
                 <input type="number" id="token-stat-block-hp" class="token-stat-block-hp-input">
                 <span id="token-stat-block-max-hp"></span>
+            </div>
+            <div class="stat-block-visibility">
+                <label>
+                    <input type="checkbox" id="token-stat-block-visibility-checkbox">
+                    Show Details to Players
+                </label>
             </div>
             <button id="token-stat-block-set-targets">Set Targets</button>
             <div id="token-stat-block-targets-container" style="display: none;">
