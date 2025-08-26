@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Shadow tool elements
     const shadowToolsContainer = document.getElementById('shadow-tools-container');
+    const btnShadowObject = document.getElementById('btn-shadow-object');
     const btnShadowWall = document.getElementById('btn-shadow-wall');
     const btnShadowDoor = document.getElementById('btn-shadow-door');
     const btnAddLightSource = document.getElementById('btn-add-light-source');
@@ -1311,6 +1312,26 @@ function propagateCharacterUpdate(characterId) {
                 drawingCtx.lineTo(p2CanvasX, p2CanvasY);
                 drawingCtx.stroke();
                 drawingCtx.setLineDash([]); // Reset line dash
+            } else if (overlay.type === 'smart_object' && overlay.polygon) {
+                if (isPlayerViewContext) return;
+
+                drawingCtx.beginPath();
+                drawingCtx.strokeStyle = 'rgba(255, 0, 255, 0.7)'; // Magenta for smart objects
+                drawingCtx.lineWidth = 3;
+                drawingCtx.fillStyle = 'rgba(255, 0, 255, 0.1)';
+
+                overlay.polygon.forEach((point, index) => {
+                    const canvasX = (point.x * scale) + originX;
+                    const canvasY = (point.y * scale) + originY;
+                    if (index === 0) {
+                        drawingCtx.moveTo(canvasX, canvasY);
+                    } else {
+                        drawingCtx.lineTo(canvasX, canvasY);
+                    }
+                });
+                drawingCtx.closePath();
+                drawingCtx.stroke();
+                drawingCtx.fill();
             }
             });
         }
@@ -1368,6 +1389,10 @@ function propagateCharacterUpdate(characterId) {
     let shadowAnimationId = null;
 
     function recalculateLightMap() {
+        // This function handles dynamic lighting and shadows for the 'view' mode.
+        // It is designed to be compatible with save files that do not contain the new 'smart_object' overlay type.
+        // If no 'smart_object' overlays are present in the map data, the function will simply not find any to process
+        // and will render only standard walls and doors, ensuring backward compatibility.
         if (!isLightMapDirty) return;
 
         const mapData = detailedMapData.get(selectedMapFileName);
@@ -1375,7 +1400,7 @@ function propagateCharacterUpdate(characterId) {
             if (lightMapCtx) {
                 lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
             }
-            isLightMapDirty = false; // Mark as clean even if we did nothing
+            isLightMapDirty = false;
             return;
         }
 
@@ -1390,48 +1415,52 @@ function propagateCharacterUpdate(characterId) {
         }
 
         const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
-        const shadowLines = mapData.overlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
+        const walls = mapData.overlays.filter(o => o.type === 'wall');
+        const closedDoors = mapData.overlays.filter(o => o.type === 'door' && !o.isOpen);
+        const smartObjects = mapData.overlays.filter(o => o.type === 'smart_object');
 
         lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
         lightMapCtx.fillStyle = 'rgba(0, 0, 0, 0.33)';
         lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
 
         const lightScale = dmRenderQuality;
-
-        const allSegments = shadowLines.map(line => {
-            if (line.type === 'wall') {
-                const segments = [];
-                for (let i = 0; i < line.points.length - 1; i++) {
-                    segments.push({ x1: line.points[i].x, y1: line.points[i].y, x2: line.points[i+1].x, y2: line.points[i+1].y });
-                }
-                return segments;
-            } else {
-                 return [{ x1: line.points[0].x, y1: line.points[0].y, x2: line.points[1].x, y2: line.points[1].y }];
-            }
-        }).flat();
-
         const imgWidth = currentMapDisplayData.imgWidth;
         const imgHeight = currentMapDisplayData.imgHeight;
-        allSegments.push({ x1: 0, y1: 0, x2: imgWidth, y2: 0 });
-        allSegments.push({ x1: imgWidth, y1: 0, x2: imgWidth, y2: imgHeight });
-        allSegments.push({ x1: imgWidth, y1: imgHeight, x2: 0, y2: imgHeight });
-        allSegments.push({ x1: 0, y1: imgHeight, x2: 0, y2: 0 });
+
+        const allSegments = [];
+        walls.forEach(wall => {
+            for (let i = 0; i < wall.points.length - 1; i++) {
+                allSegments.push({ p1: wall.points[i], p2: wall.points[i+1], parent: wall });
+            }
+        });
+        closedDoors.forEach(door => {
+            allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door });
+        });
+        smartObjects.forEach(object => {
+            for (let i = 0; i < object.polygon.length - 1; i++) {
+                allSegments.push({ p1: object.polygon[i], p2: object.polygon[i+1], parent: object });
+            }
+        });
+
+        allSegments.push({ p1: {x: 0, y: 0}, p2: {x: imgWidth, y: 0}, parent: {type: 'boundary'} });
+        allSegments.push({ p1: {x: imgWidth, y: 0}, p2: {x: imgWidth, y: imgHeight}, parent: {type: 'boundary'} });
+        allSegments.push({ p1: {x: imgWidth, y: imgHeight}, p2: {x: 0, y: imgHeight}, parent: {type: 'boundary'} });
+        allSegments.push({ p1: {x: 0, y: imgHeight}, p2: {x: 0, y: 0}, parent: {type: 'boundary'} });
+
+        const allVertices = [];
+        allSegments.forEach(seg => {
+            allVertices.push(seg.p1, seg.p2);
+        });
 
         lightSources.forEach(light => {
+            const litObjects = new Set();
             const visiblePoints = [];
-            const allVertices = [];
-
-            shadowLines.forEach(line => {
-                line.points.forEach(p => allVertices.push({x: p.x, y: p.y}));
-            });
-
-            allVertices.push({ x: 0, y: 0 }, { x: imgWidth, y: 0 }, { x: imgWidth, y: imgHeight }, { x: 0, y: imgHeight });
-
             const angles = new Set();
+
             allVertices.forEach(vertex => {
                 const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
-                angles.add(angle);
                 angles.add(angle - 0.0001);
+                angles.add(angle);
                 angles.add(angle + 0.0001);
             });
 
@@ -1447,20 +1476,60 @@ function propagateCharacterUpdate(characterId) {
 
                 let closestIntersection = null;
                 let minDistance = Infinity;
+                let hitSegment = null;
 
                 allSegments.forEach(segment => {
-                    const intersection = getLineIntersection(ray, segment);
+                    const intersection = getLineIntersection(ray, {x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y});
                     if (intersection) {
                         const distance = Math.sqrt((intersection.x - light.position.x) ** 2 + (intersection.y - light.position.y) ** 2);
                         if (distance < minDistance) {
                             minDistance = distance;
                             closestIntersection = intersection;
+                            hitSegment = segment;
                         }
                     }
                 });
 
                 if (closestIntersection) {
-                    visiblePoints.push(closestIntersection);
+                    const hitObject = hitSegment.parent;
+                    if (hitObject.type === 'smart_object') {
+                        litObjects.add(hitObject);
+                        const entryPoint = closestIntersection;
+
+                        const internalRay = {
+                            x1: entryPoint.x + Math.cos(angle) * 0.01,
+                            y1: entryPoint.y + Math.sin(angle) * 0.01,
+                            x2: entryPoint.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
+                            y2: entryPoint.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
+                        };
+
+                        let exitPoint = null;
+                        let exitMinDistance = Infinity;
+
+                        for (let i = 0; i < hitObject.polygon.length - 1; i++) {
+                            const objectSeg = { p1: hitObject.polygon[i], p2: hitObject.polygon[i+1] };
+
+                            if (objectSeg.p1 === hitSegment.p1 && objectSeg.p2 === hitSegment.p2) continue;
+
+                            const intersection = getLineIntersection(internalRay, {x1: objectSeg.p1.x, y1: objectSeg.p1.y, x2: objectSeg.p2.x, y2: objectSeg.p2.y});
+                            if (intersection) {
+                                const distance = Math.sqrt((intersection.x - entryPoint.x) ** 2 + (intersection.y - entryPoint.y) ** 2);
+                                if (distance > 0.01 && distance < exitMinDistance) {
+                                    exitMinDistance = distance;
+                                    exitPoint = intersection;
+                                }
+                            }
+                        }
+
+                        if (exitPoint) {
+                            visiblePoints.push(exitPoint);
+                        } else {
+                            visiblePoints.push(entryPoint);
+                        }
+
+                    } else { // It's a normal wall or boundary
+                        visiblePoints.push(closestIntersection);
+                    }
                 }
             });
 
@@ -1477,10 +1546,24 @@ function propagateCharacterUpdate(characterId) {
                 lightMapCtx.fill();
             }
             lightMapCtx.restore();
+
+            lightMapCtx.save();
+            lightMapCtx.globalCompositeOperation = 'destination-out';
+            litObjects.forEach(object => {
+                lightMapCtx.beginPath();
+                const firstPoint = object.polygon[0];
+                lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
+                for(let i = 1; i < object.polygon.length; i++) {
+                    lightMapCtx.lineTo(object.polygon[i].x * lightScale, object.polygon[i].y * lightScale);
+                }
+                lightMapCtx.closePath();
+                lightMapCtx.fill();
+            });
+            lightMapCtx.restore();
         });
 
         isLightMapDirty = false;
-        console.log("Light map recalculated.");
+        console.log("Light map recalculated with smart objects.");
     }
 
     function animateShadows() {
@@ -1647,6 +1730,14 @@ function propagateCharacterUpdate(characterId) {
                                 break;
                             }
                         }
+            } else if (overlay.type === 'smart_object' && overlay.polygon) {
+                for (let j = 0; j < overlay.polygon.length - 1; j++) {
+                    if (checkLineCircleCollision(overlay.polygon[j], overlay.polygon[j+1], {x: mouseX, y: mouseY}, eraserRadius)) {
+                        mapData.overlays.splice(i, 1);
+                        changed = true;
+                        break;
+                    }
+                }
                     } else if (overlay.type === 'lightSource') {
                         const lightRadius = (overlay.radius || 15) / (currentMapDisplayData.scale || 1);
                         const distance = Math.sqrt((mouseX - overlay.position.x)**2 + (mouseY - overlay.position.y)**2);
@@ -1749,25 +1840,31 @@ function propagateCharacterUpdate(characterId) {
         if (!imageCoords) return;
 
         const selectedMapData = detailedMapData.get(selectedMapFileName);
-        if (!selectedMapData || selectedMapData.mode !== 'edit') return;
+        if (!selectedMapData) return;
 
+        // This listener handles all polygon-drawing tools
+        if (isLinkingChildMap || isRedrawingPolygon || activeShadowTool === 'object') {
+            // All these tools require edit mode
+            if (selectedMapData.mode !== 'edit') return;
 
-    if (!isLinkingChildMap && !isRedrawingPolygon) return;
+            if (polygonDrawingComplete) return; // a polygon was just completed and is awaiting another action (e.g. linking)
 
-        if (!polygonDrawingComplete) {
-            const clickThreshold = 10 / currentMapDisplayData.ratio;
+            const clickThreshold = 10 / (currentMapDisplayData.scale || 1);
+
             if (currentPolygonPoints.length > 0) {
                 const firstPoint = currentPolygonPoints[0];
                 const dx = Math.abs(imageCoords.x - firstPoint.x);
                 const dy = Math.abs(imageCoords.y - firstPoint.y);
 
+                // Check for closing the polygon
                 if (currentPolygonPoints.length >= 2 && dx < clickThreshold && dy < clickThreshold) {
                     currentPolygonPoints.push({ x: firstPoint.x, y: firstPoint.y });
-                    polygonDrawingComplete = true;
-                    drawingCanvas.style.pointerEvents = 'none';
-                    dmCanvas.style.cursor = 'auto';
 
+                    // --- Tool-specific completion logic ---
                     if (isLinkingChildMap) {
+                        polygonDrawingComplete = true; // Stop further drawing until action is taken
+                        drawingCanvas.style.pointerEvents = 'none';
+                        dmCanvas.style.cursor = 'auto';
                         if (btnLinkChildMap) btnLinkChildMap.textContent = 'Select Child Map from List';
                         alert('Polygon complete. Select a map from the list to link as its child.');
                     } else if (isRedrawingPolygon) {
@@ -1778,20 +1875,34 @@ function propagateCharacterUpdate(characterId) {
                         };
                         selectedMapData.overlays.push(newOverlay);
                         alert(`Polygon redrawn successfully, linked to "${preservedLinkedMapNameForRedraw}".`);
+                        resetAllInteractiveStates(); // This will redraw canvas
+                    } else if (activeShadowTool === 'object') {
+                        const newObjectOverlay = {
+                            type: 'smart_object',
+                            polygon: [...currentPolygonPoints]
+                        };
+                        selectedMapData.overlays.push(newObjectOverlay);
+                        isLightMapDirty = true;
 
-                        const drawingCtx = drawingCanvas.getContext('2d');
-                        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-                        displayMapOnCanvas(selectedMapFileName);
-                        resetAllInteractiveStates();
+                        // Reset for next drawing, but keep the tool active
+                        currentPolygonPoints = [];
+                        // polygonDrawingComplete remains false, allowing immediate new drawing
+                        drawOverlays(selectedMapData.overlays); // Redraw to show the new permanent object
                     }
                 } else {
+                    // Not closing, just add a new point
                     currentPolygonPoints.push(imageCoords);
                 }
             } else {
+                // First point of the polygon
                 currentPolygonPoints.push(imageCoords);
             }
-            drawCurrentPolygon();
+
+            // After any click that modifies the polygon, redraw the scene
+            if (!polygonDrawingComplete) {
+                 drawOverlays(selectedMapData.overlays); // Redraw existing overlays
+                 drawCurrentPolygon(); // Draw the in-progress polygon on top
+            }
         }
     });
 
@@ -2273,33 +2384,64 @@ function propagateCharacterUpdate(characterId) {
     }
 
     function setShadowTool(tool) {
+        // If a polygon drawing tool from another system is active, cancel it.
+        if (isLinkingChildMap || isRedrawingPolygon) {
+            resetAllInteractiveStates();
+        }
+
         if (activeShadowTool === tool) {
             activeShadowTool = null;
         } else {
             activeShadowTool = tool;
         }
 
-        // When deselecting a tool, redraw overlays to clear any temporary drawings (like the door line)
-        if (!activeShadowTool) {
-            lineStartPoint = null; // Also reset the start point for the door tool
-            const mapData = detailedMapData.get(selectedMapFileName);
-            if (mapData) {
-                drawOverlays(mapData.overlays);
-            }
+        // Reset polygon points if we are deactivating or switching away from the object tool
+        if (activeShadowTool !== 'object') {
+            currentPolygonPoints = [];
+            polygonDrawingComplete = false;
+        }
+
+        // Cleanup for door tool
+        if (activeShadowTool !== 'door') {
+            lineStartPoint = null;
+        }
+
+        // Redraw to clear temp lines from door tool
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (mapData) {
+            drawOverlays(mapData.overlays);
         }
 
         // Update button styles
+        if (btnShadowObject) btnShadowObject.classList.toggle('active', activeShadowTool === 'object');
         btnShadowWall.classList.toggle('active', activeShadowTool === 'wall');
         btnShadowDoor.classList.toggle('active', activeShadowTool === 'door');
         btnAddLightSource.classList.toggle('active', activeShadowTool === 'lightSource');
         btnShadowErase.classList.toggle('active', activeShadowTool === 'erase');
 
-        // Set cursor style and enable pointer events on the interactive canvas
+        // Set cursor style and enable pointer events on the appropriate canvas
         const cursorStyle = activeShadowTool ? 'crosshair' : 'auto';
-        shadowCanvas.style.pointerEvents = activeShadowTool ? 'auto' : 'none';
-        shadowCanvas.style.cursor = cursorStyle;
-        dmCanvas.style.cursor = cursorStyle; // Also set on underlying canvases for consistency
+        dmCanvas.style.cursor = cursorStyle;
         drawingCanvas.style.cursor = cursorStyle;
+        shadowCanvas.style.cursor = cursorStyle;
+
+        if (activeShadowTool === 'object') {
+            drawingCanvas.style.pointerEvents = 'auto';
+            shadowCanvas.style.pointerEvents = 'none';
+            if (currentPolygonPoints.length === 0) {
+                alert("Click on the map to start drawing an object polygon. Click the first point to close the shape.");
+            }
+        } else if (activeShadowTool) { // For wall, door, erase, lightSource
+            drawingCanvas.style.pointerEvents = 'none';
+            shadowCanvas.style.pointerEvents = 'auto';
+        } else { // No tool active
+            drawingCanvas.style.pointerEvents = 'none';
+            shadowCanvas.style.pointerEvents = 'none';
+        }
+    }
+
+    if (btnShadowObject) {
+        btnShadowObject.addEventListener('click', () => setShadowTool('object'));
     }
 
     if (btnShadowWall) {
