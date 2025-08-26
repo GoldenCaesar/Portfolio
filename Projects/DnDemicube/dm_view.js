@@ -1453,7 +1453,6 @@ function propagateCharacterUpdate(characterId) {
         });
 
         lightSources.forEach(light => {
-            const litObjects = new Set();
             const visiblePoints = [];
             const angles = new Set();
 
@@ -1476,7 +1475,6 @@ function propagateCharacterUpdate(characterId) {
 
                 let closestIntersection = null;
                 let minDistance = Infinity;
-                let hitSegment = null;
 
                 allSegments.forEach(segment => {
                     const intersection = getLineIntersection(ray, {x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y});
@@ -1485,19 +1483,28 @@ function propagateCharacterUpdate(characterId) {
                         if (distance < minDistance) {
                             minDistance = distance;
                             closestIntersection = intersection;
-                            hitSegment = segment;
                         }
                     }
                 });
 
                 if (closestIntersection) {
-                    const hitObject = hitSegment.parent;
-                    if (hitObject.type === 'smart_object') {
-                        // The object is lit by this light source.
-                        litObjects.add(hitObject);
-                        // The light ray stops at the first point of contact with the smart object.
-                        visiblePoints.push(closestIntersection);
-                    } else { // It's a normal wall, door, or boundary.
+                    const intersections = [];
+                    allSegments.forEach(segment => {
+                        if (segment.parent.type === 'smart_object') {
+                            const intersection = getLineIntersection(ray, {x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y});
+                            if (intersection) {
+                                intersections.push({
+                                    point: intersection,
+                                    dist: Math.sqrt((intersection.x - light.position.x)**2 + (intersection.y - light.position.y)**2)
+                                });
+                            }
+                        }
+                    });
+
+                    if (intersections.length >= 2) {
+                        intersections.sort((a, b) => a.dist - b.dist);
+                        visiblePoints.push(intersections[1].point);
+                    } else {
                         visiblePoints.push(closestIntersection);
                     }
                 }
@@ -1515,20 +1522,6 @@ function propagateCharacterUpdate(characterId) {
                 lightMapCtx.closePath();
                 lightMapCtx.fill();
             }
-            lightMapCtx.restore();
-
-            lightMapCtx.save();
-            lightMapCtx.globalCompositeOperation = 'destination-out';
-            litObjects.forEach(object => {
-                lightMapCtx.beginPath();
-                const firstPoint = object.polygon[0];
-                lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
-                for(let i = 1; i < object.polygon.length; i++) {
-                    lightMapCtx.lineTo(object.polygon[i].x * lightScale, object.polygon[i].y * lightScale);
-                }
-                lightMapCtx.closePath();
-                lightMapCtx.fill();
-            });
             lightMapCtx.restore();
         });
 
