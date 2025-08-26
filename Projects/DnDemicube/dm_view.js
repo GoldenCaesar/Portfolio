@@ -1493,41 +1493,11 @@ function propagateCharacterUpdate(characterId) {
                 if (closestIntersection) {
                     const hitObject = hitSegment.parent;
                     if (hitObject.type === 'smart_object') {
+                        // The object is lit by this light source.
                         litObjects.add(hitObject);
-                        const entryPoint = closestIntersection;
-
-                        const internalRay = {
-                            x1: entryPoint.x + Math.cos(angle) * 0.01,
-                            y1: entryPoint.y + Math.sin(angle) * 0.01,
-                            x2: entryPoint.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
-                            y2: entryPoint.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
-                        };
-
-                        let exitPoint = null;
-                        let exitMinDistance = Infinity;
-
-                        for (let i = 0; i < hitObject.polygon.length - 1; i++) {
-                            const objectSeg = { p1: hitObject.polygon[i], p2: hitObject.polygon[i+1] };
-
-                            if (objectSeg.p1 === hitSegment.p1 && objectSeg.p2 === hitSegment.p2) continue;
-
-                            const intersection = getLineIntersection(internalRay, {x1: objectSeg.p1.x, y1: objectSeg.p1.y, x2: objectSeg.p2.x, y2: objectSeg.p2.y});
-                            if (intersection) {
-                                const distance = Math.sqrt((intersection.x - entryPoint.x) ** 2 + (intersection.y - entryPoint.y) ** 2);
-                                if (distance > 0.01 && distance < exitMinDistance) {
-                                    exitMinDistance = distance;
-                                    exitPoint = intersection;
-                                }
-                            }
-                        }
-
-                        if (exitPoint) {
-                            visiblePoints.push(exitPoint);
-                        } else {
-                            visiblePoints.push(entryPoint);
-                        }
-
-                    } else { // It's a normal wall or boundary
+                        // The light ray stops at the first point of contact with the smart object.
+                        visiblePoints.push(closestIntersection);
+                    } else { // It's a normal wall, door, or boundary.
                         visiblePoints.push(closestIntersection);
                     }
                 }
@@ -2464,14 +2434,7 @@ function propagateCharacterUpdate(characterId) {
         btnShadowDone.addEventListener('click', () => {
             isShadowMode = false;
             shadowToolsContainer.style.display = 'none';
-            activeShadowTool = null;
-            lineStartPoint = null;
-            shadowCanvas.style.pointerEvents = 'none';
-            dmCanvas.style.cursor = 'auto';
-            // Redraw overlays without tool-specific highlights
-            if(selectedMapFileName) {
-                drawOverlays(detailedMapData.get(selectedMapFileName).overlays);
-            }
+            setShadowTool(null); // This will reset all tool states correctly
         });
     }
 
@@ -5073,6 +5036,9 @@ function propagateCharacterUpdate(characterId) {
     const tabContents = document.querySelectorAll('.tab-content');
 
     function switchTab(tabId) {
+        // Reset any active map-editing states when switching tabs
+        resetAllInteractiveStates();
+
         // Hide all main content containers by default
         if (mapContainer) mapContainer.style.display = 'none';
         if (noteEditorContainer) noteEditorContainer.style.display = 'none';
