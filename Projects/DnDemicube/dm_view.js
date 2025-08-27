@@ -1410,7 +1410,15 @@ function propagateCharacterUpdate(characterId) {
             lightMapCtx = lightMapCanvas.getContext('2d');
         }
 
-        const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
+        const dmLightSources = mapData.overlays.filter(o => o.type === 'lightSource');
+        const tokenLightSources = initiativeTokens
+            .filter(token => token.isDetailsVisible !== false)
+            .map(token => ({
+                type: 'lightSource',
+                position: { x: token.x, y: token.y },
+                radius: 40 // A reasonable default radius for a token
+            }));
+        const lightSources = [...dmLightSources, ...tokenLightSources];
         const walls = mapData.overlays.filter(o => o.type === 'wall');
         const closedDoors = mapData.overlays.filter(o => o.type === 'door' && !o.isOpen);
         const smartObjects = mapData.overlays.filter(o => o.type === 'smart_object');

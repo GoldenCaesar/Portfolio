@@ -111,24 +111,48 @@ let renderQuality = 0.5; // Default quality, will be updated by DM
 
 let shadowAnimationId = null;
 
-function getLineIntersection(line1, line2) {
-    const x1 = line1.x1, y1 = line1.y1, x2 = line1.x2, y2 = line1.y2;
-    const x3 = line2.x1, y3 = line2.y1, x4 = line2.x2, y4 = line2.y2;
+function getPolygonSignedArea(polygon) {
+    let area = 0;
+    if (polygon.length < 4) { // A closed polygon needs at least 4 points (e.g., A, B, C, A)
+        return 0;
+    }
+    for (let i = 0; i < polygon.length - 1; i++) {
+        const p1 = polygon[i];
+        const p2 = polygon[i + 1];
+        area += (p1.x * p2.y - p2.x * p1.y);
+    }
+    return area / 2;
+}
 
-    const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (den === 0) {
-        return null; // Parallel lines
+function isPointInPolygon(point, polygon) {
+    if (!polygon || polygon.length < 3) return false;
+    let x = point.x, y = point.y;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        let xi = polygon[i].x, yi = polygon[i].y;
+        let xj = polygon[j].x, yj = polygon[j].y;
+        let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function getLineIntersection(p1, p2) {
+    const dX = p1.x2 - p1.x1;
+    const dY = p1.y2 - p1.y1;
+    const dX2 = p2.x2 - p2.x1;
+    const dY2 = p2.y2 - p2.y1;
+    const denominator = dX * dY2 - dY * dX2;
+
+    if (denominator === 0) return null;
+
+    const t = ((p2.x1 - p1.x1) * dY2 - (p2.y1 - p1.y1) * dX2) / denominator;
+    const u = -((p1.x1 - p2.x1) * dY - (p1.y1 - p2.y1) * dX) / denominator;
+
+    if (t >= 0 && u >= 0 && u <= 1) {
+        return { x: p1.x1 + t * dX, y: p1.y1 + t * dY };
     }
 
-    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
-    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
-
-    if (t > 0 && u >= 0 && u <= 1) { // Adjusted to handle intersections on the edge of the ray
-        return {
-            x: x1 + t * (x2 - x1),
-            y: y1 + t * (y2 - y1)
-        };
-    }
     return null;
 }
 
@@ -159,51 +183,63 @@ function recalculateLightMap_Player() {
         .map(token => ({
             type: 'lightSource',
             position: { x: token.x, y: token.y },
+            radius: 40 // A reasonable default radius for a token
         }));
     const lightSources = [...dmLightSources, ...tokenLightSources];
-    const shadowLines = currentOverlays.filter(o => o.type === 'wall' || (o.type === 'door' && !o.isOpen));
+    const walls = currentOverlays.filter(o => o.type === 'wall');
+    const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
+    // Smart objects are only visible to the DM, so we don't filter them here for the player.
+    const smartObjects = currentOverlays.filter(o => o.type === 'smart_object');
 
     lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-    if (lightSources.length === 0) {
-        isLightMapDirty = false;
-        return; // Nothing to draw, so leave it clear
-    }
-
-    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)';
+    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)'; // Full black for player fog of war
     lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
 
     const lightScale = renderQuality;
-
-    const allSegments = shadowLines.map(line => {
-        if (line.type === 'wall') {
-            const segments = [];
-            for (let i = 0; i < line.points.length - 1; i++) {
-                segments.push({ x1: line.points[i].x, y1: line.points[i].y, x2: line.points[i+1].x, y2: line.points[i+1].y });
-            }
-            return segments;
-        } else {
-             return [{ x1: line.points[0].x, y1: line.points[0].y, x2: line.points[1].x, y2: line.points[1].y }];
-        }
-    }).flat();
-
     const imgWidth = currentMapDisplayData.imgWidth;
     const imgHeight = currentMapDisplayData.imgHeight;
-    allSegments.push({ x1: 0, y1: 0, x2: imgWidth, y2: 0 });
-    allSegments.push({ x1: imgWidth, y1: 0, x2: imgWidth, y2: imgHeight });
-    allSegments.push({ x1: imgWidth, y1: imgHeight, x2: 0, y2: imgHeight });
-    allSegments.push({ x1: 0, y1: imgHeight, x2: 0, y2: 0 });
+
+    const allSegments = [];
+    walls.forEach(wall => {
+        for (let i = 0; i < wall.points.length - 1; i++) {
+            allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
+        }
+    });
+    closedDoors.forEach(door => {
+        allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door });
+    });
+    smartObjects.forEach(object => {
+        for (let i = 0; i < object.polygon.length - 1; i++) {
+            allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
+        }
+    });
+
+    allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
+
+    const allVertices = [];
+    allSegments.forEach(seg => {
+        allVertices.push(seg.p1, seg.p2);
+    });
 
     lightSources.forEach(light => {
         const visiblePoints = [];
-        const allVertices = [];
-        shadowLines.forEach(line => line.points.forEach(p => allVertices.push({x: p.x, y: p.y})));
-        allVertices.push({ x: 0, y: 0 }, { x: imgWidth, y: 0 }, { x: imgWidth, y: imgHeight }, { x: 0, y: imgHeight });
-
         const angles = new Set();
+
+        let lightIsInsideObject = false;
+        for (const so of smartObjects) {
+            if (isPointInPolygon(light.position, so.polygon)) {
+                lightIsInsideObject = true;
+                break;
+            }
+        }
+
         allVertices.forEach(vertex => {
             const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
-            angles.add(angle);
             angles.add(angle - 0.0001);
+            angles.add(angle);
             angles.add(angle + 0.0001);
         });
 
@@ -216,20 +252,40 @@ function recalculateLightMap_Player() {
                 x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
                 y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
             };
+
             let closestIntersection = null;
             let minDistance = Infinity;
+
             allSegments.forEach(segment => {
-                const intersection = getLineIntersection(ray, segment);
-                if (intersection) {
-                    const distance = Math.sqrt((intersection.x - light.position.x) ** 2 + (intersection.y - light.position.y) ** 2);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestIntersection = intersection;
+                const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
+                if (intersectionPoint) {
+                    let ignoreThisIntersection = false;
+                    if (segment.parent.type === 'smart_object') {
+                        const p1 = segment.p1;
+                        const p2 = segment.p2;
+                        const normal = { x: p2.y - p1.y, y: p1.x - p2.x }; // Outward-facing normal for clockwise polygons
+                        const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
+                        const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
+
+                        if (!lightIsInsideObject && dot > 0) {
+                            ignoreThisIntersection = true;
+                        }
+                    }
+
+                    if (!ignoreThisIntersection) {
+                        const distance = Math.sqrt(Math.pow(intersectionPoint.x - light.position.x, 2) + Math.pow(intersectionPoint.y - light.position.y, 2));
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestIntersection = intersectionPoint;
+                        }
                     }
                 }
             });
+
             if (closestIntersection) {
                 visiblePoints.push(closestIntersection);
+            } else {
+                visiblePoints.push({ x: ray.x2, y: ray.y2 });
             }
         });
 
@@ -247,6 +303,7 @@ function recalculateLightMap_Player() {
         }
         lightMapCtx.restore();
     });
+
     isLightMapDirty = false;
 }
 
