@@ -555,8 +555,8 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 }
 
 .asset-item.selected {
-    border-color: #4d90fe;
-    box-shadow: 0 0 8px 2px #4d90fe;
+    border-color: #8ab4f8;
+    box-shadow: 0 0 12px 4px rgba(138, 180, 248, 0.7);
 }
 
 .asset-item img {
