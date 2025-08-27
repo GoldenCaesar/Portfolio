@@ -2735,6 +2735,13 @@ function propagateCharacterUpdate(characterId) {
     function handleAssetPreviewMouseMove(event) {
         if (!selectedAssetForPreview || !selectedAssetForPreview.complete) return;
 
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+
+        // Redraw existing overlays. This also clears the canvas.
+        drawOverlays(selectedMapData.overlays);
+
+        // Now, draw the preview on top.
         const drawingCtx = drawingCanvas.getContext('2d');
         const rect = dmCanvas.getBoundingClientRect();
         const canvasX = event.clientX - rect.left;
@@ -2754,7 +2761,6 @@ function propagateCharacterUpdate(characterId) {
             }
         }
 
-        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
         drawingCtx.globalAlpha = 0.33;
 
         // Draw the image centered on the cursor
@@ -2764,8 +2770,13 @@ function propagateCharacterUpdate(characterId) {
     }
 
     function handleAssetPreviewMouseOut() {
-        const drawingCtx = drawingCanvas.getContext('2d');
-        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (selectedMapData) {
+            drawOverlays(selectedMapData.overlays);
+        } else {
+            const drawingCtx = drawingCanvas.getContext('2d');
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        }
     }
 
     function updateAssetPreview() {
