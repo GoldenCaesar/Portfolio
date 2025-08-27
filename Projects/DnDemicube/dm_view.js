@@ -399,8 +399,7 @@ let linkingNoteForAutomationCard = null;
                 role: row.querySelector('.npc-role').value
             })).filter(npc => npc.id),
             storySteps: Array.from(document.querySelectorAll('.story-step-row')).map(row => ({
-                title: row.querySelector('.story-step-title').innerText,
-                text: row.querySelector('.story-step-text').innerText,
+                title: row.querySelector('.story-step-text').innerText,
                 completed: row.querySelector('.story-step-checkbox').checked
             })),
             successTriggers: Array.from(document.querySelectorAll('#quest-success-triggers .trigger-row')).map((row, index) => {
@@ -3609,13 +3608,12 @@ function propagateCharacterUpdate(characterId) {
                         if (quest.storySteps === undefined) {
                             quest.storySteps = [];
                         } else {
-                            // Backward compatibility for story steps
                             quest.storySteps = quest.storySteps.map(step => {
                                 if (typeof step === 'string') {
-                                    return { title: step, text: '', completed: false };
+                                    return { title: step, completed: false };
                                 }
-                                if (typeof step.title === 'undefined') {
-                                    return { title: step.text, text: '', completed: step.completed };
+                                if (typeof step.title === 'undefined' && typeof step.text !== 'undefined') {
+                                    return { title: step.text, completed: step.completed };
                                 }
                                 return step;
                             });
@@ -8760,16 +8758,12 @@ function getDragAfterElement(container, y) {
             <h3>Story Steps</h3>
             <div id="quest-story-steps">
                 ${(quest.storySteps || []).map((step, index) => {
-                    const title = step.title ?? (typeof step === 'string' ? step : step.text);
-                    const text = step.title ? step.text : '';
+                    const title = step.title ?? (typeof step === 'string' ? step : step.text) ?? `Story Step ${index + 1}`;
                     const completed = step.completed || false;
                     return `
                     <div class="story-step-row" data-index="${index}">
                         <input type="checkbox" class="story-step-checkbox" ${completed ? 'checked' : ''}>
-                        <div class="story-step-content">
-                            <div contenteditable="true" class="editable-div story-step-title" placeholder="Step Title">${title}</div>
-                            <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description...">${text}</div>
-                        </div>
+                        <div contenteditable="true" class="editable-div story-step-text">${title}</div>
                         <button class="remove-step-btn">X</button>
                     </div>
                 `}).join('')}
@@ -8942,10 +8936,7 @@ function getDragAfterElement(container, y) {
             newRow.dataset.index = newIndex;
             newRow.innerHTML = `
                 <input type="checkbox" class="story-step-checkbox">
-                <div class="story-step-content">
-                    <div contenteditable="true" class="editable-div story-step-title" placeholder="Step Title">New Step</div>
-                    <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description..."></div>
-                </div>
+                <div contenteditable="true" class="editable-div story-step-text">Story Step ${newIndex + 1}</div>
                 <button class="remove-step-btn">X</button>
             `;
             container.appendChild(newRow);
@@ -8963,7 +8954,7 @@ function getDragAfterElement(container, y) {
                 const quest = quests.find(q => q.id === activeOverlayCardId);
                 if (quest && quest.questStatus === 'Active') {
                     const stepRow = e.target.closest('.story-step-row');
-                    const stepTitle = stepRow.querySelector('.story-step-title').innerText;
+                    const stepTitle = stepRow.querySelector('.story-step-text').innerText;
                     addLogEntry({
                         type: 'system',
                         message: `${quest.name} ${stepTitle}`
@@ -9458,7 +9449,7 @@ function getDragAfterElement(container, y) {
         if (quest.storySteps && quest.storySteps.length > 0) {
             html += `<ul class="quest-steps-list">`;
             quest.storySteps.forEach((step, index) => {
-                const title = step.title ?? (typeof step === 'string' ? step : step.text);
+                const title = step.title ?? (typeof step === 'string' ? step : step.text) ?? `Story Step ${index + 1}`;
                 html += `
                     <li>
                         <input type="checkbox" id="footer-step-${quest.id}-${index}" data-quest-id="${quest.id}" data-step-index="${index}" ${step.completed ? 'checked' : ''}>
