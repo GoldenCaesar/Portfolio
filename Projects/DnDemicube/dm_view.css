@@ -506,6 +506,11 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     font-weight: bold;
 }
 
+.story-step-title:hover {
+    background-color: #f0f0f0;
+    cursor: text;
+}
+
 .story-step-text {
     font-size: 0.9em;
     color: #a0b4c9;

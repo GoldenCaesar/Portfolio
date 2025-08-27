@@ -3610,12 +3610,12 @@ function propagateCharacterUpdate(characterId) {
                             quest.storySteps = [];
                         } else {
                             // Backward compatibility for story steps
-                            quest.storySteps = quest.storySteps.map(step => {
+                            quest.storySteps = quest.storySteps.map((step, index) => {
                                 if (typeof step === 'string') {
                                     return { title: step, text: '', completed: false };
                                 }
                                 if (typeof step.title === 'undefined') {
-                                    return { title: step.text, text: '', completed: step.completed };
+                                    return { title: `Step ${index + 1}`, text: step.text, completed: step.completed };
                                 }
                                 return step;
                             });
@@ -8760,14 +8760,14 @@ function getDragAfterElement(container, y) {
             <h3>Story Steps</h3>
             <div id="quest-story-steps">
                 ${(quest.storySteps || []).map((step, index) => {
-                    const title = step.title ?? (typeof step === 'string' ? step : step.text) ?? `Story Step ${index + 1}`;
-                    const text = step.title ? step.text : '';
+                    const title = step.title ?? `Story Step ${index + 1}`;
+                    const text = step.text || '';
                     const completed = step.completed || false;
                     return `
                     <div class="story-step-row" data-index="${index}">
                         <input type="checkbox" class="story-step-checkbox" ${completed ? 'checked' : ''}>
                         <div class="story-step-content">
-                            <div contenteditable="true" class="editable-div story-step-title" placeholder="Step Title">${title}</div>
+                            <h3 class="editable-div story-step-title" placeholder="Step Title">${title}</h3>
                             <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description...">${text}</div>
                         </div>
                         <button class="remove-step-btn">X</button>
@@ -8824,6 +8824,30 @@ function getDragAfterElement(container, y) {
         originalQuestState = JSON.parse(JSON.stringify(quest));
         overlay.style.display = 'flex';
         activeOverlayCardId = quest.id;
+
+        // --- Click to Edit for Story Step Titles ---
+        const storyStepsContainer = document.getElementById('quest-story-steps');
+        if (storyStepsContainer) {
+            storyStepsContainer.addEventListener('click', (e) => {
+                const titleEl = e.target.closest('.story-step-title');
+                if (titleEl && !titleEl.isContentEditable) {
+                    titleEl.contentEditable = true;
+                    titleEl.focus();
+                    const range = document.createRange();
+                    range.selectNodeContents(titleEl);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            });
+
+            storyStepsContainer.addEventListener('blur', (e) => {
+                const titleEl = e.target.closest('.story-step-title');
+                if (titleEl) {
+                    titleEl.contentEditable = false;
+                }
+            }, true); // Use capture phase
+        }
 
         // --- Event Listeners for editing ---
         const saveButton = document.getElementById('save-quest-details-btn');
