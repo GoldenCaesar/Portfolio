@@ -2642,7 +2642,7 @@ function propagateCharacterUpdate(characterId) {
             } else if (item.type === 'file') {
                 const isFavorite = assetFavorites[item.path];
                 assetItemDiv.innerHTML = `
-                    <button class="asset-favorite-btn ${isFavorite ? 'is-favorite' : ''}" title="Toggle Favorite">⭐</button>
+                    <button class="asset-favorite-btn ${isFavorite ? 'is-favorite' : ''}" title="Toggle Favorite">${isFavorite ? '⭐' : '⚪'}</button>
                     <img src="${item.url}" alt="${name}">
                     <span class="asset-name">${name}</span>
                 `;
@@ -2673,8 +2673,6 @@ function propagateCharacterUpdate(characterId) {
     function handleAssetFolderUpload(event) {
         const files = event.target.files;
         if (!files.length) return;
-
-        assetsByPath = {}; // Reset
 
         for (const file of files) {
             // We only care about images
