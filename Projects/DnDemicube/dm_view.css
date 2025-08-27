@@ -545,12 +545,18 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     padding: 10px;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
     background-color: #2a3138;
+    border: 2px solid transparent;
 }
 
 .asset-item:hover {
     background-color: #3f4c5a;
+}
+
+.asset-item.selected {
+    border-color: #4d90fe;
+    box-shadow: 0 0 8px 2px #4d90fe;
 }
 
 .asset-item img {
@@ -572,6 +578,27 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     text-align: center;
     word-break: break-all; /* To prevent long names from overflowing */
     line-height: 1.2;
+}
+
+.asset-favorite-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #a0b4c9; /* Muted color for non-favorite */
+    padding: 0;
+    font-size: 20px; /* Make the star bigger */
+    line-height: 1;
+}
+
+.asset-favorite-btn:hover {
+    color: #ffd700; /* Gold color on hover */
+}
+
+.asset-favorite-btn.is-favorite {
+    color: #ffd700; /* Gold for favorite */
 }
 
 .asset-favorite-btn {

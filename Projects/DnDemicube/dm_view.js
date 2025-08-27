@@ -321,7 +321,9 @@ let linkingNoteForAutomationCard = null;
     let isAssetsMode = false;
     let assetsByPath = {};
     let currentAssetPath = [];
-    let assetFavorites = {}; // For simplicity, just storing paths
+    let assetFavorites = {}; // path: true
+    let isFavoritesView = false;
+    let selectedAssetPath = null;
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -2486,6 +2488,32 @@ function propagateCharacterUpdate(characterId) {
         });
     }
 
+    function toggleFavorite(assetPath) {
+        if (assetFavorites[assetPath]) {
+            delete assetFavorites[assetPath];
+        } else {
+            assetFavorites[assetPath] = true;
+        }
+        renderAssetExplorer();
+    }
+
+    function findAssetByPath(path) {
+        const parts = path.split('/');
+        let currentLevel = assetsByPath;
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (currentLevel[part]) {
+                if (i === parts.length - 1) {
+                    return currentLevel[part];
+                }
+                currentLevel = currentLevel[part].children;
+            } else {
+                return null; // Not found
+            }
+        }
+        return null;
+    }
+
     function renderAssetExplorer() {
         if (!footerAssetsContent) return;
 
@@ -2507,6 +2535,11 @@ function propagateCharacterUpdate(characterId) {
             });
 
             document.getElementById('assets-folder-input').addEventListener('change', handleAssetFolderUpload);
+
+            // Prevent clicks inside the asset footer from closing it unnecessarily
+            footerAssetsContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
         }
 
         const pathDisplay = document.getElementById('asset-path-display');
@@ -2521,51 +2554,116 @@ function propagateCharacterUpdate(characterId) {
         rootLink.textContent = 'Assets';
         rootLink.addEventListener('click', (e) => {
             e.preventDefault();
+            e.stopPropagation();
+            isFavoritesView = false;
             currentAssetPath = [];
             renderAssetExplorer();
         });
         pathDisplay.appendChild(rootLink);
 
-        let currentLevel = assetsByPath;
-        currentAssetPath.forEach((folderName, index) => {
-            pathDisplay.append(' / ');
-            const partLink = document.createElement('a');
-            partLink.href = '#';
-            partLink.textContent = folderName;
-            partLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                currentAssetPath = currentAssetPath.slice(0, index + 1);
+        if (isFavoritesView) {
+            pathDisplay.append(' / Favorites');
+        } else {
+            let currentLevel = assetsByPath;
+            currentAssetPath.forEach((folderName, index) => {
+                pathDisplay.append(' / ');
+                const partLink = document.createElement('a');
+                partLink.href = '#';
+                partLink.textContent = folderName;
+                partLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    isFavoritesView = false;
+                    currentAssetPath = currentAssetPath.slice(0, index + 1);
+                    renderAssetExplorer();
+                });
+                pathDisplay.appendChild(partLink);
+                currentLevel = currentLevel[folderName].children;
+            });
+        }
+
+        // Render Favorites folder at root
+        if (currentAssetPath.length === 0 && !isFavoritesView) {
+            const favoritesFolder = document.createElement('div');
+            favoritesFolder.className = 'asset-item';
+            favoritesFolder.title = 'Favorites';
+            favoritesFolder.innerHTML = `
+                <svg fill="currentColor" viewBox="0 0 256 256"><path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L65.5,153.74l-45.1-39.36a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a16,16,0,0,1,29.64,0l23.21,55.36,59.46,5.15a16,16,0,0,1,9.11,28.06Z"></path></svg>
+                <span class="asset-name">Favorites</span>
+            `;
+            favoritesFolder.addEventListener('click', (e) => {
+                e.stopPropagation();
+                isFavoritesView = true;
                 renderAssetExplorer();
             });
-            pathDisplay.appendChild(partLink);
-            currentLevel = currentLevel[folderName].children;
-        });
+            fileListContainer.appendChild(favoritesFolder);
+        }
 
         // Render folders and files
-        for (const name in currentLevel) {
-            const item = currentLevel[name];
+        let itemsToRender = {};
+        if (isFavoritesView) {
+            for (const path in assetFavorites) {
+                const item = findAssetByPath(path);
+                if (item) {
+                    // To get the name, we split the path and take the last part
+                    const name = path.substring(path.lastIndexOf('/') + 1);
+                    itemsToRender[name] = item;
+                }
+            }
+        } else {
+            let currentLevel = assetsByPath;
+            currentAssetPath.forEach(folderName => {
+                currentLevel = currentLevel[folderName].children;
+            });
+            itemsToRender = currentLevel;
+        }
+
+        for (const name in itemsToRender) {
+            const item = itemsToRender[name];
             const assetItemDiv = document.createElement('div');
             assetItemDiv.className = 'asset-item';
             assetItemDiv.title = name;
+
+            if (item.path && item.path === selectedAssetPath) {
+                assetItemDiv.classList.add('selected');
+            }
 
             if (item.type === 'folder') {
                 assetItemDiv.innerHTML = `
                     <svg fill="currentColor" viewBox="0 0 256 256"><path d="M216,72H145.41a16,16,0,0,1-10.42-3.89L123.08,59.32A8,8,0,0,0,117.41,56H40A16,16,0,0,0,24,72v24H232V88A16,16,0,0,0,216,72ZM24,120V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V120Z"></path></svg>
                     <span class="asset-name">${name}</span>
                 `;
-                assetItemDiv.addEventListener('click', () => {
+                assetItemDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    isFavoritesView = false;
                     currentAssetPath.push(name);
                     renderAssetExplorer();
                 });
             } else if (item.type === 'file') {
+                const isFavorite = assetFavorites[item.path];
                 assetItemDiv.innerHTML = `
+                    <button class="asset-favorite-btn ${isFavorite ? 'is-favorite' : ''}" title="Toggle Favorite">⭐</button>
                     <img src="${item.url}" alt="${name}">
                     <span class="asset-name">${name}</span>
                 `;
-                // Add click listener to do something with the asset, e.g., place on map
-                // For now, it does nothing. This will be a future feature.
-                assetItemDiv.addEventListener('click', () => {
-                    alert(`Selected asset: ${item.path}`);
+                assetItemDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Don't do anything if the favorite button was clicked
+                    if (e.target.classList.contains('asset-favorite-btn')) {
+                        return;
+                    }
+                    const currentlySelected = document.querySelector('#asset-file-list .asset-item.selected');
+                    if (currentlySelected) {
+                        currentlySelected.classList.remove('selected');
+                    }
+                    assetItemDiv.classList.add('selected');
+                    selectedAssetPath = item.path;
+                });
+
+                const favButton = assetItemDiv.querySelector('.asset-favorite-btn');
+                favButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleFavorite(item.path);
                 });
             }
             fileListContainer.appendChild(assetItemDiv);
@@ -3251,6 +3349,7 @@ function propagateCharacterUpdate(characterId) {
                     return value;
                 }));
                 campaignData.assets = serializableAssetsByPath;
+                campaignData.assetFavorites = assetFavorites;
             }
 
             // 1. Handle Maps & Map Links
@@ -3580,6 +3679,7 @@ function propagateCharacterUpdate(characterId) {
             const loadAssetsCheckbox = document.getElementById('load-assets-checkbox');
             if (loadAssetsCheckbox && loadAssetsCheckbox.checked && campaignData.assets) {
                 assetsByPath = campaignData.assets;
+                assetFavorites = campaignData.assetFavorites || {};
                 const assetsFolder = zip.folder("assets");
                 if (assetsFolder) {
                     const assetPromises = [];
