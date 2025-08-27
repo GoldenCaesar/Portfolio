@@ -8825,30 +8825,6 @@ function getDragAfterElement(container, y) {
         overlay.style.display = 'flex';
         activeOverlayCardId = quest.id;
 
-        // --- Click to Edit for Story Step Titles ---
-        const storyStepsContainer = document.getElementById('quest-story-steps');
-        if (storyStepsContainer) {
-            storyStepsContainer.addEventListener('click', (e) => {
-                const titleEl = e.target.closest('.story-step-title');
-                if (titleEl && !titleEl.isContentEditable) {
-                    titleEl.contentEditable = true;
-                    titleEl.focus();
-                    const range = document.createRange();
-                    range.selectNodeContents(titleEl);
-                    const sel = window.getSelection();
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }
-            });
-
-            storyStepsContainer.addEventListener('blur', (e) => {
-                const titleEl = e.target.closest('.story-step-title');
-                if (titleEl) {
-                    titleEl.contentEditable = false;
-                }
-            }, true); // Use capture phase
-        }
-
         // --- Event Listeners for editing ---
         const saveButton = document.getElementById('save-quest-details-btn');
         saveButton.addEventListener('click', () => {
@@ -8980,7 +8956,25 @@ function getDragAfterElement(container, y) {
             if (e.target.classList.contains('remove-step-btn')) {
                 e.target.closest('.story-step-row').remove();
             }
+
+            const titleEl = e.target.closest('.story-step-title');
+            if (titleEl && !titleEl.isContentEditable) {
+                titleEl.contentEditable = true;
+                titleEl.focus();
+                const range = document.createRange();
+                range.selectNodeContents(titleEl);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
         });
+
+        storyStepsContainer.addEventListener('blur', (e) => {
+            const titleEl = e.target.closest('.story-step-title');
+            if (titleEl) {
+                titleEl.contentEditable = false;
+            }
+        }, true);
 
         storyStepsContainer.addEventListener('change', e => {
             if (e.target.classList.contains('story-step-checkbox') && e.target.checked) {
