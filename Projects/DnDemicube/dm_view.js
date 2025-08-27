@@ -324,6 +324,8 @@ let linkingNoteForAutomationCard = null;
     let assetFavorites = {}; // path: true
     let isFavoritesView = false;
     let selectedAssetPath = null;
+    let selectedAssetForPreview = null; // To hold the Image object for previewing
+    let assetImageCache = {};
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -1324,6 +1326,30 @@ function propagateCharacterUpdate(characterId) {
                 drawingCtx.lineTo(p2CanvasX, p2CanvasY);
                 drawingCtx.stroke();
                 drawingCtx.setLineDash([]); // Reset line dash
+            } else if (overlay.type === 'placedAsset' && overlay.position) {
+                if (assetImageCache[overlay.path] && assetImageCache[overlay.path].complete) {
+                    const img = assetImageCache[overlay.path];
+                    const canvasX = (overlay.position.x * scale) + originX;
+                    const canvasY = (overlay.position.y * scale) + originY;
+                    const assetCanvasWidth = overlay.width * scale;
+                    const assetCanvasHeight = overlay.height * scale;
+
+                    drawingCtx.drawImage(img, canvasX - assetCanvasWidth / 2, canvasY - assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
+                } else if (!assetImageCache[overlay.path]) {
+                    // Image not in cache, start loading it
+                    const asset = findAssetByPath(overlay.path);
+                    if (asset && asset.url) {
+                        const img = new Image();
+                        img.src = asset.url;
+                        assetImageCache[overlay.path] = img;
+                        img.onload = () => {
+                            // Once loaded, redraw the canvas
+                            if (selectedMapFileName) {
+                                displayMapOnCanvas(selectedMapFileName);
+                            }
+                        };
+                    }
+                }
             } else if (overlay.type === 'smart_object' && overlay.polygon) {
                 if (isPlayerViewContext) return;
 
@@ -2652,12 +2678,17 @@ function propagateCharacterUpdate(characterId) {
                     if (e.target.classList.contains('asset-favorite-btn')) {
                         return;
                     }
-                    const currentlySelected = document.querySelector('#asset-file-list .asset-item.selected');
-                    if (currentlySelected) {
-                        currentlySelected.classList.remove('selected');
+
+                    // If the clicked item is already selected, deselect it.
+                    if (selectedAssetPath === item.path) {
+                        selectedAssetPath = null;
+                    } else {
+                        selectedAssetPath = item.path;
                     }
-                    assetItemDiv.classList.add('selected');
-                    selectedAssetPath = item.path;
+
+                    // Re-render the explorer to reflect the change in selection.
+                    renderAssetExplorer();
+                    updateAssetPreview();
                 });
 
                 const favButton = assetItemDiv.querySelector('.asset-favorite-btn');
@@ -2699,6 +2730,105 @@ function propagateCharacterUpdate(characterId) {
         currentAssetPath = [];
         renderAssetExplorer();
         event.target.value = ''; // Reset input
+    }
+
+    function handleAssetPreviewMouseMove(event) {
+        if (!selectedAssetForPreview || !selectedAssetForPreview.complete) return;
+
+        const drawingCtx = drawingCanvas.getContext('2d');
+        const rect = dmCanvas.getBoundingClientRect();
+        const canvasX = event.clientX - rect.left;
+        const canvasY = event.clientY - rect.top;
+
+        // Calculate preview size
+        const MAX_PREVIEW_SIZE = 150;
+        let previewWidth = selectedAssetForPreview.width;
+        let previewHeight = selectedAssetForPreview.height;
+        if (previewWidth > MAX_PREVIEW_SIZE || previewHeight > MAX_PREVIEW_SIZE) {
+            if (previewWidth > previewHeight) {
+                previewHeight = (previewHeight / previewWidth) * MAX_PREVIEW_SIZE;
+                previewWidth = MAX_PREVIEW_SIZE;
+            } else {
+                previewWidth = (previewWidth / previewHeight) * MAX_PREVIEW_SIZE;
+                previewHeight = MAX_PREVIEW_SIZE;
+            }
+        }
+
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        drawingCtx.globalAlpha = 0.33;
+
+        // Draw the image centered on the cursor
+        drawingCtx.drawImage(selectedAssetForPreview, canvasX - previewWidth / 2, canvasY - previewHeight / 2, previewWidth, previewHeight);
+
+        drawingCtx.globalAlpha = 1.0; // Reset alpha
+    }
+
+    function handleAssetPreviewMouseOut() {
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    }
+
+    function updateAssetPreview() {
+        // Clear any existing preview listeners and drawings
+        dmCanvas.removeEventListener('mousemove', handleAssetPreviewMouseMove);
+        dmCanvas.removeEventListener('mouseout', handleAssetPreviewMouseOut);
+        dmCanvas.removeEventListener('click', handlePlaceAsset); // Also remove click listener
+
+        handleAssetPreviewMouseOut(); // Clear the canvas just in case
+        selectedAssetForPreview = null;
+
+        if (selectedAssetPath) {
+            const asset = findAssetByPath(selectedAssetPath);
+            if (asset && asset.url) {
+                selectedAssetForPreview = new Image();
+                selectedAssetForPreview.src = asset.url;
+                selectedAssetForPreview.onload = () => {
+                    // Now that the image is loaded, we can start listening
+                    dmCanvas.addEventListener('mousemove', handleAssetPreviewMouseMove);
+                    dmCanvas.addEventListener('mouseout', handleAssetPreviewMouseOut);
+                    dmCanvas.addEventListener('click', handlePlaceAsset);
+                };
+            }
+        }
+    }
+
+    function handlePlaceAsset(event) {
+        if (!selectedAssetPath || !selectedAssetForPreview) return;
+
+        const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+        if (!imageCoords) return;
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+
+        const DEFAULT_ASSET_SIZE = 100; // 100 pixels on the map image
+        let assetWidth = selectedAssetForPreview.naturalWidth;
+        let assetHeight = selectedAssetForPreview.naturalHeight;
+
+        let placeWidth, placeHeight;
+        if (assetWidth > assetHeight) {
+            placeWidth = DEFAULT_ASSET_SIZE;
+            placeHeight = (assetHeight / assetWidth) * DEFAULT_ASSET_SIZE;
+        } else {
+            placeHeight = DEFAULT_ASSET_SIZE;
+            placeWidth = (assetWidth / assetHeight) * DEFAULT_ASSET_SIZE;
+        }
+
+        const newAssetOverlay = {
+            type: 'placedAsset',
+            path: selectedAssetPath,
+            position: imageCoords,
+            width: placeWidth,
+            height: placeHeight
+        };
+
+        if (!selectedMapData.overlays) {
+            selectedMapData.overlays = [];
+        }
+        selectedMapData.overlays.push(newAssetOverlay);
+
+        // Redraw the map to show the placed asset
+        displayMapOnCanvas(selectedMapFileName);
     }
 
     dmCanvas.addEventListener('mouseup', (event) => {
