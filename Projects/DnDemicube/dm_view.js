@@ -8767,7 +8767,7 @@ function getDragAfterElement(container, y) {
                     <div class="story-step-row" data-index="${index}">
                         <input type="checkbox" class="story-step-checkbox" ${completed ? 'checked' : ''}>
                         <div class="story-step-content">
-                            <h3 class="editable-div story-step-title" placeholder="Step Title">${title}</h3>
+                            <h3 class="story-step-title" placeholder="Step Title">${title}</h3>
                             <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description...">${text}</div>
                         </div>
                         <button class="remove-step-btn">X</button>
@@ -8943,7 +8943,7 @@ function getDragAfterElement(container, y) {
             newRow.innerHTML = `
                 <input type="checkbox" class="story-step-checkbox">
                 <div class="story-step-content">
-                    <div contenteditable="true" class="editable-div story-step-title" placeholder="Step Title">Story Step ${newIndex + 1}</div>
+                    <h3 class="story-step-title" placeholder="Step Title">Story Step ${newIndex + 1}</h3>
                     <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description..."></div>
                 </div>
                 <button class="remove-step-btn">X</button>
@@ -8975,6 +8975,13 @@ function getDragAfterElement(container, y) {
                 titleEl.contentEditable = false;
             }
         }, true);
+
+        storyStepsContainer.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.classList.contains('story-step-title')) {
+                e.preventDefault(); // Prevent new line
+                e.target.blur(); // Trigger the blur event to save and set contentEditable=false
+            }
+        });
 
         storyStepsContainer.addEventListener('change', e => {
             if (e.target.classList.contains('story-step-checkbox') && e.target.checked) {
