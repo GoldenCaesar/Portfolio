@@ -399,6 +399,7 @@ let linkingNoteForAutomationCard = null;
                 role: row.querySelector('.npc-role').value
             })).filter(npc => npc.id),
             storySteps: Array.from(document.querySelectorAll('.story-step-row')).map(row => ({
+                title: row.querySelector('.story-step-title').innerText,
                 text: row.querySelector('.story-step-text').innerText,
                 completed: row.querySelector('.story-step-checkbox').checked
             })),
@@ -3607,6 +3608,17 @@ function propagateCharacterUpdate(characterId) {
                         }
                         if (quest.storySteps === undefined) {
                             quest.storySteps = [];
+                        } else {
+                            // Backward compatibility for story steps
+                            quest.storySteps = quest.storySteps.map(step => {
+                                if (typeof step === 'string') {
+                                    return { title: step, text: '', completed: false };
+                                }
+                                if (typeof step.title === 'undefined') {
+                                    return { title: step.text, text: '', completed: step.completed };
+                                }
+                                return step;
+                            });
                         }
 
                         // Convert old string triggers to new object format
@@ -8747,13 +8759,20 @@ function getDragAfterElement(container, y) {
 
             <h3>Story Steps</h3>
             <div id="quest-story-steps">
-                ${(quest.storySteps || []).map((step, index) => `
+                ${(quest.storySteps || []).map((step, index) => {
+                    const title = step.title ?? (typeof step === 'string' ? step : step.text);
+                    const text = step.title ? step.text : '';
+                    const completed = step.completed || false;
+                    return `
                     <div class="story-step-row" data-index="${index}">
-                        <input type="checkbox" class="story-step-checkbox" ${step.completed ? 'checked' : ''}>
-                        <div contenteditable="true" class="editable-div story-step-text">${step.text}</div>
+                        <input type="checkbox" class="story-step-checkbox" ${completed ? 'checked' : ''}>
+                        <div class="story-step-content">
+                            <div contenteditable="true" class="editable-div story-step-title" placeholder="Step Title">${title}</div>
+                            <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description...">${text}</div>
+                        </div>
                         <button class="remove-step-btn">X</button>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
             <button id="add-story-step-btn">+ Add Step</button>
 
@@ -8815,10 +8834,14 @@ function getDragAfterElement(container, y) {
                 return;
             }
 
+            const oldStatus = questToUpdate.questStatus;
+            const newStatus = document.getElementById('quest-status').value;
+            const questName = document.getElementById('quest-name').innerText;
+
             // Save all fields to the object from the main quests array
-            questToUpdate.name = document.getElementById('quest-name').innerText;
+            questToUpdate.name = questName;
             questToUpdate.description = document.getElementById('quest-description').innerText;
-            questToUpdate.questStatus = document.getElementById('quest-status').value;
+            questToUpdate.questStatus = newStatus;
             questToUpdate.questType = document.getElementById('quest-type').value.split(',').map(s => s.trim()).filter(Boolean);
             questToUpdate.storyDuration = document.getElementById('quest-story-duration').value;
 
@@ -8859,6 +8882,13 @@ function getDragAfterElement(container, y) {
                 magicItems: document.getElementById('reward-magic-items').value,
                 information: document.getElementById('reward-information').value,
             };
+
+            if (oldStatus !== newStatus) {
+                addLogEntry({
+                    type: 'system',
+                    message: `${questName} ${newStatus}`
+                });
+            }
 
             alert('Quest details saved!');
             renderCards(); // Re-render cards to reflect name change
@@ -8912,7 +8942,10 @@ function getDragAfterElement(container, y) {
             newRow.dataset.index = newIndex;
             newRow.innerHTML = `
                 <input type="checkbox" class="story-step-checkbox">
-                <div contenteditable="true" class="editable-div story-step-text">New Step</div>
+                <div class="story-step-content">
+                    <div contenteditable="true" class="editable-div story-step-title" placeholder="Step Title">New Step</div>
+                    <div contenteditable="true" class="editable-div story-step-text" placeholder="Step Description..."></div>
+                </div>
                 <button class="remove-step-btn">X</button>
             `;
             container.appendChild(newRow);
@@ -8922,6 +8955,20 @@ function getDragAfterElement(container, y) {
         storyStepsContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('remove-step-btn')) {
                 e.target.closest('.story-step-row').remove();
+            }
+        });
+
+        storyStepsContainer.addEventListener('change', e => {
+            if (e.target.classList.contains('story-step-checkbox') && e.target.checked) {
+                const quest = quests.find(q => q.id === activeOverlayCardId);
+                if (quest && quest.questStatus === 'Active') {
+                    const stepRow = e.target.closest('.story-step-row');
+                    const stepTitle = stepRow.querySelector('.story-step-title').innerText;
+                    addLogEntry({
+                        type: 'system',
+                        message: `${quest.name} ${stepTitle}`
+                    });
+                }
             }
         });
 
@@ -9411,10 +9458,11 @@ function getDragAfterElement(container, y) {
         if (quest.storySteps && quest.storySteps.length > 0) {
             html += `<ul class="quest-steps-list">`;
             quest.storySteps.forEach((step, index) => {
+                const title = step.title ?? (typeof step === 'string' ? step : step.text);
                 html += `
                     <li>
                         <input type="checkbox" id="footer-step-${quest.id}-${index}" data-quest-id="${quest.id}" data-step-index="${index}" ${step.completed ? 'checked' : ''}>
-                        <label for="footer-step-${quest.id}-${index}" class="${step.completed ? 'completed' : ''}">${step.text}</label>
+                        <label for="footer-step-${quest.id}-${index}" class="${step.completed ? 'completed' : ''}">${title}</label>
                     </li>
                 `;
             });
@@ -9459,6 +9507,15 @@ function getDragAfterElement(container, y) {
                 const questToUpdate = quests.find(q => q.id === questIdToUpdate);
                 if (questToUpdate && questToUpdate.storySteps[stepIndex]) {
                     questToUpdate.storySteps[stepIndex].completed = isChecked;
+
+                    if (isChecked && questToUpdate.questStatus === 'Active') {
+                        const step = questToUpdate.storySteps[stepIndex];
+                        const stepTitle = step.title ?? (typeof step === 'string' ? step : step.text);
+                        addLogEntry({
+                            type: 'system',
+                            message: `${questToUpdate.name} ${stepTitle}`
+                        });
+                    }
 
                     // Re-render the details to update the UI (e.g., strikethrough)
                     renderActiveQuestDetailsInFooter(questIdToUpdate);
