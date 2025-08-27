@@ -72,6 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnShadowErase = document.getElementById('btn-shadow-erase');
     const btnShadowDone = document.getElementById('btn-shadow-done');
 
+    const assetsToolsContainer = document.getElementById('assets-tools-container');
+    const btnAssetsDone = document.getElementById('btn-assets-done');
+    const footerAssetsTab = document.querySelector('[data-tab="footer-assets"]');
+    const footerAssetsContent = document.getElementById('footer-assets');
+
     // Token Stat Block Elements
     const tokenStatBlock = document.getElementById('token-stat-block');
     const tokenStatBlockCharName = document.getElementById('token-stat-block-char-name');
@@ -313,6 +318,10 @@ let linkingNoteForAutomationCard = null;
     let isShadowMode = false;
     let activeShadowTool = null; // 'wall', 'door', 'erase'
     let isDrawing = false; // Generic drawing flag for wall tool
+    let isAssetsMode = false;
+    let assetsByPath = {};
+    let currentAssetPath = [];
+    let assetFavorites = {}; // For simplicity, just storing paths
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -2290,6 +2299,12 @@ function propagateCharacterUpdate(characterId) {
             setShadowTool(null);
         }
 
+        if (isAssetsMode) {
+            isAssetsMode = false;
+            assetsToolsContainer.style.display = 'none';
+            if (footerAssetsTab) footerAssetsTab.style.display = 'none';
+        }
+
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
         selectedCharacterForContextMenu = null;
@@ -2459,6 +2474,135 @@ function propagateCharacterUpdate(characterId) {
             shadowToolsContainer.style.display = 'none';
             setShadowTool(null); // This will reset all tool states correctly
         });
+    }
+
+    if (btnAssetsDone) {
+        btnAssetsDone.addEventListener('click', () => {
+            isAssetsMode = false;
+            assetsToolsContainer.style.display = 'none';
+            if (footerAssetsTab) footerAssetsTab.style.display = 'none';
+            const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
+            if (toolsTabButton) toolsTabButton.click();
+        });
+    }
+
+    function renderAssetExplorer() {
+        if (!footerAssetsContent) return;
+
+        // Create elements if they don't exist
+        if (!document.getElementById('asset-explorer')) {
+            footerAssetsContent.innerHTML = `
+                <div id="assets-controls">
+                    <button id="upload-assets-folder-btn">Upload Assets Folder</button>
+                    <input type="file" id="assets-folder-input" style="display: none;" webkitdirectory directory multiple>
+                </div>
+                <div id="asset-explorer">
+                    <div id="asset-path-display"></div>
+                    <div id="asset-file-list"></div>
+                </div>
+            `;
+
+            document.getElementById('upload-assets-folder-btn').addEventListener('click', () => {
+                document.getElementById('assets-folder-input').click();
+            });
+
+            document.getElementById('assets-folder-input').addEventListener('change', handleAssetFolderUpload);
+        }
+
+        const pathDisplay = document.getElementById('asset-path-display');
+        const fileListContainer = document.getElementById('asset-file-list');
+
+        pathDisplay.innerHTML = '';
+        fileListContainer.innerHTML = '';
+
+        // Breadcrumbs
+        const rootLink = document.createElement('a');
+        rootLink.href = '#';
+        rootLink.textContent = 'Assets';
+        rootLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentAssetPath = [];
+            renderAssetExplorer();
+        });
+        pathDisplay.appendChild(rootLink);
+
+        let currentLevel = assetsByPath;
+        currentAssetPath.forEach((folderName, index) => {
+            pathDisplay.append(' / ');
+            const partLink = document.createElement('a');
+            partLink.href = '#';
+            partLink.textContent = folderName;
+            partLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentAssetPath = currentAssetPath.slice(0, index + 1);
+                renderAssetExplorer();
+            });
+            pathDisplay.appendChild(partLink);
+            currentLevel = currentLevel[folderName].children;
+        });
+
+        // Render folders and files
+        for (const name in currentLevel) {
+            const item = currentLevel[name];
+            const assetItemDiv = document.createElement('div');
+            assetItemDiv.className = 'asset-item';
+            assetItemDiv.title = name;
+
+            if (item.type === 'folder') {
+                assetItemDiv.innerHTML = `
+                    <svg fill="currentColor" viewBox="0 0 256 256"><path d="M216,72H145.41a16,16,0,0,1-10.42-3.89L123.08,59.32A8,8,0,0,0,117.41,56H40A16,16,0,0,0,24,72v24H232V88A16,16,0,0,0,216,72ZM24,120V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V120Z"></path></svg>
+                    <span class="asset-name">${name}</span>
+                `;
+                assetItemDiv.addEventListener('click', () => {
+                    currentAssetPath.push(name);
+                    renderAssetExplorer();
+                });
+            } else if (item.type === 'file') {
+                assetItemDiv.innerHTML = `
+                    <img src="${item.url}" alt="${name}">
+                    <span class="asset-name">${name}</span>
+                `;
+                // Add click listener to do something with the asset, e.g., place on map
+                // For now, it does nothing. This will be a future feature.
+                assetItemDiv.addEventListener('click', () => {
+                    alert(`Selected asset: ${item.path}`);
+                });
+            }
+            fileListContainer.appendChild(assetItemDiv);
+        }
+    }
+
+    function handleAssetFolderUpload(event) {
+        const files = event.target.files;
+        if (!files.length) return;
+
+        assetsByPath = {}; // Reset
+
+        for (const file of files) {
+            // We only care about images
+            if (!file.type.startsWith('image/')) continue;
+
+            const pathParts = file.webkitRelativePath.split('/');
+            const filename = pathParts.pop();
+            let currentLevel = assetsByPath;
+
+            pathParts.forEach(folder => {
+                if (!currentLevel[folder]) {
+                    currentLevel[folder] = { type: 'folder', children: {} };
+                }
+                currentLevel = currentLevel[folder].children;
+            });
+
+            currentLevel[filename] = {
+                type: 'file',
+                path: file.webkitRelativePath,
+                url: URL.createObjectURL(file),
+                file: file // Store the file object itself for saving later
+            };
+        }
+        currentAssetPath = [];
+        renderAssetExplorer();
+        event.target.value = ''; // Reset input
     }
 
     dmCanvas.addEventListener('mouseup', (event) => {
@@ -3079,6 +3223,36 @@ function propagateCharacterUpdate(characterId) {
             const zip = new JSZip();
             const campaignData = {};
 
+            const saveAssetsCheckbox = document.getElementById('save-assets-checkbox');
+            if (saveAssetsCheckbox && saveAssetsCheckbox.checked && Object.keys(assetsByPath).length > 0) {
+                const assetsFolder = zip.folder("assets");
+                const assetFiles = [];
+
+                function findAssetFiles(level) {
+                    for (const name in level) {
+                        const item = level[name];
+                        if (item.type === 'file') {
+                            assetFiles.push(item);
+                        } else if (item.type === 'folder') {
+                            findAssetFiles(item.children);
+                        }
+                    }
+                }
+                findAssetFiles(assetsByPath);
+
+                assetFiles.forEach(asset => {
+                    if (asset.file) {
+                        assetsFolder.file(asset.path, asset.file);
+                    }
+                });
+
+                const serializableAssetsByPath = JSON.parse(JSON.stringify(assetsByPath, (key, value) => {
+                    if (key === 'file' || key === 'url') return undefined;
+                    return value;
+                }));
+                campaignData.assets = serializableAssetsByPath;
+            }
+
             // 1. Handle Maps & Map Links
             if (saveMapsCheckbox.checked) {
                 const imagesFolder = zip.folder("images");
@@ -3337,7 +3511,8 @@ function propagateCharacterUpdate(characterId) {
             campaignTime: "Campaign Timer",
             audio: "Audio Recordings",
             storyTree: "Story Beats",
-            quoteMap: "Character Quotes"
+            quoteMap: "Character Quotes",
+            assets: "Assets"
         };
 
         for (const key in dataTypeMapping) {
@@ -3402,6 +3577,34 @@ function propagateCharacterUpdate(characterId) {
 
     async function mergeCampaignData(zip, campaignData, selectedOptions) {
         try {
+            const loadAssetsCheckbox = document.getElementById('load-assets-checkbox');
+            if (loadAssetsCheckbox && loadAssetsCheckbox.checked && campaignData.assets) {
+                assetsByPath = campaignData.assets;
+                const assetsFolder = zip.folder("assets");
+                if (assetsFolder) {
+                    const assetPromises = [];
+
+                    function restoreAssetUrls(level) {
+                        for (const name in level) {
+                            const item = level[name];
+                            if (item.type === 'file') {
+                                const fileInZip = assetsFolder.file(item.path);
+                                if (fileInZip) {
+                                    const promise = fileInZip.async("blob").then(blob => {
+                                        item.url = URL.createObjectURL(blob);
+                                        item.file = new File([blob], name, { type: blob.type });
+                                    });
+                                    assetPromises.push(promise);
+                                }
+                            } else if (item.type === 'folder') {
+                                restoreAssetUrls(item.children);
+                            }
+                        }
+                    }
+                    restoreAssetUrls(assetsByPath);
+                    await Promise.all(assetPromises);
+                }
+            }
             // Merge Characters
             if (selectedOptions.characters && campaignData.characters) {
                 const characterPromises = [];
@@ -4613,6 +4816,14 @@ function propagateCharacterUpdate(characterId) {
         if (action === 'shadow-tool') {
             isShadowMode = true;
             shadowToolsContainer.style.display = 'flex';
+        } else if (action === 'assets-tool') {
+            isAssetsMode = true;
+            assetsToolsContainer.style.display = 'flex';
+            if (footerAssetsTab) {
+                footerAssetsTab.style.display = 'block';
+                footerAssetsTab.click();
+            }
+            renderAssetExplorer();
         } else if (action) {
             const button = document.getElementById(`btn-${action.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
             if (button) {
