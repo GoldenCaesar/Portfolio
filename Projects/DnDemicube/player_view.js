@@ -359,9 +359,6 @@ function drawMapAndOverlays() {
         return;
     }
 
-    playerCanvas.width = playerMapContainer.clientWidth;
-    playerCanvas.height = playerMapContainer.clientHeight;
-
     pCtx.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
     pCtx.save();
 
@@ -537,14 +534,14 @@ window.addEventListener('message', (event) => {
                         window.opener.postMessage({ type: 'slideshowPaused', index: currentSlideIndex }, '*');
                     }
                 }
-
-            case 'loadMap':
                 slideshowContainer.style.display = 'none';
                 playerMapContainer.style.display = 'flex';
 
                 if (data.mapDataUrl) {
                     const img = new Image();
                     img.onload = () => {
+                        playerCanvas.width = playerMapContainer.clientWidth;
+                        playerCanvas.height = playerMapContainer.clientHeight;
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
                         if (data.viewRectangle) {
