@@ -4787,13 +4787,21 @@ function propagateCharacterUpdate(characterId) {
                                 width: dmCanvas.width / transform.scale,
                                 height: dmCanvas.height / transform.scale
                             };
-                            playerWindow.postMessage({
+                            const messagePayload = {
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
                                 overlays: JSON.parse(JSON.stringify(visibleOverlays)),
                                 viewRectangle: viewRectangle,
                                 active: mapData.mode === 'view'
-                            }, '*');
+                            };
+                            console.log('[DM View] Sending loadMap message:', {
+                                mapName: mapFileName,
+                                hasMapDataUrl: !!messagePayload.mapDataUrl,
+                                overlayCount: messagePayload.overlays.length,
+                                viewRectangle: messagePayload.viewRectangle,
+                                active: messagePayload.active
+                            });
+                            playerWindow.postMessage(messagePayload, '*');
                             console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
                         };
                         reader.onerror = () => {
