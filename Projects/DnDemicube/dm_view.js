@@ -1389,10 +1389,6 @@ function propagateCharacterUpdate(characterId) {
     let shadowAnimationId = null;
 
     function recalculateLightMap() {
-        // This function handles dynamic lighting and shadows for the 'view' mode.
-        // It is designed to be compatible with save files that do not contain the new 'smart_object' overlay type.
-        // If no 'smart_object' overlays are present in the map data, the function will simply not find any to process
-        // and will render only standard walls and doors, ensuring backward compatibility.
         if (!isLightMapDirty) return;
 
         const mapData = detailedMapData.get(selectedMapFileName);
@@ -1430,7 +1426,7 @@ function propagateCharacterUpdate(characterId) {
         const allSegments = [];
         walls.forEach(wall => {
             for (let i = 0; i < wall.points.length - 1; i++) {
-                allSegments.push({ p1: wall.points[i], p2: wall.points[i+1], parent: wall });
+                allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
             }
         });
         closedDoors.forEach(door => {
@@ -1438,14 +1434,14 @@ function propagateCharacterUpdate(characterId) {
         });
         smartObjects.forEach(object => {
             for (let i = 0; i < object.polygon.length - 1; i++) {
-                allSegments.push({ p1: object.polygon[i], p2: object.polygon[i+1], parent: object });
+                allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
             }
         });
 
-        allSegments.push({ p1: {x: 0, y: 0}, p2: {x: imgWidth, y: 0}, parent: {type: 'boundary'} });
-        allSegments.push({ p1: {x: imgWidth, y: 0}, p2: {x: imgWidth, y: imgHeight}, parent: {type: 'boundary'} });
-        allSegments.push({ p1: {x: imgWidth, y: imgHeight}, p2: {x: 0, y: imgHeight}, parent: {type: 'boundary'} });
-        allSegments.push({ p1: {x: 0, y: imgHeight}, p2: {x: 0, y: 0}, parent: {type: 'boundary'} });
+        allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
+        allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
+        allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
+        allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
 
         const allVertices = [];
         allSegments.forEach(seg => {
@@ -1455,6 +1451,14 @@ function propagateCharacterUpdate(characterId) {
         lightSources.forEach(light => {
             const visiblePoints = [];
             const angles = new Set();
+
+            let lightIsInsideObject = false;
+            for (const so of smartObjects) {
+                if (isPointInPolygon(light.position, so.polygon)) {
+                    lightIsInsideObject = true;
+                    break;
+                }
+            }
 
             allVertices.forEach(vertex => {
                 const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
@@ -1477,36 +1481,35 @@ function propagateCharacterUpdate(characterId) {
                 let minDistance = Infinity;
 
                 allSegments.forEach(segment => {
-                    const intersection = getLineIntersection(ray, {x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y});
-                    if (intersection) {
-                        const distance = Math.sqrt((intersection.x - light.position.x) ** 2 + (intersection.y - light.position.y) ** 2);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestIntersection = intersection;
+                    const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
+                    if (intersectionPoint) {
+                        let ignoreThisIntersection = false;
+                        if (segment.parent.type === 'smart_object') {
+                            const p1 = segment.p1;
+                            const p2 = segment.p2;
+                            const normal = { x: p2.y - p1.y, y: p1.x - p2.x }; // Outward-facing normal for clockwise polygons
+                            const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
+                            const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
+
+                            if (!lightIsInsideObject && dot > 0) {
+                                ignoreThisIntersection = true;
+                            }
+                        }
+
+                        if (!ignoreThisIntersection) {
+                            const distance = Math.sqrt(Math.pow(intersectionPoint.x - light.position.x, 2) + Math.pow(intersectionPoint.y - light.position.y, 2));
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestIntersection = intersectionPoint;
+                            }
                         }
                     }
                 });
 
                 if (closestIntersection) {
-                    const intersections = [];
-                    allSegments.forEach(segment => {
-                        if (segment.parent.type === 'smart_object') {
-                            const intersection = getLineIntersection(ray, {x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y});
-                            if (intersection) {
-                                intersections.push({
-                                    point: intersection,
-                                    dist: Math.sqrt((intersection.x - light.position.x)**2 + (intersection.y - light.position.y)**2)
-                                });
-                            }
-                        }
-                    });
-
-                    if (intersections.length >= 2) {
-                        intersections.sort((a, b) => a.dist - b.dist);
-                        visiblePoints.push(intersections[1].point);
-                    } else {
-                        visiblePoints.push(closestIntersection);
-                    }
+                    visiblePoints.push(closestIntersection);
+                } else {
+                    visiblePoints.push({ x: ray.x2, y: ray.y2 });
                 }
             });
 
@@ -1526,7 +1529,6 @@ function propagateCharacterUpdate(characterId) {
         });
 
         isLightMapDirty = false;
-        console.log("Light map recalculated with smart objects.");
     }
 
     function animateShadows() {
@@ -1840,6 +1842,12 @@ function propagateCharacterUpdate(characterId) {
                         alert(`Polygon redrawn successfully, linked to "${preservedLinkedMapNameForRedraw}".`);
                         resetAllInteractiveStates(); // This will redraw canvas
                     } else if (activeShadowTool === 'object') {
+                        // Ensure polygon is clockwise for consistent normal calculations
+                        const area = getPolygonSignedArea(currentPolygonPoints);
+                        if (area > 0) { // It's counter-clockwise, reverse it to make it clockwise
+                            currentPolygonPoints.reverse();
+                        }
+
                         const newObjectOverlay = {
                             type: 'smart_object',
                             polygon: [...currentPolygonPoints]
@@ -2043,6 +2051,19 @@ function propagateCharacterUpdate(characterId) {
             }
         }
     });
+
+    function getPolygonSignedArea(polygon) {
+        let area = 0;
+        if (polygon.length < 4) { // A closed polygon needs at least 4 points (e.g., A, B, C, A)
+            return 0;
+        }
+        for (let i = 0; i < polygon.length - 1; i++) {
+            const p1 = polygon[i];
+            const p2 = polygon[i + 1];
+            area += (p1.x * p2.y - p2.x * p1.y);
+        }
+        return area / 2;
+    }
 
     function isPointInPolygon(point, polygon) {
         if (!polygon || polygon.length < 3) return false;
@@ -3415,8 +3436,21 @@ function propagateCharacterUpdate(characterId) {
                 const imagesFolder = zip.folder("images");
 
                 for (const mapName in campaignData.mapDefinitions) {
+                    const definition = campaignData.mapDefinitions[mapName];
+
+                    // Backward compatibility: Ensure smart object polygons are clockwise
+                    if (definition.overlays) {
+                        definition.overlays.forEach(overlay => {
+                            if (overlay.type === 'smart_object' && Array.isArray(overlay.polygon) && overlay.polygon.length > 0) {
+                                const area = getPolygonSignedArea(overlay.polygon);
+                                if (area > 0) { // It's counter-clockwise, reverse it
+                                    overlay.polygon.reverse();
+                                }
+                            }
+                        });
+                    }
+
                     if (!detailedMapData.has(mapName)) {
-                        const definition = campaignData.mapDefinitions[mapName];
                         const imageFile = imagesFolder ? imagesFolder.file(mapName) : null;
                         if (imageFile) {
                             const promise = imageFile.async("blob").then(blob => {
@@ -3729,6 +3763,19 @@ function propagateCharacterUpdate(characterId) {
         if (campaignData.mapDefinitions) {
             for (const mapName in campaignData.mapDefinitions) {
                 const definition = campaignData.mapDefinitions[mapName];
+
+                // Backward compatibility: Ensure smart object polygons are clockwise
+                if (definition.overlays) {
+                    definition.overlays.forEach(overlay => {
+                        if (overlay.type === 'smart_object' && Array.isArray(overlay.polygon) && overlay.polygon.length > 0) {
+                            const area = getPolygonSignedArea(overlay.polygon);
+                            if (area > 0) { // It's counter-clockwise, reverse it
+                                overlay.polygon.reverse();
+                            }
+                        }
+                    });
+                }
+
                 detailedMapData.set(mapName, {
                     name: definition.name,
                     url: null,
