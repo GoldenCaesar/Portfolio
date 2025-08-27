@@ -332,6 +332,8 @@ let linkingNoteForAutomationCard = null;
     let assetTransformHandles = {};
     let isDraggingAssetHandle = false;
     let draggedHandleInfo = null; // { name, initialAsset, initialMouseCoords }
+    let isDraggingAsset = false;
+    let draggedAssetInfo = null; // { initialAsset, initialMouseCoords }
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -2092,6 +2094,18 @@ function propagateCharacterUpdate(characterId) {
                 mapContainer.style.cursor = 'grabbing';
                 return;
             }
+
+            // If not a handle, check if the asset itself was clicked for dragging
+            if (isPointInPlacedAsset(imageCoords, selectedPlacedAsset)) {
+                event.stopPropagation(); // Prevent panning
+                isDraggingAsset = true;
+                draggedAssetInfo = {
+                    initialAsset: JSON.parse(JSON.stringify(selectedPlacedAsset)),
+                    initialMouseCoords: imageCoords
+                };
+                mapContainer.style.cursor = 'grabbing';
+                return;
+            }
         }
     });
 
@@ -3133,6 +3147,15 @@ function propagateCharacterUpdate(characterId) {
             }
         }
 
+        if (isDraggingAsset) {
+            isDraggingAsset = false;
+            draggedAssetInfo = null;
+            mapContainer.style.cursor = 'grab';
+            if (isAssetSelectMode) {
+                mapContainer.style.cursor = 'pointer';
+            }
+        }
+
         if (isDraggingToken) {
             isDraggingToken = false;
             draggedToken = null;
@@ -3652,6 +3675,21 @@ function propagateCharacterUpdate(characterId) {
 
         mapContainer.addEventListener('mousemove', (e) => {
             const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+
+            if (isDraggingAsset && draggedAssetInfo) {
+                e.stopPropagation();
+                if (!imageCoords) return;
+
+                const { initialAsset, initialMouseCoords } = draggedAssetInfo;
+                const dx = imageCoords.x - initialMouseCoords.x;
+                const dy = imageCoords.y - initialMouseCoords.y;
+
+                selectedPlacedAsset.position.x = initialAsset.position.x + dx;
+                selectedPlacedAsset.position.y = initialAsset.position.y + dy;
+
+                displayMapOnCanvas(selectedMapFileName);
+                return;
+            }
 
             if (isDraggingAssetHandle && draggedHandleInfo) {
                 e.stopPropagation();
