@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnShadowDone = document.getElementById('btn-shadow-done');
 
     const assetsToolsContainer = document.getElementById('assets-tools-container');
+    const btnAssetsSelect = document.getElementById('btn-assets-select');
     const btnAssetsDone = document.getElementById('btn-assets-done');
     const footerAssetsTab = document.querySelector('[data-tab="footer-assets"]');
     const footerAssetsContent = document.getElementById('footer-assets');
@@ -326,6 +327,11 @@ let linkingNoteForAutomationCard = null;
     let selectedAssetPath = null;
     let selectedAssetForPreview = null; // To hold the Image object for previewing
     let assetImageCache = {};
+    let isAssetSelectMode = false;
+    let selectedPlacedAsset = null;
+    let assetTransformHandles = {};
+    let isDraggingAssetHandle = false;
+    let draggedHandleInfo = null; // { name, initialAsset, initialMouseCoords }
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -1329,12 +1335,27 @@ function propagateCharacterUpdate(characterId) {
             } else if (overlay.type === 'placedAsset' && overlay.position) {
                 if (assetImageCache[overlay.path] && assetImageCache[overlay.path].complete) {
                     const img = assetImageCache[overlay.path];
+                    const assetScale = overlay.scale || 1;
+                    const assetRotation = overlay.rotation || 0;
+
                     const canvasX = (overlay.position.x * scale) + originX;
                     const canvasY = (overlay.position.y * scale) + originY;
-                    const assetCanvasWidth = overlay.width * scale;
-                    const assetCanvasHeight = overlay.height * scale;
 
-                    drawingCtx.drawImage(img, canvasX - assetCanvasWidth / 2, canvasY - assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
+                    const assetCanvasWidth = overlay.width * assetScale * scale;
+                    const assetCanvasHeight = overlay.height * assetScale * scale;
+
+                    drawingCtx.save();
+                    drawingCtx.translate(canvasX, canvasY);
+                    drawingCtx.rotate(assetRotation);
+
+                    drawingCtx.drawImage(img, -assetCanvasWidth / 2, -assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
+
+                    drawingCtx.restore();
+
+                    // If this asset is the selected one, draw the selection box over it
+                    if (overlay === selectedPlacedAsset) {
+                        drawAssetSelectionBox(overlay);
+                    }
                 } else if (!assetImageCache[overlay.path]) {
                     // Image not in cache, start loading it
                     const asset = findAssetByPath(overlay.path);
@@ -1798,6 +1819,136 @@ function propagateCharacterUpdate(characterId) {
     }
 
 
+    function getAssetTransformHandles(asset) {
+        // We need map scale to keep handle sizes visually consistent when zooming
+        const mapScale = currentMapDisplayData.scale || 1;
+        const assetScale = asset.scale || 1;
+
+        // Define handle size in canvas pixels for visual consistency
+        const handleCanvasSize = 8;
+        const rotateHandleCanvasOffset = 20;
+
+        // Convert canvas size back to local image space size, considering both map and asset zoom
+        const handleImageSize = handleCanvasSize / (mapScale * assetScale);
+        const rotateHandleImageOffset = rotateHandleCanvasOffset / (mapScale * assetScale);
+
+        // Use the asset's original, unscaled dimensions
+        const halfWidth = asset.width / 2;
+        const halfHeight = asset.height / 2;
+
+        return {
+            topLeft:     { x: -halfWidth, y: -halfHeight,       width: handleImageSize, height: handleImageSize },
+            topRight:    { x:  halfWidth, y: -halfHeight,       width: handleImageSize, height: handleImageSize },
+            bottomLeft:  { x: -halfWidth, y:  halfHeight,       width: handleImageSize, height: handleImageSize },
+            bottomRight: { x:  halfWidth, y:  halfHeight,       width: handleImageSize, height: handleImageSize },
+            rotate:      { x: 0,          y: -halfHeight - rotateHandleImageOffset, radius: handleImageSize / 1.5 }
+        };
+    }
+
+    function getHandleForPoint(point, asset) {
+        if (!asset || !point) return null;
+
+        const assetScale = asset.scale || 1;
+        const assetRotation = asset.rotation || 0;
+
+        // 1. Translate the world-space `point` to be relative to the asset's center.
+        const dx = point.x - asset.position.x;
+        const dy = point.y - asset.position.y;
+
+        // 2. Rotate the point by the *negative* of the asset's rotation.
+        const cos = Math.cos(-assetRotation);
+        const sin = Math.sin(-assetRotation);
+        const rotatedX = dx * cos - dy * sin;
+        const rotatedY = dx * sin + dy * cos;
+
+        // 3. Scale the point by the inverse of the asset's scale to get to local space.
+        const localPoint = {
+            x: rotatedX / assetScale,
+            y: rotatedY / assetScale,
+        };
+
+        // 4. Get the handles, which are in local, un-rotated, un-scaled space.
+        const handles = getAssetTransformHandles(asset);
+
+        // 5. Check for collision in local space.
+        for (const name in handles) {
+            const handle = handles[name];
+            if (handle.radius) { // Circle check for rotate handle
+                const hdx = localPoint.x - handle.x;
+                const hdy = localPoint.y - handle.y;
+                if (hdx * hdx + hdy * hdy <= handle.radius * handle.radius) {
+                    return name;
+                }
+            } else { // Rectangle check for resize handles
+                const halfHandleWidth = handle.width / 2;
+                const halfHandleHeight = handle.height / 2;
+                if (localPoint.x >= handle.x - halfHandleWidth && localPoint.x <= handle.x + halfHandleWidth &&
+                    localPoint.y >= handle.y - halfHandleHeight && localPoint.y <= handle.y + halfHandleHeight) {
+                    return name;
+                }
+            }
+        }
+        return null;
+    }
+
+
+    function drawAssetSelectionBox(asset) {
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) return;
+        const { scale: mapScale, originX, originY } = mapData.transform;
+        const drawingCtx = drawingCanvas.getContext('2d');
+
+        const assetScale = asset.scale || 1;
+        const assetRotation = asset.rotation || 0;
+
+        // Final canvas position and dimensions
+        const canvasX = (asset.position.x * mapScale) + originX;
+        const canvasY = (asset.position.y * mapScale) + originY;
+        const assetCanvasWidth = asset.width * assetScale * mapScale;
+        const assetCanvasHeight = asset.height * assetScale * mapScale;
+
+        drawingCtx.save();
+        drawingCtx.translate(canvasX, canvasY);
+        drawingCtx.rotate(assetRotation);
+
+        // Draw the main bounding box - it's centered, so from -half to +half
+        drawingCtx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
+        drawingCtx.lineWidth = 2; // Keep line width consistent regardless of zoom
+        drawingCtx.strokeRect(-assetCanvasWidth / 2, -assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
+
+        // Get handle definitions. These are in asset-local space. We need to scale them to canvas space for drawing.
+        const handles = getAssetTransformHandles(asset);
+        drawingCtx.fillStyle = 'rgba(0, 150, 255, 0.8)';
+
+        // Draw resize handles (rectangles)
+        ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'].forEach(name => {
+            const handle = handles[name];
+            // Scale handle position and size from asset-local space to canvas space
+            const handleCanvasX = handle.x * assetScale * mapScale;
+            const handleCanvasY = handle.y * assetScale * mapScale;
+            const handleCanvasWidth = handle.width * assetScale * mapScale;
+            const handleCanvasHeight = handle.height * assetScale * mapScale;
+            drawingCtx.fillRect(handleCanvasX - handleCanvasWidth / 2, handleCanvasY - handleCanvasHeight / 2, handleCanvasWidth, handleCanvasHeight);
+        });
+
+        // Draw rotate handle (circle and line)
+        const rotateHandle = handles.rotate;
+        const rotateHandleCanvasX = rotateHandle.x * assetScale * mapScale;
+        const rotateHandleCanvasY = rotateHandle.y * assetScale * mapScale;
+        const rotateHandleCanvasRadius = rotateHandle.radius * assetScale * mapScale;
+
+        drawingCtx.beginPath();
+        drawingCtx.arc(rotateHandleCanvasX, rotateHandleCanvasY, rotateHandleCanvasRadius, 0, Math.PI * 2);
+        drawingCtx.fill();
+
+        drawingCtx.beginPath();
+        drawingCtx.moveTo(0, -assetCanvasHeight / 2);
+        drawingCtx.lineTo(rotateHandleCanvasX, rotateHandleCanvasY);
+        drawingCtx.stroke();
+
+        drawingCtx.restore();
+    }
+
     function drawCurrentPolygon() {
         if (currentPolygonPoints.length === 0 || !currentMapDisplayData.img) return;
 
@@ -1923,10 +2074,64 @@ function propagateCharacterUpdate(characterId) {
         }
     });
 
+    dmCanvas.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) return;
+
+        if (isAssetSelectMode && selectedPlacedAsset) {
+            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+            const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
+
+            if (handleName) {
+                event.stopPropagation(); // Prevent panning
+                isDraggingAssetHandle = true;
+                draggedHandleInfo = {
+                    name: handleName,
+                    initialAsset: JSON.parse(JSON.stringify(selectedPlacedAsset)),
+                    initialMouseCoords: imageCoords
+                };
+                mapContainer.style.cursor = 'grabbing';
+                return;
+            }
+        }
+    });
+
     dmCanvas.addEventListener('click', (event) => {
         const canvasX = event.offsetX;
         const canvasY = event.offsetY;
         const imageCoords = getRelativeCoords(canvasX, canvasY);
+
+        if (isDraggingAssetHandle) {
+            return;
+        }
+
+        if (isAssetSelectMode) {
+            if (!imageCoords) return; // Still need coords for selection
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || !selectedMapData.overlays) return;
+
+            let assetClicked = false;
+            // Iterate backwards to select the top-most asset
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'placedAsset' && isPointInPlacedAsset(imageCoords, overlay)) {
+                    // If we clicked the already selected asset, we don't need to do anything
+                    if (selectedPlacedAsset === overlay) {
+                        assetClicked = true;
+                        break;
+                    }
+                    selectedPlacedAsset = overlay;
+                    assetClicked = true;
+                    break; // Stop after finding the first one
+                }
+            }
+
+            if (!assetClicked) {
+                selectedPlacedAsset = null; // Clicked on empty space, deselect
+            }
+
+            displayMapOnCanvas(selectedMapFileName); // Redraw to show/hide selection box
+            return; // Prevent other click logic from running while in select mode
+        }
 
         if (imageCoords && initiativeTokens.length > 0) {
             let tokenClicked = false;
@@ -2149,6 +2354,32 @@ function propagateCharacterUpdate(characterId) {
         return distance <= tokenRadius;
     }
 
+    function isPointInPlacedAsset(point, asset) {
+        // Use scale and rotation if they exist, otherwise default them.
+        const assetScale = asset.scale || 1;
+        const assetRotation = asset.rotation || 0; // in radians
+
+        const assetWidth = asset.width * assetScale;
+        const assetHeight = asset.height * assetScale;
+
+        // 1. Translate the point to be relative to the asset's center (position)
+        const dx = point.x - asset.position.x;
+        const dy = point.y - asset.position.y;
+
+        // 2. Rotate the translated point by the *negative* of the asset's rotation
+        const cos = Math.cos(-assetRotation);
+        const sin = Math.sin(-assetRotation);
+        const rotatedX = dx * cos - dy * sin;
+        const rotatedY = dx * sin + dy * cos;
+
+        // 3. Check if the now-rotated point is within the asset's un-rotated, scaled bounding box
+        const halfWidth = assetWidth / 2;
+        const halfHeight = assetHeight / 2;
+
+        return rotatedX >= -halfWidth && rotatedX <= halfWidth &&
+               rotatedY >= -halfHeight && rotatedY <= halfHeight;
+    }
+
     function isPointOnDoor(point, doorOverlay) {
         const p1 = doorOverlay.points[0];
         const p2 = doorOverlay.points[1];
@@ -2321,6 +2552,7 @@ function propagateCharacterUpdate(characterId) {
         const drawingCtx = drawingCanvas.getContext('2d');
         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
         drawingCanvas.style.pointerEvents = 'none';
+        mapContainer.style.cursor = 'grab';
         dmCanvas.style.cursor = 'auto';
 
         if (activeShadowTool) {
@@ -2331,6 +2563,12 @@ function propagateCharacterUpdate(characterId) {
             isAssetsMode = false;
             assetsToolsContainer.style.display = 'none';
             if (footerAssetsTab) footerAssetsTab.style.display = 'none';
+             // Explicitly reset asset selection state
+            isAssetSelectMode = false;
+            if(btnAssetsSelect) btnAssetsSelect.classList.remove('active');
+            selectedPlacedAsset = null;
+            isDraggingAssetHandle = false;
+            draggedHandleInfo = null;
         }
 
         selectedPolygonForContextMenu = null;
@@ -2504,6 +2742,31 @@ function propagateCharacterUpdate(characterId) {
         });
     }
 
+    if (btnAssetsSelect) {
+        btnAssetsSelect.addEventListener('click', () => {
+            isAssetSelectMode = !isAssetSelectMode;
+            btnAssetsSelect.classList.toggle('active', isAssetSelectMode);
+
+            if (isAssetSelectMode) {
+                    mapContainer.style.cursor = 'pointer';
+                // Deactivate asset placement if it was active
+                if (selectedAssetPath) {
+                    selectedAssetPath = null;
+                    updateAssetPreview();
+                }
+            } else {
+                    // Reset everything when turning off select mode
+                    mapContainer.style.cursor = 'grab';
+                    selectedPlacedAsset = null;
+                    isDraggingAssetHandle = false;
+                    draggedHandleInfo = null;
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
+                }
+            }
+        });
+    }
+
     if (btnAssetsDone) {
         btnAssetsDone.addEventListener('click', () => {
             isAssetsMode = false;
@@ -2512,9 +2775,19 @@ function propagateCharacterUpdate(characterId) {
             const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
             if (toolsTabButton) toolsTabButton.click();
 
-            // Reset asset preview state
+            // Reset both asset placement and selection states
             selectedAssetPath = null;
             updateAssetPreview();
+            isAssetSelectMode = false;
+            if(btnAssetsSelect) btnAssetsSelect.classList.remove('active');
+            selectedPlacedAsset = null;
+            isDraggingAssetHandle = false;
+            draggedHandleInfo = null;
+            mapContainer.style.cursor = 'grab';
+
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
         });
     }
 
@@ -2834,7 +3107,9 @@ function propagateCharacterUpdate(characterId) {
             path: selectedAssetPath,
             position: imageCoords,
             width: placeWidth,
-            height: placeHeight
+            height: placeHeight,
+            scale: 1,
+            rotation: 0
         };
 
         if (!selectedMapData.overlays) {
@@ -2848,6 +3123,15 @@ function propagateCharacterUpdate(characterId) {
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
+
+        if (isDraggingAssetHandle) {
+            isDraggingAssetHandle = false;
+            draggedHandleInfo = null;
+            mapContainer.style.cursor = 'grab';
+             if (isAssetSelectMode) {
+                mapContainer.style.cursor = 'pointer';
+            }
+        }
 
         if (isDraggingToken) {
             isDraggingToken = false;
@@ -3367,8 +3651,40 @@ function propagateCharacterUpdate(characterId) {
     }
 
         mapContainer.addEventListener('mousemove', (e) => {
-
             const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+
+            if (isDraggingAssetHandle && draggedHandleInfo) {
+                e.stopPropagation();
+                if (!imageCoords) return;
+
+                const { name, initialAsset, initialMouseCoords } = draggedHandleInfo;
+                const assetCenter = initialAsset.position;
+
+                if (name === 'rotate') {
+                    const initialAngle = Math.atan2(initialMouseCoords.y - assetCenter.y, initialMouseCoords.x - assetCenter.x);
+                    const currentAngle = Math.atan2(imageCoords.y - assetCenter.y, imageCoords.x - assetCenter.x);
+                    const angleDelta = currentAngle - initialAngle;
+                    selectedPlacedAsset.rotation = initialAsset.rotation + angleDelta;
+                } else {
+                    // Handle uniform scaling based on distance from center
+                    const initialDist = Math.sqrt(Math.pow(initialMouseCoords.x - assetCenter.x, 2) + Math.pow(initialMouseCoords.y - assetCenter.y, 2));
+                    const currentDist = Math.sqrt(Math.pow(imageCoords.x - assetCenter.x, 2) + Math.pow(imageCoords.y - assetCenter.y, 2));
+
+                    if (initialDist > 0) {
+                        const scaleFactor = currentDist / initialDist;
+                        let newScale = initialAsset.scale * scaleFactor;
+
+                        // Prevent scaling down to nothing or inverting
+                        if (newScale < 0.1) newScale = 0.1;
+
+                        selectedPlacedAsset.scale = newScale;
+                    }
+                }
+
+                displayMapOnCanvas(selectedMapFileName); // Redraw to show the change
+                return;
+            }
+
 
             if (isDraggingToken && draggedToken) {
                 if (imageCoords) {
@@ -3404,6 +3720,14 @@ function propagateCharacterUpdate(characterId) {
                 displayMapOnCanvas(selectedMapFileName);
                 sendMapTransformToPlayerView(mapData.transform);
             } else {
+                // Update cursor for asset selection mode
+                if (isAssetSelectMode && selectedPlacedAsset) {
+                    const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
+                    mapContainer.style.cursor = handleName ? 'grab' : 'pointer';
+                } else if (isAssetSelectMode) {
+                    mapContainer.style.cursor = 'pointer';
+                }
+
                 handleMouseMoveOnCanvas(e);
             }
         });
