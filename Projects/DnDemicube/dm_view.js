@@ -2511,6 +2511,10 @@ function propagateCharacterUpdate(characterId) {
             if (footerAssetsTab) footerAssetsTab.style.display = 'none';
             const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
             if (toolsTabButton) toolsTabButton.click();
+
+            // Reset asset preview state
+            selectedAssetPath = null;
+            updateAssetPreview();
         });
     }
 
