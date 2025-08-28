@@ -4767,16 +4767,6 @@ function propagateCharacterUpdate(characterId) {
                                             };
                                         }
                                     }
-                                    // For placed assets, find the asset data and embed its URL for the player view
-                                    if (overlay.type === 'placedAsset') {
-                                        const assetData = findAssetByPath(overlay.path);
-                                        if (assetData && assetData.url) {
-                                            return {
-                                                ...overlay,
-                                                dataUrl: assetData.url // Add the data URL for the player view
-                                            };
-                                        }
-                                    }
                                     return overlay;
                                 });
 
