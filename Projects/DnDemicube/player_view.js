@@ -359,6 +359,9 @@ function drawMapAndOverlays() {
         return;
     }
 
+    playerCanvas.width = playerMapContainer.clientWidth;
+    playerCanvas.height = playerMapContainer.clientHeight;
+
     pCtx.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
     pCtx.save();
 
@@ -507,8 +510,8 @@ function drawOverlays_PlayerView(overlays) {
 window.addEventListener('message', (event) => {
     // Basic security: check origin if DM view is on a different domain in production.
     // Example: if (event.origin !== "https://your-dm-view-domain.com") return;
+    console.log('[Player View] Received message:', event.data);
     const data = event.data;
-    console.log('Player view received message:', data);
 
     if (data && data.type) {
         switch (data.type) {
@@ -536,39 +539,44 @@ window.addEventListener('message', (event) => {
                 }
 
             case 'loadMap':
+                console.log("[Player View] Executing 'loadMap' case.");
                 slideshowContainer.style.display = 'none';
                 playerMapContainer.style.display = 'flex';
 
                 if (data.mapDataUrl) {
-                    requestAnimationFrame(() => {
-                        const img = new Image();
-                        img.onload = () => {
-                            playerCanvas.width = playerMapContainer.clientWidth;
-                            playerCanvas.height = playerMapContainer.clientHeight;
-                            currentMapImage = img;
-                            currentOverlays = data.overlays || [];
-                            if (data.viewRectangle) {
-                                const viewRect = data.viewRectangle;
-                                const hScale = playerCanvas.width / viewRect.width;
-                                const vScale = playerCanvas.height / viewRect.height;
-                                const scale = Math.min(hScale, vScale);
-                                const renderedWidth = viewRect.width * scale;
-                                const renderedHeight = viewRect.height * scale;
-                                currentMapTransform.scale = scale;
-                                currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
-                                currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
-                            }
-                            drawMapAndOverlays();
-                            isLightMapDirty = true;
-                            toggleShadowAnimation(data.active);
-                        };
-                        img.onerror = () => {
-                            drawPlaceholder("Error loading map.");
-                            currentMapImage = null;
-                            toggleShadowAnimation(false);
-                        };
-                        img.src = data.mapDataUrl;
-                    });
+                    const img = new Image();
+                    img.onload = () => {
+                        console.log('[Player View] Image successfully loaded.', {
+                            imgWidth: img.width,
+                            imgHeight: img.height,
+                            containerWidth: playerMapContainer.clientWidth,
+                            containerHeight: playerMapContainer.clientHeight
+                        });
+                        currentMapImage = img;
+                        currentOverlays = data.overlays || [];
+                        if (data.viewRectangle) {
+                            const viewRect = data.viewRectangle;
+                            const hScale = playerCanvas.width / viewRect.width;
+                            const vScale = playerCanvas.height / viewRect.height;
+                            const scale = Math.min(hScale, vScale);
+                            const renderedWidth = viewRect.width * scale;
+                            const renderedHeight = viewRect.height * scale;
+                            currentMapTransform.scale = scale;
+                            currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
+                            currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
+                        }
+                        drawMapAndOverlays();
+                        isLightMapDirty = true;
+                        toggleShadowAnimation(data.active);
+                    };
+                    img.onerror = () => {
+                        console.error("[Player View] Error loading map image.", { src: data.mapDataUrl });
+                        drawPlaceholder("Error loading map.");
+                        currentMapImage = null;
+                        toggleShadowAnimation(false);
+                    };
+                    console.log('[Player View] Setting image src to load map.');
+                    img.src = data.mapDataUrl;
                 } else {
                     drawPlaceholder("Received invalid map data from DM.");
                     toggleShadowAnimation(false);
