@@ -469,7 +469,35 @@ function drawOverlays_PlayerView(overlays) {
                     pCtx.beginPath(); // Reset path after clipping
                 }
             }
-        }
+        } else if (overlay.type === 'placedAsset' && overlay.position && overlay.dataUrl) {
+                let img = imageCache.get(overlay.dataUrl);
+                if (!img) {
+                    img = new Image();
+                    img.src = overlay.dataUrl;
+                    img.onload = () => {
+                        // Request a redraw from the main logic once the image is loaded
+                        drawMapAndOverlays();
+                    };
+                    imageCache.set(overlay.dataUrl, img);
+                }
+
+                if (img.complete) {
+                    const assetScale = overlay.scale || 1;
+                    const assetRotation = overlay.rotation || 0;
+
+                    // The context is already transformed by the map scale, so we just use asset properties
+                    const assetRenderWidth = overlay.width * assetScale;
+                    const assetRenderHeight = overlay.height * assetScale;
+
+                    pCtx.save();
+                    pCtx.translate(overlay.position.x, overlay.position.y);
+                    pCtx.rotate(assetRotation);
+
+                    pCtx.drawImage(img, -assetRenderWidth / 2, -assetRenderHeight / 2, assetRenderWidth, assetRenderHeight);
+
+                    pCtx.restore();
+                }
+            }
         });
     }
 
