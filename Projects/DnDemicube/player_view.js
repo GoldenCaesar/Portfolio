@@ -558,7 +558,7 @@ window.addEventListener('message', (event) => {
                             const viewRect = data.viewRectangle;
                             const hScale = playerCanvas.width / viewRect.width;
                             const vScale = playerCanvas.height / viewRect.height;
-                            const scale = Math.min(hScale, vScale);
+                            const scale = playerCanvas.width / viewRect.width;
                             const renderedWidth = viewRect.width * scale;
                             const renderedHeight = viewRect.height * scale;
                             currentMapTransform.scale = scale;
@@ -585,9 +585,7 @@ window.addEventListener('message', (event) => {
             case 'mapTransformUpdate':
                 if (data.viewRectangle) {
                     const viewRect = data.viewRectangle;
-                    const hScale = playerCanvas.width / viewRect.width;
-                    const vScale = playerCanvas.height / viewRect.height;
-                    const scale = Math.min(hScale, vScale);
+                    const scale = playerCanvas.width / viewRect.width;
                     const renderedWidth = viewRect.width * scale;
                     const renderedHeight = viewRect.height * scale;
                     currentMapTransform.scale = scale;
