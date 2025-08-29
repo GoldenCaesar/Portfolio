@@ -700,6 +700,38 @@ function propagateCharacterUpdate(characterId) {
     sendInitiativeDataToPlayerView();
 }
 
+    let animationFrameRequest = null;
+
+    function redrawCanvas() {
+        if (!selectedMapFileName) return;
+        const mapData = detailedMapData.get(selectedMapFileName);
+        const displayData = currentMapDisplayData;
+
+        if (!mapData || !displayData || !displayData.img || !displayData.img.complete) {
+            return;
+        }
+
+        const ctx = dmCanvas.getContext('2d');
+        const transform = mapData.transform;
+
+        ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
+        ctx.save();
+        ctx.translate(transform.originX, transform.originY);
+        ctx.scale(transform.scale, transform.scale);
+        ctx.drawImage(displayData.img, 0, 0, displayData.imgWidth, displayData.imgHeight);
+        ctx.restore();
+
+        // Overlays are on a separate canvas, so they need their own redraw.
+        drawOverlays(mapData.overlays);
+    }
+
+    function requestRedraw() {
+        if (animationFrameRequest) {
+            cancelAnimationFrame(animationFrameRequest);
+        }
+        animationFrameRequest = requestAnimationFrame(redrawCanvas);
+    }
+
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
         if (dmCanvas && shadowCanvas && drawingCanvas && mapContainer) {
@@ -784,25 +816,15 @@ function propagateCharacterUpdate(characterId) {
                 transform.initialized = true;
             }
 
-            ctx.clearRect(0, 0, dmCanvas.width, dmCanvas.height);
-            ctx.save();
-            ctx.translate(transform.originX, transform.originY);
-            ctx.scale(transform.scale, transform.scale);
-            ctx.drawImage(img, 0, 0, img.width, img.height);
-            ctx.restore();
-
-            // The ratio is now simply the scale, and offsets are the origin.
-            // These are canvas-level transforms, not image-specific scaling to fit.
             const hRatio = dmCanvas.width / img.width;
             const vRatio = dmCanvas.height / img.height;
             const fitRatio = Math.min(hRatio, vRatio);
 
             currentMapDisplayData = {
                 img: img,
-                ratio: fitRatio, // Keep the original fit ratio for calculations if needed
+                ratio: fitRatio,
                 imgWidth: img.width,
                 imgHeight: img.height,
-                // These are no longer simple values, they depend on the transform
                 scaledWidth: img.width * transform.scale,
                 scaledHeight: img.height * transform.scale,
                 offsetX: transform.originX,
@@ -810,26 +832,18 @@ function propagateCharacterUpdate(characterId) {
                 scale: transform.scale
             };
 
-
-            // Clamp initiative tokens to be within the new map's boundaries
             if (initiativeTokens.length > 0) {
                 const imgWidth = currentMapDisplayData.imgWidth;
                 const imgHeight = currentMapDisplayData.imgHeight;
                 initiativeTokens.forEach(token => {
-                    // The token's radius on the image is half its size (which is a percentage of the image width).
                     const tokenRadius = (token.size / 100 * imgWidth) / 2;
-
-                    // Clamp coordinates to ensure the token is fully on the map.
                     token.x = Math.max(tokenRadius, Math.min(token.x, imgWidth - tokenRadius));
                     token.y = Math.max(tokenRadius, Math.min(token.y, imgHeight - tokenRadius));
                 });
             }
 
             updateButtonStates();
-
-            if (mapData.overlays) {
-                drawOverlays(mapData.overlays);
-            }
+            redrawCanvas(); // Use the new centralized drawing function
             isLightMapDirty = true;
 
             if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapFileName === fileName) {
@@ -3687,7 +3701,7 @@ function propagateCharacterUpdate(characterId) {
                 selectedPlacedAsset.position.x = initialAsset.position.x + dx;
                 selectedPlacedAsset.position.y = initialAsset.position.y + dy;
 
-                displayMapOnCanvas(selectedMapFileName);
+                requestRedraw();
                 return;
             }
 
@@ -3719,7 +3733,7 @@ function propagateCharacterUpdate(characterId) {
                     }
                 }
 
-                displayMapOnCanvas(selectedMapFileName); // Redraw to show the change
+                requestRedraw(); // Redraw to show the change
                 return;
             }
 
@@ -3755,7 +3769,7 @@ function propagateCharacterUpdate(characterId) {
                 mapData.transform.originX = e.clientX - panStartX;
                 mapData.transform.originY = e.clientY - panStartY;
                 isLightMapDirty = true;
-                displayMapOnCanvas(selectedMapFileName);
+                requestRedraw();
                 sendMapTransformToPlayerView(mapData.transform);
             } else {
                 // Update cursor for asset selection mode
