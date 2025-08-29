@@ -91,6 +91,7 @@ let initiativeTokens = [];
 let currentMapTransform = { scale: 1, originX: 0, originY: 0 };
 const imageCache = new Map();
 let dmCanvasAspectRatio = null;
+let lastViewRectangle = null;
 let currentMapDisplayData = {
     img: null,
     ratio: 1,
@@ -163,6 +164,22 @@ function resizePlayerCanvas() {
         shadowCanvas.style.top = `${top}px`;
         shadowCanvas.style.left = `${left}px`;
     }
+}
+
+function recalculateAndApplyTransform() {
+    if (!lastViewRectangle || !playerCanvas) {
+        return;
+    }
+    const viewRect = lastViewRectangle;
+    const hScale = playerCanvas.width / viewRect.width;
+    const vScale = playerCanvas.height / viewRect.height;
+    const scale = Math.min(hScale, vScale);
+    const renderedWidth = viewRect.width * scale;
+    const renderedHeight = viewRect.height * scale;
+    currentMapTransform.scale = scale;
+    currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
+    currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
+    isLightMapDirty = true;
 }
 
 function isPointInPolygon(point, polygon) {
@@ -563,15 +580,8 @@ window.addEventListener('message', (event) => {
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
                         if (data.viewRectangle) {
-                            const viewRect = data.viewRectangle;
-                            const hScale = playerCanvas.width / viewRect.width;
-                            const vScale = playerCanvas.height / viewRect.height;
-                            const scale = Math.min(hScale, vScale);
-                            const renderedWidth = viewRect.width * scale;
-                            const renderedHeight = viewRect.height * scale;
-                            currentMapTransform.scale = scale;
-                            currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
-                            currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
+                            lastViewRectangle = data.viewRectangle;
+                            recalculateAndApplyTransform();
                         }
                         drawMapAndOverlays();
                         isLightMapDirty = true;
@@ -595,16 +605,8 @@ window.addEventListener('message', (event) => {
                 resizePlayerCanvas();
 
                 if (data.viewRectangle) {
-                    const viewRect = data.viewRectangle;
-                    const hScale = playerCanvas.width / viewRect.width;
-                    const vScale = playerCanvas.height / viewRect.height;
-                    const scale = Math.min(hScale, vScale);
-                    const renderedWidth = viewRect.width * scale;
-                    const renderedHeight = viewRect.height * scale;
-                    currentMapTransform.scale = scale;
-                    currentMapTransform.originX = -viewRect.x * scale + (playerCanvas.width - renderedWidth) / 2;
-                    currentMapTransform.originY = -viewRect.y * scale + (playerCanvas.height - renderedHeight) / 2;
-                    isLightMapDirty = true;
+                    lastViewRectangle = data.viewRectangle;
+                    recalculateAndApplyTransform();
                     drawMapAndOverlays();
                 }
                 break;
@@ -1030,10 +1032,9 @@ function populateAndShowStatBlock_Player(character, position) {
 function resizeAndRedraw() {
     resizePlayerCanvas();
     if (currentMapImage && currentMapImage.complete) {
-        // console.log("Player view: Resizing and redrawing map.");
+        recalculateAndApplyTransform();
         drawMapAndOverlays();
     } else {
-        // console.log("Player view: Resizing and redrawing placeholder.");
         drawPlaceholder("Waiting for DM to share map...");
     }
 }
