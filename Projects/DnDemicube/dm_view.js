@@ -82,6 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetPreviewTitle = document.getElementById('asset-preview-title');
     const assetPreviewOpacitySlider = document.getElementById('asset-preview-opacity');
     const assetPreviewOpacityValue = document.getElementById('asset-preview-opacity-value');
+    const assetChainPointsSliderContainer = document.getElementById('asset-chain-points-slider-container');
+    const assetChainPointsSlider = document.getElementById('asset-chain-points');
+    const assetChainStartPoint = document.getElementById('asset-chain-start-point');
+    const assetChainEndPoint = document.getElementById('asset-chain-end-point');
     const footerAssetsTab = document.querySelector('[data-tab="footer-assets"]');
     const footerAssetsContent = document.getElementById('footer-assets');
 
@@ -338,6 +342,7 @@ let linkingNoteForAutomationCard = null;
     let currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
     let assetTransformHandles = {};
 let activeAssetTool = null; // Can be 'select', 'stamp', or 'chain'
+let chainPointsAngle = 0; // In radians
 let isChaining = false;
 let lastStampedAssetEndpoint = null;
     let isDraggingAssetHandle = false;
@@ -994,6 +999,62 @@ function propagateCharacterUpdate(characterId) {
             if (countSpan) {
                 countSpan.textContent = count > 0 ? `+${count}` : '';
             }
+        });
+    }
+
+    function getChainPoints(assetWidth, assetHeight, angle) {
+        const halfW = assetWidth / 2;
+        const halfH = assetHeight / 2;
+
+        const startAngle = angle;
+        const endAngle = angle + Math.PI;
+
+        const startPoint = {
+            x: halfW * Math.cos(startAngle),
+            y: halfH * Math.sin(startAngle)
+        };
+
+        const endPoint = {
+            x: halfW * Math.cos(endAngle),
+            y: halfH * Math.sin(endAngle)
+        };
+
+        return { startPoint, endPoint };
+    }
+
+    function updateChainPointsVisuals() {
+        if (!assetPreviewImage || !assetPreviewImage.complete || assetPreviewImage.naturalWidth === 0) {
+            return;
+        }
+        if (!assetChainStartPoint || !assetChainEndPoint) {
+            return;
+        }
+
+        const w = assetPreviewImage.offsetWidth;
+        const h = assetPreviewImage.offsetHeight;
+        const centerX = w / 2;
+        const centerY = h / 2;
+
+        // Start point (green)
+        const startX = centerX + (w / 2) * Math.cos(chainPointsAngle) - (assetChainStartPoint.offsetWidth / 2);
+        const startY = centerY + (h / 2) * Math.sin(chainPointsAngle) - (assetChainStartPoint.offsetHeight / 2);
+        assetChainStartPoint.style.left = `${startX}px`;
+        assetChainStartPoint.style.top = `${startY}px`;
+
+        // End point (red) is opposite
+        const endAngle = chainPointsAngle + Math.PI;
+        const endX = centerX + (w / 2) * Math.cos(endAngle) - (assetChainEndPoint.offsetWidth / 2);
+        const endY = centerY + (h / 2) * Math.sin(endAngle) - (assetChainEndPoint.offsetHeight / 2);
+        assetChainEndPoint.style.left = `${endX}px`;
+        assetChainEndPoint.style.top = `${endY}px`;
+    }
+
+    if (assetChainPointsSlider) {
+        assetChainPointsSlider.addEventListener('input', (e) => {
+            const sliderValue = parseInt(e.target.value, 10); // 0-100
+            // Map 0-100 to 0-2PI
+            chainPointsAngle = (sliderValue / 100) * 2 * Math.PI;
+            updateChainPointsVisuals();
         });
     }
 
@@ -2133,87 +2194,93 @@ function propagateCharacterUpdate(characterId) {
         const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
         if (!imageCoords) return;
 
-        // --- Corrected Logic ---
         const assetScale = currentAssetPreviewTransform.scale;
-        const assetW = assetImage.naturalWidth * assetScale;
-        const assetH = assetImage.naturalHeight * assetScale;
+        const assetW = assetImage.naturalWidth;
+        const assetH = assetImage.naturalHeight;
 
-        // The "length" of the asset for chaining is its height, assuming an upright asset like a wall section.
-        const assetChainLength = assetH;
+        const { startPoint: localStart, endPoint: localEnd } = getChainPoints(assetW, assetH, chainPointsAngle);
+
+        const chainVectorX = localEnd.x - localStart.x;
+        const chainVectorY = localEnd.y - localStart.y;
+        const assetChainLength = Math.sqrt(chainVectorX * chainVectorX + chainVectorY * chainVectorY) * assetScale;
+        const assetChainAngle = Math.atan2(chainVectorY, chainVectorX);
+
+        if (assetChainLength === 0) return; // Avoid division by zero if points are the same
 
         let dx = imageCoords.x - lastStampedAssetEndpoint.x;
         let dy = imageCoords.y - lastStampedAssetEndpoint.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
-        let angle = Math.atan2(dy, dx);
+        let dragAngle = Math.atan2(dy, dx);
 
         let stampedSomething = false;
         while (distance >= assetChainLength) {
-            // The new asset's back edge should be at lastStampedAssetEndpoint.
-            // Its center is therefore half its length along the angle from that endpoint.
+            const newAssetRotation = dragAngle - assetChainAngle;
+
+            const rotatedStartOffsetX = (localStart.x * Math.cos(newAssetRotation) - localStart.y * Math.sin(newAssetRotation)) * assetScale;
+            const rotatedStartOffsetY = (localStart.x * Math.sin(newAssetRotation) + localStart.y * Math.cos(newAssetRotation)) * assetScale;
+
             const assetCenter = {
-                x: lastStampedAssetEndpoint.x + (assetChainLength / 2) * Math.cos(angle),
-                y: lastStampedAssetEndpoint.y + (assetChainLength / 2) * Math.sin(angle)
+                x: lastStampedAssetEndpoint.x - rotatedStartOffsetX,
+                y: lastStampedAssetEndpoint.y - rotatedStartOffsetY
             };
 
             const newAssetOverlay = {
                 type: 'placedAsset',
                 path: selectedAssetPath,
                 position: assetCenter,
-                width: assetImage.naturalWidth,
-                height: assetImage.naturalHeight,
-                scale: currentAssetPreviewTransform.scale,
-                // Add PI/2 to align the asset's height with the drag direction
-                rotation: angle + (Math.PI / 2),
+                width: assetW,
+                height: assetH,
+                scale: assetScale,
+                rotation: newAssetRotation,
                 opacity: currentAssetPreviewTransform.opacity
             };
 
-            if (!selectedMapData.overlays) {
-                selectedMapData.overlays = [];
-            }
+            if (!selectedMapData.overlays) selectedMapData.overlays = [];
             selectedMapData.overlays.push(newAssetOverlay);
             stampedSomething = true;
 
-            // The new endpoint for the next chain is the front edge of the asset we just stamped.
+            const rotatedEndOffsetX = (localEnd.x * Math.cos(newAssetRotation) - localEnd.y * Math.sin(newAssetRotation)) * assetScale;
+            const rotatedEndOffsetY = (localEnd.x * Math.sin(newAssetRotation) + localEnd.y * Math.cos(newAssetRotation)) * assetScale;
+
             lastStampedAssetEndpoint = {
-                x: lastStampedAssetEndpoint.x + assetChainLength * Math.cos(angle),
-                y: lastStampedAssetEndpoint.y + assetChainLength * Math.sin(angle)
+                x: assetCenter.x + rotatedEndOffsetX,
+                y: assetCenter.y + rotatedEndOffsetY
             };
 
-            // Recalculate distance and angle for the next potential segment
             dx = imageCoords.x - lastStampedAssetEndpoint.x;
             dy = imageCoords.y - lastStampedAssetEndpoint.y;
             distance = Math.sqrt(dx * dx + dy * dy);
-            angle = Math.atan2(dy, dx);
+            dragAngle = Math.atan2(dy, dx);
         }
 
         if (stampedSomething) {
-            displayMapOnCanvas(selectedMapFileName); // Redraw permanent assets
+            displayMapOnCanvas(selectedMapFileName);
         }
 
-        // --- Draw Ghost Asset ---
         const drawingCtx = drawingCanvas.getContext('2d');
         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
-        // The ghost asset shows where the next segment will be placed, without distortion.
-        const ghostAngle = Math.atan2(imageCoords.y - lastStampedAssetEndpoint.y, imageCoords.x - lastStampedAssetEndpoint.y);
+        const ghostDragAngle = Math.atan2(imageCoords.y - lastStampedAssetEndpoint.y, imageCoords.x - lastStampedAssetEndpoint.y);
+        const ghostRotation = ghostDragAngle - assetChainAngle;
+
+        const ghostRotatedStartOffsetX = (localStart.x * Math.cos(ghostRotation) - localStart.y * Math.sin(ghostRotation)) * assetScale;
+        const ghostRotatedStartOffsetY = (localStart.x * Math.sin(ghostRotation) + localStart.y * Math.cos(ghostRotation)) * assetScale;
+
         const ghostCenter = {
-            x: lastStampedAssetEndpoint.x + (assetChainLength / 2) * Math.cos(ghostAngle),
-            y: lastStampedAssetEndpoint.y + (assetChainLength / 2) * Math.sin(ghostAngle)
+            x: lastStampedAssetEndpoint.x - ghostRotatedStartOffsetX,
+            y: lastStampedAssetEndpoint.y - ghostRotatedStartOffsetY
         };
 
         const { scale: mapScale, originX, originY } = selectedMapData.transform;
-
         const canvasX = (ghostCenter.x * mapScale) + originX;
         const canvasY = (ghostCenter.y * mapScale) + originY;
-
-        // Use the scaled dimensions for drawing
-        const assetCanvasWidth = assetW * mapScale;
-        const assetCanvasHeight = assetH * mapScale;
+        const assetCanvasWidth = assetW * assetScale * mapScale;
+        const assetCanvasHeight = assetH * assetScale * mapScale;
 
         drawingCtx.save();
         drawingCtx.globalAlpha = 0.5 * currentAssetPreviewTransform.opacity;
         drawingCtx.translate(canvasX, canvasY);
-        drawingCtx.rotate(ghostAngle + (Math.PI / 2)); // Rotate ghost same as real asset
+        drawingCtx.rotate(ghostRotation);
         drawingCtx.drawImage(assetImage, -assetCanvasWidth / 2, -assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
         drawingCtx.restore();
     });
@@ -3303,7 +3370,6 @@ function propagateCharacterUpdate(characterId) {
 
     function updateAssetPreview(assetToPreview = null) {
         selectedAssetForPreview = null;
-
         const assetData = assetToPreview || findAssetByPath(selectedAssetPath);
 
         if (isAssetsMode && assetData) {
@@ -3316,42 +3382,48 @@ function propagateCharacterUpdate(characterId) {
             assetPreviewContainer.style.display = 'block';
             assetPreviewImage.src = assetUrl;
 
-            // Extract filename from path
+            assetPreviewImage.onload = () => {
+                if (activeAssetTool === 'chain') {
+                    updateChainPointsVisuals();
+                }
+            };
+            if (assetPreviewImage.complete) {
+                assetPreviewImage.onload();
+            }
+
             const path = assetData.path || selectedAssetPath;
             assetPreviewTitle.textContent = path.substring(path.lastIndexOf('/') + 1);
 
-            // Determine scale and rotation.
-            // If previewing a placed asset, use its transform.
-            // If previewing a library asset, use the transform currently in the preview.
             const scale = assetData.scale || currentAssetPreviewTransform.scale;
             const rotation = assetData.rotation || currentAssetPreviewTransform.rotation;
             const opacity = assetData.opacity ?? currentAssetPreviewTransform.opacity;
 
-            // Update the global preview transform state
             currentAssetPreviewTransform.scale = scale;
             currentAssetPreviewTransform.rotation = rotation;
             currentAssetPreviewTransform.opacity = opacity;
 
-            // Apply transformations to the preview image
             assetPreviewImage.style.transform = `scale(${scale}) rotate(${rotation}rad)`;
             assetPreviewImage.style.opacity = opacity;
 
-            // Update the opacity slider UI
-            if (assetPreviewOpacitySlider) {
-                assetPreviewOpacitySlider.value = opacity;
-            }
-            if (assetPreviewOpacityValue) {
-                assetPreviewOpacityValue.textContent = opacity.toFixed(1);
+            if (assetPreviewOpacitySlider) assetPreviewOpacitySlider.value = opacity;
+            if (assetPreviewOpacityValue) assetPreviewOpacityValue.textContent = opacity.toFixed(1);
+
+            if (assetChainPointsSliderContainer && assetChainStartPoint && assetChainEndPoint) {
+                const isChainActive = activeAssetTool === 'chain';
+                assetChainPointsSliderContainer.style.display = isChainActive ? 'block' : 'none';
+                assetChainStartPoint.style.display = isChainActive ? 'block' : 'none';
+                assetChainEndPoint.style.display = isChainActive ? 'block' : 'none';
             }
 
         } else {
-            // Hide the preview pane if no asset is selected or if we're not in assets mode
             assetPreviewContainer.style.display = 'none';
             assetPreviewImage.src = '';
             assetPreviewTitle.textContent = '';
+            if (assetChainPointsSliderContainer) assetChainPointsSliderContainer.style.display = 'none';
+            if (assetChainStartPoint) assetChainStartPoint.style.display = 'none';
+            if (assetChainEndPoint) assetChainEndPoint.style.display = 'none';
         }
 
-        // Load the image object for width/height, needed for stamping
         const assetForSizing = findAssetByPath(selectedAssetPath);
         if (assetForSizing && assetForSizing.url) {
             if (!assetImageCache[assetForSizing.path]) {
