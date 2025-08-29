@@ -75,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetsToolsContainer = document.getElementById('assets-tools-container');
     const btnAssetsSelect = document.getElementById('btn-assets-select');
     const btnAssetsDone = document.getElementById('btn-assets-done');
+    const assetPreviewContainer = document.getElementById('asset-preview-container');
+    const assetPreviewImage = document.getElementById('asset-preview-image');
+    const assetPreviewTitle = document.getElementById('asset-preview-title');
     const footerAssetsTab = document.querySelector('[data-tab="footer-assets"]');
     const footerAssetsContent = document.getElementById('footer-assets');
 
@@ -329,6 +332,7 @@ let linkingNoteForAutomationCard = null;
     let assetImageCache = {};
     let isAssetSelectMode = false;
     let selectedPlacedAsset = null;
+    let currentAssetPreviewTransform = { scale: 1, rotation: 0 };
     let assetTransformHandles = {};
     let isDraggingAssetHandle = false;
     let draggedHandleInfo = null; // { name, initialAsset, initialMouseCoords }
@@ -2157,6 +2161,9 @@ function propagateCharacterUpdate(characterId) {
                 selectedPlacedAsset = null; // Clicked on empty space, deselect
             }
 
+            // Update the preview pane based on the selection
+            updateAssetPreview(selectedPlacedAsset);
+
             displayMapOnCanvas(selectedMapFileName); // Redraw to show/hide selection box
             return; // Prevent other click logic from running while in select mode
         }
@@ -2776,18 +2783,26 @@ function propagateCharacterUpdate(characterId) {
             btnAssetsSelect.classList.toggle('active', isAssetSelectMode);
 
             if (isAssetSelectMode) {
-                    mapContainer.style.cursor = 'pointer';
+                mapContainer.style.cursor = 'pointer';
                 // Deactivate asset placement if it was active
                 if (selectedAssetPath) {
                     selectedAssetPath = null;
+                    // No argument means clear the preview
                     updateAssetPreview();
                 }
-            } else {
-                    // Reset everything when turning off select mode
-                    mapContainer.style.cursor = 'grab';
+                 // If an asset was selected on the map, deselect it when turning off select mode
+                if (selectedPlacedAsset) {
                     selectedPlacedAsset = null;
-                    isDraggingAssetHandle = false;
-                    draggedHandleInfo = null;
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+                updateAssetPreview(); // Clear preview when toggling select mode
+            } else {
+                // Reset everything when turning off select mode
+                mapContainer.style.cursor = 'grab';
+                selectedPlacedAsset = null;
+                isDraggingAssetHandle = false;
+                draggedHandleInfo = null;
+                updateAssetPreview(); // Clear preview
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
                 }
@@ -3084,24 +3099,58 @@ function propagateCharacterUpdate(characterId) {
         }
     }
 
-    function updateAssetPreview() {
-        // Clear any existing preview listeners and drawings
+    function updateAssetPreview(assetToPreview = null) {
+        // First, always clear the old canvas-based preview method
         dmCanvas.removeEventListener('mousemove', handleAssetPreviewMouseMove);
         dmCanvas.removeEventListener('mouseout', handleAssetPreviewMouseOut);
-        dmCanvas.removeEventListener('click', handlePlaceAsset); // Also remove click listener
+        dmCanvas.removeEventListener('click', handlePlaceAsset);
+        handleAssetPreviewMouseOut(); // This clears any lingering canvas drawings
+        selectedAssetForPreview = null; // This is the old canvas-preview image object
 
-        handleAssetPreviewMouseOut(); // Clear the canvas just in case
-        selectedAssetForPreview = null;
+        const assetData = assetToPreview || findAssetByPath(selectedAssetPath);
 
-        if (selectedAssetPath) {
+        if (isAssetsMode && assetData) {
+            const assetUrl = assetData.url || findAssetByPath(assetData.path)?.url;
+            if (!assetUrl) {
+                assetPreviewContainer.style.display = 'none';
+                return;
+            }
+
+            assetPreviewContainer.style.display = 'block';
+            assetPreviewImage.src = assetUrl;
+
+            // Extract filename from path
+            const path = assetData.path || selectedAssetPath;
+            assetPreviewTitle.textContent = path.substring(path.lastIndexOf('/') + 1);
+
+            // Determine scale and rotation.
+            // If previewing a placed asset, use its transform.
+            // If previewing a library asset, use the transform currently in the preview.
+            const scale = assetData.scale || currentAssetPreviewTransform.scale;
+            const rotation = assetData.rotation || currentAssetPreviewTransform.rotation;
+
+            // Update the global preview transform state
+            currentAssetPreviewTransform.scale = scale;
+            currentAssetPreviewTransform.rotation = rotation;
+
+            // Apply transformations to the preview image
+            assetPreviewImage.style.transform = `scale(${scale}) rotate(${rotation}rad)`;
+
+        } else {
+            // Hide the preview pane if no asset is selected or if we're not in assets mode
+            assetPreviewContainer.style.display = 'none';
+            assetPreviewImage.src = '';
+            assetPreviewTitle.textContent = '';
+        }
+
+        // Re-enable asset placement click listener ONLY if an asset is selected from the footer
+        if (selectedAssetPath && !isAssetSelectMode) {
             const asset = findAssetByPath(selectedAssetPath);
             if (asset && asset.url) {
                 selectedAssetForPreview = new Image();
                 selectedAssetForPreview.src = asset.url;
                 selectedAssetForPreview.onload = () => {
-                    // Now that the image is loaded, we can start listening
-                    dmCanvas.addEventListener('mousemove', handleAssetPreviewMouseMove);
-                    dmCanvas.addEventListener('mouseout', handleAssetPreviewMouseOut);
+                    // This is the new, simplified placement logic
                     dmCanvas.addEventListener('click', handlePlaceAsset);
                 };
             }
@@ -3136,8 +3185,8 @@ function propagateCharacterUpdate(characterId) {
             position: imageCoords,
             width: placeWidth,
             height: placeHeight,
-            scale: 1,
-            rotation: 0
+            scale: currentAssetPreviewTransform.scale,
+            rotation: currentAssetPreviewTransform.rotation
         };
 
         if (!selectedMapData.overlays) {
@@ -3734,6 +3783,7 @@ function propagateCharacterUpdate(characterId) {
                 }
 
                 requestRedraw(); // Redraw to show the change
+                updateAssetPreview(selectedPlacedAsset); // Update the preview pane in real-time
                 return;
             }
 

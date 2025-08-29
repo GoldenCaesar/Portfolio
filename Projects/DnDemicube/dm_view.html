@@ -110,9 +110,17 @@
             <button id="btn-shadow-erase">Erase</button>
             <button id="btn-shadow-done">Done</button>
         </div>
-        <div id="assets-tools-container" style="display: none; position: absolute; top: 10px; left: 10px; z-index: 4;">
-            <button id="btn-assets-select">Select</button>
-            <button id="btn-assets-done">Done</button>
+        <div id="assets-tools-container" style="display: none; position: absolute; top: 10px; left: 10px; z-index: 4; flex-direction: column;">
+            <div id="asset-main-controls" style="display: flex; gap: 10px;">
+                <button id="btn-assets-select">Select</button>
+                <button id="btn-assets-done">Done</button>
+            </div>
+            <div id="asset-preview-container" style="display: none; margin-top: 10px;">
+                <div id="asset-preview-box">
+                    <img id="asset-preview-image" src="" alt="Asset Preview">
+                </div>
+                <p id="asset-preview-title"></p>
+            </div>
         </div>
         <canvas id="dm-canvas"></canvas>
         <canvas id="shadow-canvas"></canvas>
