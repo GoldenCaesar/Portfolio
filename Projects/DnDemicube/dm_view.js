@@ -3146,6 +3146,7 @@ function propagateCharacterUpdate(characterId) {
     }
 
     function findAssetByPath(path) {
+        if (!path) return null;
         const parts = path.split('/');
         let currentLevel = assetsByPath;
         for (let i = 0; i < parts.length; i++) {
