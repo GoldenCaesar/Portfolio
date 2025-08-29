@@ -2210,10 +2210,10 @@ function propagateCharacterUpdate(characterId) {
         let dx = imageCoords.x - lastStampedAssetEndpoint.x;
         let dy = imageCoords.y - lastStampedAssetEndpoint.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
-        let dragAngle = Math.atan2(dy, dx);
 
-        let stampedSomething = false;
         while (distance >= assetChainLength) {
+            // Recalculate dragAngle inside the loop to allow the chain to curve.
+            let dragAngle = Math.atan2(dy, dx);
             const newAssetRotation = dragAngle - assetChainAngle;
 
             const rotatedStartOffsetX = (localStart.x * Math.cos(newAssetRotation) - localStart.y * Math.sin(newAssetRotation)) * assetScale;
@@ -2237,7 +2237,6 @@ function propagateCharacterUpdate(characterId) {
 
             if (!selectedMapData.overlays) selectedMapData.overlays = [];
             selectedMapData.overlays.push(newAssetOverlay);
-            stampedSomething = true;
 
             const rotatedEndOffsetX = (localEnd.x * Math.cos(newAssetRotation) - localEnd.y * Math.sin(newAssetRotation)) * assetScale;
             const rotatedEndOffsetY = (localEnd.x * Math.sin(newAssetRotation) + localEnd.y * Math.cos(newAssetRotation)) * assetScale;
@@ -2253,12 +2252,12 @@ function propagateCharacterUpdate(characterId) {
             dragAngle = Math.atan2(dy, dx);
         }
 
-        if (stampedSomething) {
-            displayMapOnCanvas(selectedMapFileName);
-        }
+        // Redraw all overlays, including any that were just added.
+        // `drawOverlays` handles clearing the canvas itself.
+        drawOverlays(selectedMapData.overlays);
 
+        // Now, draw the ghost preview on top of the newly drawn overlays.
         const drawingCtx = drawingCanvas.getContext('2d');
-        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
         const ghostDragAngle = Math.atan2(imageCoords.y - lastStampedAssetEndpoint.y, imageCoords.x - lastStampedAssetEndpoint.y);
         const ghostRotation = ghostDragAngle - assetChainAngle;
