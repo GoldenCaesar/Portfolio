@@ -2867,8 +2867,6 @@ function propagateCharacterUpdate(characterId) {
 
             // If we are turning select mode ON
             if (!wasActive) {
-                // Deselect any footer asset to avoid confusion between stamping and selecting.
-                selectedAssetPath = null;
                 updateAssetPreview();
             } else { // If we are turning select mode OFF
                 // Deselect any placed asset
