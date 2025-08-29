@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetsToolsContainer = document.getElementById('assets-tools-container');
     const btnAssetsSelect = document.getElementById('btn-assets-select');
     const btnAssetsStamp = document.getElementById('btn-assets-stamp');
+    const btnAssetsChain = document.getElementById('btn-assets-chain');
     const btnAssetsDone = document.getElementById('btn-assets-done');
     const assetPreviewContainer = document.getElementById('asset-preview-container');
     const assetPreviewImage = document.getElementById('asset-preview-image');
@@ -336,7 +337,9 @@ let linkingNoteForAutomationCard = null;
     let selectedPlacedAsset = null;
     let currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
     let assetTransformHandles = {};
-    let activeAssetTool = null; // Can be 'select', 'stamp', or null
+let activeAssetTool = null; // Can be 'select', 'stamp', or 'chain'
+let isChaining = false;
+let lastStampedAssetEndpoint = null;
     let isDraggingAssetHandle = false;
     let draggedHandleInfo = null; // { name, initialAsset, initialMouseCoords }
     let isDraggingAsset = false;
@@ -990,6 +993,24 @@ function propagateCharacterUpdate(characterId) {
             const countSpan = button.querySelector('.dice-count');
             if (countSpan) {
                 countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    if (btnAssetsChain) {
+        btnAssetsChain.addEventListener('click', () => {
+            const wasActive = activeAssetTool === 'chain';
+            setActiveAssetTool('chain');
+
+            // If we are turning chain mode ON
+            if (!wasActive) {
+                // Deselect any placed asset, as we can only chain the footer asset.
+                selectedPlacedAsset = null;
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
+                }
+                // The preview will now reflect the footer selection
+                updateAssetPreview();
             }
         });
     }
@@ -2099,8 +2120,122 @@ function propagateCharacterUpdate(characterId) {
         }
     });
 
+    dmCanvas.addEventListener('mousemove', (event) => {
+        if (!isChaining || activeAssetTool !== 'chain') return;
+        event.stopPropagation();
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+
+        const assetImage = selectedAssetForPreview;
+        if (!assetImage || !assetImage.complete || assetImage.naturalWidth === 0) return;
+
+        const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+        if (!imageCoords) return;
+
+        // --- Corrected Logic ---
+        const assetScale = currentAssetPreviewTransform.scale;
+        const assetW = assetImage.naturalWidth * assetScale;
+        const assetH = assetImage.naturalHeight * assetScale;
+
+        // The "length" of the asset for chaining is its height, assuming an upright asset like a wall section.
+        const assetChainLength = assetH;
+
+        let dx = imageCoords.x - lastStampedAssetEndpoint.x;
+        let dy = imageCoords.y - lastStampedAssetEndpoint.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        let angle = Math.atan2(dy, dx);
+
+        let stampedSomething = false;
+        while (distance >= assetChainLength) {
+            // The new asset's back edge should be at lastStampedAssetEndpoint.
+            // Its center is therefore half its length along the angle from that endpoint.
+            const assetCenter = {
+                x: lastStampedAssetEndpoint.x + (assetChainLength / 2) * Math.cos(angle),
+                y: lastStampedAssetEndpoint.y + (assetChainLength / 2) * Math.sin(angle)
+            };
+
+            const newAssetOverlay = {
+                type: 'placedAsset',
+                path: selectedAssetPath,
+                position: assetCenter,
+                width: assetImage.naturalWidth,
+                height: assetImage.naturalHeight,
+                scale: currentAssetPreviewTransform.scale,
+                // Add PI/2 to align the asset's height with the drag direction
+                rotation: angle + (Math.PI / 2),
+                opacity: currentAssetPreviewTransform.opacity
+            };
+
+            if (!selectedMapData.overlays) {
+                selectedMapData.overlays = [];
+            }
+            selectedMapData.overlays.push(newAssetOverlay);
+            stampedSomething = true;
+
+            // The new endpoint for the next chain is the front edge of the asset we just stamped.
+            lastStampedAssetEndpoint = {
+                x: lastStampedAssetEndpoint.x + assetChainLength * Math.cos(angle),
+                y: lastStampedAssetEndpoint.y + assetChainLength * Math.sin(angle)
+            };
+
+            // Recalculate distance and angle for the next potential segment
+            dx = imageCoords.x - lastStampedAssetEndpoint.x;
+            dy = imageCoords.y - lastStampedAssetEndpoint.y;
+            distance = Math.sqrt(dx * dx + dy * dy);
+            angle = Math.atan2(dy, dx);
+        }
+
+        if (stampedSomething) {
+            displayMapOnCanvas(selectedMapFileName); // Redraw permanent assets
+        }
+
+        // --- Draw Ghost Asset ---
+        const drawingCtx = drawingCanvas.getContext('2d');
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+        // The ghost asset shows where the next segment will be placed, without distortion.
+        const ghostAngle = Math.atan2(imageCoords.y - lastStampedAssetEndpoint.y, imageCoords.x - lastStampedAssetEndpoint.y);
+        const ghostCenter = {
+            x: lastStampedAssetEndpoint.x + (assetChainLength / 2) * Math.cos(ghostAngle),
+            y: lastStampedAssetEndpoint.y + (assetChainLength / 2) * Math.sin(ghostAngle)
+        };
+
+        const { scale: mapScale, originX, originY } = selectedMapData.transform;
+
+        const canvasX = (ghostCenter.x * mapScale) + originX;
+        const canvasY = (ghostCenter.y * mapScale) + originY;
+
+        // Use the scaled dimensions for drawing
+        const assetCanvasWidth = assetW * mapScale;
+        const assetCanvasHeight = assetH * mapScale;
+
+        drawingCtx.save();
+        drawingCtx.globalAlpha = 0.5 * currentAssetPreviewTransform.opacity;
+        drawingCtx.translate(canvasX, canvasY);
+        drawingCtx.rotate(ghostAngle + (Math.PI / 2)); // Rotate ghost same as real asset
+        drawingCtx.drawImage(assetImage, -assetCanvasWidth / 2, -assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
+        drawingCtx.restore();
+    });
+
     dmCanvas.addEventListener('mousedown', (event) => {
         if (event.button !== 0) return;
+
+        if (activeAssetTool === 'chain') {
+            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+            if (!imageCoords) return;
+
+            // Ensure an asset is selected
+            if (!selectedAssetPath || !selectedAssetForPreview || !selectedAssetForPreview.complete) {
+                alert("Please select an asset from the library to chain.");
+                return;
+            }
+
+            isChaining = true;
+            lastStampedAssetEndpoint = imageCoords;
+            event.stopPropagation(); // Prevent map panning
+            return;
+        }
 
         // This listener now exclusively handles starting a drag/resize on a selected asset.
         if (activeAssetTool === 'select' && selectedPlacedAsset) {
@@ -2849,12 +2984,15 @@ function propagateCharacterUpdate(characterId) {
         // Update button active states
         if (btnAssetsSelect) btnAssetsSelect.classList.toggle('active', activeAssetTool === 'select');
         if (btnAssetsStamp) btnAssetsStamp.classList.toggle('active', activeAssetTool === 'stamp');
+    if (btnAssetsChain) btnAssetsChain.classList.toggle('active', activeAssetTool === 'chain');
 
         // Update cursor style
         if (activeAssetTool === 'select') {
             mapContainer.style.cursor = 'pointer';
         } else if (activeAssetTool === 'stamp') {
             mapContainer.style.cursor = 'copy';
+    } else if (activeAssetTool === 'chain') {
+        mapContainer.style.cursor = 'crosshair';
         } else {
             mapContainer.style.cursor = 'grab';
         }
@@ -3226,6 +3364,15 @@ function propagateCharacterUpdate(characterId) {
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
+
+        if (isChaining) {
+            isChaining = false;
+            lastStampedAssetEndpoint = null;
+            const drawingCtx = drawingCanvas.getContext('2d');
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            // No need to return, let other mouseup logic run if needed,
+            // but chaining state is now reset.
+        }
 
         if (isDraggingAssetHandle) {
             isDraggingAssetHandle = false;
@@ -3728,6 +3875,15 @@ function propagateCharacterUpdate(characterId) {
             }
             isPanning = false;
             mapContainer.style.cursor = 'grab';
+        });
+
+        dmCanvas.addEventListener('mouseout', (event) => {
+            if (isChaining) {
+                isChaining = false;
+                lastStampedAssetEndpoint = null;
+                const drawingCtx = drawingCanvas.getContext('2d');
+                drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            }
         });
 
         mapContainer.addEventListener('mouseleave', () => {
