@@ -90,6 +90,7 @@ let currentOverlays = [];
 let initiativeTokens = [];
 let currentMapTransform = { scale: 1, originX: 0, originY: 0 };
 const imageCache = new Map();
+let dmCanvasAspectRatio = null;
 let currentMapDisplayData = {
     img: null,
     ratio: 1,
@@ -122,6 +123,46 @@ function getPolygonSignedArea(polygon) {
         area += (p1.x * p2.y - p2.x * p1.y);
     }
     return area / 2;
+}
+
+function resizePlayerCanvas() {
+    if (!playerMapContainer || !playerCanvas) return;
+
+    const containerWidth = playerMapContainer.clientWidth;
+    const containerHeight = playerMapContainer.clientHeight;
+
+    let newWidth, newHeight;
+
+    if (dmCanvasAspectRatio) {
+        const containerAspectRatio = containerWidth / containerHeight;
+        if (dmCanvasAspectRatio > containerAspectRatio) {
+            newWidth = containerWidth;
+            newHeight = newWidth / dmCanvasAspectRatio;
+        } else {
+            newHeight = containerHeight;
+            newWidth = newHeight * dmCanvasAspectRatio;
+        }
+    } else {
+        newWidth = containerWidth;
+        newHeight = containerHeight;
+    }
+
+    playerCanvas.width = newWidth;
+    playerCanvas.height = newHeight;
+
+    const top = (containerHeight - newHeight) / 2;
+    const left = (containerWidth - newWidth) / 2;
+    playerCanvas.style.position = 'absolute';
+    playerCanvas.style.top = `${top}px`;
+    playerCanvas.style.left = `${left}px`;
+
+    if (shadowCanvas) {
+        shadowCanvas.width = newWidth;
+        shadowCanvas.height = newHeight;
+        shadowCanvas.style.position = 'absolute';
+        shadowCanvas.style.top = `${top}px`;
+        shadowCanvas.style.left = `${left}px`;
+    }
 }
 
 function isPointInPolygon(point, polygon) {
@@ -359,9 +400,6 @@ function drawMapAndOverlays() {
         return;
     }
 
-    playerCanvas.width = playerMapContainer.clientWidth;
-    playerCanvas.height = playerMapContainer.clientHeight;
-
     pCtx.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
     pCtx.save();
 
@@ -511,6 +549,11 @@ window.addEventListener('message', (event) => {
                 }
 
             case 'loadMap':
+                if (data.dmCanvasWidth && data.dmCanvasHeight) {
+                    dmCanvasAspectRatio = data.dmCanvasWidth / data.dmCanvasHeight;
+                }
+                resizePlayerCanvas();
+
                 slideshowContainer.style.display = 'none';
                 playerMapContainer.style.display = 'flex';
 
@@ -546,6 +589,11 @@ window.addEventListener('message', (event) => {
                 }
                 break;
             case 'mapTransformUpdate':
+                if (data.dmCanvasWidth && data.dmCanvasHeight) {
+                    dmCanvasAspectRatio = data.dmCanvasWidth / data.dmCanvasHeight;
+                }
+                resizePlayerCanvas();
+
                 if (data.viewRectangle) {
                     const viewRect = data.viewRectangle;
                     const hScale = playerCanvas.width / viewRect.width;
@@ -980,6 +1028,7 @@ function populateAndShowStatBlock_Player(character, position) {
 
 
 function resizeAndRedraw() {
+    resizePlayerCanvas();
     if (currentMapImage && currentMapImage.complete) {
         // console.log("Player view: Resizing and redrawing map.");
         drawMapAndOverlays();
@@ -999,9 +1048,6 @@ function drawPlaceholder(message = "Waiting for DM to share map...") {
         // console.error("drawPlaceholder: Canvas, context, or container not available.");
         return;
     }
-
-    playerCanvas.width = playerMapContainer.clientWidth;
-    playerCanvas.height = playerMapContainer.clientHeight;
 
     pCtx.fillStyle = '#2a3138';
     pCtx.fillRect(0, 0, playerCanvas.width, playerCanvas.height);

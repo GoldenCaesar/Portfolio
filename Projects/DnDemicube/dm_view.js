@@ -4796,6 +4796,8 @@ function propagateCharacterUpdate(characterId) {
                                 mapDataUrl: base64dataUrl,
                                 overlays: JSON.parse(JSON.stringify(visibleOverlays)),
                                 viewRectangle: viewRectangle,
+                                dmCanvasWidth: dmCanvas.width,
+                                dmCanvasHeight: dmCanvas.height,
                                 active: mapData.mode === 'view'
                             }, '*');
                             console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
@@ -4836,7 +4838,9 @@ function propagateCharacterUpdate(characterId) {
             };
             playerWindow.postMessage({
                 type: 'mapTransformUpdate',
-                viewRectangle: viewRectangle
+                viewRectangle: viewRectangle,
+                dmCanvasWidth: dmCanvas.width,
+                dmCanvasHeight: dmCanvas.height
             }, '*');
         }
     }
