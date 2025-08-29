@@ -3166,12 +3166,7 @@ function propagateCharacterUpdate(characterId) {
     }
 
     function updateAssetPreview(assetToPreview = null) {
-        // First, always clear the old canvas-based preview method
-        dmCanvas.removeEventListener('mousemove', handleAssetPreviewMouseMove);
-        dmCanvas.removeEventListener('mouseout', handleAssetPreviewMouseOut);
-        // dmCanvas.removeEventListener('click', handlePlaceAsset); // REMOVED: Placement is now handled by the stamp tool
-        handleAssetPreviewMouseOut(); // This clears any lingering canvas drawings
-        selectedAssetForPreview = null; // This is the old canvas-preview image object
+        selectedAssetForPreview = null;
 
         const assetData = assetToPreview || findAssetByPath(selectedAssetPath);
 
