@@ -505,6 +505,7 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 }
 
 #asset-preview-box {
+    position: relative; /* Needed for positioning the chain points */
     width: 150px;
     height: 150px;
     background-color: #15191e;
@@ -515,6 +516,24 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     justify-content: center;
     align-items: center;
     margin: 0 auto; /* Center the box within its container */
+}
+
+.chain-point {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid white;
+    transform: translate(-50%, -50%); /* Center the dot on its coordinates */
+    z-index: 10;
+}
+
+#asset-chain-start-point {
+    background-color: #4caf50; /* Green */
+}
+
+#asset-chain-end-point {
+    background-color: #f44336; /* Red */
 }
 
 #asset-preview-image {
