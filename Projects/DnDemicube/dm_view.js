@@ -2194,9 +2194,17 @@ function propagateCharacterUpdate(characterId) {
         const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
         if (!imageCoords) return;
 
-        const assetScale = currentAssetPreviewTransform.scale;
         const assetW = assetImage.naturalWidth;
         const assetH = assetImage.naturalHeight;
+
+        // Calculate a sensible default scale to make the asset ~5% of the map width
+        const defaultSize = currentMapDisplayData.imgWidth * 0.05;
+        const longestDim = Math.max(assetW, assetH);
+        const defaultScale = longestDim > 0 ? defaultSize / longestDim : 1;
+
+        // If the current scale is the default (1), use our calculated default scale.
+        // Otherwise, use the scale inherited from a previously selected placed asset.
+        const assetScale = currentAssetPreviewTransform.scale === 1 ? defaultScale : currentAssetPreviewTransform.scale;
 
         const { startPoint: localStart, endPoint: localEnd } = getChainPoints(assetW, assetH, chainPointsAngle);
 
@@ -2358,29 +2366,25 @@ function propagateCharacterUpdate(characterId) {
             const selectedMapData = detailedMapData.get(selectedMapFileName);
             if (!selectedMapData) return;
 
-            // Use the natural dimensions of the image for correct aspect ratio
             const assetWidth = selectedAssetForPreview.naturalWidth;
             const assetHeight = selectedAssetForPreview.naturalHeight;
 
-            // Define a default size for the asset on the map, preserving aspect ratio.
-            // Let's make the longest side 5% of the map's width by default.
+            // Calculate a sensible default scale to make the asset ~5% of the map width
             const defaultSize = currentMapDisplayData.imgWidth * 0.05;
-            let placeWidth, placeHeight;
-            if (assetWidth > assetHeight) {
-                placeWidth = defaultSize;
-                placeHeight = (assetHeight / assetWidth) * defaultSize;
-            } else {
-                placeHeight = defaultSize;
-                placeWidth = (assetWidth / assetHeight) * defaultSize;
-            }
+            const longestDim = Math.max(assetWidth, assetHeight);
+            const defaultScale = longestDim > 0 ? defaultSize / longestDim : 1;
+
+            // If the current scale is the default (1), use our calculated default scale.
+            // Otherwise, use the scale inherited from a previously selected placed asset.
+            const finalScale = currentAssetPreviewTransform.scale === 1 ? defaultScale : currentAssetPreviewTransform.scale;
 
             const newAssetOverlay = {
                 type: 'placedAsset',
                 path: selectedAssetPath,
                 position: imageCoords,
-                width: placeWidth, // Base width
-                height: placeHeight, // Base height
-                scale: currentAssetPreviewTransform.scale,
+                width: assetWidth, // Use natural width
+                height: assetHeight, // Use natural height
+                scale: finalScale,
                 rotation: currentAssetPreviewTransform.rotation,
                 opacity: currentAssetPreviewTransform.opacity
             };
@@ -3302,15 +3306,21 @@ function propagateCharacterUpdate(characterId) {
                         return;
                     }
 
-                    // If the clicked item is already selected, deselect it.
-                    if (selectedAssetPath === item.path) {
+                    const clickedPath = item.path;
+
+                    if (selectedAssetPath === clickedPath) {
+                        // User clicked the same asset again, deselect it and reset transform.
                         selectedAssetPath = null;
+                        currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
                     } else {
-                        selectedAssetPath = item.path;
+                        // User clicked a new asset. Select it and reset transform.
+                        selectedAssetPath = clickedPath;
+                        currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
                     }
 
                     // Re-render the explorer to reflect the change in selection.
                     renderAssetExplorer();
+                    // Update the preview pane, which will now use the (potentially reset) transform state.
                     updateAssetPreview();
                 });
 
@@ -3357,6 +3367,14 @@ function propagateCharacterUpdate(characterId) {
 
     function updateAssetPreview(assetToPreview = null) {
         selectedAssetForPreview = null;
+
+        // If a placed asset is passed, update the global transform state with its properties.
+        if (assetToPreview) {
+            currentAssetPreviewTransform.scale = assetToPreview.scale || 1;
+            currentAssetPreviewTransform.rotation = assetToPreview.rotation || 0;
+            currentAssetPreviewTransform.opacity = assetToPreview.opacity ?? 1;
+        }
+
         const assetData = assetToPreview || findAssetByPath(selectedAssetPath);
 
         if (isAssetsMode && assetData) {
@@ -3381,24 +3399,8 @@ function propagateCharacterUpdate(characterId) {
             const path = assetData.path || selectedAssetPath;
             assetPreviewTitle.textContent = path.substring(path.lastIndexOf('/') + 1);
 
-            let scale, rotation, opacity;
-
-            if (assetToPreview) {
-                // We are previewing a placed asset from the map. Use its properties.
-                scale = assetToPreview.scale || 1;
-                rotation = assetToPreview.rotation || 0;
-                opacity = assetToPreview.opacity ?? 1;
-            } else {
-                // We are previewing a template asset from the footer. Reset to defaults.
-                scale = 1;
-                rotation = 0;
-                opacity = 1;
-            }
-
-            // Update the global transform state for the next Stamp/Chain operation
-            currentAssetPreviewTransform.scale = scale;
-            currentAssetPreviewTransform.rotation = rotation;
-            currentAssetPreviewTransform.opacity = opacity;
+            // Always read from the global transform state to update the UI.
+            const { scale, rotation, opacity } = currentAssetPreviewTransform;
 
             // Update the UI elements
             assetPreviewImage.style.transform = `scale(${scale}) rotate(${rotation}rad)`;
@@ -3415,11 +3417,10 @@ function propagateCharacterUpdate(characterId) {
             }
 
         } else {
-            // Hide the preview and reset the global transform to defaults
+            // No asset selected, hide the preview. The transform state is preserved.
             assetPreviewContainer.style.display = 'none';
             assetPreviewImage.src = '';
             assetPreviewTitle.textContent = '';
-            currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 }; // Reset here
             if (assetChainPointsSliderContainer) assetChainPointsSliderContainer.style.display = 'none';
             if (assetChainStartPoint) assetChainStartPoint.style.display = 'none';
             if (assetChainEndPoint) assetChainEndPoint.style.display = 'none';
