@@ -2903,7 +2903,7 @@ function propagateCharacterUpdate(characterId) {
         assetPreviewOpacitySlider.addEventListener('input', (e) => {
             const opacity = parseFloat(e.target.value);
             currentAssetPreviewTransform.opacity = opacity;
-
+            
             if (assetPreviewOpacityValue) {
                 assetPreviewOpacityValue.textContent = opacity.toFixed(1);
             }
