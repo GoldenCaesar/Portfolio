@@ -801,9 +801,67 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     border-radius: 5px;
 }
 
-#shadow-tools-container button.active {
+#shadow-tools-container button.active,
+#assets-tools-container button.active {
     background-color: #a0b4c9;
     box-shadow: 0 0 8px rgba(182, 202, 225, 0.7);
+}
+
+/* Opacity slider styles */
+.asset-preview-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.asset-preview-slider-container label {
+    font-size: 12px;
+    margin-bottom: 0; /* Override default label margin */
+}
+
+.asset-preview-slider-container input[type="range"] {
+    flex-grow: 1;
+    margin: 0; /* Override default input margin */
+    padding: 0; /* Override default input padding */
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #5f6a7a;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity .2s;
+    border-radius: 4px;
+}
+
+.asset-preview-slider-container input[type="range"]:hover {
+    opacity: 1;
+}
+
+.asset-preview-slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #b6cae1;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.asset-preview-slider-container input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #b6cae1;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+#asset-preview-opacity-value {
+    font-size: 12px;
+    font-family: 'Courier New', Courier, monospace;
+    min-width: 25px; /* Ensure space for "1.0" */
+    text-align: right;
 }
 
 /* Automation View Styles */

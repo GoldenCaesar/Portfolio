@@ -113,6 +113,7 @@
         <div id="assets-tools-container" style="display: none; position: absolute; top: 10px; left: 10px; z-index: 4; flex-direction: column;">
             <div id="asset-main-controls" style="display: flex; gap: 10px;">
                 <button id="btn-assets-select">Select</button>
+                <button id="btn-assets-stamp">Stamp</button>
                 <button id="btn-assets-done">Done</button>
             </div>
             <div id="asset-preview-container" style="display: none; margin-top: 10px;">
@@ -120,6 +121,11 @@
                     <img id="asset-preview-image" src="" alt="Asset Preview">
                 </div>
                 <p id="asset-preview-title"></p>
+                <div class="asset-preview-slider-container">
+                    <label for="asset-preview-opacity">Opacity</label>
+                    <input type="range" id="asset-preview-opacity" min="0" max="1" step="0.05" value="1">
+                    <span id="asset-preview-opacity-value">1.0</span>
+                </div>
             </div>
         </div>
         <canvas id="dm-canvas"></canvas>
