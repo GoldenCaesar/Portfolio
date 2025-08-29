@@ -2413,6 +2413,8 @@ function propagateCharacterUpdate(characterId) {
                     }
                     // A new asset was clicked, select it.
                     selectedPlacedAsset = overlay;
+                    selectedAssetPath = overlay.path;
+                    renderAssetExplorer();
                     assetClicked = true;
                     break; // Stop after finding the first one
                 }
@@ -2856,17 +2858,18 @@ function propagateCharacterUpdate(characterId) {
             setShadowTool(null);
         }
 
-        if (isAssetsMode) {
-            isAssetsMode = false;
-            assetsToolsContainer.style.display = 'none';
-            if (footerAssetsTab) footerAssetsTab.style.display = 'none';
-             // Explicitly reset asset selection state
-            isAssetSelectMode = false;
-            if(btnAssetsSelect) btnAssetsSelect.classList.remove('active');
-            selectedPlacedAsset = null;
-            isDraggingAssetHandle = false;
-            draggedHandleInfo = null;
-        }
+        // This block handles the full shutdown of the Assets tool.
+        isAssetsMode = false;
+        if(assetsToolsContainer) assetsToolsContainer.style.display = 'none';
+        if (footerAssetsTab) footerAssetsTab.style.display = 'none';
+        setActiveAssetTool(null);
+        selectedPlacedAsset = null;
+        updateAssetPreview(); // This will also clear the preview
+        isDraggingAssetHandle = false;
+        draggedHandleInfo = null;
+        isDraggingAsset = false;
+        draggedAssetInfo = null;
+
 
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
@@ -3126,26 +3129,10 @@ function propagateCharacterUpdate(characterId) {
 
     if (btnAssetsDone) {
         btnAssetsDone.addEventListener('click', () => {
-            isAssetsMode = false;
-            assetsToolsContainer.style.display = 'none';
-            if (footerAssetsTab) footerAssetsTab.style.display = 'none';
+            resetAllInteractiveStates();
+            // Also ensure the main tools tab is re-selected in the footer
             const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
             if (toolsTabButton) toolsTabButton.click();
-
-            // Reset asset tool states
-            setActiveAssetTool(null);
-            selectedAssetPath = null;
-            selectedPlacedAsset = null;
-            updateAssetPreview();
-            isDraggingAssetHandle = false;
-            draggedHandleInfo = null;
-            isDraggingAsset = false;
-            draggedAssetInfo = null;
-            mapContainer.style.cursor = 'grab';
-
-            if (selectedMapFileName) {
-                displayMapOnCanvas(selectedMapFileName);
-            }
         });
     }
 
@@ -3393,14 +3380,26 @@ function propagateCharacterUpdate(characterId) {
             const path = assetData.path || selectedAssetPath;
             assetPreviewTitle.textContent = path.substring(path.lastIndexOf('/') + 1);
 
-            const scale = assetData.scale || currentAssetPreviewTransform.scale;
-            const rotation = assetData.rotation || currentAssetPreviewTransform.rotation;
-            const opacity = assetData.opacity ?? currentAssetPreviewTransform.opacity;
+            let scale, rotation, opacity;
 
+            if (assetToPreview) {
+                // We are previewing a placed asset from the map. Use its properties.
+                scale = assetToPreview.scale || 1;
+                rotation = assetToPreview.rotation || 0;
+                opacity = assetToPreview.opacity ?? 1;
+            } else {
+                // We are previewing a template asset from the footer. Reset to defaults.
+                scale = 1;
+                rotation = 0;
+                opacity = 1;
+            }
+
+            // Update the global transform state for the next Stamp/Chain operation
             currentAssetPreviewTransform.scale = scale;
             currentAssetPreviewTransform.rotation = rotation;
             currentAssetPreviewTransform.opacity = opacity;
 
+            // Update the UI elements
             assetPreviewImage.style.transform = `scale(${scale}) rotate(${rotation}rad)`;
             assetPreviewImage.style.opacity = opacity;
 
@@ -3415,9 +3414,11 @@ function propagateCharacterUpdate(characterId) {
             }
 
         } else {
+            // Hide the preview and reset the global transform to defaults
             assetPreviewContainer.style.display = 'none';
             assetPreviewImage.src = '';
             assetPreviewTitle.textContent = '';
+            currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 }; // Reset here
             if (assetChainPointsSliderContainer) assetChainPointsSliderContainer.style.display = 'none';
             if (assetChainStartPoint) assetChainStartPoint.style.display = 'none';
             if (assetChainEndPoint) assetChainEndPoint.style.display = 'none';
@@ -3439,10 +3440,11 @@ function propagateCharacterUpdate(characterId) {
         if (isChaining) {
             isChaining = false;
             lastStampedAssetEndpoint = null;
-            const drawingCtx = drawingCanvas.getContext('2d');
-            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-            // No need to return, let other mouseup logic run if needed,
-            // but chaining state is now reset.
+            // The ghost preview is already cleared by the mousemove handler not running.
+            // We just need to ensure the final state of the overlays is drawn.
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
         }
 
         if (isDraggingAssetHandle) {
@@ -3848,9 +3850,7 @@ function propagateCharacterUpdate(characterId) {
                 displayMapOnCanvas(selectedMapFileName);
                 updateButtonStates();
                 if (selectedMapData.mode === 'view') {
-                    if (activeShadowTool) {
-                        setShadowTool(null);
-                    }
+                    resetAllInteractiveStates(); // This handles closing all tools
                     sendMapToPlayerView(selectedMapFileName);
                     toggleShadowAnimation(true);
                 } else {
@@ -5743,6 +5743,7 @@ function propagateCharacterUpdate(characterId) {
 
     mapToolsContextMenu.addEventListener('click', (event) => {
         event.stopPropagation();
+        resetAllInteractiveStates();
         const action = event.target.dataset.action;
 
         if (action === 'shadow-tool') {
