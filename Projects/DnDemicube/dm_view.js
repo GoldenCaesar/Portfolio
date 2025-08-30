@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAssetsStamp = document.getElementById('btn-assets-stamp');
     const btnAssetsChain = document.getElementById('btn-assets-chain');
     const btnAssetsDelete = document.getElementById('btn-assets-delete');
+    const btnAssetsFlatten = document.getElementById('btn-assets-flatten');
     const btnAssetsDone = document.getElementById('btn-assets-done');
     const assetPreviewContainer = document.getElementById('asset-preview-container');
     const assetPreviewImage = document.getElementById('asset-preview-image');
@@ -339,7 +340,9 @@ let linkingNoteForAutomationCard = null;
     let selectedAssetPath = null;
     let selectedAssetForPreview = null; // To hold the Image object for previewing
     let assetImageCache = {};
-    let selectedPlacedAsset = null;
+    let selectedPlacedAssets = []; // Replaces selectedPlacedAsset for multi-select
+    let isSelecting = false; // For marquee selection
+    let selectionBox = null; // For marquee box coordinates
     let currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
     let assetTransformHandles = {};
 let activeAssetTool = null; // Can be 'select', 'stamp', or 'chain'
@@ -1554,8 +1557,8 @@ function getTightBoundingBox(img) {
 
                     drawingCtx.restore();
 
-                    // If this asset is the selected one, draw the selection box over it
-                    if (overlay === selectedPlacedAsset) {
+                    // If this asset is one of the selected ones, draw the selection box over it
+                    if (selectedPlacedAssets.includes(overlay)) {
                         drawAssetSelectionBox(overlay);
                     }
                 } else if (!assetImageCache[overlay.path]) {
@@ -1604,7 +1607,16 @@ function getTightBoundingBox(img) {
             });
         }
 
-
+        // Draw marquee selection box
+        if (isSelecting && selectionBox) {
+            drawingCtx.strokeStyle = 'rgba(0, 255, 255, 0.7)';
+            drawingCtx.lineWidth = 1;
+            drawingCtx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+            const rectWidth = selectionBox.endX - selectionBox.startX;
+            const rectHeight = selectionBox.endY - selectionBox.startY;
+            drawingCtx.fillRect(selectionBox.startX, selectionBox.startY, rectWidth, rectHeight);
+            drawingCtx.strokeRect(selectionBox.startX, selectionBox.startY, rectWidth, rectHeight);
+        }
     }
 
     const characterPreviewClose = document.getElementById('character-preview-close');
@@ -2388,54 +2400,84 @@ function getTightBoundingBox(img) {
     });
 
     dmCanvas.addEventListener('mousedown', (event) => {
-        if (event.button !== 0) return;
+        if (event.button !== 0) return; // Only left-click
+        const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
+        if (!imageCoords) return;
 
         if (activeAssetTool === 'chain') {
-            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
-            if (!imageCoords) return;
-
-            // Ensure an asset is selected
             if (!selectedAssetPath || !selectedAssetForPreview || !selectedAssetForPreview.complete) {
                 alert("Please select an asset from the library to chain.");
                 return;
             }
-
             isChaining = true;
             lastStampedAssetEndpoint = imageCoords;
-            event.stopPropagation(); // Prevent map panning
+            event.stopPropagation();
             return;
         }
 
-        // This listener now exclusively handles starting a drag/resize on a selected asset.
-        if (activeAssetTool === 'select' && selectedPlacedAsset) {
-            const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
-            if (!imageCoords) return;
+        if (activeAssetTool === 'select') {
+            event.stopPropagation();
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || !selectedMapData.overlays) return;
 
-            const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
+            let clickedOnExistingSelection = false;
+            let clickedAsset = null;
 
-            if (handleName) {
-                event.stopPropagation(); // Prevent map panning
-                isDraggingAssetHandle = true;
-                draggedHandleInfo = {
-                    name: handleName,
-                    initialAsset: JSON.parse(JSON.stringify(selectedPlacedAsset)),
-                    initialMouseCoords: imageCoords
-                };
-                mapContainer.style.cursor = 'grabbing';
-                return;
+            // Check if click is on an already selected asset or a handle
+            for (let i = selectedPlacedAssets.length - 1; i >= 0; i--) {
+                const asset = selectedPlacedAssets[i];
+                if (getHandleForPoint(imageCoords, asset) || isPointInPlacedAsset(imageCoords, asset)) {
+                    clickedOnExistingSelection = true;
+                    break;
+                }
             }
 
-            // If not a handle, check if the asset itself was clicked for dragging
-            if (isPointInPlacedAsset(imageCoords, selectedPlacedAsset)) {
-                event.stopPropagation(); // Prevent map panning
+            // If clicked on existing selection, initiate group drag
+            if (clickedOnExistingSelection) {
                 isDraggingAsset = true;
                 draggedAssetInfo = {
-                    initialAsset: JSON.parse(JSON.stringify(selectedPlacedAsset)),
-                    initialMouseCoords: imageCoords
+                    initialMouseCoords: imageCoords,
+                    initialAssetPositions: selectedPlacedAssets.map(a => ({ asset: a, x: a.position.x, y: a.position.y }))
                 };
                 mapContainer.style.cursor = 'grabbing';
                 return;
             }
+
+            // Check for a click on any asset (not just selected ones)
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'placedAsset' && isPointInPlacedAsset(imageCoords, overlay)) {
+                    clickedAsset = overlay;
+                    break;
+                }
+            }
+
+            if (clickedAsset) {
+                if (event.shiftKey) { // Add/remove from selection
+                    const index = selectedPlacedAssets.indexOf(clickedAsset);
+                    if (index > -1) {
+                        selectedPlacedAssets.splice(index, 1);
+                    } else {
+                        selectedPlacedAssets.push(clickedAsset);
+                    }
+                } else { // New selection
+                    selectedPlacedAssets = [clickedAsset];
+                }
+                isDraggingAsset = true; // Prepare for potential drag
+                 draggedAssetInfo = {
+                    initialMouseCoords: imageCoords,
+                    initialAssetPositions: selectedPlacedAssets.map(a => ({ asset: a, x: a.position.x, y: a.position.y }))
+                };
+            } else { // Clicked on empty space, start marquee selection
+                if (!event.shiftKey) {
+                    selectedPlacedAssets = [];
+                }
+                isSelecting = true;
+                selectionBox = { startX: event.offsetX, startY: event.offsetY, endX: event.offsetX, endY: event.offsetY };
+            }
+
+            updateAssetPreview(selectedPlacedAssets.length === 1 ? selectedPlacedAssets[0] : null);
+            displayMapOnCanvas(selectedMapFileName);
         }
     });
 
@@ -2492,43 +2534,6 @@ function getTightBoundingBox(img) {
             // Redraw the map to show the newly placed asset
             displayMapOnCanvas(selectedMapFileName);
             return; // Stamping is an exclusive action, so we stop here.
-        }
-
-        // Handle Select Tool
-        if (activeAssetTool === 'select') {
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            if (!selectedMapData || !selectedMapData.overlays) return;
-
-            let assetClicked = false;
-            // Iterate backwards to select the top-most asset
-            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
-                const overlay = selectedMapData.overlays[i];
-                if (overlay.type === 'placedAsset' && isPointInPlacedAsset(imageCoords, overlay)) {
-                    // If we clicked the already selected asset, we don't need to do anything.
-                    // This allows drag/resize to start without deselecting.
-                    if (selectedPlacedAsset === overlay) {
-                        assetClicked = true;
-                        break;
-                    }
-                    // A new asset was clicked, select it.
-                    selectedPlacedAsset = overlay;
-                    selectedAssetPath = overlay.path;
-                    renderAssetExplorer();
-                    assetClicked = true;
-                    break; // Stop after finding the first one
-                }
-            }
-
-            if (!assetClicked) {
-                selectedPlacedAsset = null; // Clicked on empty space, deselect.
-            }
-
-            // Update the preview pane based on the new selection state
-            updateAssetPreview(selectedPlacedAsset);
-
-            // Redraw to show/hide selection box
-            displayMapOnCanvas(selectedMapFileName);
-            return; // Prevent other click logic from running while in select mode.
         }
 
         if (imageCoords && initiativeTokens.length > 0) {
@@ -2972,6 +2977,7 @@ function getTightBoundingBox(img) {
         setActiveAssetTool(null);
         selectedPlacedAssets = [];
         isSelecting = false;
+        selectionBox = null;
         updateAssetPreview(); // This will also clear the preview
         isDraggingAssetHandle = false;
         draggedHandleInfo = null;
@@ -3246,19 +3252,16 @@ function getTightBoundingBox(img) {
 
     if (btnAssetsDelete) {
         btnAssetsDelete.addEventListener('click', () => {
-            if (activeAssetTool === 'select' && selectedPlacedAsset) {
+            if (activeAssetTool === 'select' && selectedPlacedAssets.length > 0) {
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
                 if (selectedMapData && selectedMapData.overlays) {
-                    const index = selectedMapData.overlays.findIndex(o => o === selectedPlacedAsset);
-                    if (index > -1) {
-                        selectedMapData.overlays.splice(index, 1);
-                        selectedPlacedAsset = null;
-                        updateAssetPreview();
-                        displayMapOnCanvas(selectedMapFileName);
-                    }
+                    selectedMapData.overlays = selectedMapData.overlays.filter(o => !selectedPlacedAssets.includes(o));
+                    selectedPlacedAssets = [];
+                    updateAssetPreview();
+                    displayMapOnCanvas(selectedMapFileName);
                 }
             } else {
-                alert("Select an asset on the map to delete.");
+                alert("Select one or more assets on the map to delete.");
             }
         });
     }
@@ -3269,6 +3272,91 @@ function getTightBoundingBox(img) {
             // Also ensure the main tools tab is re-selected in the footer
             const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
             if (toolsTabButton) toolsTabButton.click();
+        });
+    }
+
+    if (btnAssetsFlatten) {
+        btnAssetsFlatten.addEventListener('click', () => {
+            if (!selectedMapFileName) {
+                alert("Please select a map to flatten.");
+                return;
+            }
+
+            if (confirm("Are you sure you want to flatten all assets onto the map? This action cannot be undone.")) {
+                const mapData = detailedMapData.get(selectedMapFileName);
+                if (!mapData || !currentMapDisplayData.img) {
+                    alert("Map data is not loaded correctly. Cannot flatten.");
+                    return;
+                }
+
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = currentMapDisplayData.imgWidth;
+                tempCanvas.height = currentMapDisplayData.imgHeight;
+
+                // 1. Draw the base map
+                tempCtx.drawImage(currentMapDisplayData.img, 0, 0);
+
+                // 2. Draw all placed assets
+                const assetOverlays = mapData.overlays.filter(o => o.type === 'placedAsset');
+                const assetImagePromises = assetOverlays.map(overlay => {
+                    return new Promise((resolve, reject) => {
+                        if (assetImageCache[overlay.path] && assetImageCache[overlay.path].complete) {
+                            resolve({overlay, img: assetImageCache[overlay.path]});
+                        } else {
+                            const img = new Image();
+                            img.src = findAssetByPath(overlay.path).url;
+                            img.onload = () => {
+                                assetImageCache[overlay.path] = img;
+                                resolve({overlay, img});
+                            };
+                            img.onerror = reject;
+                        }
+                    });
+                });
+
+                Promise.all(assetImagePromises).then(assetsToDraw => {
+                    assetsToDraw.forEach(({ overlay, img }) => {
+                        const assetScale = overlay.scale || 1;
+                        const assetRotation = overlay.rotation || 0;
+                        const assetOpacity = overlay.opacity ?? 1;
+
+                        const w = overlay.width * assetScale;
+                        const h = overlay.height * assetScale;
+                        const x = overlay.position.x;
+                        const y = overlay.position.y;
+
+                        tempCtx.save();
+                        tempCtx.globalAlpha = assetOpacity;
+                        tempCtx.translate(x, y);
+                        tempCtx.rotate(assetRotation);
+                        tempCtx.drawImage(img, -w / 2, -h / 2, w, h);
+                        tempCtx.restore();
+                    });
+
+                    // 3. Create a new image from the flattened canvas
+                    const flattenedImageDataUrl = tempCanvas.toDataURL('image/png');
+                    const newMapImage = new Image();
+                    newMapImage.onload = () => {
+                        // 4. Update the map data
+                        mapData.url = flattenedImageDataUrl;
+                        // Revoke the old object URL to free memory
+                        URL.revokeObjectURL(currentMapDisplayData.img.src);
+
+                        // 5. Remove the placed assets from the overlays
+                        mapData.overlays = mapData.overlays.filter(o => o.type !== 'placedAsset');
+                        selectedPlacedAsset = null;
+
+                        // 6. Redraw the canvas with the new, flattened map
+                        displayMapOnCanvas(selectedMapFileName);
+                        alert("Assets have been flattened to the map.");
+                    };
+                    newMapImage.src = flattenedImageDataUrl;
+                }).catch(error => {
+                    console.error("Error loading asset images for flattening:", error);
+                    alert("An error occurred while loading assets. Flattening failed.");
+                });
+            }
         });
     }
 
@@ -3639,6 +3727,40 @@ function getTightBoundingBox(img) {
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
+
+        if (isSelecting) {
+            isSelecting = false;
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (selectedMapData && selectedMapData.overlays && selectionBox) {
+                const { scale, originX, originY } = selectedMapData.transform;
+                const selectionRect = {
+                    x1: (Math.min(selectionBox.startX, selectionBox.endX) - originX) / scale,
+                    y1: (Math.min(selectionBox.startY, selectionBox.endY) - originY) / scale,
+                    x2: (Math.max(selectionBox.startX, selectionBox.endX) - originX) / scale,
+                    y2: (Math.max(selectionBox.startY, selectionBox.endY) - originY) / scale
+                };
+
+                const assetsInBox = selectedMapData.overlays.filter(overlay => {
+                    if (overlay.type !== 'placedAsset') return false;
+                    return overlay.position.x >= selectionRect.x1 && overlay.position.x <= selectionRect.x2 &&
+                           overlay.position.y >= selectionRect.y1 && overlay.position.y <= selectionRect.y2;
+                });
+
+                if (!event.shiftKey) {
+                    selectedPlacedAssets = assetsInBox;
+                } else {
+                    assetsInBox.forEach(asset => {
+                        if (!selectedPlacedAssets.includes(asset)) {
+                            selectedPlacedAssets.push(asset);
+                        }
+                    });
+                }
+            }
+            selectionBox = null;
+            updateAssetPreview(selectedPlacedAssets.length === 1 ? selectedPlacedAssets[0] : null);
+            displayMapOnCanvas(selectedMapFileName); // Redraw to remove marquee and show selections
+        }
+
 
         if (isChaining) {
             isChaining = false;
@@ -4201,16 +4323,25 @@ function getTightBoundingBox(img) {
         mapContainer.addEventListener('mousemove', (e) => {
             const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
 
+            if (isSelecting && selectionBox) {
+                selectionBox.endX = e.offsetX;
+                selectionBox.endY = e.offsetY;
+                displayMapOnCanvas(selectedMapFileName); // This will redraw overlays including the marquee
+                return;
+            }
+
             if (isDraggingAsset && draggedAssetInfo) {
                 e.stopPropagation();
                 if (!imageCoords) return;
 
-                const { initialAsset, initialMouseCoords } = draggedAssetInfo;
-                const dx = imageCoords.x - initialMouseCoords.x;
-                const dy = imageCoords.y - initialMouseCoords.y;
+                const dx = imageCoords.x - draggedAssetInfo.initialMouseCoords.x;
+                const dy = imageCoords.y - draggedAssetInfo.initialMouseCoords.y;
 
-                selectedPlacedAsset.position.x = initialAsset.position.x + dx;
-                selectedPlacedAsset.position.y = initialAsset.position.y + dy;
+                draggedAssetInfo.initialAssetPositions.forEach(pos => {
+                    pos.asset.position.x = pos.x + dx;
+                    pos.asset.position.y = pos.y + dy;
+                });
+
 
                 requestRedraw();
                 return;
