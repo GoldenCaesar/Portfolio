@@ -3384,14 +3384,14 @@ function getTightBoundingBox(img) {
             fileListContainer.appendChild(favoritesFolder);
         }
 
-        // Render folders and files
-        let itemsToRender = {};
+        // Get the base items to render
+        let baseItems = {};
         if (isFavoritesView) {
             for (const path in assetFavorites) {
                 const item = findAssetByPath(path);
                 if (item) {
                     const name = path.substring(path.lastIndexOf('/') + 1);
-                    itemsToRender[name] = item;
+                    baseItems[name] = item;
                 }
             }
         } else {
@@ -3399,16 +3399,28 @@ function getTightBoundingBox(img) {
             currentAssetPath.forEach(folderName => {
                 currentLevel = currentLevel[folderName].children;
             });
-            itemsToRender = currentLevel;
+            baseItems = currentLevel;
         }
 
-        for (const name in itemsToRender) {
-            const item = itemsToRender[name];
+        // Convert to array, filter, and sort
+        const itemsToRender = Object.entries(baseItems)
+            .map(([name, item]) => ({ name, ...item }))
+            .filter(item => !filterText || item.type === 'folder' || item.name.toLowerCase().includes(filterText))
+            .sort((a, b) => {
+                // Folders first
+                if (a.type === 'folder' && b.type !== 'folder') {
+                    return -1;
+                }
+                if (a.type !== 'folder' && b.type === 'folder') {
+                    return 1;
+                }
+                // Then sort alphabetically
+                return a.name.localeCompare(b.name);
+            });
 
-            if (filterText && item.type === 'file' && !name.toLowerCase().includes(filterText)) {
-                continue;
-            }
-
+        // Render the sorted and filtered items
+        itemsToRender.forEach(item => {
+            const { name } = item;
             const assetItemDiv = document.createElement('div');
             assetItemDiv.className = 'asset-item';
             assetItemDiv.title = name;
@@ -3461,7 +3473,7 @@ function getTightBoundingBox(img) {
                 });
             }
             fileListContainer.appendChild(assetItemDiv);
-        }
+        });
     }
 
     function handleAssetFolderUpload(event) {
