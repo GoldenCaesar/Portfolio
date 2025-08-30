@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const noteContextMenu = document.getElementById('note-context-menu');
     const characterContextMenu = document.getElementById('character-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
+    const viewModeMapContextMenu = document.getElementById('view-mode-map-context-menu');
     const displayedFileNames = new Set();
 
     // Shadow tool elements
@@ -225,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // const mapObjectURLs = new Map(); // Old: To store filename -> objectURL mapping for Manage Maps
     // New structure: fileName -> { url: objectURL, name: fileName, overlays: [], transform: { scale: 1, originX: 0, originY: 0 } }
     const detailedMapData = new Map();
+    const fogOfWarCanvasCache = new Map();
     let isEditMode = false;
     let isPanning = false;
     let panStartX = 0;
@@ -369,6 +371,9 @@ let assetBoundingBoxCache = {};
     let isLightMapDirty = true;
     let dmRenderQuality = 0.5; // Default quality for DM view (0.1 to 1.0)
     let playerRenderQuality = 0.5; // Default quality for Player view
+
+    // Fog of War State
+    let fogOfWarUpdateTimeout = null;
 
     // Campaign Timer State
     let campaignTimerInterval = null;
@@ -720,6 +725,7 @@ function propagateCharacterUpdate(characterId) {
     if (selectedMapFileName) {
         displayMapOnCanvas(selectedMapFileName); // This will redraw the tokens
     }
+    requestFogOfWarUpdate();
     sendInitiativeDataToPlayerView();
 }
 
@@ -855,6 +861,29 @@ function propagateCharacterUpdate(characterId) {
                 scale: transform.scale
             };
 
+            if (!fogOfWarCanvasCache.has(fileName)) {
+                const fowCanvas = document.createElement('canvas');
+                fowCanvas.width = img.width;
+                fowCanvas.height = img.height;
+                const fowCtx = fowCanvas.getContext('2d');
+
+                if (mapData.fogOfWarDataUrl) {
+                    const fowImage = new Image();
+                    fowImage.onload = () => {
+                        fowCtx.drawImage(fowImage, 0, 0);
+                        console.log(`Loaded existing Fog of War for ${fileName}`);
+                    };
+                    fowImage.src = mapData.fogOfWarDataUrl;
+                } else {
+                    // It's a new map or a map from an old save. Start with full fog.
+                    fowCtx.fillStyle = 'black';
+                    fowCtx.fillRect(0, 0, fowCanvas.width, fowCanvas.height);
+                    mapData.fogOfWarDataUrl = fowCanvas.toDataURL(); // Save this initial state
+                    console.log(`Initialized new Fog of War for ${fileName}`);
+                }
+                fogOfWarCanvasCache.set(fileName, fowCanvas);
+            }
+
             if (initiativeTokens.length > 0) {
                 const imgWidth = currentMapDisplayData.imgWidth;
                 const imgHeight = currentMapDisplayData.imgHeight;
@@ -868,6 +897,7 @@ function propagateCharacterUpdate(characterId) {
             updateButtonStates();
             redrawCanvas(); // Use the new centralized drawing function
             isLightMapDirty = true;
+            requestFogOfWarUpdate(); // Reveal initial token positions
 
             if (isLinkingChildMap && currentPolygonPoints.length > 0 && selectedMapFileName === fileName) {
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
@@ -3965,6 +3995,7 @@ function getTightBoundingBox(img) {
         if (isDraggingToken) {
             isDraggingToken = false;
             draggedToken = null;
+            requestFogOfWarUpdate();
             sendInitiativeDataToPlayerView();
         }
 
@@ -4175,7 +4206,8 @@ function getTightBoundingBox(img) {
                         name: file.name,
                         overlays: [],
                         mode: 'edit',
-                        transform: { scale: 1, originX: 0, originY: 0, initialized: false }
+                        transform: { scale: 1, originX: 0, originY: 0, initialized: false },
+                        fogOfWarDataUrl: null
                     });
 
                     if (!isEditMode) {
@@ -4561,6 +4593,7 @@ function getTightBoundingBox(img) {
                     draggedToken.y += dy;
                     dragStartX = imageCoords.x;
                     dragStartY = imageCoords.y;
+                    requestFogOfWarUpdate();
                     // Set dirty flag because token positions affect player view lighting
                     isLightMapDirty = true;
                     const mapData = detailedMapData.get(selectedMapFileName);
@@ -4755,7 +4788,8 @@ function getTightBoundingBox(img) {
                         name: data.name,
                         overlays: data.overlays,
                         mode: data.mode,
-                        transform: data.transform
+                        transform: data.transform,
+                        fogOfWarDataUrl: data.fogOfWarDataUrl
                     };
                 }
                 campaignData.mapDefinitions = serializableDetailedMapData;
@@ -5152,7 +5186,8 @@ function getTightBoundingBox(img) {
                                     url: url,
                                     overlays: definition.overlays || [],
                                     mode: definition.mode || 'edit',
-                                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false }
+                                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false },
+                                    fogOfWarDataUrl: definition.fogOfWarDataUrl || null
                                 });
                                 displayedFileNames.add(mapName);
                             });
@@ -5487,7 +5522,8 @@ function getTightBoundingBox(img) {
                     url: null,
                     overlays: definition.overlays || [],
                     mode: definition.mode || 'edit',
-                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false }
+                    transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false },
+                    fogOfWarDataUrl: definition.fogOfWarDataUrl || null
                 });
                 displayedFileNames.add(mapName);
             }
@@ -6244,12 +6280,48 @@ function getTightBoundingBox(img) {
             }
         }
 
-        if (!overlayClicked && selectedMapData.mode === 'edit') {
-            mapToolsContextMenu.style.left = `${event.pageX}px`;
-            mapToolsContextMenu.style.top = `${event.pageY}px`;
-            mapToolsContextMenu.style.display = 'block';
+        if (!overlayClicked) {
+            if (selectedMapData.mode === 'edit') {
+                mapToolsContextMenu.style.left = `${event.pageX}px`;
+                mapToolsContextMenu.style.top = `${event.pageY}px`;
+                mapToolsContextMenu.style.display = 'block';
+            } else if (selectedMapData.mode === 'view' && viewModeMapContextMenu) {
+                viewModeMapContextMenu.style.left = `${event.pageX}px`;
+                viewModeMapContextMenu.style.top = `${event.pageY}px`;
+                viewModeMapContextMenu.style.display = 'block';
+            }
         }
     });
+
+    if (viewModeMapContextMenu) {
+        viewModeMapContextMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const action = event.target.dataset.action;
+            if (action === 'reset-fog-of-war') {
+                if (confirm("Are you sure you want to reset the fog of war for this map? This cannot be undone.")) {
+                    if (selectedMapFileName) {
+                        const mapData = detailedMapData.get(selectedMapFileName);
+                        const fowCanvas = fogOfWarCanvasCache.get(selectedMapFileName);
+
+                        if (mapData && fowCanvas) {
+                            // Reset the off-screen canvas to be fully black
+                            const fowCtx = fowCanvas.getContext('2d');
+                            fowCtx.fillStyle = 'black';
+                            fowCtx.fillRect(0, 0, fowCanvas.width, fowCanvas.height);
+
+                            // Save the newly blackened state
+                            mapData.fogOfWarDataUrl = fowCanvas.toDataURL();
+
+                            // Push the update to the player view
+                            sendFogOfWarToPlayerView();
+                            alert("Fog of War has been reset.");
+                        }
+                    }
+                }
+            }
+            viewModeMapContextMenu.style.display = 'none';
+        });
+    }
 
     document.addEventListener('click', (event) => {
         if (dmFloatingFooter && dmFloatingFooter.classList.contains('visible')) {
@@ -8805,6 +8877,7 @@ function displayToast(messageElement) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
 
+                requestFogOfWarUpdate();
                 highlightActiveTurn();
                 sendInitiativeDataToPlayerView();
             } else { // Stopping initiative
@@ -8906,6 +8979,7 @@ function displayToast(messageElement) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
 
+                requestFogOfWarUpdate();
                 createLogEntry("Characters are Wandering");
                 sendInitiativeDataToPlayerView();
             }
@@ -8923,6 +8997,7 @@ function displayToast(messageElement) {
                     createLogEntry(`Round ${initiativeRound} Started`);
                 }
                 highlightActiveTurn();
+                requestFogOfWarUpdate();
                 sendInitiativeDataToPlayerView();
             }
         });
@@ -8933,6 +9008,7 @@ function displayToast(messageElement) {
             if(initiativeTurn !== -1) {
                 initiativeTurn = (initiativeTurn - 1 + activeInitiative.length) % activeInitiative.length;
                 highlightActiveTurn();
+                requestFogOfWarUpdate();
                 sendInitiativeDataToPlayerView();
             }
         });
@@ -9100,6 +9176,184 @@ function displayToast(messageElement) {
             stopRecording();
         }
     }
+
+    function requestFogOfWarUpdate() {
+        if (fogOfWarUpdateTimeout) {
+            clearTimeout(fogOfWarUpdateTimeout);
+        }
+        fogOfWarUpdateTimeout = setTimeout(updateFogOfWar, 500); // Debounce for 500ms
+    }
+
+    function sendFogOfWarToPlayerView() {
+        if (playerWindow && !playerWindow.closed && selectedMapFileName) {
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (mapData) {
+                playerWindow.postMessage({
+                    type: 'fogOfWarUpdate',
+                    fogOfWarDataUrl: mapData.fogOfWarDataUrl // This could be null if no FOW exists yet
+                }, '*');
+            }
+        }
+    }
+
+    function generateVisionMask() {
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !currentMapDisplayData.img) return null;
+
+        const visionMaskCanvas = document.createElement('canvas');
+        visionMaskCanvas.width = currentMapDisplayData.imgWidth;
+        visionMaskCanvas.height = currentMapDisplayData.imgHeight;
+        const visionCtx = visionMaskCanvas.getContext('2d');
+
+        const lightSources = initiativeTokens
+            .filter(token => {
+                const character = charactersData.find(c => c.id === token.characterId);
+                return character && character.vision === true;
+            })
+            .map(token => ({
+                position: { x: token.x, y: token.y }
+            }));
+
+        if (lightSources.length === 0) return null;
+
+        const walls = mapData.overlays.filter(o => o.type === 'wall');
+        const closedDoors = mapData.overlays.filter(o => o.type === 'door' && !o.isOpen);
+        const smartObjects = mapData.overlays.filter(o => o.type === 'smart_object');
+
+        const allSegments = [];
+        walls.forEach(wall => {
+            for (let i = 0; i < wall.points.length - 1; i++) {
+                allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
+            }
+        });
+        closedDoors.forEach(door => {
+            allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door });
+        });
+        smartObjects.forEach(object => {
+            for (let i = 0; i < object.polygon.length - 1; i++) {
+                allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
+            }
+             allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
+        });
+
+        const imgWidth = currentMapDisplayData.imgWidth;
+        const imgHeight = currentMapDisplayData.imgHeight;
+        allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
+        allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
+        allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
+        allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
+
+        const allVertices = [];
+        allSegments.forEach(seg => {
+            allVertices.push(seg.p1, seg.p2);
+        });
+
+        visionCtx.fillStyle = 'black';
+        visionCtx.beginPath();
+
+        lightSources.forEach(light => {
+            const visiblePoints = [];
+            const angles = new Set();
+
+            let lightIsInsideObject = false;
+            for (const so of smartObjects) {
+                if (isPointInPolygon(light.position, so.polygon)) {
+                    lightIsInsideObject = true;
+                    break;
+                }
+            }
+
+            allVertices.forEach(vertex => {
+                const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
+                angles.add(angle - 0.0001);
+                angles.add(angle);
+                angles.add(angle + 0.0001);
+            });
+
+            const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+
+            sortedAngles.forEach(angle => {
+                const ray = {
+                    x1: light.position.x,
+                    y1: light.position.y,
+                    x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
+                    y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
+                };
+
+                let closestIntersection = null;
+                let minDistance = Infinity;
+
+                allSegments.forEach(segment => {
+                    const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
+                    if (intersectionPoint) {
+                        let ignoreThisIntersection = false;
+                        if (segment.parent.type === 'smart_object') {
+                            const p1 = segment.p1;
+                            const p2 = segment.p2;
+                            const normal = { x: p2.y - p1.y, y: p1.x - p2.x };
+                            const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
+                            const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
+                            if (!lightIsInsideObject && dot > 0) {
+                                ignoreThisIntersection = true;
+                            }
+                        }
+
+                        if (!ignoreThisIntersection) {
+                            const distance = Math.sqrt(Math.pow(intersectionPoint.x - light.position.x, 2) + Math.pow(intersectionPoint.y - light.position.y, 2));
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestIntersection = intersectionPoint;
+                            }
+                        }
+                    }
+                });
+
+                if (closestIntersection) {
+                    visiblePoints.push(closestIntersection);
+                } else {
+                    visiblePoints.push({ x: ray.x2, y: ray.y2 });
+                }
+            });
+
+            if (visiblePoints.length > 0) {
+                const firstPoint = visiblePoints[0];
+                visionCtx.moveTo(firstPoint.x, firstPoint.y);
+                visiblePoints.forEach(point => {
+                    visionCtx.lineTo(point.x, point.y);
+                });
+                visionCtx.closePath();
+            }
+        });
+        visionCtx.fill();
+        return visionMaskCanvas;
+    }
+
+
+    function updateFogOfWar() {
+        if (!selectedMapFileName || !currentMapDisplayData.img) return;
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        const fowCanvas = fogOfWarCanvasCache.get(selectedMapFileName);
+
+        if (!mapData || !fowCanvas) {
+            return;
+        }
+
+        const visionMaskCanvas = generateVisionMask();
+
+        if (visionMaskCanvas) {
+            const fowCtx = fowCanvas.getContext('2d');
+            fowCtx.save();
+            fowCtx.globalCompositeOperation = 'destination-out';
+            fowCtx.drawImage(visionMaskCanvas, 0, 0);
+            fowCtx.restore();
+
+            mapData.fogOfWarDataUrl = fowCanvas.toDataURL();
+        }
+
+        sendFogOfWarToPlayerView();
+    }
+
 
     if (campaignTimerToggle) {
         campaignTimerToggle.addEventListener('click', toggleCampaignTimer);
