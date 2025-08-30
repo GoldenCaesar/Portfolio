@@ -1158,19 +1158,7 @@ function getTightBoundingBox(img) {
 
     if (btnAssetsChain) {
         btnAssetsChain.addEventListener('click', () => {
-            const wasActive = activeAssetTool === 'chain';
             setActiveAssetTool('chain');
-
-            // If we are turning chain mode ON
-            if (!wasActive) {
-                // Deselect any placed asset, as we can only chain the footer asset.
-                selectedPlacedAsset = null;
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
-                }
-                // The preview will now reflect the footer selection
-                updateAssetPreview();
-            }
         });
     }
 
@@ -2476,7 +2464,12 @@ function getTightBoundingBox(img) {
                 selectionBox = { startX: event.offsetX, startY: event.offsetY, endX: event.offsetX, endY: event.offsetY };
             }
 
-            updateAssetPreview(selectedPlacedAssets.length === 1 ? selectedPlacedAssets[0] : null);
+            const lastSelected = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
+            updateAssetPreview(lastSelected);
+            if (lastSelected) {
+                selectedAssetPath = lastSelected.path;
+                renderAssetExplorer();
+            }
             displayMapOnCanvas(selectedMapFileName);
         }
     });
@@ -3211,19 +3204,7 @@ function getTightBoundingBox(img) {
 
     if (btnAssetsStamp) {
         btnAssetsStamp.addEventListener('click', () => {
-            const wasActive = activeAssetTool === 'stamp';
             setActiveAssetTool('stamp');
-
-            // If we are turning stamp mode ON
-            if (!wasActive) {
-                // Deselect any placed asset, as we can only stamp the footer asset.
-                selectedPlacedAsset = null;
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
-                }
-                // The preview will now reflect the footer selection (or last transform)
-                updateAssetPreview();
-            }
         });
     }
 
@@ -3757,7 +3738,12 @@ function getTightBoundingBox(img) {
                 }
             }
             selectionBox = null;
-            updateAssetPreview(selectedPlacedAssets.length === 1 ? selectedPlacedAssets[0] : null);
+            const lastSelected = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
+            updateAssetPreview(lastSelected);
+            if (lastSelected) {
+                selectedAssetPath = lastSelected.path;
+                renderAssetExplorer();
+            }
             displayMapOnCanvas(selectedMapFileName); // Redraw to remove marquee and show selections
         }
 
