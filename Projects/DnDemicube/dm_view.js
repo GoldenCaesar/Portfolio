@@ -4326,7 +4326,7 @@ function getTightBoundingBox(img) {
             if (isSelecting && selectionBox) {
                 selectionBox.endX = e.offsetX;
                 selectionBox.endY = e.offsetY;
-                displayMapOnCanvas(selectedMapFileName); // This will redraw overlays including the marquee
+                requestRedraw(); // Use the lighter redraw function
                 return;
             }
 
