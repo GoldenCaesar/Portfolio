@@ -77,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAssetsStamp = document.getElementById('btn-assets-stamp');
     const btnAssetsChain = document.getElementById('btn-assets-chain');
     const btnAssetsDelete = document.getElementById('btn-assets-delete');
-    const btnAssetsFlatten = document.getElementById('btn-assets-flatten');
     const btnAssetsDone = document.getElementById('btn-assets-done');
     const assetPreviewContainer = document.getElementById('asset-preview-container');
     const assetPreviewImage = document.getElementById('asset-preview-image');
@@ -340,9 +339,7 @@ let linkingNoteForAutomationCard = null;
     let selectedAssetPath = null;
     let selectedAssetForPreview = null; // To hold the Image object for previewing
     let assetImageCache = {};
-    let selectedPlacedAssets = [];
-    let isSelecting = false;
-    let selectionBox = { startX: 0, startY: 0, endX: 0, endY: 0 };
+    let selectedPlacedAsset = null;
     let currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
     let assetTransformHandles = {};
 let activeAssetTool = null; // Can be 'select', 'stamp', or 'chain'
@@ -1558,7 +1555,7 @@ function getTightBoundingBox(img) {
                     drawingCtx.restore();
 
                     // If this asset is the selected one, draw the selection box over it
-                    if (selectedPlacedAssets.includes(overlay)) {
+                    if (overlay === selectedPlacedAsset) {
                         drawAssetSelectionBox(overlay);
                     }
                 } else if (!assetImageCache[overlay.path]) {
@@ -2280,17 +2277,6 @@ function getTightBoundingBox(img) {
     });
 
     dmCanvas.addEventListener('mousemove', (event) => {
-        if (isSelecting) {
-            selectionBox.endX = event.offsetX;
-            selectionBox.endY = event.offsetY;
-            const mapData = detailedMapData.get(selectedMapFileName);
-            if (mapData) {
-                drawOverlays(mapData.overlays);
-            }
-            drawSelectionBox();
-            return;
-        }
-
         if (!isChaining || activeAssetTool !== 'chain') return;
         event.stopPropagation();
 
@@ -2401,20 +2387,6 @@ function getTightBoundingBox(img) {
         drawingCtx.restore();
     });
 
-    function drawSelectionBox() {
-        if (!isSelecting) return;
-        const drawingCtx = drawingCanvas.getContext('2d');
-        drawingCtx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
-        drawingCtx.lineWidth = 1;
-        drawingCtx.fillStyle = 'rgba(0, 150, 255, 0.2)';
-
-        const width = selectionBox.endX - selectionBox.startX;
-        const height = selectionBox.endY - selectionBox.startY;
-
-        drawingCtx.fillRect(selectionBox.startX, selectionBox.startY, width, height);
-        drawingCtx.strokeRect(selectionBox.startX, selectionBox.startY, width, height);
-    }
-
     dmCanvas.addEventListener('mousedown', (event) => {
         if (event.button !== 0) return;
 
@@ -2434,59 +2406,36 @@ function getTightBoundingBox(img) {
             return;
         }
 
-        if (activeAssetTool === 'select') {
-            event.stopPropagation(); // Prevent map panning for all select tool actions
+        // This listener now exclusively handles starting a drag/resize on a selected asset.
+        if (activeAssetTool === 'select' && selectedPlacedAsset) {
             const imageCoords = getRelativeCoords(event.offsetX, event.offsetY);
             if (!imageCoords) return;
 
-            const lastSelectedAsset = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
-            if (lastSelectedAsset) {
-                const handleName = getHandleForPoint(imageCoords, lastSelectedAsset);
-                if (handleName) {
-                    isDraggingAssetHandle = true;
-                    draggedHandleInfo = {
-                        name: handleName,
-                        initialAsset: JSON.parse(JSON.stringify(lastSelectedAsset)),
-                        initialMouseCoords: imageCoords
-                    };
-                    mapContainer.style.cursor = 'grabbing';
-                    return;
-                }
+            const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
+
+            if (handleName) {
+                event.stopPropagation(); // Prevent map panning
+                isDraggingAssetHandle = true;
+                draggedHandleInfo = {
+                    name: handleName,
+                    initialAsset: JSON.parse(JSON.stringify(selectedPlacedAsset)),
+                    initialMouseCoords: imageCoords
+                };
+                mapContainer.style.cursor = 'grabbing';
+                return;
             }
 
-            const selectedMapData = detailedMapData.get(selectedMapFileName);
-            let clickedAsset = null;
-            if (selectedMapData && selectedMapData.overlays) {
-                for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
-                    const overlay = selectedMapData.overlays[i];
-                    if (overlay.type === 'placedAsset' && isPointInPlacedAsset(imageCoords, overlay)) {
-                        clickedAsset = overlay;
-                        break;
-                    }
-                }
-            }
-
-            if (clickedAsset) {
+            // If not a handle, check if the asset itself was clicked for dragging
+            if (isPointInPlacedAsset(imageCoords, selectedPlacedAsset)) {
+                event.stopPropagation(); // Prevent map panning
                 isDraggingAsset = true;
                 draggedAssetInfo = {
-                    initialAsset: JSON.parse(JSON.stringify(clickedAsset)),
-                    initialMouseCoords: imageCoords,
-                    initialSelectionState: JSON.parse(JSON.stringify(selectedPlacedAssets))
+                    initialAsset: JSON.parse(JSON.stringify(selectedPlacedAsset)),
+                    initialMouseCoords: imageCoords
                 };
-
-                if (!selectedPlacedAssets.includes(clickedAsset)) {
-                    selectedPlacedAssets = [clickedAsset];
-                }
                 mapContainer.style.cursor = 'grabbing';
-            } else {
-                isSelecting = true;
-                selectionBox.startX = event.offsetX;
-                selectionBox.startY = event.offsetY;
-                selectionBox.endX = event.offsetX;
-                selectionBox.endY = event.offsetY;
-                selectedPlacedAssets = [];
+                return;
             }
-            displayMapOnCanvas(selectedMapFileName);
         }
     });
 
@@ -2496,8 +2445,8 @@ function getTightBoundingBox(img) {
         const imageCoords = getRelativeCoords(canvasX, canvasY);
         if (!imageCoords) return;
 
-        // If an asset drag/resize or marquee just finished, don't process a click.
-        if (isDraggingAssetHandle || isDraggingAsset || isSelecting) {
+        // If an asset drag/resize just finished, don't process a click.
+        if (isDraggingAssetHandle || isDraggingAsset) {
             return;
         }
 
@@ -2547,12 +2496,210 @@ function getTightBoundingBox(img) {
 
         // Handle Select Tool
         if (activeAssetTool === 'select') {
-            // This logic is now handled by mousedown and mouseup events to support marquee selection.
-            // A simple click on an asset is handled by the mousedown->mouseup sequence without a drag.
-            return;
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (!selectedMapData || !selectedMapData.overlays) return;
+
+            let assetClicked = false;
+            // Iterate backwards to select the top-most asset
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+                if (overlay.type === 'placedAsset' && isPointInPlacedAsset(imageCoords, overlay)) {
+                    // If we clicked the already selected asset, we don't need to do anything.
+                    // This allows drag/resize to start without deselecting.
+                    if (selectedPlacedAsset === overlay) {
+                        assetClicked = true;
+                        break;
+                    }
+                    // A new asset was clicked, select it.
+                    selectedPlacedAsset = overlay;
+                    selectedAssetPath = overlay.path;
+                    renderAssetExplorer();
+                    assetClicked = true;
+                    break; // Stop after finding the first one
+                }
+            }
+
+            if (!assetClicked) {
+                selectedPlacedAsset = null; // Clicked on empty space, deselect.
+            }
+
+            // Update the preview pane based on the new selection state
+            updateAssetPreview(selectedPlacedAsset);
+
+            // Redraw to show/hide selection box
+            displayMapOnCanvas(selectedMapFileName);
+            return; // Prevent other click logic from running while in select mode.
         }
 
         if (imageCoords && initiativeTokens.length > 0) {
+            let tokenClicked = false;
+            for (const token of initiativeTokens) {
+                if (isPointInToken(imageCoords, token)) {
+                    tokenClicked = true;
+                    if (isTargeting) {
+                        if (targetingCharacter && token.uniqueId === targetingCharacter.uniqueId) {
+                            // Finish targeting by clicking the originating token
+                            isTargeting = false;
+                            document.body.classList.remove('targeting');
+                            tokenStatBlockSetTargets.textContent = 'Set Targets';
+                            tokenStatBlockSetTargets.classList.remove('active');
+                            populateAndShowStatBlock(token, event.pageX, event.pageY);
+                            targetingCharacter = null;
+                        } else {
+                            // Add/remove a target from the list
+                            const targetCharacter = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+                            if (targetCharacter) {
+                                const targetIndex = targetingCharacter.targets.indexOf(targetCharacter.uniqueId);
+                                if (targetIndex > -1) {
+                                    targetingCharacter.targets.splice(targetIndex, 1);
+                                } else {
+                                    targetingCharacter.targets.push(targetCharacter.uniqueId);
+                                }
+                                if (selectedMapFileName) {
+                                    displayMapOnCanvas(selectedMapFileName);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            if (tokenClicked) {
+                return;
+            }
+        }
+
+        if (isMovingPolygon) {
+            if (!moveStartPoint) {
+                console.log("In move mode, click occurred but not on polygon to start drag. No action.");
+                return;
+            }
+            return;
+        }
+
+        if (!imageCoords) {
+            return;
+        }
+
+        if (selectedTokenForStatBlock) {
+            tokenStatBlock.style.display = 'none';
+            selectedTokenForStatBlock = null;
+            sendTokenStatBlockStateToPlayerView(false);
+        }
+
+        const selectedMapData = detailedMapData.get(selectedMapFileName);
+        if (!selectedMapData) return;
+        if (selectedMapData.mode === 'edit' && isLinkingNote) {
+            const newOverlay = {
+                type: 'noteLink',
+                position: imageCoords,
+                linkedNoteId: null,
+                playerVisible: false
+            };
+            selectedMapData.overlays.push(newOverlay);
+            console.log('Note icon placed. Overlay:', newOverlay);
+            resetAllInteractiveStates();
+            return;
+        }
+
+        if (selectedMapData.mode === 'edit' && isLinkingCharacter) {
+            const newOverlay = {
+                type: 'characterLink',
+                position: imageCoords,
+                linkedCharacterId: null,
+                playerVisible: false
+            };
+            selectedMapData.overlays.push(newOverlay);
+            console.log('Character icon placed. Overlay:', newOverlay);
+            resetAllInteractiveStates();
+            return;
+        }
+
+        if (selectedMapData.mode === 'view' && selectedMapData.overlays) {
+            for (let i = selectedMapData.overlays.length - 1; i >= 0; i--) {
+                const overlay = selectedMapData.overlays[i];
+            if (overlay.type === 'door' && isPointOnDoor(imageCoords, overlay)) {
+                overlay.isOpen = !overlay.isOpen;
+                isLightMapDirty = true;
+                displayMapOnCanvas(selectedMapFileName);
+                sendMapToPlayerView(selectedMapFileName);
+                return;
+            } else if (overlay.type === 'door' && isPointOnDoor(imageCoords, overlay)) {
+                overlay.isOpen = !overlay.isOpen;
+                isLightMapDirty = true;
+                displayMapOnCanvas(selectedMapFileName);
+                sendMapToPlayerView(selectedMapFileName);
+                return;
+            } else if (overlay.type === 'childMapLink' && overlay.polygon && isPointInPolygon(imageCoords, overlay.polygon)) {
+                    console.log("Clicked on child map link:", overlay);
+                    const childMapName = overlay.linkedMapName;
+                    const childMapData = detailedMapData.get(childMapName);
+                    if (childMapData) {
+                        childMapData.mode = 'view';
+                        selectedMapFileName = childMapName;
+                        clearAllSelections();
+                        const mapItems = mapsList.querySelectorAll('li');
+                        mapItems.forEach(li => {
+                            if (li.dataset.fileName === childMapName) {
+                                li.classList.add('selected-map-item');
+                            }
+                        });
+                        displayMapOnCanvas(childMapName);
+                        updateButtonStates();
+                        sendMapToPlayerView(childMapName);
+                        console.log(`Switched to child map: ${childMapName}`);
+                    } else {
+                        alert(`Map "${childMapName}" not found.`);
+                    }
+                    return;
+                } else if (overlay.type === 'noteLink' && isPointInNoteIcon(imageCoords, overlay)) {
+                    if (overlay.linkedNoteId) {
+                        const note = notesData.find(n => n.id === overlay.linkedNoteId);
+                        if (note) {
+                            const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                            const notePreviewBody = document.getElementById('note-preview-body');
+                            if (notePreviewOverlay && notePreviewBody) {
+                                const renderedHTML = easyMDE.options.previewRender(note.content);
+                                notePreviewBody.innerHTML = renderedHTML;
+                                notePreviewOverlay.style.display = 'flex';
+                                if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                    const playerNoteContent = filterPlayerContent(note.content);
+                                    const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
+                                    playerWindow.postMessage({
+                                        type: 'showNotePreview',
+                                        content: playerRenderedHTML
+                                    }, '*');
+                                }
+                            }
+                        }
+                    }
+                    return;
+                } else if (overlay.type === 'characterLink' && isPointInCharacterIcon(imageCoords, overlay)) {
+                    if (overlay.linkedCharacterId) {
+                        const character = charactersData.find(c => c.id === overlay.linkedCharacterId);
+                        if (character) {
+                            const markdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
+                            const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+                            const characterPreviewBody = document.getElementById('character-preview-body');
+                            if (characterPreviewOverlay && characterPreviewBody) {
+                                characterPreviewBody.innerHTML = markdown;
+                                characterPreviewOverlay.style.display = 'flex';
+                            }
+
+                            if (playerWindow && !playerWindow.closed && overlay.playerVisible) {
+                                const playerMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, true, character.isDetailsVisible);
+                                playerWindow.postMessage({
+                                    type: 'showCharacterPreview',
+                                    content: playerMarkdown
+                                }, '*');
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+    });
 
     function getPolygonSignedArea(polygon) {
         let area = 0;
@@ -3047,7 +3194,7 @@ function getTightBoundingBox(img) {
                 updateAssetPreview();
             } else { // If we are turning select mode OFF
                 // Deselect any placed asset
-                selectedPlacedAssets = [];
+                selectedPlacedAsset = null;
                 updateAssetPreview(); // This will hide the preview
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
@@ -3064,7 +3211,7 @@ function getTightBoundingBox(img) {
             // If we are turning stamp mode ON
             if (!wasActive) {
                 // Deselect any placed asset, as we can only stamp the footer asset.
-                selectedPlacedAssets = [];
+                selectedPlacedAsset = null;
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
                 }
@@ -3099,88 +3246,19 @@ function getTightBoundingBox(img) {
 
     if (btnAssetsDelete) {
         btnAssetsDelete.addEventListener('click', () => {
-            if (activeAssetTool === 'select' && selectedPlacedAssets.length > 0) {
+            if (activeAssetTool === 'select' && selectedPlacedAsset) {
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
                 if (selectedMapData && selectedMapData.overlays) {
-                     selectedMapData.overlays = selectedMapData.overlays.filter(o => !selectedPlacedAssets.includes(o));
-                    selectedPlacedAssets = [];
-                    updateAssetPreview();
-                    displayMapOnCanvas(selectedMapFileName);
+                    const index = selectedMapData.overlays.findIndex(o => o === selectedPlacedAsset);
+                    if (index > -1) {
+                        selectedMapData.overlays.splice(index, 1);
+                        selectedPlacedAsset = null;
+                        updateAssetPreview();
+                        displayMapOnCanvas(selectedMapFileName);
+                    }
                 }
             } else {
-                alert("Select one or more assets on the map to delete.");
-            }
-        });
-    }
-
-    if (btnAssetsFlatten) {
-        btnAssetsFlatten.addEventListener('click', () => {
-            if (!selectedMapFileName) {
-                alert("Please select a map to flatten.");
-                return;
-            }
-
-            if (confirm("Are you sure you want to flatten all assets onto the map? This action cannot be undone and will permanently modify the map image.")) {
-                const mapData = detailedMapData.get(selectedMapFileName);
-                if (!mapData || !currentMapDisplayData.img) {
-                    alert("Error: Could not find map data or image to flatten.");
-                    return;
-                }
-
-                // Create a temporary canvas to merge the images
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-
-                // Set size to the original image dimensions for best quality
-                tempCanvas.width = currentMapDisplayData.imgWidth;
-                tempCanvas.height = currentMapDisplayData.imgHeight;
-
-                // 1. Draw the base map image
-                tempCtx.drawImage(currentMapDisplayData.img, 0, 0);
-
-                // 2. Draw the assets from the drawingCanvas on top
-                // We need to draw them relative to the original image, not the transformed canvas
-                if (mapData.overlays) {
-                    mapData.overlays.forEach(overlay => {
-                        if (overlay.type === 'placedAsset' && assetImageCache[overlay.path] && assetImageCache[overlay.path].complete) {
-                            const img = assetImageCache[overlay.path];
-                            const assetScale = overlay.scale || 1;
-                            const assetRotation = overlay.rotation || 0;
-                            const assetOpacity = overlay.opacity ?? 1;
-
-                            const assetRenderWidth = overlay.width * assetScale;
-                            const assetRenderHeight = overlay.height * assetScale;
-
-                            tempCtx.save();
-                            tempCtx.globalAlpha = assetOpacity;
-                            tempCtx.translate(overlay.position.x, overlay.position.y);
-                            tempCtx.rotate(assetRotation);
-                            tempCtx.drawImage(img, -assetRenderWidth / 2, -assetRenderHeight / 2, assetRenderWidth, assetRenderHeight);
-                            tempCtx.restore();
-                        }
-                    });
-                }
-
-
-                // 3. Get the new image as a Data URL
-                const newDataUrl = tempCanvas.toDataURL('image/png');
-
-                // 4. Update the map data
-                // Revoke the old object URL to prevent memory leaks if it was from a blob
-                if (mapData.url.startsWith('blob:')) {
-                    URL.revokeObjectURL(mapData.url);
-                }
-                mapData.url = newDataUrl;
-
-                // 5. Remove all 'placedAsset' overlays
-                mapData.overlays = mapData.overlays.filter(o => o.type !== 'placedAsset');
-
-                // 6. Reset asset-related states and redraw the map
-                selectedPlacedAsset = null;
-                updateAssetPreview();
-                displayMapOnCanvas(selectedMapFileName);
-
-                alert("Assets have been flattened successfully.");
+                alert("Select an asset on the map to delete.");
             }
         });
     }
@@ -3561,41 +3639,6 @@ function getTightBoundingBox(img) {
 
     dmCanvas.addEventListener('mouseup', (event) => {
         if (event.button !== 0) return;
-
-        if (isSelecting) {
-            isSelecting = false;
-
-            const mapData = detailedMapData.get(selectedMapFileName);
-            if (mapData && mapData.overlays) {
-                // Ensure start is top-left and end is bottom-right for easier calculation
-                const selStartX = Math.min(selectionBox.startX, selectionBox.endX);
-                const selStartY = Math.min(selectionBox.startY, selectionBox.endY);
-                const selEndX = Math.max(selectionBox.startX, selectionBox.endX);
-                const selEndY = Math.max(selectionBox.startY, selectionBox.endY);
-
-                // Convert selection box from canvas coordinates to image coordinates
-                const imageSelStart = getRelativeCoords(selStartX, selStartY);
-                const imageSelEnd = getRelativeCoords(selEndX, selEndY);
-
-                if (imageSelStart && imageSelEnd) {
-                    const newlySelected = mapData.overlays.filter(overlay => {
-                        if (overlay.type !== 'placedAsset') return false;
-
-                        // Simple check: is the center of the asset inside the box?
-                        const assetX = overlay.position.x;
-                        const assetY = overlay.position.y;
-
-                        return assetX >= imageSelStart.x && assetX <= imageSelEnd.x &&
-                               assetY >= imageSelStart.y && assetY <= imageSelEnd.y;
-                    });
-                    selectedPlacedAssets = newlySelected;
-                }
-            }
-
-            const lastSelected = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
-            updateAssetPreview(lastSelected);
-            displayMapOnCanvas(selectedMapFileName); // Redraws to show final selection
-        }
 
         if (isChaining) {
             isChaining = false;
@@ -4162,17 +4205,12 @@ function getTightBoundingBox(img) {
                 e.stopPropagation();
                 if (!imageCoords) return;
 
-                const { initialMouseCoords } = draggedAssetInfo;
+                const { initialAsset, initialMouseCoords } = draggedAssetInfo;
                 const dx = imageCoords.x - initialMouseCoords.x;
                 const dy = imageCoords.y - initialMouseCoords.y;
 
-                selectedPlacedAssets.forEach((asset, index) => {
-                    const initialAsset = draggedAssetInfo.initialSelectionState[index];
-                    if (initialAsset) {
-                        asset.position.x = initialAsset.position.x + dx;
-                        asset.position.y = initialAsset.position.y + dy;
-                    }
-                });
+                selectedPlacedAsset.position.x = initialAsset.position.x + dx;
+                selectedPlacedAsset.position.y = initialAsset.position.y + dy;
 
                 requestRedraw();
                 return;
@@ -4184,16 +4222,12 @@ function getTightBoundingBox(img) {
 
                 const { name, initialAsset, initialMouseCoords } = draggedHandleInfo;
                 const assetCenter = initialAsset.position;
-                const lastSelectedAsset = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
-
-                if (!lastSelectedAsset) return;
-
 
                 if (name === 'rotate') {
                     const initialAngle = Math.atan2(initialMouseCoords.y - assetCenter.y, initialMouseCoords.x - assetCenter.x);
                     const currentAngle = Math.atan2(imageCoords.y - assetCenter.y, imageCoords.x - assetCenter.x);
                     const angleDelta = currentAngle - initialAngle;
-                    lastSelectedAsset.rotation = initialAsset.rotation + angleDelta;
+                    selectedPlacedAsset.rotation = initialAsset.rotation + angleDelta;
                 } else {
                     // Handle uniform scaling based on distance from center
                     const initialDist = Math.sqrt(Math.pow(initialMouseCoords.x - assetCenter.x, 2) + Math.pow(initialMouseCoords.y - assetCenter.y, 2));
@@ -4206,12 +4240,12 @@ function getTightBoundingBox(img) {
                         // Prevent scaling down to nothing or inverting
                         if (newScale < 0.1) newScale = 0.1;
 
-                        lastSelectedAsset.scale = newScale;
+                        selectedPlacedAsset.scale = newScale;
                     }
                 }
 
                 requestRedraw(); // Redraw to show the change
-                updateAssetPreview(lastSelectedAsset); // Update the preview pane in real-time
+                updateAssetPreview(selectedPlacedAsset); // Update the preview pane in real-time
                 return;
             }
 
@@ -4289,9 +4323,8 @@ function getTightBoundingBox(img) {
 
                 } else {
                      // Update cursor for asset selection mode
-                    const lastSelectedAsset = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
-                    if (activeAssetTool === 'select' && lastSelectedAsset) {
-                        const handleName = getHandleForPoint(imageCoords, lastSelectedAsset);
+                    if (activeAssetTool === 'select' && selectedPlacedAsset) {
+                        const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
                         mapContainer.style.cursor = handleName ? 'grab' : 'pointer';
                     } else if (activeAssetTool === 'select') {
                         mapContainer.style.cursor = 'pointer';
