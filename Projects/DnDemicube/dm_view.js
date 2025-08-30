@@ -3325,7 +3325,6 @@ function getTightBoundingBox(img) {
             footerAssetsContent.addEventListener('click', (e) => e.stopPropagation());
         }
 
-        // Now, just update the parts that change
         const filterText = document.getElementById('asset-search-input').value.toLowerCase();
         const pathDisplay = document.getElementById('asset-path-display');
         const fileListContainer = document.getElementById('asset-file-list');
@@ -3333,147 +3332,177 @@ function getTightBoundingBox(img) {
         pathDisplay.innerHTML = '';
         fileListContainer.innerHTML = '';
 
-        // Breadcrumbs
-        const rootLink = document.createElement('a');
-        rootLink.href = '#';
-        rootLink.textContent = 'Assets';
-        rootLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            isFavoritesView = false;
-            currentAssetPath = [];
-            renderAssetExplorer();
-        });
-        pathDisplay.appendChild(rootLink);
+        function findAssetsRecursively(directory, term, pathPrefix = '') {
+            let results = [];
+            for (const name in directory) {
+                const item = directory[name];
+                const currentPath = pathPrefix ? `${pathPrefix}/${name}` : name;
 
-        if (isFavoritesView) {
-            pathDisplay.append(' / Favorites');
-        } else {
-            let currentLevel = assetsByPath;
-            currentAssetPath.forEach((folderName, index) => {
-                pathDisplay.append(' / ');
-                const partLink = document.createElement('a');
-                partLink.href = '#';
-                partLink.textContent = folderName;
-                partLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    isFavoritesView = false;
-                    currentAssetPath = currentAssetPath.slice(0, index + 1);
-                    renderAssetExplorer();
-                });
-                pathDisplay.appendChild(partLink);
-                currentLevel = currentLevel[folderName].children;
+                if (item.type === 'folder') {
+                    results = results.concat(findAssetsRecursively(item.children, term, currentPath));
+                } else if (item.type === 'file' && name.toLowerCase().includes(term)) {
+                    // Add the name to the item object so we can sort by it later
+                    results.push({ ...item, name: name });
+                }
+            }
+            return results;
+        }
+
+        function renderItems(items) {
+            fileListContainer.innerHTML = ''; // Clear previous items
+            items.forEach(item => {
+                const { name } = item;
+                const assetItemDiv = document.createElement('div');
+                assetItemDiv.className = 'asset-item';
+                assetItemDiv.title = name;
+
+                if (item.path && item.path === selectedAssetPath) {
+                    assetItemDiv.classList.add('selected');
+                }
+
+                if (item.type === 'folder') {
+                    assetItemDiv.innerHTML = `
+                        <svg fill="currentColor" viewBox="0 0 256 256"><path d="M216,72H145.41a16,16,0,0,1-10.42-3.89L123.08,59.32A8,8,0,0,0,117.41,56H40A16,16,0,0,0,24,72v24H232V88A16,16,0,0,0,216,72ZM24,120V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V120Z"></path></svg>
+                        <span class="asset-name">${name}</span>
+                    `;
+                    assetItemDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        isFavoritesView = false;
+                        currentAssetPath.push(name);
+                        renderAssetExplorer();
+                    });
+                } else if (item.type === 'file') {
+                    const isFavorite = assetFavorites[item.path];
+                    assetItemDiv.innerHTML = `
+                        <button class="asset-favorite-btn ${isFavorite ? 'is-favorite' : ''}" title="Toggle Favorite">${isFavorite ? '⭐' : '⚪'}</button>
+                        <img src="${item.url}" alt="${name}">
+                        <span class="asset-name">${name}</span>
+                    `;
+                    assetItemDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (e.target.classList.contains('asset-favorite-btn')) return;
+
+                        const clickedPath = item.path;
+                        if (selectedAssetPath === clickedPath) {
+                            selectedAssetPath = null;
+                            currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
+                        } else {
+                            selectedAssetPath = clickedPath;
+                            currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
+                        }
+                        updateAssetPreview();
+                        // Re-render to update selection highlight
+                        const currentFilter = document.getElementById('asset-search-input').value;
+                        if(currentFilter) {
+                            renderAssetExplorer();
+                        } else {
+                            // Find the currently displayed items and update the class
+                            const allItems = fileListContainer.querySelectorAll('.asset-item');
+                            allItems.forEach(div => {
+                                const path = findAssetByPath(div.title)?.path; // A bit inefficient but works
+                                if(path === selectedAssetPath) {
+                                    div.classList.add('selected');
+                                } else {
+                                    div.classList.remove('selected');
+                                }
+                            });
+                        }
+                    });
+
+                    const favButton = assetItemDiv.querySelector('.asset-favorite-btn');
+                    favButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleFavorite(item.path);
+                    });
+                }
+                fileListContainer.appendChild(assetItemDiv);
             });
         }
 
-        // Render Favorites folder at root
-        if (currentAssetPath.length === 0 && !isFavoritesView) {
-            const favoritesFolder = document.createElement('div');
-            favoritesFolder.className = 'asset-item';
-            favoritesFolder.title = 'Favorites';
-            favoritesFolder.innerHTML = `
-                <svg fill="currentColor" viewBox="0 0 256 256"><path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L65.5,153.74l-45.1-39.36a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a16,16,0,0,1,29.64,0l23.21,55.36,59.46,5.15a16,16,0,0,1,9.11,28.06Z"></path></svg>
-                <span class="asset-name">Favorites</span>
-            `;
-            favoritesFolder.addEventListener('click', (e) => {
+        if (filterText) {
+            pathDisplay.innerHTML = 'Search Results';
+            let searchRoot = assetsByPath;
+            if (!isFavoritesView) {
+                let currentLevel = assetsByPath;
+                currentAssetPath.forEach(folderName => {
+                    currentLevel = currentLevel[folderName].children;
+                });
+                searchRoot = currentLevel;
+            }
+            const searchResults = findAssetsRecursively(searchRoot, filterText);
+            searchResults.sort((a, b) => a.name.localeCompare(b.name));
+            renderItems(searchResults);
+        } else {
+            // Breadcrumbs
+            const rootLink = document.createElement('a');
+            rootLink.href = '#';
+            rootLink.textContent = 'Assets';
+            rootLink.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                isFavoritesView = true;
+                isFavoritesView = false;
+                currentAssetPath = [];
                 renderAssetExplorer();
             });
-            fileListContainer.appendChild(favoritesFolder);
-        }
+            pathDisplay.appendChild(rootLink);
 
-        // Get the base items to render
-        let baseItems = {};
-        if (isFavoritesView) {
-            for (const path in assetFavorites) {
-                const item = findAssetByPath(path);
-                if (item) {
-                    const name = path.substring(path.lastIndexOf('/') + 1);
-                    baseItems[name] = item;
-                }
-            }
-        } else {
-            let currentLevel = assetsByPath;
-            currentAssetPath.forEach(folderName => {
-                currentLevel = currentLevel[folderName].children;
-            });
-            baseItems = currentLevel;
-        }
-
-        // Convert to array, filter, and sort
-        const itemsToRender = Object.entries(baseItems)
-            .map(([name, item]) => ({ name, ...item }))
-            .filter(item => !filterText || item.type === 'folder' || item.name.toLowerCase().includes(filterText))
-            .sort((a, b) => {
-                // Folders first
-                if (a.type === 'folder' && b.type !== 'folder') {
-                    return -1;
-                }
-                if (a.type !== 'folder' && b.type === 'folder') {
-                    return 1;
-                }
-                // Then sort alphabetically
-                return a.name.localeCompare(b.name);
-            });
-
-        // Render the sorted and filtered items
-        itemsToRender.forEach(item => {
-            const { name } = item;
-            const assetItemDiv = document.createElement('div');
-            assetItemDiv.className = 'asset-item';
-            assetItemDiv.title = name;
-
-            if (item.path && item.path === selectedAssetPath) {
-                assetItemDiv.classList.add('selected');
-            }
-
-            if (item.type === 'folder') {
-                assetItemDiv.innerHTML = `
-                    <svg fill="currentColor" viewBox="0 0 256 256"><path d="M216,72H145.41a16,16,0,0,1-10.42-3.89L123.08,59.32A8,8,0,0,0,117.41,56H40A16,16,0,0,0,24,72v24H232V88A16,16,0,0,0,216,72ZM24,120V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V120Z"></path></svg>
-                    <span class="asset-name">${name}</span>
-                `;
-                assetItemDiv.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    isFavoritesView = false;
-                    currentAssetPath.push(name);
-                    renderAssetExplorer();
+            if (isFavoritesView) {
+                pathDisplay.append(' / Favorites');
+            } else {
+                currentAssetPath.forEach((folderName, index) => {
+                    pathDisplay.append(' / ');
+                    const partLink = document.createElement('a');
+                    partLink.href = '#';
+                    partLink.textContent = folderName;
+                    partLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        isFavoritesView = false;
+                        currentAssetPath = currentAssetPath.slice(0, index + 1);
+                        renderAssetExplorer();
+                    });
+                    pathDisplay.appendChild(partLink);
                 });
-            } else if (item.type === 'file') {
-                const isFavorite = assetFavorites[item.path];
-                assetItemDiv.innerHTML = `
-                    <button class="asset-favorite-btn ${isFavorite ? 'is-favorite' : ''}" title="Toggle Favorite">${isFavorite ? '⭐' : '⚪'}</button>
-                    <img src="${item.url}" alt="${name}">
-                    <span class="asset-name">${name}</span>
-                `;
-                assetItemDiv.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (e.target.classList.contains('asset-favorite-btn')) {
-                        return;
+            }
+
+            let baseItems = {};
+            if (isFavoritesView) {
+                pathDisplay.append(' / Favorites');
+                for (const path in assetFavorites) {
+                    const item = findAssetByPath(path);
+                    if (item) {
+                        const name = path.substring(path.lastIndexOf('/') + 1);
+                        baseItems[name] = item;
                     }
-
-                    const clickedPath = item.path;
-
-                    if (selectedAssetPath === clickedPath) {
-                        selectedAssetPath = null;
-                        currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
-                    } else {
-                        selectedAssetPath = clickedPath;
-                        currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
-                    }
-                    renderAssetExplorer();
-                    updateAssetPreview();
+                }
+            } else {
+                let currentLevel = assetsByPath;
+                currentAssetPath.forEach(folderName => {
+                    currentLevel = currentLevel[folderName].children;
                 });
-
-                const favButton = assetItemDiv.querySelector('.asset-favorite-btn');
-                favButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    toggleFavorite(item.path);
-                });
+                baseItems = currentLevel;
             }
-            fileListContainer.appendChild(assetItemDiv);
-        });
+
+            const itemsToRender = Object.entries(baseItems)
+                .map(([name, item]) => ({ name, ...item }))
+                .sort((a, b) => {
+                    if (a.type === 'folder' && b.type !== 'folder') return -1;
+                    if (a.type !== 'folder' && b.type === 'folder') return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+            // Add favorites folder at root
+            if (currentAssetPath.length === 0 && !isFavoritesView) {
+                const favoritesFolder = {
+                    name: 'Favorites',
+                    type: 'folder',
+                    special: 'favorites'
+                };
+                itemsToRender.unshift(favoritesFolder);
+            }
+
+            renderItems(itemsToRender);
+        }
     }
 
     function handleAssetFolderUpload(event) {

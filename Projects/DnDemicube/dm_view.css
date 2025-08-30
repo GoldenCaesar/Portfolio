@@ -591,7 +591,6 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 15px;
-    overflow-y: auto;
     flex-grow: 1;
 }
 
@@ -1413,6 +1412,7 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     flex-direction: column;
     max-height: 45vh;
     transform: translateY(100%);
+    overflow-y: auto;
 }
 
 #dm-floating-footer.visible {
