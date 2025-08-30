@@ -1413,7 +1413,6 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
     flex-direction: column;
     max-height: 45vh;
     transform: translateY(100%);
-    overflow: hidden;
 }
 
 #dm-floating-footer.visible {
