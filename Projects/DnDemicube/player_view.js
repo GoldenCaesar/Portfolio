@@ -155,21 +155,18 @@ function resizePlayerCanvas() {
 
     const top = (containerHeight - newHeight) / 2;
     const left = (containerWidth - newWidth) / 2;
-    playerCanvas.style.position = 'absolute';
     playerCanvas.style.top = `${top}px`;
     playerCanvas.style.left = `${left}px`;
 
     if (shadowCanvas) {
         shadowCanvas.width = newWidth;
         shadowCanvas.height = newHeight;
-        shadowCanvas.style.position = 'absolute';
         shadowCanvas.style.top = `${top}px`;
         shadowCanvas.style.left = `${left}px`;
     }
     if (fogCanvas) {
         fogCanvas.width = newWidth;
         fogCanvas.height = newHeight;
-        fogCanvas.style.position = 'absolute';
         fogCanvas.style.top = `${top}px`;
         fogCanvas.style.left = `${left}px`;
     }
