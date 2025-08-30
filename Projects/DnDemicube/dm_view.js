@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAssetsChain = document.getElementById('btn-assets-chain');
     const btnAssetsDelete = document.getElementById('btn-assets-delete');
     const btnAssetsFlatten = document.getElementById('btn-assets-flatten');
+    const btnAssetsMerge = document.getElementById('btn-assets-merge');
     const btnAssetsDone = document.getElementById('btn-assets-done');
     const assetPreviewContainer = document.getElementById('asset-preview-container');
     const assetPreviewImage = document.getElementById('asset-preview-image');
@@ -2488,6 +2489,7 @@ function getTightBoundingBox(img) {
             updateAssetPreview(lastSelected);
             renderAssetExplorer();
             displayMapOnCanvas(selectedMapFileName);
+            updateAssetTools();
         }
     });
 
@@ -2993,6 +2995,7 @@ function getTightBoundingBox(img) {
         draggedHandleInfo = null;
         isDraggingAsset = false;
         draggedAssetInfo = null;
+        updateAssetTools();
 
 
         selectedPolygonForContextMenu = null;
@@ -3166,6 +3169,12 @@ function getTightBoundingBox(img) {
         });
     }
 
+    function updateAssetTools() {
+        if (btnAssetsMerge) {
+            btnAssetsMerge.style.display = selectedPlacedAssets.length > 1 ? 'inline-block' : 'none';
+        }
+    }
+
     function setActiveAssetTool(tool) {
         const oldTool = activeAssetTool;
         // If the same tool is clicked again, deactivate it.
@@ -3257,6 +3266,7 @@ function getTightBoundingBox(img) {
                     selectedPlacedAssets = [];
                     updateAssetPreview();
                     displayMapOnCanvas(selectedMapFileName);
+                    updateAssetTools();
                 }
             } else {
                 alert("Select one or more assets on the map to delete.");
@@ -3270,6 +3280,145 @@ function getTightBoundingBox(img) {
             // Also ensure the main tools tab is re-selected in the footer
             const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
             if (toolsTabButton) toolsTabButton.click();
+        });
+    }
+
+    if (btnAssetsMerge) {
+        btnAssetsMerge.addEventListener('click', () => {
+            if (selectedPlacedAssets.length < 2) {
+                alert("Please select at least two assets to merge.");
+                return;
+            }
+
+            // Helper function to get the transformed corners of an asset
+            const getTransformedCorners = (asset) => {
+                const w = asset.width * (asset.scale || 1);
+                const h = asset.height * (asset.scale || 1);
+                const angle = asset.rotation || 0;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+
+                const halfW = w / 2;
+                const halfH = h / 2;
+
+                const corners = [
+                    { x: -halfW, y: -halfH },
+                    { x:  halfW, y: -halfH },
+                    { x:  halfW, y:  halfH },
+                    { x: -halfW, y:  halfH }
+                ];
+
+                return corners.map(corner => ({
+                    x: asset.position.x + corner.x * cos - corner.y * sin,
+                    y: asset.position.y + corner.x * sin + corner.y * cos
+                }));
+            };
+
+            let allCorners = [];
+            selectedPlacedAssets.forEach(asset => {
+                allCorners = allCorners.concat(getTransformedCorners(asset));
+            });
+
+            const minX = Math.min(...allCorners.map(c => c.x));
+            const maxX = Math.max(...allCorners.map(c => c.x));
+            const minY = Math.min(...allCorners.map(c => c.y));
+            const maxY = Math.max(...allCorners.map(c => c.y));
+
+            const newWidth = maxX - minX;
+            const newHeight = maxY - minY;
+
+            if (newWidth <= 0 || newHeight <= 0) {
+                alert("Cannot merge assets with zero or negative size.");
+                return;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = newWidth;
+            tempCanvas.height = newHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const assetImagePromises = selectedPlacedAssets.map(asset => {
+                return new Promise((resolve, reject) => {
+                    const img = assetImageCache[asset.path];
+                    if (img && img.complete) {
+                        resolve({ asset, img });
+                    } else {
+                        const newImg = new Image();
+                        newImg.src = findAssetByPath(asset.path).url;
+                        newImg.onload = () => {
+                            assetImageCache[asset.path] = newImg;
+                            resolve({ asset, img: newImg });
+                        };
+                        newImg.onerror = reject;
+                    }
+                });
+            });
+
+            Promise.all(assetImagePromises).then(assetsToDraw => {
+                assetsToDraw.forEach(({ asset, img }) => {
+                    const scale = asset.scale || 1;
+                    const rotation = asset.rotation || 0;
+                    const opacity = asset.opacity ?? 1;
+
+                    const drawX = asset.position.x - minX;
+                    const drawY = asset.position.y - minY;
+                    const drawW = asset.width * scale;
+                    const drawH = asset.height * scale;
+
+                    tempCtx.save();
+                    tempCtx.globalAlpha = opacity;
+                    tempCtx.translate(drawX, drawY);
+                    tempCtx.rotate(rotation);
+                    tempCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                    tempCtx.restore();
+                });
+
+                const dataUrl = tempCanvas.toDataURL('image/png');
+
+                let counter = 1;
+                let newAssetName = `Merged Asset ${counter}.png`;
+                let newAssetPath = `Merged/${newAssetName}`;
+
+                if (!assetsByPath['Merged']) {
+                    assetsByPath['Merged'] = { type: 'folder', children: {} };
+                }
+
+                while (assetsByPath['Merged'].children[newAssetName]) {
+                    counter++;
+                    newAssetName = `Merged Asset ${counter}.png`;
+                    newAssetPath = `Merged/${newAssetName}`;
+                }
+
+                const newAsset = {
+                    type: 'file',
+                    path: newAssetPath,
+                    url: dataUrl,
+                    file: null // Merged assets don't have a source file object
+                };
+
+                assetsByPath['Merged'].children[newAssetName] = newAsset;
+                assetFavorites[newAssetPath] = true;
+
+                // Clear selection and redraw map without the merged assets
+                const mapData = detailedMapData.get(selectedMapFileName);
+                if (mapData && mapData.overlays) {
+                    mapData.overlays = mapData.overlays.filter(o => !selectedPlacedAssets.includes(o));
+                }
+                selectedPlacedAssets = [];
+                updateAssetTools();
+                displayMapOnCanvas(selectedMapFileName);
+
+                // Switch to favorites view to show the new asset
+                isFavoritesView = true;
+                currentAssetPath = [];
+                renderAssetExplorer();
+
+                alert(`New asset "${newAssetName}" created and added to favorites!`);
+
+            }).catch(error => {
+                console.error("Error loading asset images for merging:", error);
+                alert("An error occurred while loading assets for merging. Please try again.");
+            });
         });
     }
 
@@ -3767,6 +3916,7 @@ function getTightBoundingBox(img) {
             updateAssetPreview(lastSelected);
             renderAssetExplorer();
             displayMapOnCanvas(selectedMapFileName); // Redraw to remove marquee and show selections
+            updateAssetTools();
         }
 
 
