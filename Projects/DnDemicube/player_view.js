@@ -1,7 +1,9 @@
 const playerCanvas = document.getElementById('player-canvas');
+const fogCanvas = document.getElementById('fog-canvas');
 const shadowCanvas = document.getElementById('player-shadow-canvas');
 const playerMapContainer = document.getElementById('player-map-container');
 const pCtx = playerCanvas ? playerCanvas.getContext('2d') : null;
+const fCtx = fogCanvas ? fogCanvas.getContext('2d') : null;
 
 // Dice Roller Elements
 const diceRollerIcon = document.getElementById('dice-roller-icon');
@@ -163,6 +165,13 @@ function resizePlayerCanvas() {
         shadowCanvas.style.position = 'absolute';
         shadowCanvas.style.top = `${top}px`;
         shadowCanvas.style.left = `${left}px`;
+    }
+    if (fogCanvas) {
+        fogCanvas.width = newWidth;
+        fogCanvas.height = newHeight;
+        fogCanvas.style.position = 'absolute';
+        fogCanvas.style.top = `${top}px`;
+        fogCanvas.style.left = `${left}px`;
     }
 }
 
@@ -583,12 +592,24 @@ window.addEventListener('message', (event) => {
                             lastViewRectangle = data.viewRectangle;
                             recalculateAndApplyTransform();
                         }
-                        drawMapAndOverlays();
+                        drawMapAndOverlays(); // This draws the main map
+
+                        // Now, prepare the fog canvas
+                        if (fCtx) {
+                            fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height); // Clear old fog
+                            // Draw the map again on the fog canvas
+                            fCtx.drawImage(img, 0, 0, fogCanvas.width, fogCanvas.height);
+                            // Overlay it with grey
+                            fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                            fCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
+                        }
+
                         isLightMapDirty = true;
                         toggleShadowAnimation(data.active);
                     };
                     img.onerror = () => {
                         drawPlaceholder("Error loading map.");
+                        if (fCtx) fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
                         currentMapImage = null;
                         toggleShadowAnimation(false);
                     };
@@ -758,6 +779,25 @@ window.addEventListener('message', (event) => {
                     renderQuality = data.quality;
                     isLightMapDirty = true; // Recalculate with new quality
                     console.log(`Player view render quality updated to: ${renderQuality}`);
+                }
+                break;
+            case 'fogOfWarUpdate':
+                if (fCtx && data.fogOfWarDataUrl) {
+                    const fogImg = new Image();
+                    fogImg.onload = () => {
+                        // The greyed-out map is already on the fog canvas.
+                        // We use 'destination-in' to keep the greyed-out map only where the fog mask is opaque (black).
+                        // This erases the greyed-out map where the fog mask is transparent, revealing the full-color map underneath.
+                        fCtx.save();
+                        fCtx.globalCompositeOperation = 'destination-in';
+                        fCtx.drawImage(fogImg, 0, 0, fogCanvas.width, fogCanvas.height);
+                        fCtx.restore();
+                    };
+                    fogImg.src = data.fogOfWarDataUrl;
+                } else if (fCtx) {
+                    // If the DM sends a null/empty FOW (e.g., for a new map), clear the fog canvas.
+                    // This results in the full color map being visible.
+                    fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
                 }
                 break;
             default:
