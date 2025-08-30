@@ -2465,11 +2465,11 @@ function getTightBoundingBox(img) {
             }
 
             const lastSelected = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
-            updateAssetPreview(lastSelected);
             if (lastSelected) {
                 selectedAssetPath = lastSelected.path;
-                renderAssetExplorer();
             }
+            updateAssetPreview(lastSelected);
+            renderAssetExplorer();
             displayMapOnCanvas(selectedMapFileName);
         }
     });
@@ -3739,11 +3739,11 @@ function getTightBoundingBox(img) {
             }
             selectionBox = null;
             const lastSelected = selectedPlacedAssets.length > 0 ? selectedPlacedAssets[selectedPlacedAssets.length - 1] : null;
-            updateAssetPreview(lastSelected);
             if (lastSelected) {
                 selectedAssetPath = lastSelected.path;
-                renderAssetExplorer();
             }
+            updateAssetPreview(lastSelected);
+            renderAssetExplorer();
             displayMapOnCanvas(selectedMapFileName); // Redraw to remove marquee and show selections
         }
 
