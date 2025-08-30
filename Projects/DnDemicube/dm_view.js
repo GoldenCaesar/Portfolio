@@ -698,6 +698,7 @@ function propagateCharacterUpdate(characterId) {
             // Update properties from the master character
             activeChar.name = masterCharacter.name;
             activeChar.isDetailsVisible = masterCharacter.isDetailsVisible;
+            activeChar.vision = masterCharacter.vision;
             activeChar.sheetData = masterCharacter.sheetData;
         }
     });
@@ -710,6 +711,7 @@ function propagateCharacterUpdate(characterId) {
             token.portrait = masterCharacter.sheetData.character_portrait;
             token.initials = getInitials(masterCharacter.name);
             token.isDetailsVisible = masterCharacter.isDetailsVisible;
+            token.vision = masterCharacter.vision;
         }
     });
 
@@ -1276,6 +1278,16 @@ function getTightBoundingBox(img) {
 
         tokenStatBlockCharName.textContent = character.name;
         tokenStatBlockPlayerName.textContent = `(${character.sheetData.player_name || 'N/A'})`;
+
+        const detailsToggle = document.getElementById('token-stat-block-details-toggle');
+        const visionToggle = document.getElementById('token-stat-block-vision-toggle');
+        if (detailsToggle) {
+            detailsToggle.checked = character.isDetailsVisible;
+        }
+        if (visionToggle) {
+            visionToggle.checked = typeof character.vision === 'boolean' ? character.vision : true;
+        }
+
         tokenStatBlockHp.value = character.sheetData.hp_current || 0;
         tokenStatBlockMaxHp.textContent = `/ ${character.sheetData.hp_max || 'N/A'}`;
 
@@ -5379,6 +5391,9 @@ function getTightBoundingBox(img) {
             if (typeof character.isDetailsVisible === 'undefined') {
                 character.isDetailsVisible = true;
             }
+            if (typeof character.vision === 'undefined') {
+                character.vision = true;
+            }
         });
         selectedNoteId = campaignData.selectedNoteId || null;
         selectedCharacterId = campaignData.selectedCharacterId || null;
@@ -6779,9 +6794,11 @@ function getTightBoundingBox(img) {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    function switchTab(tabId) {
+    function switchTab(tabId, preserveState = false) {
         // Reset any active map-editing states when switching tabs
-        resetAllInteractiveStates();
+        if (!preserveState) {
+            resetAllInteractiveStates();
+        }
 
         // Hide all main content containers by default
         if (mapContainer) mapContainer.style.display = 'none';
@@ -6880,7 +6897,7 @@ function getTightBoundingBox(img) {
                                 selectedNoteForContextMenu = null;
                             } else {
                                 alert("Please select a note from the list in the Notes tab to link it.");
-                                switchTab('tab-notes');
+                                switchTab('tab-notes', true);
                             }
                         }
                         break;
@@ -7011,7 +7028,8 @@ function getTightBoundingBox(img) {
             name: newName,
             sheetData: {},
             notes: "",
-            isDetailsVisible: true
+            isDetailsVisible: true,
+            vision: true
         };
         charactersData.push(newCharacter);
 
@@ -7542,7 +7560,7 @@ function getTightBoundingBox(img) {
                                 selectedCharacterForContextMenu = null;
                             } else {
                                 alert("Please select a character from the list in the Characters tab to link it.");
-                                switchTab('tab-characters');
+                                switchTab('tab-characters', true);
                             }
                         }
                         break;
@@ -7615,6 +7633,14 @@ function getTightBoundingBox(img) {
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.isDetailsVisible = event.data.isDetailsVisible;
+                    propagateCharacterUpdate(selectedCharacterId);
+                }
+            }
+        } else if (event.data.type === 'characterVisionChange') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    character.vision = event.data.vision;
                     propagateCharacterUpdate(selectedCharacterId);
                 }
             }
@@ -8768,7 +8794,8 @@ function displayToast(messageElement) {
                         playerName: character.sheetData.player_name,
                         portrait: character.sheetData.character_portrait,
                         initials: getInitials(character.name),
-                        isDetailsVisible: character.isDetailsVisible
+                        isDetailsVisible: character.isDetailsVisible,
+                        vision: character.vision
                     };
                     initiativeTokens.push(token);
                     tokenX += tokenPixelSize + 10;
@@ -8868,7 +8895,8 @@ function displayToast(messageElement) {
                         playerName: character.sheetData.player_name,
                         portrait: character.sheetData.character_portrait,
                         initials: getInitials(character.name),
-                        isDetailsVisible: character.isDetailsVisible
+                        isDetailsVisible: character.isDetailsVisible,
+                        vision: character.vision
                     };
                     initiativeTokens.push(token);
                     tokenX += tokenPixelSize + 10;
@@ -11298,4 +11326,50 @@ function getDragAfterElement(container, y) {
 
     // Initial call to populate footer
     renderActiveQuestsInFooter();
+
+    const tokenStatBlockDetailsToggle = document.getElementById('token-stat-block-details-toggle');
+    if (tokenStatBlockDetailsToggle) {
+        tokenStatBlockDetailsToggle.addEventListener('change', (event) => {
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character) return;
+
+            const masterCharacter = charactersData.find(c => c.id === character.id);
+            if (masterCharacter) {
+                masterCharacter.isDetailsVisible = event.target.checked;
+                propagateCharacterUpdate(masterCharacter.id);
+
+                // Sync with character sheet if it's the current one
+                if (selectedCharacterId === masterCharacter.id) {
+                    characterSheetIframe.contentWindow.postMessage({
+                        type: 'characterDetailsVisibilityChange',
+                        isDetailsVisible: event.target.checked
+                    }, '*');
+                }
+            }
+        });
+    }
+
+    const tokenStatBlockVisionToggle = document.getElementById('token-stat-block-vision-toggle');
+    if (tokenStatBlockVisionToggle) {
+        tokenStatBlockVisionToggle.addEventListener('change', (event) => {
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character) return;
+
+            const masterCharacter = charactersData.find(c => c.id === character.id);
+            if (masterCharacter) {
+                masterCharacter.vision = event.target.checked;
+                propagateCharacterUpdate(masterCharacter.id);
+
+                // Sync with character sheet if it's the current one
+                if (selectedCharacterId === masterCharacter.id) {
+                    characterSheetIframe.contentWindow.postMessage({
+                        type: 'characterVisionChange_from_dm',
+                        vision: event.target.checked
+                    }, '*');
+                }
+            }
+        });
+    }
 });

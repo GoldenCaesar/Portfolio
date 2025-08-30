@@ -192,6 +192,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const visionCheckbox = document.getElementById('vision-checkbox');
+    if (visionCheckbox) {
+        visionCheckbox.addEventListener('change', function() {
+            window.parent.postMessage({
+                type: 'characterVisionChange',
+                vision: this.checked
+            }, '*');
+        });
+    }
+
     window.addEventListener('message', function(event) {
         if (event.data.type === 'loadCharacterSheet') {
             clearSheetFields();
@@ -218,6 +228,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (detailsVisibilityToggle) {
                 detailsVisibilityToggle.checked = typeof data.isDetailsVisible === 'boolean' ? data.isDetailsVisible : true;
+            }
+            if (visionCheckbox) {
+                visionCheckbox.checked = typeof data.vision === 'boolean' ? data.vision : true;
+            }
+        } else if (event.data.type === 'characterVisionChange_from_dm') {
+            if (visionCheckbox) {
+                visionCheckbox.checked = event.data.vision;
             }
         } else if (event.data.type === 'requestSheetData') {
             const sheetData = {};
