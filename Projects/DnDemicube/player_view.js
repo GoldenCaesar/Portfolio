@@ -237,7 +237,7 @@ function recalculateLightMap_Player() {
 
     const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
     const tokenLightSources = initiativeTokens
-        .filter(token => token.isDetailsVisible !== false)
+        .filter(token => token.vision !== false)
         .map(token => ({
             type: 'lightSource',
             position: { x: token.x, y: token.y },
