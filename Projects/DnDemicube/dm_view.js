@@ -2369,8 +2369,8 @@ function getTightBoundingBox(img) {
         const ghostRotatedStartOffsetY = (localStart.x * Math.sin(ghostRotation) + localStart.y * Math.cos(ghostRotation)) * assetScale;
 
         const ghostCenter = {
-            x: lastStampedAssetEndpoint.x - ghostRotatedStartOffsetX,
-            y: lastStampedAssetEndpoint.y - ghostRotatedStartOffsetY
+            x: imageCoords.x,
+            y: imageCoords.y
         };
 
         const { scale: mapScale, originX, originY } = selectedMapData.transform;
@@ -2411,10 +2411,27 @@ function getTightBoundingBox(img) {
             let clickedOnExistingSelection = false;
             let clickedAsset = null;
 
-            // Check if click is on an already selected asset or a handle
+            // If exactly one asset is selected, check for handle clicks.
+            if (selectedPlacedAssets.length === 1) {
+                const asset = selectedPlacedAssets[0];
+                const handleName = getHandleForPoint(imageCoords, asset);
+                if (handleName) {
+                    isDraggingAssetHandle = true;
+                    selectedPlacedAsset = asset; // Set the global for the move handler
+                    draggedHandleInfo = {
+                        name: handleName,
+                        initialAsset: { ...asset, position: { ...asset.position } },
+                        initialMouseCoords: imageCoords
+                    };
+                    mapContainer.style.cursor = 'grabbing';
+                    return; // Done.
+                }
+            }
+
+            // Check if click is on an already selected asset
             for (let i = selectedPlacedAssets.length - 1; i >= 0; i--) {
                 const asset = selectedPlacedAssets[i];
-                if (getHandleForPoint(imageCoords, asset) || isPointInPlacedAsset(imageCoords, asset)) {
+                if (isPointInPlacedAsset(imageCoords, asset)) {
                     clickedOnExistingSelection = true;
                     break;
                 }
@@ -3437,8 +3454,13 @@ function getTightBoundingBox(img) {
                     `;
                     assetItemDiv.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        isFavoritesView = false;
-                        currentAssetPath.push(name);
+                        if (item.special === 'favorites') {
+                            isFavoritesView = true;
+                            currentAssetPath = [];
+                        } else {
+                            isFavoritesView = false;
+                            currentAssetPath.push(name);
+                        }
                         renderAssetExplorer();
                     });
                 } else if (item.type === 'file') {
