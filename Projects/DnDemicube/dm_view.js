@@ -3207,6 +3207,8 @@ function getTightBoundingBox(img) {
         } else {
             mapContainer.style.cursor = 'grab';
         }
+
+        updateAssetPreview();
     }
 
     if (btnAssetsSelect) {
