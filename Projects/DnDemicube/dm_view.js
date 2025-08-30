@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAssetsSelect = document.getElementById('btn-assets-select');
     const btnAssetsStamp = document.getElementById('btn-assets-stamp');
     const btnAssetsChain = document.getElementById('btn-assets-chain');
+    const btnAssetsDelete = document.getElementById('btn-assets-delete');
     const btnAssetsDone = document.getElementById('btn-assets-done');
     const assetPreviewContainer = document.getElementById('asset-preview-container');
     const assetPreviewImage = document.getElementById('asset-preview-image');
@@ -3047,12 +3048,21 @@ function propagateCharacterUpdate(characterId) {
     }
 
     function setActiveAssetTool(tool) {
+        const oldTool = activeAssetTool;
         // If the same tool is clicked again, deactivate it.
         if (activeAssetTool === tool) {
             tool = null;
         }
 
         activeAssetTool = tool;
+
+        // If switching away from stamp, clear any ghost preview
+        if (oldTool === 'stamp' && activeAssetTool !== 'stamp') {
+            const selectedMapData = detailedMapData.get(selectedMapFileName);
+            if (selectedMapData) {
+                drawOverlays(selectedMapData.overlays);
+            }
+        }
 
         // Update button active states
         if (btnAssetsSelect) btnAssetsSelect.classList.toggle('active', activeAssetTool === 'select');
@@ -3131,6 +3141,25 @@ function propagateCharacterUpdate(characterId) {
         });
     }
 
+    if (btnAssetsDelete) {
+        btnAssetsDelete.addEventListener('click', () => {
+            if (activeAssetTool === 'select' && selectedPlacedAsset) {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData && selectedMapData.overlays) {
+                    const index = selectedMapData.overlays.findIndex(o => o === selectedPlacedAsset);
+                    if (index > -1) {
+                        selectedMapData.overlays.splice(index, 1);
+                        selectedPlacedAsset = null;
+                        updateAssetPreview();
+                        displayMapOnCanvas(selectedMapFileName);
+                    }
+                }
+            } else {
+                alert("Select an asset on the map to delete.");
+            }
+        });
+    }
+
     if (btnAssetsDone) {
         btnAssetsDone.addEventListener('click', () => {
             resetAllInteractiveStates();
@@ -3170,31 +3199,32 @@ function propagateCharacterUpdate(characterId) {
     function renderAssetExplorer() {
         if (!footerAssetsContent) return;
 
-        // Create elements if they don't exist
-        if (!document.getElementById('asset-explorer')) {
+        // Create the main structure if it doesn't exist
+        if (!document.getElementById('asset-explorer-wrapper')) {
             footerAssetsContent.innerHTML = `
-                <div id="assets-controls">
-                    <button id="upload-assets-folder-btn">Upload Assets Folder</button>
-                    <input type="file" id="assets-folder-input" style="display: none;" webkitdirectory directory multiple>
-                </div>
-                <div id="asset-explorer">
-                    <div id="asset-path-display"></div>
-                    <div id="asset-file-list"></div>
+                <div id="asset-explorer-wrapper">
+                    <div id="assets-controls">
+                        <button id="upload-assets-folder-btn">Upload Assets Folder</button>
+                        <input type="file" id="assets-folder-input" style="display: none;" webkitdirectory directory multiple>
+                        <input type="text" id="asset-search-input" placeholder="Search assets..." style="margin-left: 10px;">
+                    </div>
+                    <div id="asset-explorer">
+                        <div id="asset-path-display"></div>
+                        <div id="asset-file-list"></div>
+                    </div>
                 </div>
             `;
 
             document.getElementById('upload-assets-folder-btn').addEventListener('click', () => {
                 document.getElementById('assets-folder-input').click();
             });
-
             document.getElementById('assets-folder-input').addEventListener('change', handleAssetFolderUpload);
-
-            // Prevent clicks inside the asset footer from closing it unnecessarily
-            footerAssetsContent.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
+            document.getElementById('asset-search-input').addEventListener('keyup', renderAssetExplorer);
+            footerAssetsContent.addEventListener('click', (e) => e.stopPropagation());
         }
 
+        // Now, just update the parts that change
+        const filterText = document.getElementById('asset-search-input').value.toLowerCase();
         const pathDisplay = document.getElementById('asset-path-display');
         const fileListContainer = document.getElementById('asset-file-list');
 
@@ -3258,7 +3288,6 @@ function propagateCharacterUpdate(characterId) {
             for (const path in assetFavorites) {
                 const item = findAssetByPath(path);
                 if (item) {
-                    // To get the name, we split the path and take the last part
                     const name = path.substring(path.lastIndexOf('/') + 1);
                     itemsToRender[name] = item;
                 }
@@ -3273,6 +3302,11 @@ function propagateCharacterUpdate(characterId) {
 
         for (const name in itemsToRender) {
             const item = itemsToRender[name];
+
+            if (filterText && item.type === 'file' && !name.toLowerCase().includes(filterText)) {
+                continue;
+            }
+
             const assetItemDiv = document.createElement('div');
             assetItemDiv.className = 'asset-item';
             assetItemDiv.title = name;
@@ -3301,7 +3335,6 @@ function propagateCharacterUpdate(characterId) {
                 `;
                 assetItemDiv.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    // Don't do anything if the favorite button was clicked
                     if (e.target.classList.contains('asset-favorite-btn')) {
                         return;
                     }
@@ -3309,18 +3342,13 @@ function propagateCharacterUpdate(characterId) {
                     const clickedPath = item.path;
 
                     if (selectedAssetPath === clickedPath) {
-                        // User clicked the same asset again, deselect it and reset transform.
                         selectedAssetPath = null;
                         currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
                     } else {
-                        // User clicked a new asset. Select it and reset transform.
                         selectedAssetPath = clickedPath;
                         currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
                     }
-
-                    // Re-render the explorer to reflect the change in selection.
                     renderAssetExplorer();
-                    // Update the preview pane, which will now use the (potentially reset) transform state.
                     updateAssetPreview();
                 });
 
@@ -3368,7 +3396,6 @@ function propagateCharacterUpdate(characterId) {
     function updateAssetPreview(assetToPreview = null) {
         selectedAssetForPreview = null;
 
-        // If a placed asset is passed, update the global transform state with its properties.
         if (assetToPreview) {
             currentAssetPreviewTransform.scale = assetToPreview.scale || 1;
             currentAssetPreviewTransform.rotation = assetToPreview.rotation || 0;
@@ -3377,7 +3404,7 @@ function propagateCharacterUpdate(characterId) {
 
         const assetData = assetToPreview || findAssetByPath(selectedAssetPath);
 
-        if (isAssetsMode && assetData) {
+        if (isAssetsMode && assetData && currentMapDisplayData.img) { // Added check for map image
             const assetUrl = assetData.url || findAssetByPath(assetData.path)?.url;
             if (!assetUrl) {
                 assetPreviewContainer.style.display = 'none';
@@ -3388,6 +3415,41 @@ function propagateCharacterUpdate(characterId) {
             assetPreviewImage.src = assetUrl;
 
             assetPreviewImage.onload = () => {
+                const assetWidth = assetPreviewImage.naturalWidth;
+                const assetHeight = assetPreviewImage.naturalHeight;
+
+                if (assetWidth === 0) return; // Avoid division by zero if image fails to load properly
+
+                // Determine the asset's base scale factor
+                let assetScale;
+                if (assetToPreview) {
+                    // Use the scale of the asset already placed on the map
+                    assetScale = assetToPreview.scale || 1;
+                } else {
+                    // Calculate the default scale for a new asset from the footer
+                    const defaultSize = currentMapDisplayData.imgWidth * 0.05;
+                    const longestDim = Math.max(assetWidth, assetHeight);
+                    assetScale = longestDim > 0 ? defaultSize / longestDim : 1;
+                }
+
+                // Get the map's zoom-to-fit ratio
+                const fitRatio = currentMapDisplayData.ratio;
+
+                // Calculate the final size for the preview image
+                const previewWidth = assetWidth * assetScale * fitRatio;
+
+                assetPreviewImage.style.width = `${previewWidth}px`;
+                assetPreviewImage.style.height = 'auto';
+
+
+                // Handle rotation separately from scale
+                const { rotation, opacity } = currentAssetPreviewTransform;
+                assetPreviewImage.style.transform = `rotate(${rotation}rad)`;
+                assetPreviewImage.style.opacity = opacity;
+
+                if (assetPreviewOpacitySlider) assetPreviewOpacitySlider.value = opacity;
+                if (assetPreviewOpacityValue) assetPreviewOpacityValue.textContent = opacity.toFixed(1);
+
                 if (activeAssetTool === 'chain') {
                     updateChainPointsVisuals();
                 }
@@ -3399,16 +3461,7 @@ function propagateCharacterUpdate(characterId) {
             const path = assetData.path || selectedAssetPath;
             assetPreviewTitle.textContent = path.substring(path.lastIndexOf('/') + 1);
 
-            // Always read from the global transform state to update the UI.
-            const { scale, rotation, opacity } = currentAssetPreviewTransform;
-
-            // Update the UI elements
-            assetPreviewImage.style.transform = `scale(${scale}) rotate(${rotation}rad)`;
-            assetPreviewImage.style.opacity = opacity;
-
-            if (assetPreviewOpacitySlider) assetPreviewOpacitySlider.value = opacity;
-            if (assetPreviewOpacityValue) assetPreviewOpacityValue.textContent = opacity.toFixed(1);
-
+            // Chain points logic (needs to be outside onload to show immediately)
             if (assetChainPointsSliderContainer && assetChainStartPoint && assetChainEndPoint) {
                 const isChainActive = activeAssetTool === 'chain';
                 assetChainPointsSliderContainer.style.display = isChainActive ? 'block' : 'none';
@@ -3417,15 +3470,19 @@ function propagateCharacterUpdate(characterId) {
             }
 
         } else {
-            // No asset selected, hide the preview. The transform state is preserved.
+            // No asset selected or no map loaded, hide the preview.
             assetPreviewContainer.style.display = 'none';
             assetPreviewImage.src = '';
+            assetPreviewImage.style.width = 'auto'; // Reset style
+            assetPreviewImage.style.height = 'auto';
+            assetPreviewImage.style.transform = 'none';
             assetPreviewTitle.textContent = '';
             if (assetChainPointsSliderContainer) assetChainPointsSliderContainer.style.display = 'none';
             if (assetChainStartPoint) assetChainStartPoint.style.display = 'none';
             if (assetChainEndPoint) assetChainEndPoint.style.display = 'none';
         }
 
+        // This part is for caching the full Image object for drawing on canvas later
         const assetForSizing = findAssetByPath(selectedAssetPath);
         if (assetForSizing && assetForSizing.url) {
             if (!assetImageCache[assetForSizing.path]) {
@@ -4083,20 +4140,66 @@ function propagateCharacterUpdate(characterId) {
                 requestRedraw();
                 sendMapTransformToPlayerView(mapData.transform);
             } else {
-                // Update cursor for asset selection mode
-                if (activeAssetTool === 'select' && selectedPlacedAsset) {
-                    const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
-                    mapContainer.style.cursor = handleName ? 'grab' : 'pointer';
-                } else if (activeAssetTool === 'select') {
-                    mapContainer.style.cursor = 'pointer';
-                }
+                const imageCoords = getRelativeCoords(e.offsetX, e.offsetY);
+                if (!imageCoords) return;
 
-                handleMouseMoveOnCanvas(e);
+                // Handle stamp preview
+                if (activeAssetTool === 'stamp' && selectedAssetForPreview && selectedAssetForPreview.complete) {
+                    const selectedMapData = detailedMapData.get(selectedMapFileName);
+                    if (!selectedMapData) return;
+
+                    drawOverlays(selectedMapData.overlays); // Redraw permanent overlays
+
+                    const drawingCtx = drawingCanvas.getContext('2d');
+
+                    const assetWidth = selectedAssetForPreview.naturalWidth;
+                    const assetHeight = selectedAssetForPreview.naturalHeight;
+
+                    const defaultSize = currentMapDisplayData.imgWidth * 0.05;
+                    const longestDim = Math.max(assetWidth, assetHeight);
+                    const defaultScale = longestDim > 0 ? defaultSize / longestDim : 1;
+
+                    const finalScale = currentAssetPreviewTransform.scale === 1 ? defaultScale : currentAssetPreviewTransform.scale;
+                    const finalRotation = currentAssetPreviewTransform.rotation;
+                    const finalOpacity = currentAssetPreviewTransform.opacity;
+
+                    const { scale: mapScale, originX, originY } = selectedMapData.transform;
+
+                    const canvasX = (imageCoords.x * mapScale) + originX;
+                    const canvasY = (imageCoords.y * mapScale) + originY;
+                    const assetCanvasWidth = assetWidth * finalScale * mapScale;
+                    const assetCanvasHeight = assetHeight * finalScale * mapScale;
+
+                    drawingCtx.save();
+                    drawingCtx.globalAlpha = 0.5 * finalOpacity;
+                    drawingCtx.translate(canvasX, canvasY);
+                    drawingCtx.rotate(finalRotation);
+                    drawingCtx.drawImage(selectedAssetForPreview, -assetCanvasWidth / 2, -assetCanvasHeight / 2, assetCanvasWidth, assetCanvasHeight);
+                    drawingCtx.restore();
+
+                } else {
+                     // Update cursor for asset selection mode
+                    if (activeAssetTool === 'select' && selectedPlacedAsset) {
+                        const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
+                        mapContainer.style.cursor = handleName ? 'grab' : 'pointer';
+                    } else if (activeAssetTool === 'select') {
+                        mapContainer.style.cursor = 'pointer';
+                    }
+
+                    handleMouseMoveOnCanvas(e);
+                }
             }
         });
         dmCanvas.addEventListener('mouseout', () => {
             if (hoverLabel) {
                 hoverLabel.style.display = 'none';
+            }
+            // If leaving the canvas while stamping, clear the ghost preview
+            if (activeAssetTool === 'stamp') {
+                const selectedMapData = detailedMapData.get(selectedMapFileName);
+                if (selectedMapData) {
+                    drawOverlays(selectedMapData.overlays);
+                }
             }
         });
     } else {
