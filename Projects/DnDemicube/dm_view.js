@@ -350,6 +350,7 @@ let lastStampedAssetEndpoint = null;
     let draggedHandleInfo = null; // { name, initialAsset, initialMouseCoords }
     let isDraggingAsset = false;
     let draggedAssetInfo = null; // { initialAsset, initialMouseCoords }
+let assetBoundingBoxCache = {};
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -1003,21 +1004,94 @@ function propagateCharacterUpdate(characterId) {
         });
     }
 
-    function getChainPoints(assetWidth, assetHeight, angle) {
-        const halfW = assetWidth / 2;
-        const halfH = assetHeight / 2;
+function getTightBoundingBox(img) {
+    // Check cache first
+    if (assetBoundingBoxCache[img.src]) {
+        return assetBoundingBoxCache[img.src];
+    }
+
+    const canvas = document.createElement('canvas');
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    let data;
+    try {
+        data = ctx.getImageData(0, 0, w, h).data;
+    } catch (e) {
+        // This can happen due to CORS issues if the image is tainted
+        console.error("Could not get image data for tight bounding box, likely due to CORS policy. Falling back to full image dimensions.", e);
+        // Fallback to the original dimensions
+        const fallbackBox = { x: 0, y: 0, width: w, height: h, fromCache: false, isFallback: true };
+        assetBoundingBoxCache[img.src] = fallbackBox; // Cache the fallback to avoid repeated errors
+        return fallbackBox;
+    }
+
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            // The alpha channel is the 4th byte in each pixel
+            const alpha = data[((y * w) + x) * 4 + 3];
+            if (alpha > 0) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    // If the image is completely transparent, maxX will be less than minX.
+    // In this case, we'll return the full image dimensions as a fallback.
+    const result = (maxX < minX) ?
+        { x: 0, y: 0, width: w, height: h, fromCache: false, isFallback: true } :
+        { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, fromCache: false, isFallback: false };
+
+    // Cache the result
+    assetBoundingBoxCache[img.src] = result;
+    return result;
+}
+
+    function getChainPoints(assetImage, angle) {
+        if (!assetImage || !assetImage.complete || assetImage.naturalWidth === 0) {
+            return { startPoint: {x: 0, y: 0}, endPoint: {x: 0, y: 0} };
+        }
+        const tightBox = getTightBoundingBox(assetImage);
+
+        const originalCenterX = assetImage.naturalWidth / 2;
+        const originalCenterY = assetImage.naturalHeight / 2;
+
+        const tightBoxCenterX = tightBox.x + tightBox.width / 2;
+        const tightBoxCenterY = tightBox.y + tightBox.height / 2;
+
+        const halfW = tightBox.width / 2;
+        const halfH = tightBox.height / 2;
 
         const startAngle = angle;
         const endAngle = angle + Math.PI;
 
-        const startPoint = {
+        const startPointOnTightEllipse = {
             x: halfW * Math.cos(startAngle),
             y: halfH * Math.sin(startAngle)
         };
-
-        const endPoint = {
+        const endPointOnTightEllipse = {
             x: halfW * Math.cos(endAngle),
             y: halfH * Math.sin(endAngle)
+        };
+
+        const startPoint = {
+            x: (tightBoxCenterX - originalCenterX) + startPointOnTightEllipse.x,
+            y: (tightBoxCenterY - originalCenterY) + startPointOnTightEllipse.y
+        };
+
+        const endPoint = {
+            x: (tightBoxCenterX - originalCenterX) + endPointOnTightEllipse.x,
+            y: (tightBoxCenterY - originalCenterY) + endPointOnTightEllipse.y
         };
 
         return { startPoint, endPoint };
@@ -1031,21 +1105,41 @@ function propagateCharacterUpdate(characterId) {
             return;
         }
 
-        const w = assetPreviewImage.offsetWidth;
-        const h = assetPreviewImage.offsetHeight;
-        const centerX = w / 2;
-        const centerY = h / 2;
+        const tightBox = getTightBoundingBox(assetPreviewImage);
 
-        // Start point (green)
-        const startX = centerX + (w / 2) * Math.cos(chainPointsAngle) - (assetChainStartPoint.offsetWidth / 2);
-        const startY = centerY + (h / 2) * Math.sin(chainPointsAngle) - (assetChainStartPoint.offsetHeight / 2);
+        // The displayed size of the preview image
+        const displayedW = assetPreviewImage.offsetWidth;
+        const displayedH = assetPreviewImage.offsetHeight;
+
+        // The ratio between the displayed size and the image's natural size
+        const ratioW = displayedW / assetPreviewImage.naturalWidth;
+        const ratioH = displayedH / assetPreviewImage.naturalHeight;
+
+        // The dimensions of the tight box, scaled to the preview's display size
+        const tightBoxDisplayedW = tightBox.width * ratioW;
+        const tightBoxDisplayedH = tightBox.height * ratioH;
+
+        // The center of the tight box, relative to the top-left of the preview element
+        const tightBoxDisplayedCenterX = (tightBox.x + tightBox.width / 2) * ratioW;
+        const tightBoxDisplayedCenterY = (tightBox.y + tightBox.height / 2) * ratioH;
+
+        const startAngle = chainPointsAngle;
+        const endAngle = chainPointsAngle + Math.PI;
+
+        // Calculate dot positions on the tight box ellipse
+        const startX_local = (tightBoxDisplayedW / 2) * Math.cos(startAngle);
+        const startY_local = (tightBoxDisplayedH / 2) * Math.sin(startAngle);
+        const endX_local = (tightBoxDisplayedW / 2) * Math.cos(endAngle);
+        const endY_local = (tightBoxDisplayedH / 2) * Math.sin(endAngle);
+
+        // Position the dots by starting at the tight box center and adding the local ellipse offset
+        const startX = tightBoxDisplayedCenterX + startX_local - (assetChainStartPoint.offsetWidth / 2);
+        const startY = tightBoxDisplayedCenterY + startY_local - (assetChainStartPoint.offsetHeight / 2);
         assetChainStartPoint.style.left = `${startX}px`;
         assetChainStartPoint.style.top = `${startY}px`;
 
-        // End point (red) is opposite
-        const endAngle = chainPointsAngle + Math.PI;
-        const endX = centerX + (w / 2) * Math.cos(endAngle) - (assetChainEndPoint.offsetWidth / 2);
-        const endY = centerY + (h / 2) * Math.sin(endAngle) - (assetChainEndPoint.offsetHeight / 2);
+        const endX = tightBoxDisplayedCenterX + endX_local - (assetChainEndPoint.offsetWidth / 2);
+        const endY = tightBoxDisplayedCenterY + endY_local - (assetChainEndPoint.offsetHeight / 2);
         assetChainEndPoint.style.left = `${endX}px`;
         assetChainEndPoint.style.top = `${endY}px`;
     }
@@ -2207,7 +2301,7 @@ function propagateCharacterUpdate(characterId) {
         // Otherwise, use the scale inherited from a previously selected placed asset.
         const assetScale = currentAssetPreviewTransform.scale === 1 ? defaultScale : currentAssetPreviewTransform.scale;
 
-        const { startPoint: localStart, endPoint: localEnd } = getChainPoints(assetW, assetH, chainPointsAngle);
+        const { startPoint: localStart, endPoint: localEnd } = getChainPoints(assetImage, chainPointsAngle);
 
         const chainVectorX = localEnd.x - localStart.x;
         const chainVectorY = localEnd.y - localStart.y;
@@ -2866,7 +2960,15 @@ function propagateCharacterUpdate(characterId) {
         // This block handles the full shutdown of the Assets tool.
         isAssetsMode = false;
         if(assetsToolsContainer) assetsToolsContainer.style.display = 'none';
-        if (footerAssetsTab) footerAssetsTab.style.display = 'none';
+        if (footerAssetsTab) {
+            footerAssetsTab.style.display = 'none';
+            if (footerAssetsTab.classList.contains('active')) {
+                const toolsTabButton = document.querySelector('.footer-tab-button[data-tab="footer-tools"]');
+                if (toolsTabButton) {
+                    toolsTabButton.click();
+                }
+            }
+        }
         setActiveAssetTool(null);
         selectedPlacedAsset = null;
         updateAssetPreview(); // This will also clear the preview
