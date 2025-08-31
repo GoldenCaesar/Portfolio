@@ -827,56 +827,29 @@ window.addEventListener('message', (event) => {
             case 'updateQuestOverlay':
                 const questLogOverlay = document.getElementById('quest-log-overlay');
                 const titleEl = document.getElementById('quest-log-title');
-                const stepsContainer = document.getElementById('quest-log-steps-container');
+                const completedStepsEl = document.getElementById('quest-log-completed-steps');
+                const nextStepEl = document.getElementById('quest-log-next-step');
 
-                if (questLogOverlay && titleEl && stepsContainer) {
+                if (questLogOverlay && titleEl && completedStepsEl && nextStepEl) {
                     questLogOverlay.style.display = data.visible ? 'flex' : 'none';
-
                     if (data.visible && data.quest) {
                         titleEl.textContent = data.quest.title;
-                        stepsContainer.innerHTML = ''; // Clear previous steps
 
-                        // Render completed steps
+                        completedStepsEl.innerHTML = '';
                         if (data.quest.completedSteps && data.quest.completedSteps.length > 0) {
-                            data.quest.completedSteps.forEach(stepText => {
-                                const stepEl = document.createElement('div');
-                                stepEl.className = 'flex items-center gap-4 opacity-60';
-                                stepEl.innerHTML = `
-                                    <div class="flex items-center justify-center size-10 bg-border-color/40 rounded-full border-2 border-rune-gold/50">
-                                        <svg class="text-rune-gold" fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"></path>
-                                        </svg>
-                                    </div>
-                                    <div class="flex-1">
-                                        <p class="text-lg font-medium leading-normal line-through text-text-muted">${stepText}</p>
-                                    </div>
-                                `;
-                                stepsContainer.appendChild(stepEl);
+                            data.quest.completedSteps.forEach(step => {
+                                const li = document.createElement('li');
+                                li.textContent = step;
+                                completedStepsEl.appendChild(li);
                             });
+                        } else {
+                            const li = document.createElement('li');
+                            li.textContent = 'None yet.';
+                            li.style.fontStyle = 'italic';
+                            completedStepsEl.appendChild(li);
                         }
 
-                        // Render divider if there are both completed and next steps
-                        if (data.quest.completedSteps && data.quest.completedSteps.length > 0 && data.quest.nextStep) {
-                            const divider = document.createElement('div');
-                            divider.className = 'my-6 h-px bg-gradient-to-r from-transparent via-rune-gold/50 to-transparent';
-                            stepsContainer.appendChild(divider);
-                        }
-
-                        // Render next step
-                        if (data.quest.nextStep) {
-                            const nextStepEl = document.createElement('div');
-                            nextStepEl.className = 'flex items-center gap-4 bg-primary-gold/10 p-4 rounded-lg border-2 border-primary-gold shadow-[0_0_15px_rgba(244,199,37,0.5)]';
-                            nextStepEl.innerHTML = `
-                                <div class="flex items-center justify-center size-10 bg-primary-gold rounded-full shrink-0 animate-pulse">
-                                    <svg class="text-dark-bg" fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M208,88H152V32a8,8,0,0,0-16,0V88H80V32a8,8,0,0,0-16,0V88H48a16,16,0,0,0-16,16v56a16,16,0,0,0,16,16H64v48a8,8,0,0,0,16,0V176h56v48a8,8,0,0,0,16,0V176h56v48a8,8,0,0,0,16,0V176h16a16,16,0,0,0,16-16V104A16,16,0,0,0,208,88Zm0,72H48V104H208v56Z"></path></svg>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-xl font-bold leading-tight text-primary-gold">${data.quest.nextStep}</p>
-                                    <p class="text-sm font-normal leading-normal text-text-light">Next Step</p>
-                                </div>
-                            `;
-                            stepsContainer.appendChild(nextStepEl);
-                        }
+                        nextStepEl.textContent = data.quest.nextStep;
                     }
                 }
                 break;
