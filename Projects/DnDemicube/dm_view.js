@@ -231,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPanning = false;
     let panStartX = 0;
     let panStartY = 0;
+    let isQuestLogVisible = false;
 
     // Core state variables
     let selectedMapFileName = null;
@@ -11588,8 +11589,6 @@ function getDragAfterElement(container, y) {
 
     // Initial call to populate footer
     renderActiveQuestsInFooter();
-
-    let isQuestLogVisible = false;
 
     function sendQuestLogData() {
         if (!playerWindow || playerWindow.closed) return;
