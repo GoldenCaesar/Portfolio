@@ -591,20 +591,6 @@ window.addEventListener('message', (event) => {
                         }
                         drawMapAndOverlays(); // This draws the main map
 
-                        // Now, prepare the fog canvas
-                        if (fCtx) {
-                            fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-                            // Draw the greyed-out map version, applying the same transform as the main canvas
-                            fCtx.save();
-                            fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-                            fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-                            fCtx.drawImage(img, 0, 0, img.width, img.height);
-                            fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                            fCtx.globalCompositeOperation = 'source-atop';
-                            fCtx.fillRect(0, 0, img.width, img.height);
-                            fCtx.restore();
-                        }
-
                         isLightMapDirty = true;
                         toggleShadowAnimation(data.active);
                     };
@@ -783,27 +769,30 @@ window.addEventListener('message', (event) => {
                 }
                 break;
             case 'fogOfWarUpdate':
-                if (fCtx && data.fogOfWarDataUrl) {
+                if (fCtx && data.fogOfWarDataUrl && currentMapImage) {
                     const fogImg = new Image();
                     fogImg.onload = () => {
-                        // The greyed-out map is on the fog canvas, correctly transformed.
-                        // The fogImg is a mask that is the same size as the original map image.
-                        // We need to apply it with the same transform to align them.
+                        // First, draw the greyed-out version of the map. This is our "historical" view.
+                        fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
                         fCtx.save();
-                        // This operation keeps the destination (grey map) only where the source (fog mask) is.
-                        // Since the fog mask is black (opaque) where there's fog, this correctly preserves the greyed-out areas.
-                        fCtx.globalCompositeOperation = 'destination-in';
+                        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+                        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+                        fCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
+                        fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                        fCtx.globalCompositeOperation = 'source-atop';
+                        fCtx.fillRect(0, 0, currentMapImage.width, currentMapImage.height);
+                        fCtx.restore();
+
+                        // Now, use the fog mask from the DM to "cut out" the unexplored areas.
+                        // 'destination-out' keeps the grey map where the mask is transparent (explored).
+                        fCtx.save();
+                        fCtx.globalCompositeOperation = 'destination-out';
                         fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
                         fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
                         fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
                         fCtx.restore();
                     };
                     fogImg.src = data.fogOfWarDataUrl;
-                } else if (fCtx) {
-                    // This case might be hit if a map is reset. A full grey overlay is desired.
-                    // The loadMap logic already handles creating the initial grey overlay, so we just need to not erase it.
-                    // A better approach might be to have the DM send a solid black FOW data URL upon reset.
-                    // The current DM-side reset logic does this, so this else block may not be necessary.
                 }
                 break;
             default:
