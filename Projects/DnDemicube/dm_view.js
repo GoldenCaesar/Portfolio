@@ -11378,7 +11378,11 @@ function getDragAfterElement(container, y) {
 
         // If no quest is selected, or the selected one is no longer active, select the first one.
         if (!selectedFooterQuestId || !activeQuests.some(q => q.id === selectedFooterQuestId)) {
-            selectedFooterQuestId = activeQuests[0].id;
+            selectedFooterQuestId = activeQuests.length > 0 ? activeQuests[0].id : null;
+        }
+
+        if (isQuestLogVisible) {
+            sendQuestLogData();
         }
 
         activeQuests.forEach(quest => {
@@ -11488,6 +11492,10 @@ function getDragAfterElement(container, y) {
 
         detailsContainer.innerHTML = html;
 
+        if (isQuestLogVisible) {
+            sendQuestLogData();
+        }
+
         // Add event listeners for the checkboxes to ensure data synchronization
         detailsContainer.querySelectorAll('.quest-steps-list input[type="checkbox"]').forEach(checkbox => {
             checkbox.addEventListener('change', (event) => {
@@ -11580,6 +11588,40 @@ function getDragAfterElement(container, y) {
 
     // Initial call to populate footer
     renderActiveQuestsInFooter();
+
+    let isQuestLogVisible = false;
+
+    function sendQuestLogData() {
+        if (!playerWindow || playerWindow.closed) return;
+
+        const quest = quests.find(q => q.id === selectedFooterQuestId);
+        if (!quest) {
+            playerWindow.postMessage({ type: 'toggleQuestOverlay', visible: false }, '*');
+            return;
+        }
+
+        const completedSteps = quest.storySteps.filter(step => step.completed).map(step => step.title);
+        const nextStep = quest.storySteps.find(step => !step.completed);
+
+        playerWindow.postMessage({
+            type: 'updateQuestOverlay',
+            visible: isQuestLogVisible,
+            quest: {
+                title: quest.name,
+                completedSteps: completedSteps,
+                nextStep: nextStep ? nextStep.title : "All steps completed!"
+            }
+        }, '*');
+    }
+
+    const questLogButton = document.getElementById('quest-log-button');
+    if (questLogButton) {
+        questLogButton.addEventListener('click', () => {
+            isQuestLogVisible = !isQuestLogVisible;
+            sendQuestLogData();
+        });
+    }
+
 
     const tokenStatBlockDetailsToggle = document.getElementById('token-stat-block-details-toggle');
     if (tokenStatBlockDetailsToggle) {

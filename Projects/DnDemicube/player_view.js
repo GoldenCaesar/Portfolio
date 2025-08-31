@@ -818,6 +818,41 @@ window.addEventListener('message', (event) => {
                 currentFogOfWarUrl = data.fogOfWarDataUrl;
                 drawFogOfWar();
                 break;
+            case 'toggleQuestOverlay': // Legacy or simple toggle
+                const questLogOverlayToggle = document.getElementById('quest-log-overlay');
+                if (questLogOverlayToggle) {
+                    questLogOverlayToggle.style.display = data.visible ? 'flex' : 'none';
+                }
+                break;
+            case 'updateQuestOverlay':
+                const questLogOverlay = document.getElementById('quest-log-overlay');
+                const titleEl = document.getElementById('quest-log-title');
+                const completedStepsEl = document.getElementById('quest-log-completed-steps');
+                const nextStepEl = document.getElementById('quest-log-next-step');
+
+                if (questLogOverlay && titleEl && completedStepsEl && nextStepEl) {
+                    questLogOverlay.style.display = data.visible ? 'flex' : 'none';
+                    if (data.visible && data.quest) {
+                        titleEl.textContent = data.quest.title;
+
+                        completedStepsEl.innerHTML = '';
+                        if (data.quest.completedSteps && data.quest.completedSteps.length > 0) {
+                            data.quest.completedSteps.forEach(step => {
+                                const li = document.createElement('li');
+                                li.textContent = step;
+                                completedStepsEl.appendChild(li);
+                            });
+                        } else {
+                            const li = document.createElement('li');
+                            li.textContent = 'None yet.';
+                            li.style.fontStyle = 'italic';
+                            completedStepsEl.appendChild(li);
+                        }
+
+                        nextStepEl.textContent = data.quest.nextStep;
+                    }
+                }
+                break;
             default:
                 console.log("Player view received unhandled message type:", data.type);
                 break;
