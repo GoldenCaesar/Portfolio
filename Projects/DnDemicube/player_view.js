@@ -112,8 +112,49 @@ let lightMapCanvas = null;
 let lightMapCtx = null;
 let isLightMapDirty = true;
 let renderQuality = 0.5; // Default quality, will be updated by DM
+let currentFogOfWarUrl = null;
 
 let shadowAnimationId = null;
+
+function drawFogOfWar() {
+    if (!fCtx || !currentFogOfWarUrl || !currentMapImage) {
+        if (fCtx) fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+        return;
+    }
+
+    const fogImg = new Image();
+    fogImg.onload = () => {
+        // First, draw the greyed-out version of the map. This is our "historical" view.
+        fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+        fCtx.save();
+        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        fCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        fCtx.globalCompositeOperation = 'source-atop';
+        fCtx.fillRect(0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.restore();
+
+        // Now, use the fog mask from the DM to "cut out" the unexplored areas.
+        fCtx.save();
+        fCtx.globalCompositeOperation = 'destination-out';
+        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.restore();
+
+        // Finally, clear the fog from areas that are currently visible.
+        if (lightMapCanvas) {
+            fCtx.save();
+            fCtx.globalCompositeOperation = 'destination-in';
+            fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+            fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+            fCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+            fCtx.restore();
+        }
+    };
+    fogImg.src = currentFogOfWarUrl;
+}
 
 function getPolygonSignedArea(polygon) {
     let area = 0;
@@ -585,6 +626,9 @@ window.addEventListener('message', (event) => {
                     img.onload = () => {
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
+                        currentFogOfWarUrl = null; // Clear old fog data
+                        if (fCtx) fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+
                         if (data.viewRectangle) {
                             lastViewRectangle = data.viewRectangle;
                             recalculateAndApplyTransform();
@@ -598,6 +642,7 @@ window.addEventListener('message', (event) => {
                         drawPlaceholder("Error loading map.");
                         if (fCtx) fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
                         currentMapImage = null;
+                        currentFogOfWarUrl = null;
                         toggleShadowAnimation(false);
                     };
                     img.src = data.mapDataUrl;
@@ -616,6 +661,7 @@ window.addEventListener('message', (event) => {
                     lastViewRectangle = data.viewRectangle;
                     recalculateAndApplyTransform();
                     drawMapAndOverlays();
+                    drawFogOfWar();
                 }
                 break;
             // Note: 'polygonVisibilityUpdate' from DM is largely superseded by DM sending
@@ -769,44 +815,8 @@ window.addEventListener('message', (event) => {
                 }
                 break;
             case 'fogOfWarUpdate':
-                if (fCtx && data.fogOfWarDataUrl && currentMapImage) {
-                    const fogImg = new Image();
-                    fogImg.onload = () => {
-                        // First, draw the greyed-out version of the map. This is our "historical" view.
-                        fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-                        fCtx.save();
-                        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-                        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-                        fCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
-                        fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                        fCtx.globalCompositeOperation = 'source-atop';
-                        fCtx.fillRect(0, 0, currentMapImage.width, currentMapImage.height);
-                        fCtx.restore();
-
-                        // Now, use the fog mask from the DM to "cut out" the unexplored areas.
-                        // 'destination-out' keeps the grey map where the mask is transparent (explored).
-                        fCtx.save();
-                        fCtx.globalCompositeOperation = 'destination-out';
-                        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-                        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-                        fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
-                        fCtx.restore();
-
-                        // Finally, clear the fog from areas that are currently visible.
-                        // The lightMapCanvas is black in shadowed areas and transparent in lit areas.
-                        // 'destination-in' will keep the fog only where the new shape (lightMapCanvas) is drawn.
-                        if (lightMapCanvas) {
-                            fCtx.save();
-                            fCtx.globalCompositeOperation = 'destination-in';
-                            fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-                            fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-                            // Draw the light map, which represents shadows, to effectively "keep" the fog only in shadowed areas.
-                            fCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
-                            fCtx.restore();
-                        }
-                    };
-                    fogImg.src = data.fogOfWarDataUrl;
-                }
+                currentFogOfWarUrl = data.fogOfWarDataUrl;
+                drawFogOfWar();
                 break;
             default:
                 console.log("Player view received unhandled message type:", data.type);
