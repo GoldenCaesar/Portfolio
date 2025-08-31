@@ -791,6 +791,19 @@ window.addEventListener('message', (event) => {
                         fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
                         fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
                         fCtx.restore();
+
+                        // Finally, clear the fog from areas that are currently visible.
+                        // The lightMapCanvas is black in shadowed areas and transparent in lit areas.
+                        // 'destination-in' will keep the fog only where the new shape (lightMapCanvas) is drawn.
+                        if (lightMapCanvas) {
+                            fCtx.save();
+                            fCtx.globalCompositeOperation = 'destination-in';
+                            fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+                            fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+                            // Draw the light map, which represents shadows, to effectively "keep" the fog only in shadowed areas.
+                            fCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+                            fCtx.restore();
+                        }
                     };
                     fogImg.src = data.fogOfWarDataUrl;
                 }
