@@ -15,20 +15,17 @@
         :root {
             --primary-color: #141414;
             --secondary-text-color: #a9a9a9;
-            --primary-gold: #f4c725;
-            --rune-gold: #FFD700;
-            --dark-bg: #12100E;
-            --paper-bg: #1E1A17;
-            --text-light: #EAE3D3;
-            --text-muted: #A39B8B;
-            --border-color: #3A3529;
         }
         body {
-            background-color: var(--dark-bg);
-            font-family: 'Noto Serif', serif;
-        }
-        .fantasy-title {
-            font-family: 'Uncial Antiqua', cursive;
+            margin: 0;
+            background-color: #15191e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #e0e0e0;
         }
         #player-map-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; }
         #player-map-container > canvas {
@@ -273,19 +270,14 @@
             </div>
         </div>
     </div>
-    <div id="quest-log-overlay" style="display: none;" class="absolute inset-0 bg-black/60 backdrop-blur-sm z-20">
-        <div class="relative z-10 flex flex-col h-full max-w-2xl mx-auto bg-paper-bg/80 border-x-2 border-border-color/80 shadow-2xl shadow-black">
-            <header class="flex items-center p-4 border-b border-border-color/50">
-                <h1 class="fantasy-title text-2xl text-center flex-1 text-primary-gold">Quest Log</h1>
-            </header>
-            <main class="flex-grow p-6 overflow-y-auto">
-                <h2 id="quest-log-title" class="fantasy-title text-3xl text-primary-gold mb-6 text-center"></h2>
-                <div id="quest-log-steps-container" class="space-y-4">
-                    <!-- Completed steps will be injected here by JS -->
-                    <!-- Divider will be injected here by JS -->
-                    <!-- Next step will be injected here by JS -->
-                </div>
-            </main>
+    <div id="quest-log-overlay" class="note-preview-overlay" style="display: none; justify-content: flex-end; align-items: flex-start; background-color: rgba(0,0,0,0.1);">
+        <div class="note-preview-content" style="margin-top: 20px; margin-right: 20px; max-width: 400px; background-color: rgba(42, 49, 56, 0.7); backdrop-filter: blur(5px);">
+            <h3 id="quest-log-title" style="margin-top: 0;"></h3>
+            <h4>Completed Steps</h4>
+            <ul id="quest-log-completed-steps">
+            </ul>
+            <h4>Next Step</h4>
+            <div id="quest-log-next-step"></div>
         </div>
     </div>
 

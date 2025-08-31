@@ -11599,7 +11599,7 @@ function getDragAfterElement(container, y) {
             return;
         }
 
-        const completedSteps = quest.storySteps.filter(step => step.completed).map(step => step.title || 'Untitled Step');
+        const completedSteps = quest.storySteps.filter(step => step.completed).map(step => step.title);
         const nextStep = quest.storySteps.find(step => !step.completed);
 
         playerWindow.postMessage({
@@ -11608,7 +11608,7 @@ function getDragAfterElement(container, y) {
             quest: {
                 title: quest.name,
                 completedSteps: completedSteps,
-                nextStep: nextStep ? (nextStep.title || 'Untitled Step') : null
+                nextStep: nextStep ? nextStep.title : "All steps completed!"
             }
         }, '*');
     }
