@@ -9657,6 +9657,114 @@ function displayToast(messageElement) {
         });
     }
 
+function updateStoryBeatDetails(cardElement, selectedQuestId = null) {
+    const questTitleEl = document.getElementById('automation-quest-title');
+    const selectedStepsList = document.getElementById('automation-selected-steps-list');
+    const availableStepsContainer = document.getElementById('automation-available-steps');
+    const availableQuestsContainer = document.getElementById('automation-available-quests');
+
+    if (!questTitleEl || !selectedStepsList || !availableStepsContainer || !availableQuestsContainer) {
+        // The UI isn't built yet, so we can't update it.
+        return;
+    }
+
+    // Get linked data from the card
+    const linkedQuestId = parseInt(cardElement.dataset.linkedQuestId, 10);
+    let linkedSteps = JSON.parse(cardElement.dataset.linkedSteps || '[]'); // format: {questId, stepIndex}
+
+    const questToDisplayId = selectedQuestId || linkedQuestId;
+    const quest = quests.find(q => q.id === questToDisplayId);
+
+    // Render available quests
+    availableQuestsContainer.innerHTML = '';
+    if (quests.length > 0) {
+        quests.forEach(q => {
+            const questItem = document.createElement('div');
+            questItem.textContent = q.name;
+            questItem.className = 'available-note-item';
+            if (q.id === questToDisplayId) {
+                questItem.classList.add('selected');
+            }
+            questItem.addEventListener('click', () => {
+                // When a new quest is selected from the list, it becomes the linked quest.
+                cardElement.dataset.linkedQuestId = q.id;
+                // If the quest is different from the previously linked one, clear the selected steps.
+                if (q.id !== linkedQuestId) {
+                    cardElement.dataset.linkedSteps = '[]';
+                }
+                updateStoryBeatDetails(cardElement, q.id);
+            });
+            availableQuestsContainer.appendChild(questItem);
+        });
+    } else {
+        availableQuestsContainer.innerHTML = `<p class="sidebar-placeholder">No quests available.</p>`;
+    }
+
+    if (quest) {
+        questTitleEl.textContent = quest.name;
+
+        // Render selected steps
+        selectedStepsList.innerHTML = '';
+        // Filter to only show steps relevant to the currently displayed quest
+        const currentlySelectedSteps = linkedSteps.filter(step => step.questId === quest.id);
+        if (currentlySelectedSteps.length > 0) {
+            currentlySelectedSteps.forEach(linkedStep => {
+                const stepData = quest.storySteps[linkedStep.stepIndex];
+                if (stepData) {
+                    const stepItem = document.createElement('div');
+                    stepItem.className = 'encounter-participant-item'; // Reuse style
+                    stepItem.textContent = stepData.title || `Step ${linkedStep.stepIndex + 1}`;
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.className = 'remove-participant-btn'; // Reuse style
+                    removeBtn.addEventListener('click', () => {
+                        let allLinkedSteps = JSON.parse(cardElement.dataset.linkedSteps || '[]');
+                        allLinkedSteps = allLinkedSteps.filter(s => !(s.questId === linkedStep.questId && s.stepIndex === linkedStep.stepIndex));
+                        cardElement.dataset.linkedSteps = JSON.stringify(allLinkedSteps);
+                        updateStoryBeatDetails(cardElement, quest.id);
+                    });
+
+                    stepItem.appendChild(removeBtn);
+                    selectedStepsList.appendChild(stepItem);
+                }
+            });
+        } else {
+            selectedStepsList.innerHTML = `<p class="sidebar-placeholder">Select steps from the list below.</p>`;
+        }
+
+        // Render available steps for the selected quest
+        availableStepsContainer.innerHTML = '';
+        if (quest.storySteps && quest.storySteps.length > 0) {
+            quest.storySteps.forEach((step, index) => {
+                // Only show if not already selected for this quest
+                if (!currentlySelectedSteps.some(s => s.stepIndex === index)) {
+                    const stepItem = document.createElement('div');
+                    stepItem.textContent = step.title || `Step ${index + 1}`;
+                    stepItem.className = 'available-note-item';
+                    stepItem.addEventListener('click', () => {
+                        let allLinkedSteps = JSON.parse(cardElement.dataset.linkedSteps || '[]');
+                        // Add the new step, ensuring it's for the correct quest
+                        allLinkedSteps.push({ questId: quest.id, stepIndex: index });
+                        cardElement.dataset.linkedSteps = JSON.stringify(allLinkedSteps);
+                        updateStoryBeatDetails(cardElement, quest.id);
+                    });
+                    availableStepsContainer.appendChild(stepItem);
+                }
+            });
+            if (availableStepsContainer.children.length === 0) {
+                availableStepsContainer.innerHTML = `<p class="sidebar-placeholder">All steps for this quest have been selected.</p>`;
+            }
+        } else {
+            availableStepsContainer.innerHTML = `<p class="sidebar-placeholder">This quest has no story steps.</p>`;
+        }
+    } else {
+        questTitleEl.textContent = 'No Quest Selected';
+        selectedStepsList.innerHTML = `<p class="sidebar-placeholder">Select a quest first.</p>`;
+        availableStepsContainer.innerHTML = `<p class="sidebar-placeholder">Select a quest to see its steps.</p>`;
+    }
+}
+
 function displayCardDetails(cardElement) {
     const detailsSidebar = document.getElementById('details-sidebar');
     detailsSidebar.innerHTML = ''; // Clear previous content
@@ -10040,6 +10148,52 @@ function displayCardDetails(cardElement) {
             availableMapsContainer.appendChild(noMapsPlaceholder);
         }
         detailsSidebar.appendChild(availableMapsContainer);
+    } else if (cardElement.dataset.cardType === 'story_beat') {
+        // --- 1. Dynamic Quest Title ---
+        const questTitleEl = document.createElement('h3');
+        questTitleEl.id = 'automation-quest-title';
+        questTitleEl.textContent = 'No Quest Selected';
+        questTitleEl.style.color = '#e2e8f0';
+        detailsSidebar.appendChild(questTitleEl);
+
+        // --- 2. Selected Story Steps (Growing List) ---
+        const selectedStepsHeader = document.createElement('h4');
+        selectedStepsHeader.textContent = 'Selected Story Steps';
+        selectedStepsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(selectedStepsHeader);
+
+        const selectedStepsList = document.createElement('div');
+        selectedStepsList.id = 'automation-selected-steps-list';
+        selectedStepsList.className = 'available-notes-container'; // Reuse style
+        selectedStepsList.style.minHeight = '60px';
+        selectedStepsList.innerHTML = `<p class="sidebar-placeholder">Select steps from the list below.</p>`;
+        detailsSidebar.appendChild(selectedStepsList);
+
+        // --- 3. Available Quests ---
+        const availableQuestsHeader = document.createElement('h4');
+        availableQuestsHeader.textContent = 'Available Quests';
+        availableQuestsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(availableQuestsHeader);
+
+        const availableQuestsContainer = document.createElement('div');
+        availableQuestsContainer.id = 'automation-available-quests';
+        availableQuestsContainer.className = 'available-notes-container';
+        detailsSidebar.appendChild(availableQuestsContainer);
+
+        // --- 4. Available Story Steps ---
+        const availableStepsHeader = document.createElement('h4');
+        availableStepsHeader.textContent = 'Available Story Steps';
+        availableStepsHeader.style.marginTop = '20px';
+        detailsSidebar.appendChild(availableStepsHeader);
+
+        const availableStepsContainer = document.createElement('div');
+        availableStepsContainer.id = 'automation-available-steps';
+        availableStepsContainer.className = 'available-notes-container';
+        availableStepsContainer.innerHTML = `<p class="sidebar-placeholder">Select a quest to see its steps.</p>`;
+        detailsSidebar.appendChild(availableStepsContainer);
+
+        updateStoryBeatDetails(cardElement);
+
     } else if (cardElement.dataset.cardType === 'initiative' || cardElement.dataset.cardType === 'wander') {
         detailsSidebar.style.overflowY = 'auto';
         detailsSidebar.style.display = 'flex';
