@@ -10162,12 +10162,78 @@ function displayCardDetails(cardElement) {
         selectedStepsHeader.style.marginTop = '20px';
         detailsSidebar.appendChild(selectedStepsHeader);
 
+        const completeStepsButton = document.createElement('button');
+        completeStepsButton.textContent = 'Complete All Selected Steps';
+        completeStepsButton.id = 'automation-complete-steps-btn';
+        detailsSidebar.appendChild(completeStepsButton);
+
         const selectedStepsList = document.createElement('div');
         selectedStepsList.id = 'automation-selected-steps-list';
         selectedStepsList.className = 'available-notes-container'; // Reuse style
         selectedStepsList.style.minHeight = '60px';
         selectedStepsList.innerHTML = `<p class="sidebar-placeholder">Select steps from the list below.</p>`;
         detailsSidebar.appendChild(selectedStepsList);
+
+        completeStepsButton.addEventListener('click', () => {
+            const linkedQuestId = parseInt(cardElement.dataset.linkedQuestId, 10);
+            const linkedSteps = JSON.parse(cardElement.dataset.linkedSteps || '[]');
+            const interactionMode = cardElement.dataset.interactionMode;
+
+            if (!linkedQuestId || linkedSteps.length === 0) {
+                alert("No quest or steps are linked to this card.");
+                return;
+            }
+
+            const quest = quests.find(q => q.id === linkedQuestId);
+            if (!quest) {
+                alert("Linked quest not found!");
+                return;
+            }
+
+            // Mark all selected steps as complete
+            linkedSteps.forEach(linkedStepInfo => {
+                const step = quest.storySteps[linkedStepInfo.stepIndex];
+                if (step && !step.completed) {
+                    step.completed = true;
+                    addLogEntry({
+                        type: 'system',
+                        message: `${quest.name}: ${step.title || 'Unnamed step'} completed.`
+                    });
+                }
+            });
+
+            // Handle quest status automation
+            if (interactionMode === 'both') {
+                const completedFirstStep = linkedSteps.some(s => s.stepIndex === 0);
+                if (completedFirstStep && quest.questStatus === 'Available') {
+                    quest.questStatus = 'Active';
+                     addLogEntry({
+                        type: 'system',
+                        message: `${quest.name} is now Active.`
+                    });
+                }
+
+                // Check if all steps of the entire quest are now complete
+                const allStepsAreNowComplete = quest.storySteps.every(s => s.completed);
+                if (allStepsAreNowComplete && quest.questStatus !== 'Completed') {
+                     quest.questStatus = 'Completed';
+                     addLogEntry({
+                        type: 'system',
+                        message: `${quest.name} has been Completed.`
+                    });
+                }
+            }
+
+            // Refresh UIs
+            updateStoryBeatDetails(cardElement, quest.id); // Refresh sidebar
+            renderCards();
+            drawConnections();
+            renderActiveQuestsInFooter();
+            // Also refresh the main quest editor if it's open for this quest
+            if(activeOverlayCardId === quest.id) {
+                populateAndShowStoryBeatCard(quest);
+            }
+        });
 
         // --- 3. Available Quests ---
         const availableQuestsHeader = document.createElement('h4');
