@@ -11606,9 +11606,15 @@ function getDragAfterElement(container, y) {
             return step.text || step.title || '';
         };
 
-        const completedSteps = quest.storySteps.filter(step => step && step.completed).map(getStepDescription);
+        const getPlayerStepDescription = (step) => {
+            if (!step) return '';
+            if (typeof step === 'string') return step; // Backward compatibility
+            return step.title || step.text || '';
+        };
+
+        const completedSteps = quest.storySteps.filter(step => step && step.completed).map(getPlayerStepDescription);
         const nextStepObject = quest.storySteps.find(step => step && !step.completed);
-        const nextStep = nextStepObject ? getStepDescription(nextStepObject) : "All steps completed!";
+        const nextStep = nextStepObject ? getPlayerStepDescription(nextStepObject) : "All steps completed!";
 
         playerWindow.postMessage({
             type: 'updateQuestOverlay',
