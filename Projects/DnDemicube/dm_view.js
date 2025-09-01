@@ -2419,6 +2419,7 @@ function getTightBoundingBox(img) {
 
             const newAssetOverlay = {
                 type: 'placedAsset',
+                id: Date.now() + Math.random(), // Unique ID for the asset
                 path: selectedAssetPath,
                 position: assetCenter,
                 width: assetW,
@@ -2430,6 +2431,10 @@ function getTightBoundingBox(img) {
 
             if (!selectedMapData.overlays) selectedMapData.overlays = [];
             selectedMapData.overlays.push(newAssetOverlay);
+
+            if (isAutoShadowActive) {
+                applyOrUpdateAutoShadow(newAssetOverlay);
+            }
 
             const rotatedEndOffsetX = (localEnd.x * Math.cos(newAssetRotation) - localEnd.y * Math.sin(newAssetRotation)) * assetScale;
             const rotatedEndOffsetY = (localEnd.x * Math.sin(newAssetRotation) + localEnd.y * Math.cos(newAssetRotation)) * assetScale;
@@ -3968,6 +3973,7 @@ function getTightBoundingBox(img) {
 
             if (pixelPoints.length > 2) {
                 const hullPoints = getConvexHull(pixelPoints);
+                hullPoints.reverse(); // Ensure clockwise winding for the lighting engine.
 
                 const assetScale = asset.scale || 1;
                 const assetRotation = asset.rotation || 0;
