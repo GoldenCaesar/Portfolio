@@ -25,6 +25,39 @@ document.addEventListener('DOMContentLoaded', () => {
         return mod >= 0 ? '+' + mod : mod;
     }
 
+    // --- Convex Hull Algorithm (Monotone Chain) ---
+    // Adapted from https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain
+    function crossProduct(p1, p2, p3) {
+        return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+    }
+
+    function getConvexHull(points) {
+        if (points.length <= 3) return points;
+
+        points.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+
+        const lowerHull = [];
+        for (const p of points) {
+            while (lowerHull.length >= 2 && crossProduct(lowerHull[lowerHull.length - 2], lowerHull[lowerHull.length - 1], p) <= 0) {
+                lowerHull.pop();
+            }
+            lowerHull.push(p);
+        }
+
+        const upperHull = [];
+        for (let i = points.length - 1; i >= 0; i--) {
+            const p = points[i];
+            while (upperHull.length >= 2 && crossProduct(upperHull[upperHull.length - 2], upperHull[upperHull.length - 1], p) <= 0) {
+                upperHull.pop();
+            }
+            upperHull.push(p);
+        }
+
+        lowerHull.pop();
+        upperHull.pop();
+        return lowerHull.concat(upperHull);
+    }
+
     const saveCampaignModal = document.getElementById('save-campaign-modal');
     const saveCampaignModalCloseButton = document.getElementById('save-campaign-modal-close-button');
     const confirmSaveButton = document.getElementById('confirm-save-button');
@@ -90,6 +123,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetChainPointsSlider = document.getElementById('asset-chain-points');
     const assetChainStartPoint = document.getElementById('asset-chain-start-point');
     const assetChainEndPoint = document.getElementById('asset-chain-end-point');
+    const autoShadowContainer = document.getElementById('auto-shadow-container');
+    const autoShadowCheckbox = document.getElementById('auto-shadow-checkbox');
+    const autoShadowModeToggle = document.getElementById('auto-shadow-mode-toggle');
+    const autoShadowWallLabel = document.getElementById('auto-shadow-wall-label');
+    const autoShadowObjectLabel = document.getElementById('auto-shadow-object-label');
     const footerAssetsTab = document.querySelector('[data-tab="footer-assets"]');
     const footerAssetsContent = document.getElementById('footer-assets');
 
@@ -358,6 +396,8 @@ let lastStampedAssetEndpoint = null;
     let isDraggingAsset = false;
     let draggedAssetInfo = null; // { initialAsset, initialMouseCoords }
 let assetBoundingBoxCache = {};
+let isAutoShadowActive = false;
+let autoShadowMode = 'wall'; // 'wall' or 'object'
     let lastX = 0;
     let lastY = 0;
     let lineStartPoint = null; // For door tool
@@ -1183,10 +1223,16 @@ function getTightBoundingBox(img) {
 
     if (assetChainPointsSlider) {
         assetChainPointsSlider.addEventListener('input', (e) => {
-            const sliderValue = parseInt(e.target.value, 10); // 0-100
-            // Map 0-100 to 0-2PI
+            const sliderValue = parseInt(e.target.value, 10);
             chainPointsAngle = (sliderValue / 100) * 2 * Math.PI;
             updateChainPointsVisuals();
+
+            // If an asset is selected and auto-shadow wall mode is on, update the shadow
+            if (isAutoShadowActive && autoShadowMode === 'wall' && selectedPlacedAssets.length > 0) {
+                selectedPlacedAssets.forEach(asset => {
+                    applyOrUpdateAutoShadow(asset);
+                });
+            }
         });
     }
 
@@ -2572,10 +2618,11 @@ function getTightBoundingBox(img) {
 
             const newAssetOverlay = {
                 type: 'placedAsset',
+                id: Date.now() + Math.random(), // Unique ID for the asset
                 path: selectedAssetPath,
                 position: imageCoords,
-                width: assetWidth, // Use natural width
-                height: assetHeight, // Use natural height
+                width: assetWidth,
+                height: assetHeight,
                 scale: finalScale,
                 rotation: currentAssetPreviewTransform.rotation,
                 opacity: currentAssetPreviewTransform.opacity
@@ -2586,9 +2633,14 @@ function getTightBoundingBox(img) {
             }
             selectedMapData.overlays.push(newAssetOverlay);
 
-            // Redraw the map to show the newly placed asset
+            // If auto-shadow is active, create the shadow for the new asset
+            if (isAutoShadowActive) {
+                applyOrUpdateAutoShadow(newAssetOverlay);
+            }
+
+            // Redraw the map to show the newly placed asset and its shadow
             displayMapOnCanvas(selectedMapFileName);
-            return; // Stamping is an exclusive action, so we stop here.
+            return; // Stamping is an exclusive action.
         }
 
         if (imageCoords && initiativeTokens.length > 0) {
@@ -3279,6 +3331,39 @@ function getTightBoundingBox(img) {
         });
     }
 
+    if (autoShadowCheckbox) {
+        autoShadowCheckbox.addEventListener('change', () => {
+            isAutoShadowActive = autoShadowCheckbox.checked;
+            // If an asset is selected, apply/remove shadow immediately
+            if (selectedPlacedAssets.length > 0) {
+                selectedPlacedAssets.forEach(asset => {
+                    if (isAutoShadowActive) {
+                        applyOrUpdateAutoShadow(asset);
+                    } else {
+                        removeAutoShadow(asset);
+                    }
+                });
+            }
+            updateAssetPreview(); // To show/hide chain points slider
+        });
+    }
+
+    if (autoShadowModeToggle) {
+        autoShadowModeToggle.addEventListener('change', () => {
+            autoShadowMode = autoShadowModeToggle.checked ? 'object' : 'wall';
+            autoShadowWallLabel.classList.toggle('active', autoShadowMode === 'wall');
+            autoShadowObjectLabel.classList.toggle('active', autoShadowMode === 'object');
+
+            // If auto-shadow is active and an asset is selected, switch the shadow type
+            if (isAutoShadowActive && selectedPlacedAssets.length > 0) {
+                 selectedPlacedAssets.forEach(asset => {
+                    applyOrUpdateAutoShadow(asset);
+                });
+            }
+            updateAssetPreview(); // To show/hide chain points slider
+        });
+    }
+
     if (assetPreviewOpacitySlider) {
         assetPreviewOpacitySlider.addEventListener('input', (e) => {
             const opacity = parseFloat(e.target.value);
@@ -3307,7 +3392,12 @@ function getTightBoundingBox(img) {
             if (activeAssetTool === 'select' && selectedPlacedAssets.length > 0) {
                 const selectedMapData = detailedMapData.get(selectedMapFileName);
                 if (selectedMapData && selectedMapData.overlays) {
+                    // Remove associated shadows first
+                    selectedPlacedAssets.forEach(asset => removeAutoShadow(asset));
+
+                    // Now remove the assets themselves
                     selectedMapData.overlays = selectedMapData.overlays.filter(o => !selectedPlacedAssets.includes(o));
+
                     selectedPlacedAssets = [];
                     updateAssetPreview();
                     displayMapOnCanvas(selectedMapFileName);
@@ -3822,6 +3912,100 @@ function getTightBoundingBox(img) {
         event.target.value = ''; // Reset input
     }
 
+    function applyOrUpdateAutoShadow(asset) {
+        if (!asset || !asset.id || !selectedMapFileName) return;
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData) return;
+
+        // First, remove any existing auto-shadow for this asset
+        removeAutoShadow(asset);
+
+        const assetImage = assetImageCache[asset.path];
+        if (!assetImage || !assetImage.complete || assetImage.naturalWidth === 0) {
+            // If the image isn't loaded, try again in a moment.
+            setTimeout(() => applyOrUpdateAutoShadow(asset), 100);
+            return;
+        }
+
+        if (autoShadowMode === 'wall') {
+            const { startPoint: localStart, endPoint: localEnd } = getChainPoints(assetImage, chainPointsAngle);
+
+            const assetScale = asset.scale || 1;
+            const assetRotation = asset.rotation || 0;
+            const cos = Math.cos(assetRotation);
+            const sin = Math.sin(assetRotation);
+
+            const transformPoint = (localPoint) => {
+                const rotatedX = (localPoint.x * cos - localPoint.y * sin) * assetScale;
+                const rotatedY = (localPoint.x * sin + localPoint.y * cos) * assetScale;
+                return { x: asset.position.x + rotatedX, y: asset.position.y + rotatedY };
+            };
+
+            const wallStartPoint = transformPoint(localStart);
+            const wallEndPoint = transformPoint(localEnd);
+
+            const newWall = { type: 'wall', points: [wallStartPoint, wallEndPoint], autoShadowParentId: asset.id };
+            mapData.overlays.push(newWall);
+
+        } else { // 'object' mode
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = assetImage.naturalWidth;
+            tempCanvas.height = assetImage.naturalHeight;
+            tempCtx.drawImage(assetImage, 0, 0);
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const pixelPoints = [];
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                if (imageData.data[i + 3] > 0) { // Check alpha channel
+                    const x = (i / 4) % tempCanvas.width;
+                    const y = Math.floor((i / 4) / tempCanvas.width);
+                    pixelPoints.push({ x, y });
+                }
+            }
+
+            if (pixelPoints.length > 2) {
+                const hullPoints = getConvexHull(pixelPoints);
+
+                const assetScale = asset.scale || 1;
+                const assetRotation = asset.rotation || 0;
+                const cos = Math.cos(assetRotation);
+                const sin = Math.sin(assetRotation);
+                const assetCenterX = assetImage.naturalWidth / 2;
+                const assetCenterY = assetImage.naturalHeight / 2;
+
+                const transformedHull = hullPoints.map(p => {
+                    const localX = (p.x - assetCenterX);
+                    const localY = (p.y - assetCenterY);
+                    const rotatedX = (localX * cos - localY * sin) * assetScale;
+                    const rotatedY = (localX * sin + localY * cos) * assetScale;
+                    return { x: asset.position.x + rotatedX, y: asset.position.y + rotatedY };
+                });
+
+                const newPolygon = { type: 'smart_object', polygon: transformedHull, autoShadowParentId: asset.id };
+                mapData.overlays.push(newPolygon);
+            }
+        }
+
+        isLightMapDirty = true;
+        drawOverlays(mapData.overlays);
+    }
+
+    function removeAutoShadow(asset) {
+        if (!asset || !asset.id) return;
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.overlays) return;
+
+        const initialOverlayCount = mapData.overlays.length;
+        mapData.overlays = mapData.overlays.filter(o => o.autoShadowParentId !== asset.id);
+
+        if (mapData.overlays.length < initialOverlayCount) {
+            console.log(`Removed auto-shadow for asset ID: ${asset.id}`);
+            isLightMapDirty = true;
+            drawOverlays(mapData.overlays);
+        }
+    }
+
     function updateAssetPreview(assetToPreview = null) {
         selectedAssetForPreview = null;
 
@@ -3833,7 +4017,7 @@ function getTightBoundingBox(img) {
 
         const assetData = assetToPreview || findAssetByPath(selectedAssetPath);
 
-        if (isAssetsMode && assetData && currentMapDisplayData.img) { // Added check for map image
+        if (isAssetsMode && assetData && currentMapDisplayData.img) {
             const assetUrl = assetData.url || findAssetByPath(assetData.path)?.url;
             if (!assetUrl) {
                 assetPreviewContainer.style.display = 'none';
@@ -3841,37 +4025,29 @@ function getTightBoundingBox(img) {
             }
 
             assetPreviewContainer.style.display = 'block';
+            autoShadowContainer.style.display = 'flex';
             assetPreviewImage.src = assetUrl;
 
             assetPreviewImage.onload = () => {
                 const assetWidth = assetPreviewImage.naturalWidth;
                 const assetHeight = assetPreviewImage.naturalHeight;
 
-                if (assetWidth === 0) return; // Avoid division by zero if image fails to load properly
+                if (assetWidth === 0) return;
 
-                // Determine the asset's base scale factor
                 let assetScale;
                 if (assetToPreview) {
-                    // Use the scale of the asset already placed on the map
                     assetScale = assetToPreview.scale || 1;
                 } else {
-                    // Calculate the default scale for a new asset from the footer
                     const defaultSize = currentMapDisplayData.imgWidth * 0.05;
                     const longestDim = Math.max(assetWidth, assetHeight);
                     assetScale = longestDim > 0 ? defaultSize / longestDim : 1;
                 }
 
-                // Get the map's zoom-to-fit ratio
                 const fitRatio = currentMapDisplayData.ratio;
-
-                // Calculate the final size for the preview image
                 const previewWidth = assetWidth * assetScale * fitRatio;
-
                 assetPreviewImage.style.width = `${previewWidth}px`;
                 assetPreviewImage.style.height = 'auto';
 
-
-                // Handle rotation separately from scale
                 const { rotation, opacity } = currentAssetPreviewTransform;
                 assetPreviewImage.style.transform = `rotate(${rotation}rad)`;
                 assetPreviewImage.style.opacity = opacity;
@@ -3879,7 +4055,8 @@ function getTightBoundingBox(img) {
                 if (assetPreviewOpacitySlider) assetPreviewOpacitySlider.value = opacity;
                 if (assetPreviewOpacityValue) assetPreviewOpacityValue.textContent = opacity.toFixed(1);
 
-                if (activeAssetTool === 'chain') {
+                const showChainSlider = (activeAssetTool === 'chain') || (isAutoShadowActive && autoShadowMode === 'wall');
+                if (showChainSlider) {
                     updateChainPointsVisuals();
                 }
             };
@@ -3890,19 +4067,18 @@ function getTightBoundingBox(img) {
             const path = assetData.path || selectedAssetPath;
             assetPreviewTitle.textContent = path.substring(path.lastIndexOf('/') + 1);
 
-            // Chain points logic (needs to be outside onload to show immediately)
+            const showChainSlider = (activeAssetTool === 'chain') || (isAutoShadowActive && autoShadowMode === 'wall');
             if (assetChainPointsSliderContainer && assetChainStartPoint && assetChainEndPoint) {
-                const isChainActive = activeAssetTool === 'chain';
-                assetChainPointsSliderContainer.style.display = isChainActive ? 'block' : 'none';
-                assetChainStartPoint.style.display = isChainActive ? 'block' : 'none';
-                assetChainEndPoint.style.display = isChainActive ? 'block' : 'none';
+                assetChainPointsSliderContainer.style.display = showChainSlider ? 'block' : 'none';
+                assetChainStartPoint.style.display = showChainSlider ? 'block' : 'none';
+                assetChainEndPoint.style.display = showChainSlider ? 'block' : 'none';
             }
 
         } else {
-            // No asset selected or no map loaded, hide the preview.
             assetPreviewContainer.style.display = 'none';
+            if (autoShadowContainer) autoShadowContainer.style.display = 'none';
             assetPreviewImage.src = '';
-            assetPreviewImage.style.width = 'auto'; // Reset style
+            assetPreviewImage.style.width = 'auto';
             assetPreviewImage.style.height = 'auto';
             assetPreviewImage.style.transform = 'none';
             assetPreviewTitle.textContent = '';
