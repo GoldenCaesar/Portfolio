@@ -10838,6 +10838,7 @@ function getDragAfterElement(container, y) {
 
             const stepRows = document.querySelectorAll('.story-step-row');
             questToUpdate.storySteps = Array.from(stepRows).map(row => ({
+                title: row.querySelector('.story-step-title').innerText,
                 text: row.querySelector('.story-step-text').innerText,
                 completed: row.querySelector('.story-step-checkbox').checked
             }));
@@ -11510,10 +11511,10 @@ function getDragAfterElement(container, y) {
 
                     if (isChecked && questToUpdate.questStatus === 'Active') {
                         const step = questToUpdate.storySteps[stepIndex];
-                        const stepTitle = step.title ?? (typeof step === 'string' ? step : step.text);
+                        const stepTitle = step.title || 'Unnamed step';
                         addLogEntry({
                             type: 'system',
-                            message: `${questToUpdate.name} ${stepTitle}`
+                            message: `${questToUpdate.name}: ${stepTitle} completed.`
                         });
                     }
 
@@ -11598,13 +11599,6 @@ function getDragAfterElement(container, y) {
             playerWindow.postMessage({ type: 'toggleQuestOverlay', visible: false }, '*');
             return;
         }
-
-        const getStepDescription = (step) => {
-            if (!step) return '';
-            if (typeof step === 'string') return step; // Backward compatibility
-            // The DM sees the `text` as the main description, so the player should too.
-            return step.text || step.title || '';
-        };
 
         const getPlayerStepDescription = (step) => {
             if (!step) return '';
