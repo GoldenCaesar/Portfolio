@@ -11599,16 +11599,24 @@ function getDragAfterElement(container, y) {
             return;
         }
 
-        const completedSteps = quest.storySteps.filter(step => step.completed).map(step => step.title);
-        const nextStep = quest.storySteps.find(step => !step.completed);
+        const getStepDescription = (step) => {
+            if (!step) return '';
+            if (typeof step === 'string') return step; // Backward compatibility
+            // The DM sees the `text` as the main description, so the player should too.
+            return step.text || step.title || '';
+        };
+
+        const completedSteps = quest.storySteps.filter(step => step && step.completed).map(getStepDescription);
+        const nextStepObject = quest.storySteps.find(step => step && !step.completed);
+        const nextStep = nextStepObject ? getStepDescription(nextStepObject) : "All steps completed!";
 
         playerWindow.postMessage({
             type: 'updateQuestOverlay',
             visible: isQuestLogVisible,
             quest: {
                 title: quest.name,
-                completedSteps: completedSteps,
-                nextStep: nextStep ? nextStep.title : "All steps completed!"
+                completedSteps: completedSteps, // This is now an array of strings
+                nextStep: nextStep // This is now a string
             }
         }, '*');
     }
