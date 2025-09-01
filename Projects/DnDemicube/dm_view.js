@@ -3376,10 +3376,12 @@ function getTightBoundingBox(img) {
                 assetPreviewImage.style.opacity = opacity;
             }
 
-            // If an asset is selected on the map, update its opacity value directly
-            if (activeAssetTool === 'select' && selectedPlacedAsset) {
-                selectedPlacedAsset.opacity = opacity;
-                // Redraw the canvas to show the change on the placed asset immediately
+            // If assets are selected on the map, update their opacity value directly
+            if (activeAssetTool === 'select' && selectedPlacedAssets.length > 0) {
+                selectedPlacedAssets.forEach(asset => {
+                    asset.opacity = opacity;
+                });
+                // Redraw the canvas to show the change on the placed assets immediately
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName);
                 }
