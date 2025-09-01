@@ -280,20 +280,17 @@
             </div>
         </div>
     </div>
-    <div id="quest-log-overlay" class="note-preview-overlay" style="display: none;">
-        <div class="relative flex size-full min-h-screen flex-col justify-between bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBieqxr2hCqD3URHpTIioFFm9sBDpknCGRDaim_vcH335eOl2rkuN4sD3oRpehdB6GjGw-X_xC-EAvFnKfyvhMG_TLF-DV9Kf0COpsWT9RigKcrGKRgbmZWQuMtONoZ5wWDeJgBcMMT61sDxSbFyR1b2Hva_rx0MEz0y_IlFI8FVKldUrWiVEpHh-zIoId2yS-WaohU7e7Q2DwO_2G67Z6n34l-HJTXedyILxPBdFqh3eYvlYmjwK_D9R99t9ORUfb88RsMcF5_rhg');">
-            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-            <div class="relative z-10 flex flex-col h-full w-full max-w-2xl mx-auto">
-                <header class="flex items-center p-4 border-b border-border-color/50">
-                    <h1 class="fantasy-title text-2xl text-center flex-1 text-primary-gold">Quest Log</h1>
-                </header>
-                <main class="flex-grow p-6 text-text-light">
-                    <h2 id="quest-title" class="fantasy-title text-3xl text-primary-gold mb-6 text-center"></h2>
-                    <div id="quest-steps-container" class="space-y-4">
-                        <!-- Quest steps will be dynamically populated here by player_view.js -->
-                    </div>
-                </main>
-            </div>
+    <div id="quest-log-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.3); display: none; justify-content: flex-end; align-items: flex-start; z-index: 1002;">
+        <div class="relative z-10 flex flex-col h-auto w-full max-w-sm bg-paper-bg/90 backdrop-blur-sm rounded-lg border border-border-color m-5 text-text-light">
+            <header class="flex items-center p-4 border-b border-border-color/50">
+                <h1 class="fantasy-title text-2xl text-center flex-1 text-primary-gold">Quest Log</h1>
+            </header>
+            <main class="flex-grow p-6">
+                <h2 id="quest-title" class="fantasy-title text-3xl text-primary-gold mb-6 text-center"></h2>
+                <div id="quest-steps-container" class="space-y-4">
+                    <!-- Quest steps will be dynamically populated here by player_view.js -->
+                </div>
+            </main>
         </div>
     </div>
 
