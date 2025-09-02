@@ -202,6 +202,133 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const rollsList = document.getElementById('character-sheet-rolls-list');
+    const addRollNameInput = document.getElementById('character-sheet-add-roll-name');
+    const addRollTagsSelect = document.getElementById('character-sheet-add-roll-tags');
+    const diceButtonsContainer = document.getElementById('character-sheet-dice-buttons');
+    const addRollModifierInput = document.getElementById('character-sheet-add-roll-modifier');
+    const saveRollBtn = document.getElementById('character-sheet-save-roll-btn');
+
+    let characterSavedRolls = [];
+    const sheetDiceCounts = {};
+
+    function formatDiceString(dice, modifier) {
+        let parts = [];
+        for (const die in dice) {
+            if (dice[die] > 0) {
+                parts.push(`${dice[die]}${die}`);
+            }
+        }
+        let str = parts.join(' + ');
+        if (modifier > 0) {
+            str += ` + ${modifier}`;
+        } else if (modifier < 0) {
+            str += ` - ${Math.abs(modifier)}`;
+        }
+        return str;
+    }
+
+    function renderSavedRolls() {
+        rollsList.innerHTML = '';
+        if (characterSavedRolls && characterSavedRolls.length > 0) {
+            characterSavedRolls.forEach((roll, index) => {
+                const li = document.createElement('li');
+                const diceString = formatDiceString(roll.dice, roll.modifier);
+                li.innerHTML = `
+                    <span class="roll-name">${roll.name} (${diceString})</span>
+                    <div class="roll-actions">
+                        <button class="roll-btn" data-action="roll" data-index="${index}">Roll</button>
+                        <button class="delete-roll-btn" data-action="delete" data-index="${index}">Del</button>
+                    </div>
+                `;
+                rollsList.appendChild(li);
+            });
+        }
+    }
+
+    function updateCompactDiceDisplay() {
+        const buttons = diceButtonsContainer.querySelectorAll('.dice-button-compact');
+        buttons.forEach(button => {
+            const die = button.dataset.die;
+            const count = sheetDiceCounts[die] || 0;
+            const countSpan = button.querySelector('.dice-count');
+            if (countSpan) {
+                countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    if (diceButtonsContainer) {
+        diceButtonsContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die) {
+                sheetDiceCounts[die] = (sheetDiceCounts[die] || 0) + 1;
+                updateCompactDiceDisplay();
+            }
+        });
+
+        diceButtonsContainer.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die && sheetDiceCounts[die] > 0) {
+                sheetDiceCounts[die]--;
+                updateCompactDiceDisplay();
+            }
+        });
+    }
+
+    if (saveRollBtn) {
+        saveRollBtn.addEventListener('click', () => {
+            const rollName = addRollNameInput.value.trim();
+            if (!rollName) {
+                alert('Please enter a name for the roll.');
+                return;
+            }
+            const hasDice = Object.values(sheetDiceCounts).some(count => count > 0);
+            if (!hasDice) {
+                alert('Please select at least one die to save.');
+                return;
+            }
+            const newRoll = {
+                name: rollName,
+                dice: { ...sheetDiceCounts },
+                modifier: parseInt(addRollModifierInput.value, 10) || 0,
+                tags: [addRollTagsSelect.value]
+            };
+
+            window.parent.postMessage({ type: 'saveCharacterRoll', roll: newRoll }, '*');
+
+            // Reset form
+            addRollNameInput.value = '';
+            for (const die in sheetDiceCounts) {
+                sheetDiceCounts[die] = 0;
+            }
+            updateCompactDiceDisplay();
+            addRollModifierInput.value = '0';
+        });
+    }
+
+    if (rollsList) {
+        rollsList.addEventListener('click', (event) => {
+            const button = event.target;
+            const action = button.dataset.action;
+            const index = parseInt(button.dataset.index, 10);
+
+            if (!action || isNaN(index)) return;
+
+            if (action === 'delete') {
+                window.parent.postMessage({ type: 'deleteCharacterRoll', index: index }, '*');
+            } else if (action === 'roll') {
+                const savedRoll = characterSavedRolls[index];
+                window.parent.postMessage({ type: 'characterSheetRoll', rollData: savedRoll }, '*');
+            }
+        });
+    }
+
     window.addEventListener('message', function(event) {
         if (event.data.type === 'loadCharacterSheet') {
             clearSheetFields();
@@ -232,6 +359,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (visionCheckbox) {
                 visionCheckbox.checked = typeof data.vision === 'boolean' ? data.vision : true;
             }
+            characterSavedRolls = data.savedRolls || [];
+            renderSavedRolls();
         } else if (event.data.type === 'characterVisionChange_from_dm') {
             if (visionCheckbox) {
                 visionCheckbox.checked = event.data.vision;
@@ -256,6 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (portraitPreview.style.display !== 'none') {
                 sheetData['character_portrait'] = portraitPreview.src;
             }
+            sheetData.savedRolls = characterSavedRolls;
             window.parent.postMessage({ type: 'saveCharacterSheet', data: sheetData }, '*');
         } else if (event.data.type === 'clearCharacterSheet') {
             clearSheetFields();
@@ -283,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (portraitPreview.style.display !== 'none') {
                 sheetData['character_portrait'] = portraitPreview.src;
             }
+             sheetData.savedRolls = characterSavedRolls;
 
             window.parent.postMessage({ type: 'sheetDataForView', data: sheetData }, '*');
         }

@@ -1,116 +1,97 @@
+import asyncio
 import os
-import time
-from playwright.sync_api import sync_playwright, Page, expect
+from playwright.async_api import async_playwright, expect
 
-def run_verification(page: Page):
-    """
-    This script verifies three bug fixes for the DnDemicube application.
-    """
-    # Get the absolute path to the HTML file
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    dm_view_path = os.path.join(base_dir, 'Projects', 'DnDemicube', 'dm_view.html')
+async def main():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
 
-    # Use file:// protocol to open the local HTML file
-    page.goto(f'file://{dm_view_path}')
+        try:
+            # Construct the absolute path to the HTML file
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            repo_root = os.path.abspath(os.path.join(script_dir, '..', '..'))
+            dm_view_path = os.path.join(repo_root, 'Projects', 'DnDemicube', 'dm_view.html')
 
-    # Wait for the page to load by looking for a known element
-    expect(page.get_by_text("Manage Maps")).to_be_visible()
+            # Navigate to the local DM view file
+            await page.goto(f"file://{dm_view_path}")
 
-    # 1. Upload a map to enable the tools
-    with page.expect_file_chooser() as fc_info:
-        page.get_by_label("Upload Map Files:").click()
+            # Wait for the page to load by looking for a known element
+            await expect(page.get_by_text("Manage Maps")).to_be_visible()
+            print("Found 'Manage Maps' text.")
+            await page.wait_for_timeout(1000) # 1 second delay
 
-    map_asset_path = os.path.join(base_dir, 'Projects', 'DnDemicube', 'assets', 'd20icon.png')
-    fc_info.value.set_files(map_asset_path)
+            # --- Verification for Synced Rolls ---
 
-    # 2. Click on the map to display it
-    page.get_by_text("d20icon.png").first.click()
-    time.sleep(1) # Give canvas time to draw
+            # 1. Click the Characters tab to make the "Add Character" button visible
+            await page.get_by_role("button", name="Characters").click()
 
-    # 3. Switch to assets tool
-    page.locator("#map-container").click(button="right")
-    page.locator("#map-tools-context-menu").get_by_text("Assets").click()
-    time.sleep(1)
+            # 2. Add a new character
+            await page.get_by_role("button", name="Add Character").click()
+            await page.locator("#character-name-input").fill("Briv")
+            await page.get_by_role("button", name="Save Character").click()
+            print("Character 'Briv' created.")
+            await page.wait_for_timeout(1000)
 
-    # 4. Upload assets
-    assets_folder_path = os.path.join(base_dir, 'Projects', 'DnDemicube', 'assets')
-    # The input is hidden, but the button click should trigger it.
-    # We set the files on the input directly.
-    page.locator("#assets-folder-input").set_files([
-        os.path.join(assets_folder_path, 'd20icon.png'),
-        os.path.join(assets_folder_path, 'default-portrait.png')
-    ])
-    time.sleep(1)
+            # 3. Select the character in the list to show the editor
+            await page.get_by_role("listitem").filter(has_text="Briv").click()
 
-    # --- Verification 1: Select Tool Resizing ---
+            # 4. Open the character sheet
+            await page.get_by_role("button", name="View Character").click()
 
-    # 5. Click the asset to select it for stamping
-    page.locator('.asset-item', has_text='default-portrait.png').click()
+            # The character sheet is in an iframe, so we need to get the frame
+            iframe = page.frame_locator("#character-sheet-iframe")
 
-    # 6. Activate stamp tool and place the asset
-    page.locator('#btn-assets-stamp').click()
-    page.locator('#dm-canvas').click(position={'x': 200, 'y': 200})
-    time.sleep(1)
+            # 5. Add a roll in the character sheet
+            await iframe.get_by_label("Roll Name").fill("Axe Swing")
+            await iframe.get_by_role("button", name="d20").click()
+            await iframe.get_by_label("Modifier").fill("5")
+            await iframe.get_by_role("button", name="Save Roll").click()
 
-    # 7. Activate select tool and click the asset to select it
-    page.locator('#btn-assets-select').click()
-    page.locator('#dm-canvas').click(position={'x': 200, 'y': 200})
-    time.sleep(1)
+            # 6. Verify the roll exists in the character sheet
+            await expect(iframe.get_by_text("Axe Swing (1d20 + 5)")).to_be_visible()
+            await page.screenshot(path="jules-scratch/verification/01_roll_in_character_sheet.png")
 
-    # 8. Drag a resize handle. The bug was that this was ignored.
-    # We will drag from a corner of the canvas where the handle should be.
-    canvas_box = page.locator('#dm-canvas').bounding_box()
-    # Position of the asset + an offset for the handle
-    handle_x = canvas_box['x'] + 200 + 30
-    handle_y = canvas_box['y'] + 200 + 30
+            # 7. Go back to the main DM view
+            await page.get_by_role("button", name="DM Controls").click()
 
-    page.mouse.move(handle_x, handle_y)
-    page.mouse.down()
-    page.mouse.move(handle_x + 50, handle_y + 50, steps=5)
-    page.mouse.up()
+            # Open the token stat block by right-clicking the character in the list
+            await page.get_by_role("listitem").filter(has_text="Briv").click(button="right")
 
-    page.screenshot(path="jules-scratch/verification/verification_select_tool.png")
-    print("Screenshot for select tool taken.")
+            await expect(page.get_by_text("Axe Swing (1d20 + 5)")).to_be_visible()
+            await page.screenshot(path="jules-scratch/verification/02_roll_in_token_menu.png")
 
-    # --- Verification 2: Favorites Folder ---
-
-    # 9. Favorite the asset
-    page.locator('.asset-item', has_text='default-portrait.png').locator('.asset-favorite-btn').click()
-
-    # 10. Click on the "Favorites" folder
-    page.locator('.asset-item', has_text='Favorites').click()
-
-    # 11. Check if the favorited asset is visible
-    expect(page.locator('.asset-item', has_text='default-portrait.png')).to_be_visible()
-
-    page.screenshot(path="jules-scratch/verification/verification_favorites.png")
-    print("Screenshot for favorites folder taken.")
-
-    # --- Verification 3: Chain Tool Preview ---
-
-    # 12. Go back to the root asset folder
-    page.locator('#asset-path-display a').click()
-
-    # 13. Select the asset for chaining
-    page.locator('.asset-item', has_text='default-portrait.png').click()
-
-    # 14. Activate chain tool
-    page.locator('#btn-assets-chain').click()
-
-    # 15. Move mouse to a position on the canvas to show the preview
-    page.locator('#dm-canvas').hover(position={'x': 300, 'y': 300})
-    time.sleep(1) # Wait for preview to render
-
-    page.screenshot(path="jules-scratch/verification/verification_chain_tool.png")
-    print("Screenshot for chain tool taken.")
+            # Close the context menu
+            await page.keyboard.press("Escape")
 
 
-def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        run_verification(page)
-        browser.close()
+            # --- Verification for Unique Initiative Tokens ---
 
-if __name__ == "__main__":
-    main()
+            # 6. Add the same character to initiative multiple times
+            await page.get_by_role("button", name="Open Initiative Tracker").click()
+
+            # Add Briv once
+            await page.get_by_role("listitem").filter(has_text="Briv").locator("h4").click()
+
+            # Add Briv a second time
+            await page.get_by_role("listitem").filter(has_text="Briv").locator("h4").click()
+
+            # Add Briv a third time
+            await page.get_by_role("listitem").filter(has_text="Briv").locator("h4").click()
+
+            # 7. Verify the names in the active initiative list
+            active_list = page.locator("#initiative-active-list")
+            await expect(active_list.get_by_text("Briv", exact=True)).to_have_count(1)
+            await expect(active_list.get_by_text("Token Briv")).to_have_count(2)
+
+            await page.locator("#initiative-tracker-overlay").screenshot(path="jules-scratch/verification/03_unique_initiative_tokens.png")
+
+            print("Verification script completed successfully!")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            await page.screenshot(path="jules-scratch/verification/error_screenshot.png")
+        finally:
+            await browser.close()
+
+asyncio.run(main())
