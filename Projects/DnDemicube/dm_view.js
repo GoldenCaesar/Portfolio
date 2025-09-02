@@ -6132,6 +6132,35 @@ function getTightBoundingBox(img) {
         });
     }
 
+    if (tokenStatBlockAddRollTags) {
+        tokenStatBlockAddRollTags.addEventListener('change', () => {
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character || !character.sheetData) return;
+
+            const selectedTag = tokenStatBlockAddRollTags.value;
+            const attributeMatch = selectedTag.match(/^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)$/);
+
+            if (attributeMatch) {
+                const attribute = attributeMatch[0].toLowerCase();
+                const statName = attribute.charAt(0).toUpperCase() + attribute.slice(1);
+
+                tokenStatBlockAddRollName.value = `${statName} Check`;
+
+                // Reset dice and add a d20
+                for (const die in tokenStatBlockDiceCounts) {
+                    tokenStatBlockDiceCounts[die] = 0;
+                }
+                tokenStatBlockDiceCounts['d20'] = 1;
+                updateCompactDiceDisplay();
+
+                // Set modifier from character sheet data
+                const modifierValue = character.sheetData[`${attribute}_modifier`] || '+0';
+                tokenStatBlockAddRollModifier.value = parseInt(modifierValue.replace('+', ''), 10) || 0;
+            }
+        });
+    }
+
     if (tokenStatBlockRollsList) {
         tokenStatBlockRollsList.addEventListener('click', (event) => {
             const button = event.target;

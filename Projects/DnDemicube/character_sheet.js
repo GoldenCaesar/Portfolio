@@ -258,30 +258,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (addRollTagsSelect) {
-        addRollTagsSelect.addEventListener('change', () => {
-            const selectedTag = addRollTagsSelect.value;
-            const attributeTags = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
-
-            if (attributeTags.includes(selectedTag)) {
-                const attribute = selectedTag.toLowerCase();
-                const modifier = modifiers[attribute].textContent;
-
-                addRollNameInput.value = `${selectedTag} Check`;
-
-                // Reset dice counts
-                for (const die in sheetDiceCounts) {
-                    sheetDiceCounts[die] = 0;
-                }
-                // Set to 1d20
-                sheetDiceCounts['d20'] = 1;
-                updateCompactDiceDisplay();
-
-                addRollModifierInput.value = parseInt(modifier.replace('+', ''), 10) || 0;
-            }
-        });
-    }
-
     if (diceButtonsContainer) {
         diceButtonsContainer.addEventListener('click', (event) => {
             const button = event.target.closest('.dice-button-compact');
@@ -349,6 +325,31 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (action === 'roll') {
                 const savedRoll = characterSavedRolls[index];
                 window.parent.postMessage({ type: 'characterSheetRoll', rollData: savedRoll }, '*');
+            }
+        });
+    }
+
+    if (addRollTagsSelect) {
+        addRollTagsSelect.addEventListener('change', () => {
+            const selectedTag = addRollTagsSelect.value;
+            const attributeMatch = selectedTag.match(/^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)$/);
+
+            if (attributeMatch) {
+                const attribute = attributeMatch[0].toLowerCase();
+                const statName = attribute.charAt(0).toUpperCase() + attribute.slice(1);
+
+                addRollNameInput.value = `${statName} Check`;
+
+                // Reset dice and add a d20
+                for (const die in sheetDiceCounts) {
+                    sheetDiceCounts[die] = 0;
+                }
+                sheetDiceCounts['d20'] = 1;
+                updateCompactDiceDisplay();
+
+                // Set modifier
+                const modifierValue = modifiers[attribute].textContent;
+                addRollModifierInput.value = parseInt(modifierValue, 10) || 0;
             }
         });
     }
