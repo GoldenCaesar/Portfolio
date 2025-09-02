@@ -10733,7 +10733,7 @@ function displayCardDetails(cardElement) {
             // 5. Switch to the DM Controls tab to see the map
             switchTab('tab-dm-controls');
         });
-    } else if (cardElement.dataset.cardType === 'roll') {
+    } /* else if (cardElement.dataset.cardType === 'roll') {
     detailsSidebar.style.overflowY = 'auto';
     detailsSidebar.style.display = 'flex';
     detailsSidebar.style.flexDirection = 'column';
@@ -10966,7 +10966,7 @@ function displayCardDetails(cardElement) {
     renderSavedRollsList();
     renderCharacterSelectList();
     updateRollCardDiceDisplay();
-}
+}*/
 
 
     // --- Delete Button (for all cards) ---
@@ -11003,7 +11003,7 @@ function getDragAfterElement(container, y) {
         const toggleSwitch = document.getElementById('automation-mode-toggle-switch');
 
         const cardButtons = [
-            'Story Beat', 'Note', 'Character', 'Map', 'Wander', 'Initiative', 'Roll'
+            'Story Beat', 'Note', 'Character', 'Map', 'Wander', 'Initiative',// 'Roll'
         ];
 
         moduleCardsContainer.innerHTML = '';
