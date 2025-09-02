@@ -258,6 +258,30 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (addRollTagsSelect) {
+        addRollTagsSelect.addEventListener('change', () => {
+            const selectedTag = addRollTagsSelect.value;
+            const attributeTags = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+
+            if (attributeTags.includes(selectedTag)) {
+                const attribute = selectedTag.toLowerCase();
+                const modifier = modifiers[attribute].textContent;
+
+                addRollNameInput.value = `${selectedTag} Check`;
+
+                // Reset dice counts
+                for (const die in sheetDiceCounts) {
+                    sheetDiceCounts[die] = 0;
+                }
+                // Set to 1d20
+                sheetDiceCounts['d20'] = 1;
+                updateCompactDiceDisplay();
+
+                addRollModifierInput.value = parseInt(modifier.replace('+', ''), 10) || 0;
+            }
+        });
+    }
+
     if (diceButtonsContainer) {
         diceButtonsContainer.addEventListener('click', (event) => {
             const button = event.target.closest('.dice-button-compact');
