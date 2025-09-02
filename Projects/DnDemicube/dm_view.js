@@ -10733,7 +10733,240 @@ function displayCardDetails(cardElement) {
             // 5. Switch to the DM Controls tab to see the map
             switchTab('tab-dm-controls');
         });
-    }
+    } else if (cardElement.dataset.cardType === 'roll') {
+    detailsSidebar.style.overflowY = 'auto';
+    detailsSidebar.style.display = 'flex';
+    detailsSidebar.style.flexDirection = 'column';
+
+    let linkedCharacterId = null; // To track the character for the current roll entry
+
+    // --- Section 1: Saved Rolls (Growing List) ---
+    const savedRollsSection = document.createElement('div');
+    savedRollsSection.className = 'sidebar-section';
+    const savedRollsHeader = document.createElement('h4');
+    savedRollsHeader.textContent = 'Saved Rolls';
+    savedRollsSection.appendChild(savedRollsHeader);
+    const savedRollsList = document.createElement('div');
+    savedRollsList.id = 'automation-roll-list';
+    savedRollsList.className = 'available-notes-container'; // Reuse style
+    savedRollsList.style.minHeight = '80px';
+    savedRollsSection.appendChild(savedRollsList);
+    detailsSidebar.appendChild(savedRollsSection);
+
+    // --- Section 2: Roll Creation Form ---
+    const creationSection = document.createElement('div');
+    creationSection.className = 'sidebar-section';
+
+    // Character Selection
+    const availableCharsHeader = document.createElement('h4');
+    availableCharsHeader.textContent = 'Link Character for Roll';
+    creationSection.appendChild(availableCharsHeader);
+    const availableCharsContainer = document.createElement('div');
+    availableCharsContainer.className = 'available-notes-container'; // Reuse style
+    availableCharsContainer.id = 'roll-card-char-select';
+    creationSection.appendChild(availableCharsContainer);
+
+    // Roll Interface (copied from token-stat-block)
+    const rollInterfaceContainer = document.createElement('div');
+    rollInterfaceContainer.className = 'stat-block-rolls'; // Reuse class for styling
+    rollInterfaceContainer.style.marginTop = '20px';
+    rollInterfaceContainer.innerHTML = `
+        <div id="roll-card-add-roll-form" class="add-roll-form">
+            <input type="text" id="roll-card-add-roll-name" placeholder="Roll Name">
+            <select id="roll-card-add-roll-tags">
+                <option value="">None</option>
+                <option value="Hit">Hit</option>
+                <option value="Damage">Damage</option>
+                <option value="Healing">Healing</option>
+                <option value="Strength">Strength</option>
+                <option value="Dexterity">Dexterity</option>
+                <option value="Constitution">Constitution</option>
+                <option value="Intelligence">Intelligence</option>
+                <option value="Wisdom">Wisdom</option>
+                <option value="Charisma">Charisma</option>
+            </select>
+            <div id="roll-card-dice-buttons">
+                <button class="dice-button-compact" data-die="d4">d4<span class="dice-count"></span></button>
+                <button class="dice-button-compact" data-die="d6">d6<span class="dice-count"></span></button>
+                <button class="dice-button-compact" data-die="d8">d8<span class="dice-count"></span></button>
+                <button class="dice-button-compact" data-die="d10">d10<span class="dice-count"></span></button>
+                <button class="dice-button-compact" data-die="d12">d12<span class="dice-count"></span></button>
+                <button class="dice-button-compact" data-die="d20">d20<span class="dice-count"></span></button>
+                <button class="dice-button-compact" data-die="d100">d100<span class="dice-count"></span></button>
+            </div>
+            <div class="modifier-form">
+                <label for="roll-card-add-roll-modifier">Modifier:</label>
+                <input type="number" id="roll-card-add-roll-modifier" value="0">
+            </div>
+            <button id="roll-card-save-roll-btn">Save</button>
+        </div>
+    `;
+    creationSection.appendChild(rollInterfaceContainer);
+    detailsSidebar.appendChild(creationSection);
+
+    // --- Logic ---
+    let rollCardDiceCounts = {};
+
+    const updateRollCardDiceDisplay = () => {
+        const buttons = detailsSidebar.querySelectorAll('#roll-card-dice-buttons .dice-button-compact');
+        buttons.forEach(button => {
+            const die = button.dataset.die;
+            const count = rollCardDiceCounts[die] || 0;
+            const countSpan = button.querySelector('.dice-count');
+            if (countSpan) {
+                countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    };
+
+    const renderSavedRollsList = () => {
+        savedRollsList.innerHTML = '';
+        const allSavedRolls = JSON.parse(cardElement.dataset.savedRolls || '[]');
+
+        if (allSavedRolls.length === 0) {
+            savedRollsList.innerHTML = `<p class="sidebar-placeholder">No rolls saved to this card yet.</p>`;
+            return;
+        }
+
+        allSavedRolls.forEach((roll, index) => {
+            const character = charactersData.find(c => c.id === roll.characterId);
+            const characterName = character ? character.name : 'Unknown Character';
+            const diceString = formatDiceString(roll.dice, roll.modifier);
+
+            const item = document.createElement('div');
+            item.className = 'encounter-participant-item'; // Reuse style
+            item.innerHTML = `
+                <span><strong>${characterName}:</strong> ${roll.name} (${diceString})</span>
+                <button class="remove-participant-btn" data-index="${index}">×</button>
+            `;
+            savedRollsList.appendChild(item);
+        });
+    };
+
+    const renderCharacterSelectList = () => {
+        availableCharsContainer.innerHTML = '';
+        if (charactersData.length === 0) {
+            availableCharsContainer.innerHTML = `<p class="sidebar-placeholder">No characters exist.</p>`;
+            return;
+        }
+        charactersData.forEach(character => {
+            const charItem = document.createElement('div');
+            charItem.textContent = character.name;
+            charItem.className = 'available-note-item';
+            charItem.dataset.characterId = character.id;
+            if (character.id === linkedCharacterId) {
+                charItem.classList.add('selected');
+            }
+            availableCharsContainer.appendChild(charItem);
+        });
+    };
+
+    // Event Listeners
+    availableCharsContainer.addEventListener('click', (e) => {
+        if (e.target.matches('.available-note-item')) {
+            const charId = parseInt(e.target.dataset.characterId, 10);
+            if (linkedCharacterId === charId) {
+                // Deselect if clicking the same character
+                linkedCharacterId = null;
+            } else {
+                linkedCharacterId = charId;
+            }
+            renderCharacterSelectList();
+        }
+    });
+
+    detailsSidebar.querySelector('#roll-card-dice-buttons').addEventListener('click', (event) => {
+        const button = event.target.closest('.dice-button-compact');
+        if (!button) return;
+        const die = button.dataset.die;
+        if (die) {
+            rollCardDiceCounts[die] = (rollCardDiceCounts[die] || 0) + 1;
+            updateRollCardDiceDisplay();
+        }
+    });
+
+    detailsSidebar.querySelector('#roll-card-dice-buttons').addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        const button = event.target.closest('.dice-button-compact');
+        if (!button) return;
+        const die = button.dataset.die;
+        if (die && rollCardDiceCounts[die] > 0) {
+            rollCardDiceCounts[die]--;
+            updateRollCardDiceDisplay();
+        }
+    });
+
+    detailsSidebar.querySelector('#roll-card-add-roll-tags').addEventListener('change', (e) => {
+        const selectedTag = e.target.value;
+        const attributeMatch = selectedTag.match(/^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)$/);
+
+        if (attributeMatch && linkedCharacterId) {
+            const character = charactersData.find(c => c.id === linkedCharacterId);
+            if (!character || !character.sheetData) return;
+
+            const attribute = attributeMatch[0].toLowerCase();
+            const statName = attribute.charAt(0).toUpperCase() + attribute.slice(1);
+
+            detailsSidebar.querySelector('#roll-card-add-roll-name').value = `${statName} Check`;
+            rollCardDiceCounts = { 'd20': 1 };
+            updateRollCardDiceDisplay();
+            const modifierValue = character.sheetData[`${attribute}_modifier`] || '+0';
+            detailsSidebar.querySelector('#roll-card-add-roll-modifier').value = parseInt(modifierValue.replace('+', ''), 10) || 0;
+        }
+    });
+
+    detailsSidebar.querySelector('#roll-card-save-roll-btn').addEventListener('click', () => {
+        const rollName = detailsSidebar.querySelector('#roll-card-add-roll-name').value.trim();
+        if (!rollName) {
+            alert('Please enter a name for the roll.');
+            return;
+        }
+        if (!linkedCharacterId) {
+            alert('Please link a character for this roll.');
+            return;
+        }
+
+        const hasDice = Object.values(rollCardDiceCounts).some(count => count > 0);
+        if (!hasDice) {
+            alert('Please select at least one die to save.');
+            return;
+        }
+
+        const newRoll = {
+            characterId: linkedCharacterId,
+            name: rollName,
+            dice: { ...rollCardDiceCounts },
+            modifier: parseInt(detailsSidebar.querySelector('#roll-card-add-roll-modifier').value, 10) || 0,
+            tags: [detailsSidebar.querySelector('#roll-card-add-roll-tags').value]
+        };
+
+        const allSavedRolls = JSON.parse(cardElement.dataset.savedRolls || '[]');
+        allSavedRolls.push(newRoll);
+        cardElement.dataset.savedRolls = JSON.stringify(allSavedRolls);
+
+        // Reset form and render list
+        detailsSidebar.querySelector('#roll-card-add-roll-name').value = '';
+        rollCardDiceCounts = {};
+        updateRollCardDiceDisplay();
+        renderSavedRollsList();
+    });
+
+    savedRollsList.addEventListener('click', (e) => {
+        if (e.target.matches('.remove-participant-btn')) {
+            const index = parseInt(e.target.dataset.index, 10);
+            const allSavedRolls = JSON.parse(cardElement.dataset.savedRolls || '[]');
+            allSavedRolls.splice(index, 1);
+            cardElement.dataset.savedRolls = JSON.stringify(allSavedRolls);
+            renderSavedRollsList();
+        }
+    });
+
+
+    // Initial Renders
+    renderSavedRollsList();
+    renderCharacterSelectList();
+    updateRollCardDiceDisplay();
+}
 
 
     // --- Delete Button (for all cards) ---
