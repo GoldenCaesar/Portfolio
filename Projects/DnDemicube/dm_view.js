@@ -7878,6 +7878,7 @@ function getTightBoundingBox(img) {
                 const character = charactersData.find(c => c.id === selectedCharacterId);
                 if (character) {
                     character.sheetData = event.data.data;
+                    character.savedRolls = event.data.data.savedRolls;
                     propagateCharacterUpdate(selectedCharacterId);
                 }
             }
@@ -7996,6 +7997,72 @@ function getTightBoundingBox(img) {
 
             addLogEntry(rollData);
             sendDiceRollToPlayerView([d20Roll], total);
+        } else if (event.data.type === 'saveCharacterRoll') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    if (!character.savedRolls) {
+                        character.savedRolls = [];
+                    }
+                    character.savedRolls.push(event.data.roll);
+                    loadCharacterIntoEditor(selectedCharacterId); // Reload to show the new roll
+                }
+            }
+        } else if (event.data.type === 'deleteCharacterRoll') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character && character.savedRolls) {
+                    character.savedRolls.splice(event.data.index, 1);
+                    loadCharacterIntoEditor(selectedCharacterId); // Reload to show the change
+                }
+            }
+        } else if (event.data.type === 'characterSheetRoll') {
+            const { rollData } = event.data;
+            const character = charactersData.find(c => c.id === selectedCharacterId);
+            if (character) {
+                 let allRolls = [];
+                let totalSum = 0;
+                const rollsByDie = {};
+                const modifier = rollData.modifier || 0;
+
+                for (const die in rollData.dice) {
+                    const count = rollData.dice[die];
+                    if (count === 0) continue;
+
+                    const sides = parseInt(die.substring(1), 10);
+                    if (isNaN(sides)) continue;
+
+                    if (!rollsByDie[die]) rollsByDie[die] = [];
+                    for (let i = 0; i < count; i++) {
+                        const roll = Math.floor(Math.random() * sides) + 1;
+                        allRolls.push(roll);
+                        totalSum += roll;
+                        rollsByDie[die].push(roll);
+                    }
+                }
+
+                totalSum += modifier;
+
+                const detailsParts = [];
+                for (const dieName in rollsByDie) {
+                    detailsParts.push(`${rollsByDie[dieName].length}${dieName}[${rollsByDie[dieName].join(',')}]`);
+                }
+                let detailsMessage = `${rollData.name}: ${detailsParts.join(', ')}`;
+                if (modifier !== 0) {
+                    detailsMessage += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+                }
+
+                addLogEntry({
+                    characterId: character.id,
+                    characterName: character.name,
+                    playerName: character.sheetData.player_name || 'DM',
+                    roll: detailsMessage,
+                    sum: totalSum,
+                    characterPortrait: character.sheetData.character_portrait,
+                    characterInitials: getInitials(character.name)
+                });
+                sendDiceRollToPlayerView(allRolls, totalSum);
+            }
         }
     });
 
