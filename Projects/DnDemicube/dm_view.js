@@ -8278,6 +8278,30 @@ function generateCharacterMarkdown(sheetData, notes, forPlayerView = false, isDe
     return html;
 }
 
+function renderMarkdown(markdownText) {
+    if (easyMDE && easyMDE.options.previewRender) {
+        return easyMDE.options.previewRender(markdownText);
+    }
+
+    // Fallback for when the main notes editor hasn't been initialized
+    const dummyTextarea = document.createElement('textarea');
+    dummyTextarea.style.display = 'none';
+    document.body.appendChild(dummyTextarea);
+
+    let html;
+    try {
+        const tempMDE = new EasyMDE({ element: dummyTextarea, autoDownloadFontAwesome: false });
+        html = tempMDE.options.previewRender(markdownText);
+        tempMDE.toTextArea();
+    } catch (e) {
+        console.error("Fallback EasyMDE render failed:", e);
+        html = markdownText.replace(/\n/g, '<br>');
+    } finally {
+        document.body.removeChild(dummyTextarea);
+    }
+    return html;
+}
+
 let activeToastTimers = [];
 
 function clearToasts() {
@@ -9929,13 +9953,13 @@ function displayToast(messageElement) {
                         const notePreviewOverlay = document.getElementById('note-preview-overlay');
                         const notePreviewBody = document.getElementById('note-preview-body');
                         if (notePreviewOverlay && notePreviewBody) {
-                            const renderedHTML = easyMDE.options.previewRender(note.content);
+                            const renderedHTML = renderMarkdown(note.content);
                             notePreviewBody.innerHTML = renderedHTML;
                             notePreviewOverlay.style.display = 'flex';
                             const interactionMode = cardElement.dataset.interactionMode;
                             if (interactionMode === 'both' && playerWindow && !playerWindow.closed) {
                                 const playerNoteContent = filterPlayerContent(note.content);
-                                const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
+                                const playerRenderedHTML = renderMarkdown(playerNoteContent);
                                 playerWindow.postMessage({
                                     type: 'showNotePreview',
                                     content: playerRenderedHTML
