@@ -242,6 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveAutomationBranchButton = document.getElementById('save-automation-branch-button');
     const automationBranchesList = document.getElementById('automation-branches-list');
     const storyBeatCardBody = document.getElementById('story-beat-card-body');
+    const beginAutomationButton = document.getElementById('begin-automation-button');
+    const automationActiveControls = document.getElementById('automation-active-controls');
+    const previousAutomationButton = document.getElementById('previous-automation-button');
+    const stopAutomationButton = document.getElementById('stop-automation-button');
+    const nextAutomationButton = document.getElementById('next-automation-button');
     const quoteEditorContainer = document.getElementById('quote-editor-container');
     const jsonEditOverlay = document.getElementById('json-export-overlay'); // Changed name
     const jsonEditContent = document.getElementById('json-edit-content'); // Changed name
@@ -5068,7 +5073,8 @@ function getTightBoundingBox(img) {
                     nextQuestId: nextQuestId,
                     selectedQuestId: selectedQuestId,
                     automationCanvasData: automationCanvasData,
-                    automationBranches: automationBranches
+                    automationBranches: automationBranches,
+                    isAutomationActive: automationActiveControls.style.display === 'flex'
                 };
             }
 
@@ -5463,6 +5469,14 @@ function getTightBoundingBox(img) {
                     renderAutomationCanvasFromData();
                     renderAutomationBranches();
 
+                    if (campaignData.storyTree.isAutomationActive) {
+                        beginAutomationButton.style.display = 'none';
+                        automationActiveControls.style.display = 'flex';
+                    } else {
+                        beginAutomationButton.style.display = 'block';
+                        automationActiveControls.style.display = 'none';
+                    }
+
                     // Backward compatibility for quests missing new fields
                     quests.forEach(quest => {
                         if (quest.parentId !== undefined) {
@@ -5640,6 +5654,13 @@ function getTightBoundingBox(img) {
                 automationBranches = campaignData.storyTree.automationBranches || {};
                 renderAutomationCanvasFromData();
                 renderAutomationBranches();
+                if (campaignData.storyTree.isAutomationActive) {
+                    beginAutomationButton.style.display = 'none';
+                    automationActiveControls.style.display = 'flex';
+                } else {
+                    beginAutomationButton.style.display = 'block';
+                    automationActiveControls.style.display = 'none';
+                }
             } else {
                 // Attempt to convert old data or notify user
                 console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
@@ -9889,6 +9910,190 @@ function displayToast(messageElement) {
             // Show the automation container
             if (automationContainer) automationContainer.style.display = 'flex';
             initializeAutomationSidebar();
+        });
+    }
+
+    function activateCard(cardElement) {
+        if (!cardElement) return;
+
+        const cardType = cardElement.dataset.cardType;
+        let currentLinkIndex = parseInt(cardElement.dataset.currentLinkIndex || '0', 10);
+
+        switch (cardType) {
+            case 'note':
+                const linkedNotes = JSON.parse(cardElement.dataset.linkedNotes || '[]');
+                if (linkedNotes.length > 0) {
+                    const noteId = linkedNotes[currentLinkIndex];
+                    const note = notesData.find(n => n.id === noteId);
+                    if (note) {
+                        const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                        const notePreviewBody = document.getElementById('note-preview-body');
+                        if (notePreviewOverlay && notePreviewBody) {
+                            const renderedHTML = easyMDE.options.previewRender(note.content);
+                            notePreviewBody.innerHTML = renderedHTML;
+                            notePreviewOverlay.style.display = 'flex';
+                            const interactionMode = cardElement.dataset.interactionMode;
+                            if (interactionMode === 'both' && playerWindow && !playerWindow.closed) {
+                                const playerNoteContent = filterPlayerContent(note.content);
+                                const playerRenderedHTML = easyMDE.options.previewRender(playerNoteContent);
+                                playerWindow.postMessage({
+                                    type: 'showNotePreview',
+                                    content: playerRenderedHTML
+                                }, '*');
+                            }
+                        }
+                    }
+
+                    currentLinkIndex++;
+                    if (currentLinkIndex >= linkedNotes.length) {
+                        cardElement.dataset.currentLinkIndex = 0;
+                    } else {
+                        cardElement.dataset.currentLinkIndex = currentLinkIndex;
+                        const startLine = document.getElementById('automation-start-line');
+                        cardElement.before(startLine);
+                    }
+                }
+                break;
+
+            case 'character':
+                const linkedCharacters = JSON.parse(cardElement.dataset.linkedCharacters || '[]');
+                if (linkedCharacters.length > 0) {
+                    const charId = linkedCharacters[currentLinkIndex];
+                    const character = charactersData.find(c => c.id === charId);
+                    if (character) {
+                        const charPreviewOverlay = document.getElementById('character-preview-overlay');
+                        const charPreviewBody = document.getElementById('character-preview-body');
+                        const interactionMode = cardElement.dataset.interactionMode;
+
+                        if (charPreviewOverlay && charPreviewBody) {
+                            const dmMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, false, character.isDetailsVisible);
+                            charPreviewBody.innerHTML = dmMarkdown;
+                            charPreviewOverlay.style.display = 'flex';
+
+                            if (interactionMode === 'both' && playerWindow && !playerWindow.closed) {
+                                const playerMarkdown = generateCharacterMarkdown(character.sheetData, character.notes, true, character.isDetailsVisible);
+                                playerWindow.postMessage({
+                                    type: 'showCharacterPreview',
+                                    content: playerMarkdown
+                                }, '*');
+                            }
+                        }
+                    }
+
+                    currentLinkIndex++;
+                    if (currentLinkIndex >= linkedCharacters.length) {
+                        cardElement.dataset.currentLinkIndex = 0;
+                    } else {
+                        cardElement.dataset.currentLinkIndex = currentLinkIndex;
+                        const startLine = document.getElementById('automation-start-line');
+                        cardElement.before(startLine);
+                    }
+                }
+                break;
+
+            case 'map':
+                const linkedMaps = JSON.parse(cardElement.dataset.linkedMaps || '[]');
+                if (linkedMaps.length > 0) {
+                    const mapName = linkedMaps[currentLinkIndex];
+                    const interactionMode = cardElement.dataset.interactionMode || 'dm-only';
+                    const targetMapMode = interactionMode === 'both' ? 'view' : 'edit';
+                    const targetMapData = detailedMapData.get(mapName);
+
+                    if (targetMapData) {
+                        switchTab('tab-dm-controls');
+                        selectedMapFileName = mapName;
+                        targetMapData.mode = targetMapMode;
+                        modeToggleSwitch.checked = targetMapData.mode === 'view';
+                        modeToggleSwitch.disabled = false;
+
+                        clearAllSelections();
+                        const mapItems = mapsList.querySelectorAll('li');
+                        mapItems.forEach(li => {
+                            if (li.dataset.fileName === mapName) {
+                                li.classList.add('selected-map-item');
+                            }
+                        });
+
+                        displayMapOnCanvas(mapName);
+                        updateButtonStates();
+                        if (targetMapData.mode === 'view') {
+                            sendMapToPlayerView(mapName);
+                        }
+                    }
+
+                    currentLinkIndex++;
+                    if (currentLinkIndex >= linkedMaps.length) {
+                        cardElement.dataset.currentLinkIndex = 0;
+                    } else {
+                        cardElement.dataset.currentLinkIndex = currentLinkIndex;
+                        const startLine = document.getElementById('automation-start-line');
+                        cardElement.before(startLine);
+                    }
+                }
+                break;
+
+            case 'initiative':
+            case 'wander':
+                displayCardDetails(cardElement);
+                const startButton = document.getElementById('automation-start-encounter-btn');
+                if (startButton) {
+                    startButton.click();
+                }
+                break;
+
+            case 'story_beat':
+                displayCardDetails(cardElement);
+                const completeStepsButton = document.getElementById('automation-complete-steps-btn');
+                if (completeStepsButton) {
+                    completeStepsButton.click();
+                }
+                break;
+        }
+    }
+
+    if (beginAutomationButton) {
+        beginAutomationButton.addEventListener('click', () => {
+            beginAutomationButton.style.display = 'none';
+            automationActiveControls.style.display = 'flex';
+        });
+    }
+
+    if (stopAutomationButton) {
+        stopAutomationButton.addEventListener('click', () => {
+            beginAutomationButton.style.display = 'block';
+            automationActiveControls.style.display = 'none';
+            const automationCanvas = document.getElementById('automation-canvas');
+            const startLine = document.getElementById('automation-start-line');
+            if (automationCanvas && startLine) {
+                automationCanvas.prepend(startLine);
+            }
+        });
+    }
+
+    if (nextAutomationButton) {
+        nextAutomationButton.addEventListener('click', () => {
+            const startLine = document.getElementById('automation-start-line');
+            if (!startLine) return;
+
+            const cardToActivate = startLine.nextElementSibling;
+            if (cardToActivate) {
+                cardToActivate.after(startLine);
+                activateCard(cardToActivate);
+            } else {
+                stopAutomationButton.click();
+            }
+        });
+    }
+
+    if (previousAutomationButton) {
+        previousAutomationButton.addEventListener('click', () => {
+            const startLine = document.getElementById('automation-start-line');
+            if (!startLine) return;
+
+            const cardToMoveBefore = startLine.previousElementSibling;
+            if (cardToMoveBefore) {
+                cardToMoveBefore.before(startLine);
+            }
         });
     }
 
