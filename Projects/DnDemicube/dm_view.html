@@ -212,7 +212,6 @@
                     <button id="fill-from-button" class="dropdown-toggle" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Fill From</button>
                     <div id="fill-from-dropdown" class="dropdown-menu" style="display: none;">
                         <a href="#" id="fill-from-pdf-option">PDF</a>
-                        <a href="#" id="fill-from-json-option">JSON</a>
                     </div>
                 </div>
                 <button id="clear-fields-button" style="margin-top: 5px; margin-bottom: 5px; width: auto; align-self: flex-start;">Clear Fields</button>
@@ -269,7 +268,7 @@
                             <!-- Items will be populated here by JS -->
                         </div>
                         <div class="import-export-preview">
-                            <textarea readonly></textarea>
+                            <textarea></textarea>
                             <div class="import-export-buttons">
                                 <button id="save-export-button">Save</button>
                                 <button id="copy-export-button">Copy</button>
@@ -350,23 +349,8 @@
             <div class="story-beat-card-header">
                 <button id="story-beat-card-back-button" class="story-beat-card-back-button">←</button>
                 <h2>Quest Details</h2>
-                <button id="story-beat-card-export-button" class="story-beat-card-close-button" title="Export Quest to JSON">📤</button>
             </div>
             <div id="story-beat-card-body"></div>
-        </div>
-    </div>
-
-    <div id="json-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close-button" id="json-modal-close-button">&times;</span>
-            <h3>Fill from JSON</h3>
-            <p>Paste your character's JSON data below and click "Fill".</p>
-            <textarea id="json-input-textarea" rows="20" style="width: 95%;"></textarea>
-            <div style="margin-top: 10px;">
-                <button id="fill-from-json-button">Fill</button>
-                <button id="cancel-json-button">Cancel</button>
-                <a href="https://g.co/gemini/share/b2a2f34303b6" target="_blank" class="button-like-a">Convert to JSON</a>
-            </div>
         </div>
     </div>
 
