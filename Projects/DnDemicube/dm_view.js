@@ -205,12 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fillFromButton = document.getElementById('fill-from-button');
     const fillFromDropdown = document.getElementById('fill-from-dropdown');
     const fillFromPdfOption = document.getElementById('fill-from-pdf-option');
-    const fillFromJsonOption = document.getElementById('fill-from-json-option');
-    const jsonModal = document.getElementById('json-modal');
-    const jsonModalCloseButton = document.getElementById('json-modal-close-button');
-    const jsonInputTextarea = document.getElementById('json-input-textarea');
-    const fillFromJsonButton = document.getElementById('fill-from-json-button');
-    const cancelJsonButton = document.getElementById('cancel-json-button');
     const pdfUploadInput = document.getElementById('pdf-upload-input');
     const characterSheetContainer = document.getElementById('character-sheet-container');
     const characterSheetIframe = document.getElementById('character-sheet-iframe');
@@ -236,7 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyTreeCanvas = document.getElementById('quest-canvas');
     const storyTreeCardContainer = document.getElementById('card-container');
     const storyBeatCardOverlay = document.getElementById('story-beat-card-overlay');
-    const storyBeatCardExportButton = document.getElementById('story-beat-card-export-button');
     const automationManagementSection = document.getElementById('automation-management-section');
     const automationBranchNameInput = document.getElementById('automation-branch-name-input');
     const saveAutomationBranchButton = document.getElementById('save-automation-branch-button');
@@ -7645,60 +7638,6 @@ function getTightBoundingBox(img) {
         return flattened;
     }
 
-    if (fillFromJsonOption) {
-        fillFromJsonOption.addEventListener('click', (e) => {
-            e.preventDefault();
-            jsonInputTextarea.value = JSON.stringify(defaultCharacterJson, null, 2);
-            jsonModal.style.display = 'block';
-            fillFromDropdown.style.display = 'none';
-        });
-    }
-
-    if (jsonModalCloseButton) {
-        jsonModalCloseButton.addEventListener('click', () => {
-            jsonModal.style.display = 'none';
-        });
-    }
-
-    if (cancelJsonButton) {
-        cancelJsonButton.addEventListener('click', () => {
-            jsonModal.style.display = 'none';
-        });
-    }
-
-    if (fillFromJsonButton) {
-        fillFromJsonButton.addEventListener('click', () => {
-            try {
-                const jsonData = JSON.parse(jsonInputTextarea.value);
-                const flattenedData = flattenCharacterJson(jsonData);
-
-                const finalData = {};
-                for (const key in flattenedData) {
-                    let newKey = key;
-                    if (key === 'race_or_species') newKey = 'race';
-                    else if (key === 'experience_points') newKey = 'xp';
-                    else if (key === 'hit_points_maximum') newKey = 'hp_max';
-                    else if (key === 'hit_points_current') newKey = 'hp_current';
-                    else if (key === 'hit_points_temporary') newKey = 'hp_temp';
-                    else if (key === 'hit_dice') newKey = 'hit_dice_total';
-                    else if (key === 'proficiencies_armor') newKey = 'armor_proficiencies';
-                    else if (key === 'proficiencies_weapons') newKey = 'weapon_proficiencies';
-                    else if (key === 'proficiencies_tools') newKey = 'tool_proficiencies';
-                    else if (key === 'character_name') newKey = 'char_name';
-                    else if (key === 'class_and_level') newKey = 'class_level';
-                    else if (key === 'armor_class') newKey = 'ac';
-
-                    finalData[newKey] = flattenedData[key];
-                }
-
-                characterSheetIframe.contentWindow.postMessage({ type: 'loadCharacterSheet', data: finalData }, '*');
-                jsonModal.style.display = 'none';
-            } catch (error) {
-                alert('Invalid JSON format. Please check your input.');
-                console.error('Error parsing character JSON:', error);
-            }
-        });
-    }
 
     window.addEventListener('click', (e) => {
         if (!e.target.matches('.dropdown-toggle')) {
@@ -12585,36 +12524,6 @@ function getDragAfterElement(container, y) {
         });
     }
 
-    if (storyBeatCardExportButton) {
-        storyBeatCardExportButton.addEventListener('click', () => {
-            const quest = quests.find(q => q.id === activeOverlayCardId);
-            if (quest) {
-                const exportQuest = {
-                    id: quest.id,
-                    name: quest.name || '',
-                    parentIds: quest.parentIds || [],
-                    x: quest.x || 0,
-                    y: quest.y || 0,
-                    description: quest.description || '',
-                    questStatus: quest.questStatus || 'Unavailable',
-                    questType: quest.questType || [],
-                    startingTriggers: quest.startingTriggers || [],
-                    associatedMaps: quest.associatedMaps || [],
-                    associatedNPCs: quest.associatedNPCs || [],
-                    failureTriggers: quest.failureTriggers || [],
-                    successTriggers: quest.successTriggers || [],
-                    detailedRewards: quest.detailedRewards || { xp: 0, loot: '', magicItems: '', information: '' },
-                    storyDuration: quest.storyDuration || '',
-                    difficulty: quest.difficulty || 0,
-                    storySteps: quest.storySteps || [],
-                };
-                jsonEditContent.value = JSON.stringify(exportQuest, null, 2); // Use value for textarea
-                jsonEditOverlay.style.display = 'flex';
-            } else {
-                alert("Could not find quest data to export. Please reopen the quest card and try again.");
-            }
-        });
-    }
 
     // Initial setup
     resizeCanvas(); // Set initial canvas size
@@ -13309,6 +13218,9 @@ function loadAndRenderAutomationBranch(branchName) {
     const settingsWindow = document.getElementById('settings-window');
     const settingsCategoryButtons = document.querySelectorAll('.settings-category-button');
     const settingsCategoryContents = document.querySelectorAll('.settings-category-content');
+    const importExportControls = document.querySelector('.import-export-controls');
+    const importExportList = document.querySelector('.import-export-list');
+    const importExportPreview = document.querySelector('.import-export-preview textarea');
 
     if (settingsButton && settingsOverlay && settingsWindow) {
         settingsButton.addEventListener('click', () => {
@@ -13337,5 +13249,208 @@ function loadAndRenderAutomationBranch(branchName) {
                 });
             });
         });
+
+        if (importExportControls) {
+            importExportControls.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    // Remove active class from all buttons
+                    importExportControls.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                    // Add active class to clicked button
+                    e.target.classList.add('active');
+
+                    const type = e.target.dataset.type;
+                    handleImportExportSelection(type);
+                }
+            });
+        }
+    }
+
+    function handleImportExportSelection(type) {
+        // Clear previous content
+        importExportList.innerHTML = '';
+        importExportPreview.value = '';
+
+        switch(type) {
+            case 'all':
+                const allData = {
+                    characters: charactersData,
+                    notes: notesData,
+                    storyBeats: quests,
+                    initiatives: savedInitiatives,
+                    automation: automationBranches
+                };
+                importExportPreview.value = JSON.stringify(allData, null, 2);
+
+                importExportList.innerHTML = `
+                    <p>Characters: ${charactersData.length}</p>
+                    <p>Notes: ${notesData.length}</p>
+                    <p>Story Beats: ${quests.length}</p>
+                    <p>Initiatives: ${Object.keys(savedInitiatives).length}</p>
+                    <p>Automation: ${Object.keys(automationBranches).length}</p>
+                `;
+                break;
+            case 'characters':
+                renderCategorizedList(charactersData, 'name', 'id', type);
+                break;
+            case 'notes':
+                renderCategorizedList(notesData, 'title', 'id', type);
+                break;
+            case 'story_beats':
+                renderCategorizedList(quests, 'name', 'id', type);
+                break;
+            case 'initiatives':
+                const initiativesArray = Object.keys(savedInitiatives).map(name => ({ name: name }));
+                renderCategorizedList(initiativesArray, 'name', 'name', type);
+                break;
+            case 'automation':
+                const automationArray = Object.keys(automationBranches).map(name => ({ name: name }));
+                renderCategorizedList(automationArray, 'name', 'name', type);
+                break;
+        }
+    }
+
+    function renderCategorizedList(dataArray, nameKey, idKey, type) {
+        const ul = document.createElement('ul');
+        dataArray.forEach(item => {
+            const li = document.createElement('li');
+            li.textContent = item[nameKey];
+            li.dataset.id = item[idKey];
+            li.style.cursor = 'pointer';
+            li.addEventListener('click', () => {
+                // Remove 'selected' class from any previously selected item
+                const currentSelected = ul.querySelector('.selected');
+                if (currentSelected) {
+                    currentSelected.classList.remove('selected');
+                }
+                // Add 'selected' class to the clicked item
+                li.classList.add('selected');
+
+                let itemData;
+                if (type === 'initiatives') {
+                    itemData = savedInitiatives[item.name];
+                } else if (type === 'automation') {
+                    itemData = automationBranches[item.name];
+                } else {
+                    itemData = dataArray.find(d => d[idKey] == li.dataset.id);
+                }
+                importExportPreview.value = JSON.stringify(itemData, null, 2);
+            });
+            ul.appendChild(li);
+        });
+        importExportList.appendChild(ul);
+    }
+
+    const saveExportButton = document.getElementById('save-export-button');
+    const copyExportButton = document.getElementById('copy-export-button');
+
+    if (saveExportButton) {
+        saveExportButton.addEventListener('click', handleSaveExport);
+    }
+
+    if (copyExportButton) {
+        copyExportButton.addEventListener('click', () => {
+            importExportPreview.select();
+            navigator.clipboard.writeText(importExportPreview.value).then(() => {
+                alert('Copied to clipboard!');
+            }).catch(err => {
+                console.error('Could not copy text: ', err);
+                // Fallback for older browsers
+                try {
+                    document.execCommand('copy');
+                    alert('Copied to clipboard!');
+                } catch (e) {
+                    alert('Failed to copy to clipboard.');
+                }
+            });
+        });
+    }
+
+    function handleSaveExport() {
+        try {
+            const data = JSON.parse(importExportPreview.value);
+            const selectedButton = document.querySelector('.import-export-controls button.active');
+            const selectedListItem = importExportList.querySelector('li.selected');
+
+            // Determine the type of data being saved
+            let saveType = selectedButton ? selectedButton.dataset.type : null;
+            if (saveType !== 'all' && !selectedListItem) {
+                 // If a category is selected but no specific item, it's an "all" save for that category
+                 // We can infer this, but for now let's handle the explicit "All" button case
+            }
+
+
+            if (data.characters && data.notes && data.storyBeats) { // Heuristic for "All" data
+                if (confirm("This will overwrite all existing data in the campaign. Are you sure?")) {
+                    charactersData = data.characters || [];
+                    notesData = data.notes || [];
+                    quests = data.storyBeats || [];
+                    savedInitiatives = data.initiatives || {};
+                    automationBranches = data.automation || {};
+                    alert('All data has been updated.');
+                    renderAllLists();
+                    renderSavedInitiativesList();
+                    renderAutomationBranches();
+                    // Potentially need to re-render more UI elements across the app
+                }
+            } else if (data.sheetData && data.id) { // Heuristic for a single Character
+                const index = charactersData.findIndex(c => c.id === data.id);
+                if (index !== -1) {
+                    charactersData[index] = data;
+                    alert(`Character "${data.name}" has been updated.`);
+                    renderCharactersList();
+                    if (selectedCharacterId === data.id) {
+                        loadCharacterIntoEditor(data.id);
+                    }
+                } else {
+                     if (confirm(`Character with ID ${data.id} not found. Add as new character?`)) {
+                        charactersData.push(data);
+                        renderCharactersList();
+                     }
+                }
+            } else if (data.content && data.id) { // Heuristic for a single Note
+                const index = notesData.findIndex(n => n.id === data.id);
+                if (index !== -1) {
+                    notesData[index] = data;
+                    alert(`Note "${data.title}" has been updated.`);
+                    renderNotesList();
+                    if (selectedNoteId === data.id) {
+                        loadNoteIntoEditor(data.id);
+                    }
+                } else {
+                     if (confirm(`Note with ID ${data.id} not found. Add as new note?`)) {
+                        notesData.push(data);
+                        renderNotesList();
+                     }
+                }
+            } else if (data.questStatus && data.id) { // Heuristic for a single Story Beat
+                const index = quests.findIndex(q => q.id === data.id);
+                if (index !== -1) {
+                    quests[index] = data;
+                    alert(`Story Beat "${data.name}" has been updated.`);
+                    initStoryTree(); // Re-render the story tree
+                } else {
+                     if (confirm(`Story Beat with ID ${data.id} not found. Add as new story beat?`)) {
+                        quests.push(data);
+                        initStoryTree();
+                     }
+                }
+            } else if (Array.isArray(data) && selectedListItem) { // Heuristic for Initiative or Automation
+                 const name = selectedListItem.textContent;
+                 if (saveType === 'initiatives') {
+                    savedInitiatives[name] = data;
+                    alert(`Initiative "${name}" has been updated.`);
+                    renderSavedInitiativesList();
+                 } else if (saveType === 'automation') {
+                    automationBranches[name] = data;
+                    alert(`Automation branch "${name}" has been updated.`);
+                    renderAutomationBranches();
+                 }
+            } else {
+                alert("Could not determine the data type or context. Nothing was saved. Please select a category or an item first.");
+            }
+        } catch (e) {
+            alert('Invalid JSON. Please correct it and try again.');
+            console.error('Error parsing JSON on save:', e);
+        }
     }
 });
