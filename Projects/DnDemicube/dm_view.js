@@ -10078,6 +10078,22 @@ function displayToast(messageElement) {
     }
 
     function handleNextAutomation() {
+        const notePreviewOverlay = document.getElementById('note-preview-overlay');
+        const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+
+        if (notePreviewOverlay && notePreviewOverlay.style.display !== 'none') {
+            notePreviewOverlay.style.display = 'none';
+            if (playerWindow && !playerWindow.closed) {
+                playerWindow.postMessage({ type: 'hideNotePreview' }, '*');
+            }
+        }
+        if (characterPreviewOverlay && characterPreviewOverlay.style.display !== 'none') {
+            characterPreviewOverlay.style.display = 'none';
+            if (playerWindow && !playerWindow.closed) {
+                playerWindow.postMessage({ type: 'hideCharacterPreview' }, '*');
+            }
+        }
+
         const startLine = document.getElementById('automation-start-line');
         if (!startLine) return;
 
@@ -10206,6 +10222,7 @@ function displayToast(messageElement) {
                     let wasFirstStepUndone = false;
                     let wasLastStepUndone = false;
                     const lastStepIndex = quest.storySteps.length - 1;
+                    let logsRemoved = false;
 
                     linkedSteps.forEach(stepInfo => {
                         const step = quest.storySteps[stepInfo.stepIndex];
@@ -10214,27 +10231,38 @@ function displayToast(messageElement) {
                             if (stepInfo.stepIndex === 0) wasFirstStepUndone = true;
                             if (stepInfo.stepIndex === lastStepIndex) wasLastStepUndone = true;
 
-                            addLogEntry({
-                                type: 'system',
-                                message: `Undo: Step "${step.title || 'Unnamed'}" in quest "${quest.name}" marked as not completed.`
-                            });
+                            // Find and remove the corresponding log entry
+                            const logMessage = `${quest.name}: ${step.title || 'Unnamed step'} completed.`;
+                            const logIndex = diceRollHistory.findIndex(entry => entry.message === logMessage);
+                            if (logIndex > -1) {
+                                diceRollHistory.splice(logIndex, 1);
+                                logsRemoved = true;
+                            }
                         }
                     });
 
                     if (wasFirstStepUndone && quest.questStatus === 'Active') {
                         quest.questStatus = 'Available';
-                        addLogEntry({
-                            type: 'system',
-                            message: `Undo: Quest "${quest.name}" status reverted to Available.`
-                        });
+                        const logMessage = `Undo: Quest "${quest.name}" status reverted to Available.`;
+                        const logIndex = diceRollHistory.findIndex(entry => entry.message === logMessage);
+                        if (logIndex > -1) {
+                            diceRollHistory.splice(logIndex, 1);
+                            logsRemoved = true;
+                        }
                     }
 
                     if (wasLastStepUndone && quest.questStatus === 'Completed') {
                         quest.questStatus = 'Active';
-                         addLogEntry({
-                            type: 'system',
-                            message: `Undo: Quest "${quest.name}" status reverted to Active.`
-                        });
+                        const logMessage = `Undo: Quest "${quest.name}" status reverted to Active.`;
+                        const logIndex = diceRollHistory.findIndex(entry => entry.message === logMessage);
+                        if (logIndex > -1) {
+                            diceRollHistory.splice(logIndex, 1);
+                            logsRemoved = true;
+                        }
+                    }
+
+                    if (logsRemoved) {
+                        renderActionLog();
                     }
 
                     renderCards();
