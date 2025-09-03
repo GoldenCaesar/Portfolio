@@ -9901,39 +9901,61 @@ function displayToast(messageElement) {
         (automationCanvasData || []).forEach(cardData => {
             const card = document.createElement('div');
 
-            // Handle multiple formats for backward compatibility
-            if (typeof cardData === 'string') {
-                // Very old format: just innerHTML string
-                card.innerHTML = cardData;
-                card.classList.add('module-card');
-            } else if (cardData && typeof cardData === 'object') {
-                // Standard and new format
-                card.className = cardData.cardClass || 'module-card'; // Default class
-                if (cardData.innerHTML) { // For backward compatibility
-                    card.innerHTML = cardData.innerHTML;
-                } else {
-                    const cardTitleSpan = document.createElement('span');
-                    cardTitleSpan.textContent = cardData.dataset.title;
-                    card.appendChild(cardTitleSpan);
+            // Handle the special "start-line" card type
+            if (cardData.dataset && cardData.dataset.cardType === 'start-line') {
+                card.id = 'automation-start-line';
+                card.className = 'automation-start-line module-card';
+                card.textContent = '--- Start Next ---';
+                card.dataset.cardType = 'start-line';
 
-                    const label = document.createElement('span');
-                    label.className = 'automation-card-label';
-                    label.textContent = cardData.labelText;
-                    card.appendChild(label);
-                }
+                // Re-apply styles
+                card.style.textAlign = 'center';
+                card.style.fontWeight = 'bold';
+                card.style.color = '#a0b4c9';
+                card.style.cursor = 'move';
+                card.style.padding = '5px 0';
+                card.style.margin = '5px';
+                card.style.borderTop = '2px dashed #a0b4c9';
+                card.style.borderBottom = '2px dashed #a0b4c9';
+                card.style.backgroundColor = '#2d3748';
+            } else {
+                // Handle regular cards with multiple formats for backward compatibility
+                if (typeof cardData === 'string') {
+                    // Very old format: just innerHTML string
+                    card.innerHTML = cardData;
+                    card.classList.add('module-card');
+                } else if (cardData && typeof cardData === 'object') {
+                    // Standard and new format
+                    card.className = cardData.cardClass || 'module-card'; // Default class
+                    if (cardData.innerHTML) { // For backward compatibility
+                        card.innerHTML = cardData.innerHTML;
+                    } else {
+                        const cardTitleSpan = document.createElement('span');
+                        cardTitleSpan.textContent = cardData.dataset.title;
+                        card.appendChild(cardTitleSpan);
 
-                if (cardData.dataset) {
-                    for (const key in cardData.dataset) {
-                        card.dataset[key] = cardData.dataset[key];
+                        const label = document.createElement('span');
+                        label.className = 'automation-card-label';
+                        label.textContent = cardData.labelText;
+                        card.appendChild(label);
+                    }
+
+                    if (cardData.dataset) {
+                        for (const key in cardData.dataset) {
+                            card.dataset[key] = cardData.dataset[key];
+                        }
                     }
                 }
             }
+
 
             automationCanvas.appendChild(card);
 
             // Re-attach listener for all cards after loading
             card.addEventListener('click', () => {
-                displayCardDetails(card);
+                if (card.dataset.cardType !== 'start-line') {
+                    displayCardDetails(card);
+                }
             });
 
             card.draggable = true;
@@ -11031,6 +11053,36 @@ function getDragAfterElement(container, y) {
 
         moduleCardsContainer.innerHTML = '';
         automationCardCounters = {}; // Reset counters on initialization
+
+        // Add the "Start Next" line if it doesn't exist
+        if (automationCanvas && !automationCanvas.querySelector('#automation-start-line')) {
+            const startLine = document.createElement('div');
+            startLine.id = 'automation-start-line';
+            startLine.className = 'automation-start-line module-card'; // Use module-card for drag/drop compatibility
+            startLine.textContent = '--- Start Next ---';
+            startLine.draggable = true;
+            startLine.dataset.cardType = 'start-line';
+
+            // Styling
+            startLine.style.textAlign = 'center';
+            startLine.style.fontWeight = 'bold';
+            startLine.style.color = '#a0b4c9';
+            startLine.style.cursor = 'move';
+            startLine.style.padding = '5px 0';
+            startLine.style.margin = '5px';
+            startLine.style.borderTop = '2px dashed #a0b4c9';
+            startLine.style.borderBottom = '2px dashed #a0b4c9';
+            startLine.style.backgroundColor = '#2d3748';
+
+            startLine.addEventListener('dragstart', () => {
+                startLine.classList.add('dragging');
+            });
+            startLine.addEventListener('dragend', () => {
+                startLine.classList.remove('dragging');
+            });
+
+            automationCanvas.prepend(startLine);
+        }
 
         cardButtons.forEach(cardName => {
             const card = document.createElement('div');
