@@ -9937,6 +9937,44 @@ function displayToast(messageElement) {
         });
     }
 
+    function handleBeginAutomation() {
+        beginAutomationButton.style.display = 'none';
+        automationActiveControls.style.display = 'flex';
+    }
+
+    function handleStopAutomation() {
+        beginAutomationButton.style.display = 'block';
+        automationActiveControls.style.display = 'none';
+        const automationCanvas = document.getElementById('automation-canvas');
+        const startLine = document.getElementById('automation-start-line');
+        if (automationCanvas && startLine) {
+            automationCanvas.prepend(startLine);
+        }
+    }
+
+    function handleNextAutomation() {
+        const startLine = document.getElementById('automation-start-line');
+        if (!startLine) return;
+
+        const cardToActivate = startLine.nextElementSibling;
+        if (cardToActivate && cardToActivate.id !== 'automation-start-line') {
+            cardToActivate.after(startLine);
+            activateCard(cardToActivate);
+        } else {
+            handleStopAutomation();
+        }
+    }
+
+    function handlePreviousAutomation() {
+        const startLine = document.getElementById('automation-start-line');
+        if (!startLine) return;
+
+        const cardToMoveBefore = startLine.previousElementSibling;
+        if (cardToMoveBefore && cardToMoveBefore.classList.contains('module-card') && cardToMoveBefore.id !== 'automation-start-line') {
+            cardToMoveBefore.before(startLine);
+        }
+    }
+
     function activateCard(cardElement) {
         if (!cardElement) return;
 
@@ -10076,49 +10114,19 @@ function displayToast(messageElement) {
     }
 
     if (beginAutomationButton) {
-        beginAutomationButton.addEventListener('click', () => {
-            beginAutomationButton.style.display = 'none';
-            automationActiveControls.style.display = 'flex';
-        });
+        beginAutomationButton.addEventListener('click', () => handleBeginAutomation());
     }
 
     if (stopAutomationButton) {
-        stopAutomationButton.addEventListener('click', () => {
-            beginAutomationButton.style.display = 'block';
-            automationActiveControls.style.display = 'none';
-            const automationCanvas = document.getElementById('automation-canvas');
-            const startLine = document.getElementById('automation-start-line');
-            if (automationCanvas && startLine) {
-                automationCanvas.prepend(startLine);
-            }
-        });
+        stopAutomationButton.addEventListener('click', () => handleStopAutomation());
     }
 
     if (nextAutomationButton) {
-        nextAutomationButton.addEventListener('click', () => {
-            const startLine = document.getElementById('automation-start-line');
-            if (!startLine) return;
-
-            const cardToActivate = startLine.nextElementSibling;
-            if (cardToActivate) {
-                cardToActivate.after(startLine);
-                activateCard(cardToActivate);
-            } else {
-                stopAutomationButton.click();
-            }
-        });
+        nextAutomationButton.addEventListener('click', () => handleNextAutomation());
     }
 
     if (previousAutomationButton) {
-        previousAutomationButton.addEventListener('click', () => {
-            const startLine = document.getElementById('automation-start-line');
-            if (!startLine) return;
-
-            const cardToMoveBefore = startLine.previousElementSibling;
-            if (cardToMoveBefore) {
-                cardToMoveBefore.before(startLine);
-            }
-        });
+        previousAutomationButton.addEventListener('click', () => handlePreviousAutomation());
     }
 
     function renderAutomationCanvasFromData() {
@@ -12523,10 +12531,22 @@ function getDragAfterElement(container, y) {
         `;
 
         // Add event listeners
-        document.getElementById('footer-begin-automation-button').addEventListener('click', () => document.getElementById('begin-automation-button').click());
-        document.getElementById('footer-previous-automation-button').addEventListener('click', () => document.getElementById('previous-automation-button').click());
-        document.getElementById('footer-stop-automation-button').addEventListener('click', () => document.getElementById('stop-automation-button').click());
-        document.getElementById('footer-next-automation-button').addEventListener('click', () => document.getElementById('next-automation-button').click());
+        document.getElementById('footer-begin-automation-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleBeginAutomation();
+        });
+        document.getElementById('footer-previous-automation-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            handlePreviousAutomation();
+        });
+        document.getElementById('footer-stop-automation-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleStopAutomation();
+        });
+        document.getElementById('footer-next-automation-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleNextAutomation();
+        });
 
         document.getElementById('footer-automation-branches-list').addEventListener('click', (e) => {
             const li = e.target.closest('li');
