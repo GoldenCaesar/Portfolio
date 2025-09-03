@@ -336,6 +336,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let automationCanvasData = [];
     let automationCardCounters = {};
     let automationBranches = {};
+    let automationHistory = [];
+    let lastAutomationCard = null;
+    let hasDeviatedFromAutomation = false;
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -1717,6 +1720,8 @@ function getTightBoundingBox(img) {
                     playerWindow.postMessage({ type: 'hideCharacterPreview' }, '*');
                 }
             }
+            hasDeviatedFromAutomation = true;
+            updatePreviousButtonState();
         });
     }
 
@@ -4535,6 +4540,8 @@ function getTightBoundingBox(img) {
                                 sendMapToPlayerView(clickedFileName);
                             }
                         }
+                        hasDeviatedFromAutomation = true;
+                        updatePreviousButtonState();
                         return;
                     }
 
@@ -4559,6 +4566,8 @@ function getTightBoundingBox(img) {
                     } else {
                         modeToggleSwitch.disabled = true;
                     }
+                    hasDeviatedFromAutomation = true;
+                    updatePreviousButtonState();
                 }
             }
         }
@@ -4581,6 +4590,8 @@ function getTightBoundingBox(img) {
                     triggerSlideshow();
                     toggleShadowAnimation(false);
                 }
+                hasDeviatedFromAutomation = true;
+                updatePreviousButtonState();
             }
         });
     }
@@ -5074,7 +5085,9 @@ function getTightBoundingBox(img) {
                     selectedQuestId: selectedQuestId,
                     automationCanvasData: automationCanvasData,
                     automationBranches: automationBranches,
-                    isAutomationActive: automationActiveControls.style.display === 'flex'
+                    isAutomationActive: automationActiveControls.style.display === 'flex',
+                    automationHistory: automationHistory,
+                    lastAutomationCardId: lastAutomationCard ? lastAutomationCard.dataset.cardId : null
                 };
             }
 
@@ -5477,6 +5490,19 @@ function getTightBoundingBox(img) {
                         automationActiveControls.style.display = 'none';
                     }
 
+                    // Restore automation history and state
+                    automationHistory = campaignData.storyTree.automationHistory || [];
+                    const lastCardId = campaignData.storyTree.lastAutomationCardId;
+                    if (lastCardId) {
+                        const automationCanvas = document.getElementById('automation-canvas');
+                        if (automationCanvas) {
+                            lastAutomationCard = Array.from(automationCanvas.querySelectorAll('.module-card')).find(card => card.dataset.cardId === lastCardId);
+                        }
+                    } else {
+                        lastAutomationCard = null;
+                    }
+                    updatePreviousButtonState();
+
                     // Backward compatibility for quests missing new fields
                     quests.forEach(quest => {
                         if (quest.parentId !== undefined) {
@@ -5661,6 +5687,19 @@ function getTightBoundingBox(img) {
                     beginAutomationButton.style.display = 'block';
                     automationActiveControls.style.display = 'none';
                 }
+
+                // Restore automation history and state
+                automationHistory = campaignData.storyTree.automationHistory || [];
+                const lastCardId = campaignData.storyTree.lastAutomationCardId;
+                if (lastCardId) {
+                    const automationCanvas = document.getElementById('automation-canvas');
+                    if (automationCanvas) {
+                        lastAutomationCard = Array.from(automationCanvas.querySelectorAll('.module-card')).find(card => card.dataset.cardId === lastCardId);
+                    }
+                } else {
+                    lastAutomationCard = null;
+                }
+                updatePreviousButtonState();
             } else {
                 // Attempt to convert old data or notify user
                 console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
@@ -7276,6 +7315,8 @@ function getTightBoundingBox(img) {
                     playerWindow.postMessage({ type: 'hideNotePreview' }, '*');
                 }
             }
+            hasDeviatedFromAutomation = true;
+            updatePreviousButtonState();
         });
     }
 
@@ -8407,7 +8448,18 @@ function displayToast(messageElement) {
         return messageElement;
     }
 
-    function addLogEntry(data) {
+    function renderActionLog() {
+        const logContentContainer = document.getElementById('action-log-content');
+        if (!logContentContainer) return;
+
+        logContentContainer.innerHTML = '';
+        diceRollHistory.forEach(item => {
+            const messageElement = createLogCard(item);
+            logContentContainer.prepend(messageElement);
+        });
+    }
+
+    function addLogEntry(data, automationActionId = null) {
         if (!diceDialogueRecord) return;
 
         // Add timestamp and ID
@@ -8419,6 +8471,9 @@ function displayToast(messageElement) {
         const formattedMinutes = minutes.toString().padStart(2, '0');
         data.timestamp = `${(timestamp.getMonth() + 1).toString().padStart(2, '0')}.${timestamp.getDate().toString().padStart(2, '0')}.${timestamp.getFullYear().toString().slice(-2)} | ${formattedHours}:${formattedMinutes}${ampm}`;
         data.id = timestamp.getTime() + Math.random();
+        if (automationActionId) {
+            data.automationActionId = automationActionId;
+        }
 
         // Set type if not present
         if (!data.type) {
@@ -8429,22 +8484,16 @@ function displayToast(messageElement) {
 
         const messageElement = createLogCard(data);
 
-        const logContentContainer = document.getElementById('action-log-content');
-        const targetContainer = logContentContainer || diceDialogueRecord;
-
-        const minimizeButton = document.getElementById('action-log-minimize-button');
-        if (minimizeButton && targetContainer === diceDialogueRecord) {
-             minimizeButton.after(messageElement);
-        } else {
-            targetContainer.prepend(messageElement);
-        }
-
-    displayToast(messageElement);
-    sendToastToPlayerView(data);
-
         if (diceDialogueRecord.classList.contains('persistent-log')) {
-        sendActionLogStateToPlayerView(true);
+            const logContentContainer = document.getElementById('action-log-content');
+            if (logContentContainer) {
+                logContentContainer.prepend(messageElement);
+            }
+            sendActionLogStateToPlayerView(true);
         }
+
+        displayToast(messageElement);
+        sendToastToPlayerView(data);
     }
 
     function sendDiceMenuStateToPlayerView(isOpen) {
@@ -9155,79 +9204,139 @@ function displayToast(messageElement) {
         createLogEntry(message);
     }
 
+    function startInitiativeEncounter(automationActionId = null) {
+        if (activeInitiative.length === 0) {
+            alert("Please add characters to the initiative before starting.");
+            return;
+        }
+        if (initiativeTurn === -1) { // Starting initiative
+            if (isWandering) {
+                isWandering = false;
+                wanderButton.textContent = 'Wander';
+            }
+
+            initiativeTurn = 0;
+            initiativeRound = 1;
+            gameTime = 0;
+
+            activeInitiative.forEach(character => {
+                character.startingHP = character.sheetData.hp_current;
+                character.damageDealt = 0;
+            });
+
+            initiativeStartTime = Date.now();
+            realTimeInterval = setInterval(updateRealTimeTimer, 1000);
+            initiativeTimers.style.display = 'flex';
+            updateGameTimeTimer();
+
+            createLogEntry({ type: 'system', message: "Combat Started" }, automationActionId);
+
+            startInitiativeButton.textContent = 'Stop Initiative';
+            nextTurnButton.style.display = 'inline-block';
+            prevTurnButton.style.display = 'inline-block';
+
+            initiativeTokens = [];
+            let tokenX = 50;
+            let tokenY = 50;
+            let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
+
+            activeInitiative.forEach(character => {
+                const token = {
+                    characterId: character.id,
+                    uniqueId: character.uniqueId,
+                    x: tokenX,
+                    y: tokenY,
+                    size: mapIconSize,
+                    name: character.name,
+                    playerName: character.sheetData.player_name,
+                    portrait: character.sheetData.character_portrait,
+                    initials: getInitials(character.name),
+                    isDetailsVisible: character.isDetailsVisible,
+                    vision: character.vision
+                };
+                initiativeTokens.push(token);
+                tokenX += tokenPixelSize + 10;
+            });
+
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
+
+            requestFogOfWarUpdate();
+            highlightActiveTurn();
+            sendInitiativeDataToPlayerView();
+        } else { // Stopping initiative
+            initiativeTokens = [];
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
+            clearInterval(realTimeInterval);
+            const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
+            const elapsedFormatted = new Date(elapsedSeconds * 1000).toISOString().substr(11, 8);
+            createLogEntry(`Combat Ended. Real Time: ${elapsedFormatted}, Game Time: ${gameTime}s`);
+            createSurvivorStatus();
+
+            initiativeTurn = -1;
+            initiativeStartTime = null;
+            initiativeTimers.style.display = 'none';
+            startInitiativeButton.textContent = 'Start Initiative';
+            nextTurnButton.style.display = 'none';
+            prevTurnButton.style.display = 'none';
+            clearTurnHighlight();
+
+            // Hide token stat block on both DM and player views when initiative ends
+            if (selectedTokenForStatBlock) {
+                tokenStatBlock.style.display = 'none';
+                selectedTokenForStatBlock = null;
+                sendTokenStatBlockStateToPlayerView(false);
+            }
+
+            sendInitiativeDataToPlayerView();
+            if (automationActionId === null) { // Manual stop
+                hasDeviatedFromAutomation = true;
+            }
+            updatePreviousButtonState();
+        }
+    }
+
     if(startInitiativeButton) {
         startInitiativeButton.addEventListener('click', () => {
+            startInitiativeEncounter();
+        });
+    }
+
+    function startWandering(automationActionId = null) {
+        if (isWandering) {
+            // Stop Wandering
+            isWandering = false;
+            wanderButton.textContent = 'Wander';
+            initiativeTokens = [];
+            createLogEntry({ type: 'system', message: "Stopped Wandering" });
+
+            // Hide token stat block on both DM and player views when wandering ends
+            if (selectedTokenForStatBlock) {
+                tokenStatBlock.style.display = 'none';
+                selectedTokenForStatBlock = null;
+                sendTokenStatBlockStateToPlayerView(false);
+            }
+
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
+            sendInitiativeDataToPlayerView();
+            if (automationActionId === null) { // Manual stop
+                hasDeviatedFromAutomation = true;
+            }
+            updatePreviousButtonState();
+        } else {
+            // Start Wandering
             if (activeInitiative.length === 0) {
-                alert("Please add characters to the initiative before starting.");
+                alert("Please add characters to the initiative list before starting to wander.");
                 return;
             }
-            if (initiativeTurn === -1) { // Starting initiative
-                if (isWandering) {
-                    isWandering = false;
-                    wanderButton.textContent = 'Wander';
-                }
-
-                initiativeTurn = 0;
-                initiativeRound = 1;
-                gameTime = 0;
-
-                activeInitiative.forEach(character => {
-                    character.startingHP = character.sheetData.hp_current;
-                    character.damageDealt = 0;
-                });
-
-                initiativeStartTime = Date.now();
-                realTimeInterval = setInterval(updateRealTimeTimer, 1000);
-                initiativeTimers.style.display = 'flex';
-                updateGameTimeTimer();
-
-                createLogEntry("Combat Started");
-
-                startInitiativeButton.textContent = 'Stop Initiative';
-                nextTurnButton.style.display = 'inline-block';
-                prevTurnButton.style.display = 'inline-block';
-
-                initiativeTokens = [];
-                let tokenX = 50;
-                let tokenY = 50;
-                let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
-
-                activeInitiative.forEach(character => {
-                    const token = {
-                        characterId: character.id,
-                        uniqueId: character.uniqueId,
-                        x: tokenX,
-                        y: tokenY,
-                        size: mapIconSize,
-                        name: character.name,
-                        playerName: character.sheetData.player_name,
-                        portrait: character.sheetData.character_portrait,
-                        initials: getInitials(character.name),
-                        isDetailsVisible: character.isDetailsVisible,
-                        vision: character.vision
-                    };
-                    initiativeTokens.push(token);
-                    tokenX += tokenPixelSize + 10;
-                });
-
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                }
-
-                requestFogOfWarUpdate();
-                highlightActiveTurn();
-                sendInitiativeDataToPlayerView();
-            } else { // Stopping initiative
-                initiativeTokens = [];
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                }
+            // Stop initiative if it's running
+            if (initiativeTurn !== -1) {
                 clearInterval(realTimeInterval);
-                const elapsedSeconds = Math.floor((Date.now() - initiativeStartTime) / 1000);
-                const elapsedFormatted = new Date(elapsedSeconds * 1000).toISOString().substr(11, 8);
-                createLogEntry(`Combat Ended. Real Time: ${elapsedFormatted}, Game Time: ${gameTime}s`);
-                createSurvivorStatus();
-
                 initiativeTurn = -1;
                 initiativeStartTime = null;
                 initiativeTimers.style.display = 'none';
@@ -9235,91 +9344,47 @@ function displayToast(messageElement) {
                 nextTurnButton.style.display = 'none';
                 prevTurnButton.style.display = 'none';
                 clearTurnHighlight();
-
-                // Hide token stat block on both DM and player views when initiative ends
-                if (selectedTokenForStatBlock) {
-                    tokenStatBlock.style.display = 'none';
-                    selectedTokenForStatBlock = null;
-                    sendTokenStatBlockStateToPlayerView(false);
-                }
-
-                sendInitiativeDataToPlayerView();
             }
-        });
+
+            isWandering = true;
+            wanderButton.textContent = 'Stop Wandering';
+
+            initiativeTokens = [];
+            let tokenX = 50;
+            let tokenY = 50;
+            let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
+
+            activeInitiative.forEach(character => {
+                const token = {
+                    characterId: character.id,
+                    uniqueId: character.uniqueId,
+                    x: tokenX,
+                    y: tokenY,
+                    size: mapIconSize,
+                    name: character.name,
+                    playerName: character.sheetData.player_name,
+                    portrait: character.sheetData.character_portrait,
+                    initials: getInitials(character.name),
+                    isDetailsVisible: character.isDetailsVisible,
+                    vision: character.vision
+                };
+                initiativeTokens.push(token);
+                tokenX += tokenPixelSize + 10;
+            });
+
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
+
+            requestFogOfWarUpdate();
+            createLogEntry({ type: 'system', message: "Characters are Wandering" }, automationActionId);
+            sendInitiativeDataToPlayerView();
+        }
     }
 
     if (wanderButton) {
         wanderButton.addEventListener('click', () => {
-            if (isWandering) {
-                // Stop Wandering
-                isWandering = false;
-                wanderButton.textContent = 'Wander';
-                initiativeTokens = [];
-                createLogEntry("Stopped Wandering");
-
-                // Hide token stat block on both DM and player views when wandering ends
-                if (selectedTokenForStatBlock) {
-                    tokenStatBlock.style.display = 'none';
-                    selectedTokenForStatBlock = null;
-                    sendTokenStatBlockStateToPlayerView(false);
-                }
-
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                }
-                sendInitiativeDataToPlayerView();
-            } else {
-                // Start Wandering
-                if (activeInitiative.length === 0) {
-                    alert("Please add characters to the initiative list before starting to wander.");
-                    return;
-                }
-                // Stop initiative if it's running
-                if (initiativeTurn !== -1) {
-                    clearInterval(realTimeInterval);
-                    initiativeTurn = -1;
-                    initiativeStartTime = null;
-                    initiativeTimers.style.display = 'none';
-                    startInitiativeButton.textContent = 'Start Initiative';
-                    nextTurnButton.style.display = 'none';
-                    prevTurnButton.style.display = 'none';
-                    clearTurnHighlight();
-                }
-
-                isWandering = true;
-                wanderButton.textContent = 'Stop Wandering';
-
-                initiativeTokens = [];
-                let tokenX = 50;
-                let tokenY = 50;
-                let tokenPixelSize = (mapIconSize / 100) * (currentMapDisplayData.imgWidth || 1000);
-
-                activeInitiative.forEach(character => {
-                    const token = {
-                        characterId: character.id,
-                        uniqueId: character.uniqueId,
-                        x: tokenX,
-                        y: tokenY,
-                        size: mapIconSize,
-                        name: character.name,
-                        playerName: character.sheetData.player_name,
-                        portrait: character.sheetData.character_portrait,
-                        initials: getInitials(character.name),
-                        isDetailsVisible: character.isDetailsVisible,
-                        vision: character.vision
-                    };
-                    initiativeTokens.push(token);
-                    tokenX += tokenPixelSize + 10;
-                });
-
-                if (selectedMapFileName) {
-                    displayMapOnCanvas(selectedMapFileName);
-                }
-
-                requestFogOfWarUpdate();
-                createLogEntry("Characters are Wandering");
-                sendInitiativeDataToPlayerView();
-            }
+            startWandering();
         });
     }
 
@@ -9950,29 +10015,265 @@ function displayToast(messageElement) {
         if (automationCanvas && startLine) {
             automationCanvas.prepend(startLine);
         }
+        automationHistory = [];
+        lastAutomationCard = null;
+        hasDeviatedFromAutomation = true; // Stopping is always a deviation
+        updatePreviousButtonState();
+    }
+
+    function updatePreviousButtonState() {
+        const prevButton = document.getElementById('previous-automation-button');
+        const footerPrevButton = document.getElementById('footer-previous-automation-button');
+        if (!prevButton || !footerPrevButton) return;
+
+        const startLine = document.getElementById('automation-start-line');
+        if (hasDeviatedFromAutomation || !startLine || !startLine.previousElementSibling || startLine.previousElementSibling.id === 'automation-start-line') {
+            prevButton.disabled = true;
+            footerPrevButton.disabled = true;
+            return;
+        }
+
+        const currentCard = startLine.previousElementSibling;
+        if (!currentCard) {
+            prevButton.disabled = true;
+            footerPrevButton.disabled = true;
+            return;
+        }
+
+        let isStateCorrect = false;
+        const cardType = currentCard.dataset.cardType;
+
+        switch (cardType) {
+            case 'note':
+                const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                isStateCorrect = notePreviewOverlay && notePreviewOverlay.style.display !== 'none';
+                break;
+            case 'character':
+                const charPreviewOverlay = document.getElementById('character-preview-overlay');
+                isStateCorrect = charPreviewOverlay && charPreviewOverlay.style.display !== 'none';
+                break;
+            case 'map':
+                const linkedMaps = JSON.parse(currentCard.dataset.linkedMaps || '[]');
+                if (linkedMaps.length > 0) {
+                    const expectedMap = linkedMaps[linkedMaps.length - 1];
+                    isStateCorrect = selectedMapFileName === expectedMap;
+                }
+                break;
+            case 'initiative':
+                isStateCorrect = initiativeTurn > -1;
+                break;
+            case 'wander':
+                isStateCorrect = isWandering;
+                break;
+            case 'story_beat':
+                isStateCorrect = true;
+                break;
+            default:
+                isStateCorrect = false;
+                break;
+        }
+
+        prevButton.disabled = !isStateCorrect;
+        footerPrevButton.disabled = !isStateCorrect;
     }
 
     function handleNextAutomation() {
         const startLine = document.getElementById('automation-start-line');
         if (!startLine) return;
 
+        hasDeviatedFromAutomation = false;
+
         const cardToActivate = startLine.nextElementSibling;
-        if (cardToActivate && cardToActivate.id !== 'automation-start-line') {
-            cardToActivate.after(startLine);
-            activateCard(cardToActivate);
-        } else {
+        if (!cardToActivate || cardToActivate.id === 'automation-start-line') {
             handleStopAutomation();
+            return;
         }
+
+        const notePreviewOverlay = document.getElementById('note-preview-overlay');
+        const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+
+        const historyEntry = {
+            cardId: cardToActivate.dataset.cardId,
+            previousState: {
+                selectedMapFileName: selectedMapFileName,
+                initiativeTurn: initiativeTurn,
+                isWandering: isWandering,
+                initiativeTokens: JSON.parse(JSON.stringify(initiativeTokens)),
+                diceRollHistoryCount: diceRollHistory.length,
+                isNotePreviewVisible: notePreviewOverlay ? notePreviewOverlay.style.display !== 'none' : false,
+                isCharacterPreviewVisible: characterPreviewOverlay ? characterPreviewOverlay.style.display !== 'none' : false,
+            }
+        };
+        automationHistory.push(historyEntry);
+
+        lastAutomationCard = cardToActivate;
+
+        cardToActivate.after(startLine);
+        activateCard(cardToActivate);
+        updatePreviousButtonState();
+    }
+
+    function deactivateCard(card, stateToRestore) {
+        if (!card) {
+            console.error("Deactivate card called without a card.");
+            return;
+        }
+        if (!stateToRestore) {
+            console.error("Deactivate card called without a state to restore.");
+            return;
+        }
+
+        const cardType = card.dataset.cardType;
+        console.log(`Deactivating card ${card.dataset.cardId} of type: ${cardType}`);
+
+        switch (cardType) {
+            case 'note':
+                const notePreviewOverlay = document.getElementById('note-preview-overlay');
+                if (notePreviewOverlay) notePreviewOverlay.style.display = 'none';
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'hideNotePreview' }, '*');
+                }
+                break;
+
+            case 'character':
+                const charPreviewOverlay = document.getElementById('character-preview-overlay');
+                if (charPreviewOverlay) charPreviewOverlay.style.display = 'none';
+                if (playerWindow && !playerWindow.closed) {
+                    playerWindow.postMessage({ type: 'hideCharacterPreview' }, '*');
+                }
+                break;
+
+            case 'map':
+                if (stateToRestore.selectedMapFileName) {
+                    selectedMapFileName = stateToRestore.selectedMapFileName;
+                    displayMapOnCanvas(selectedMapFileName);
+                    sendMapToPlayerView(selectedMapFileName);
+                }
+                break;
+
+            case 'initiative':
+            case 'wander':
+                // Restore the exact previous state
+                initiativeTurn = stateToRestore.initiativeTurn;
+                isWandering = stateToRestore.isWandering;
+                initiativeTokens = stateToRestore.initiativeTokens;
+
+                // Clear any timers if they were running
+                clearInterval(realTimeInterval);
+                initiativeStartTime = null;
+
+                // Restore UI elements based on restored state
+                if (initiativeTurn > -1) {
+                    initiativeTimers.style.display = 'flex';
+                    startInitiativeButton.textContent = 'Stop Initiative';
+                    nextTurnButton.style.display = 'inline-block';
+                    prevTurnButton.style.display = 'inline-block';
+                    highlightActiveTurn();
+                } else if (isWandering) {
+                    wanderButton.textContent = 'Stop Wandering';
+                } else {
+                    initiativeTimers.style.display = 'none';
+                    startInitiativeButton.textContent = 'Start Initiative';
+                    wanderButton.textContent = 'Wander';
+                    nextTurnButton.style.display = 'none';
+                    prevTurnButton.style.display = 'none';
+                    clearTurnHighlight();
+                }
+
+                if (selectedMapFileName) {
+                    displayMapOnCanvas(selectedMapFileName);
+                }
+                sendInitiativeDataToPlayerView();
+
+                // Remove log entries added by the activation
+                const logCountToRemove = diceRollHistory.length - stateToRestore.diceRollHistoryCount;
+                if (logCountToRemove > 0) {
+                    diceRollHistory.splice(stateToRestore.diceRollHistoryCount, logCountToRemove);
+                    console.log(`Removed ${logCountToRemove} log entries.`);
+                    if (diceDialogueRecord.classList.contains('persistent-log')) {
+                        renderActionLog();
+                        sendActionLogStateToPlayerView(true);
+                    }
+                }
+                break;
+
+            case 'story_beat':
+                const linkedQuestId = parseInt(card.dataset.linkedQuestId, 10);
+                const linkedSteps = JSON.parse(card.dataset.linkedSteps || '[]');
+                const quest = quests.find(q => q.id === linkedQuestId);
+
+                if (quest && linkedSteps.length > 0) {
+                    let wasFirstStepUndone = false;
+                    let wasLastStepUndone = false;
+                    const lastStepIndex = quest.storySteps.length - 1;
+
+                    linkedSteps.forEach(stepInfo => {
+                        const step = quest.storySteps[stepInfo.stepIndex];
+                        if (step && step.completed) {
+                            step.completed = false;
+                            if (stepInfo.stepIndex === 0) wasFirstStepUndone = true;
+                            if (stepInfo.stepIndex === lastStepIndex) wasLastStepUndone = true;
+
+                            addLogEntry({
+                                type: 'system',
+                                message: `Undo: Step "${step.title || 'Unnamed'}" in quest "${quest.name}" marked as not completed.`
+                            });
+                        }
+                    });
+
+                    if (wasFirstStepUndone && quest.questStatus === 'Active') {
+                        quest.questStatus = 'Available';
+                        addLogEntry({
+                            type: 'system',
+                            message: `Undo: Quest "${quest.name}" status reverted to Available.`
+                        });
+                    }
+
+                    if (wasLastStepUndone && quest.questStatus === 'Completed') {
+                        quest.questStatus = 'Active';
+                         addLogEntry({
+                            type: 'system',
+                            message: `Undo: Quest "${quest.name}" status reverted to Active.`
+                        });
+                    }
+
+                    renderCards();
+                    drawConnections();
+                    renderActiveQuestsInFooter();
+                    if(activeOverlayCardId === quest.id) {
+                        populateAndShowStoryBeatCard(quest);
+                    }
+                }
+                break;
+        }
+
+        updatePreviousButtonState();
     }
 
     function handlePreviousAutomation() {
         const startLine = document.getElementById('automation-start-line');
         if (!startLine) return;
 
-        const cardToMoveBefore = startLine.previousElementSibling;
-        if (cardToMoveBefore && cardToMoveBefore.classList.contains('module-card') && cardToMoveBefore.id !== 'automation-start-line') {
-            cardToMoveBefore.before(startLine);
+        const historyEntry = automationHistory.pop();
+        if (!historyEntry) {
+            console.log("At the beginning of the automation, cannot go back further.");
+            return;
         }
+
+        const cardToUndo = Array.from(document.querySelectorAll('.module-card')).find(c => c.dataset.cardId === historyEntry.cardId);
+
+        if (!cardToUndo) {
+            console.error(`Could not find card with ID ${historyEntry.cardId} to undo.`);
+            return;
+        }
+
+        deactivateCard(cardToUndo, historyEntry.previousState);
+
+        // Move the line before the card we are "undoing"
+        cardToUndo.before(startLine);
+
+        lastAutomationCard = startLine.previousElementSibling;
+        updatePreviousButtonState();
     }
 
     function activateCard(cardElement) {
@@ -9980,6 +10281,9 @@ function displayToast(messageElement) {
 
         const cardType = cardElement.dataset.cardType;
         let currentLinkIndex = parseInt(cardElement.dataset.currentLinkIndex || '0', 10);
+
+        // Assign a unique ID for this specific activation action, used for undoing logs
+        cardElement.dataset.automationActionId = `auto-action-${Date.now()}`;
 
         switch (cardType) {
             case 'note':
@@ -10095,12 +10399,10 @@ function displayToast(messageElement) {
                 break;
 
             case 'initiative':
+                startInitiativeEncounter(cardElement.dataset.automationActionId);
+                break;
             case 'wander':
-                displayCardDetails(cardElement);
-                const startButton = document.getElementById('automation-start-encounter-btn');
-                if (startButton) {
-                    startButton.click();
-                }
+                startWandering(cardElement.dataset.automationActionId);
                 break;
 
             case 'story_beat':
@@ -11344,6 +11646,7 @@ function getDragAfterElement(container, y) {
                 newCard.appendChild(label);
 
                 newCard.dataset.cardType = baseName;
+                newCard.dataset.cardId = labelText; // Use the unique label as a persistent ID
                 newCard.dataset.title = cardName;
                 newCard.dataset.interactionMode = toggleSwitch.checked ? 'both' : 'dm-only';
                 if (cardName === 'Note') {
