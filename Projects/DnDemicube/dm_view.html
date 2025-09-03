@@ -167,6 +167,16 @@
             <div id="module-cards-container">
                 <!-- Module cards will be dynamically added here -->
             </div>
+            <div id="automation-management-section" class="sidebar-section">
+                <h3>Management</h3>
+                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                    <input type="text" id="automation-branch-name-input" placeholder="Branch Name" style="flex-grow: 1;">
+                    <button id="save-automation-branch-button">Save</button>
+                </div>
+                <ul id="automation-branches-list" style="list-style-type: none; padding: 0; max-height: 200px; overflow-y: auto;">
+                    <!-- Saved automation branches will be listed here -->
+                </ul>
+            </div>
         </div>
         <div id="automation-canvas-container">
             <div id="automation-canvas"></div>

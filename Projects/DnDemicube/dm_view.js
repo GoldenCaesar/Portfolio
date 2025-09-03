@@ -237,6 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const storyTreeCardContainer = document.getElementById('card-container');
     const storyBeatCardOverlay = document.getElementById('story-beat-card-overlay');
     const storyBeatCardExportButton = document.getElementById('story-beat-card-export-button');
+    const automationManagementSection = document.getElementById('automation-management-section');
+    const automationBranchNameInput = document.getElementById('automation-branch-name-input');
+    const saveAutomationBranchButton = document.getElementById('save-automation-branch-button');
+    const automationBranchesList = document.getElementById('automation-branches-list');
     const storyBeatCardBody = document.getElementById('story-beat-card-body');
     const quoteEditorContainer = document.getElementById('quote-editor-container');
     const jsonEditOverlay = document.getElementById('json-export-overlay'); // Changed name
@@ -326,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let originalQuestState = null;
     let automationCanvasData = [];
     let automationCardCounters = {};
+    let automationBranches = {};
 
     // Initiative Tracker State Variables
     let savedInitiatives = {}; // Object to store saved initiatives: { "name": [...] }
@@ -5049,10 +5054,11 @@ function getTightBoundingBox(img) {
                 const automationCanvas = document.getElementById('automation-canvas');
                 if (automationCanvas) {
                     automationCanvasData = Array.from(automationCanvas.children).map(card => {
+                        const label = card.querySelector('.automation-card-label');
                         return {
-                            innerHTML: card.innerHTML,
                             cardClass: card.className,
-                            dataset: { ...card.dataset }
+                            dataset: { ...card.dataset },
+                            labelText: label ? label.textContent : ''
                         };
                     });
                 }
@@ -5061,7 +5067,8 @@ function getTightBoundingBox(img) {
                     quests: quests,
                     nextQuestId: nextQuestId,
                     selectedQuestId: selectedQuestId,
-                    automationCanvasData: automationCanvasData
+                    automationCanvasData: automationCanvasData,
+                    automationBranches: automationBranches
                 };
             }
 
@@ -5452,7 +5459,9 @@ function getTightBoundingBox(img) {
                     nextQuestId = campaignData.storyTree.nextQuestId;
                     selectedQuestId = campaignData.storyTree.selectedQuestId;
                     automationCanvasData = campaignData.storyTree.automationCanvasData || [];
+                    automationBranches = campaignData.storyTree.automationBranches || {};
                     renderAutomationCanvasFromData();
+                    renderAutomationBranches();
 
                     // Backward compatibility for quests missing new fields
                     quests.forEach(quest => {
@@ -5628,7 +5637,9 @@ function getTightBoundingBox(img) {
                 nextQuestId = campaignData.storyTree.nextQuestId;
                 selectedQuestId = campaignData.storyTree.selectedQuestId;
                 automationCanvasData = campaignData.storyTree.automationCanvasData || [];
+                automationBranches = campaignData.storyTree.automationBranches || {};
                 renderAutomationCanvasFromData();
+                renderAutomationBranches();
             } else {
                 // Attempt to convert old data or notify user
                 console.warn("Old story tree data format detected. Automatic conversion is not supported. Please recreate the story tree.");
@@ -9898,7 +9909,19 @@ function displayToast(messageElement) {
             } else if (cardData && typeof cardData === 'object') {
                 // Standard and new format
                 card.className = cardData.cardClass || 'module-card'; // Default class
-                card.innerHTML = cardData.innerHTML || '';
+                if (cardData.innerHTML) { // For backward compatibility
+                    card.innerHTML = cardData.innerHTML;
+                } else {
+                    const cardTitleSpan = document.createElement('span');
+                    cardTitleSpan.textContent = cardData.dataset.title;
+                    card.appendChild(cardTitleSpan);
+
+                    const label = document.createElement('span');
+                    label.className = 'automation-card-label';
+                    label.textContent = cardData.labelText;
+                    card.appendChild(label);
+                }
+
                 if (cardData.dataset) {
                     for (const key in cardData.dataset) {
                         card.dataset[key] = cardData.dataset[key];
@@ -12323,6 +12346,82 @@ function getDragAfterElement(container, y) {
 
     // Initial call to populate footer
     renderActiveQuestsInFooter();
+
+    function renderAutomationBranches() {
+        if (!automationBranchesList) return;
+        automationBranchesList.innerHTML = '';
+
+        if (Object.keys(automationBranches).length === 0) {
+            const placeholder = document.createElement('li');
+            placeholder.textContent = 'No branches saved yet.';
+            placeholder.className = 'sidebar-placeholder';
+            automationBranchesList.appendChild(placeholder);
+            return;
+        }
+
+        for (const branchName in automationBranches) {
+            const listItem = document.createElement('li');
+            listItem.className = 'automation-branch-item';
+            listItem.style.display = 'flex';
+            listItem.style.justifyContent = 'space-between';
+            listItem.style.alignItems = 'center';
+            listItem.style.padding = '5px';
+            listItem.style.cursor = 'pointer';
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = branchName;
+            listItem.appendChild(nameSpan);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.className = 'delete-automation-branch-btn';
+            deleteBtn.title = 'Delete this branch';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm(`Are you sure you want to delete the automation branch "${branchName}"?`)) {
+                    delete automationBranches[branchName];
+                    renderAutomationBranches();
+                }
+            });
+
+            listItem.appendChild(deleteBtn);
+
+            listItem.addEventListener('click', () => {
+                if (confirm(`This will replace the current automation canvas. Are you sure you want to load the "${branchName}" branch?`)) {
+                    automationCanvasData = JSON.parse(JSON.stringify(automationBranches[branchName]));
+                    renderAutomationCanvasFromData();
+                }
+            });
+
+            automationBranchesList.appendChild(listItem);
+        }
+    }
+
+    if (saveAutomationBranchButton) {
+        saveAutomationBranchButton.addEventListener('click', () => {
+            const branchName = automationBranchNameInput.value.trim();
+            if (!branchName) {
+                alert('Please enter a name for the automation branch.');
+                return;
+            }
+
+            const automationCanvas = document.getElementById('automation-canvas');
+            if (automationCanvas) {
+                 const currentCanvasData = Array.from(automationCanvas.children).map(card => {
+                    const label = card.querySelector('.automation-card-label');
+                    return {
+                        cardClass: card.className,
+                        dataset: { ...card.dataset },
+                        labelText: label ? label.textContent : ''
+                    };
+                });
+                automationBranches[branchName] = JSON.parse(JSON.stringify(currentCanvasData));
+                automationBranchNameInput.value = '';
+                renderAutomationBranches();
+                alert(`Automation branch "${branchName}" saved.`);
+            }
+        });
+    }
 
     function sendQuestLogData() {
         if (!playerWindow || playerWindow.closed) return;
