@@ -256,8 +256,26 @@
             </div>
             <div id="settings-content">
                 <div class="settings-category-content active" id="import-export-content">
-                    <h2>Import/Export Settings</h2>
-                    <!-- Content for Import/Export settings -->
+                    <div class="import-export-controls">
+                        <button data-type="all">All</button>
+                        <button data-type="characters">Characters</button>
+                        <button data-type="notes">Notes</button>
+                        <button data-type="story_beats">Story Beats</button>
+                        <button data-type="initiatives">Initiatives</button>
+                        <button data-type="automation">Automation</button>
+                    </div>
+                    <div class="import-export-main">
+                        <div class="import-export-list">
+                            <!-- Items will be populated here by JS -->
+                        </div>
+                        <div class="import-export-preview">
+                            <textarea readonly></textarea>
+                            <div class="import-export-buttons">
+                                <button id="save-export-button">Save</button>
+                                <button id="copy-export-button">Copy</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="settings-category-content" id="ai-features-content">
                     <h2>AI Features</h2>
