@@ -562,7 +562,68 @@ h3 { margin-top: 0; border-bottom: 1px solid #3f4c5a; padding-bottom: 5px;}
 }
 
 .settings-category-content.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#import-export-content h2 {
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+.import-export-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.import-export-controls button {
+    background-color: #3a4f6a;
+}
+
+.import-export-main {
+    display: flex;
+    flex-grow: 1;
+    gap: 15px;
+    min-height: 0; /* Important for flex children with overflow */
+}
+
+.import-export-list {
+    width: 30%;
+    border: 1px solid #3f4c5a;
+    border-radius: 4px;
+    overflow-y: auto;
+    background-color: #15191e;
+    padding: 5px;
+}
+
+.import-export-preview {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.import-export-preview textarea {
+    flex-grow: 1;
+    width: 100%;
+    resize: none;
+    background-color: #15191e;
+    border: 1px solid #3f4c5a;
+    color: #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: monospace;
+}
+
+.import-export-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
 }
 
 #automation-controls {
