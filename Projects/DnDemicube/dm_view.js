@@ -12946,7 +12946,6 @@ function getDragAfterElement(container, y) {
     });
 
     const automationControls = document.getElementById('automation-controls');
-    const automationBranchesList = document.getElementById('automation-branches-list');
     const automationCanvas = document.getElementById('automation-canvas');
 
     const observerConfig = { attributes: true, childList: true, subtree: true };
