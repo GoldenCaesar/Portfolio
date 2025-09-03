@@ -10005,14 +10005,11 @@ function displayToast(messageElement) {
     function handleBeginAutomation() {
         beginAutomationButton.style.display = 'none';
         automationActiveControls.style.display = 'flex';
-        document.getElementById('floating-controls-container').style.display = 'flex';
-        updatePreviousButtonState();
     }
 
     function handleStopAutomation() {
         beginAutomationButton.style.display = 'block';
         automationActiveControls.style.display = 'none';
-        document.getElementById('floating-controls-container').style.display = 'none';
         const automationCanvas = document.getElementById('automation-canvas');
         const startLine = document.getElementById('automation-start-line');
         if (automationCanvas && startLine) {
@@ -10027,14 +10024,12 @@ function displayToast(messageElement) {
     function updatePreviousButtonState() {
         const prevButton = document.getElementById('previous-automation-button');
         const footerPrevButton = document.getElementById('footer-previous-automation-button');
-        const floatingPrevButton = document.getElementById('floating-prev-button');
-        if (!prevButton || !footerPrevButton || !floatingPrevButton) return;
+        if (!prevButton || !footerPrevButton) return;
 
         const startLine = document.getElementById('automation-start-line');
         if (hasDeviatedFromAutomation || !startLine || !startLine.previousElementSibling || startLine.previousElementSibling.id === 'automation-start-line') {
             prevButton.disabled = true;
             footerPrevButton.disabled = true;
-            floatingPrevButton.disabled = true;
             return;
         }
 
@@ -10042,7 +10037,6 @@ function displayToast(messageElement) {
         if (!currentCard) {
             prevButton.disabled = true;
             footerPrevButton.disabled = true;
-            floatingPrevButton.disabled = true;
             return;
         }
 
@@ -10081,7 +10075,6 @@ function displayToast(messageElement) {
 
         prevButton.disabled = !isStateCorrect;
         footerPrevButton.disabled = !isStateCorrect;
-        floatingPrevButton.disabled = !isStateCorrect;
     }
 
     function handleNextAutomation() {
@@ -10464,16 +10457,6 @@ function displayToast(messageElement) {
 
     if (previousAutomationButton) {
         previousAutomationButton.addEventListener('click', () => handlePreviousAutomation());
-    }
-
-    const floatingPrevButton = document.getElementById('floating-prev-button');
-    if (floatingPrevButton) {
-        floatingPrevButton.addEventListener('click', () => handlePreviousAutomation());
-    }
-
-    const floatingNextButton = document.getElementById('floating-next-button');
-    if (floatingNextButton) {
-        floatingNextButton.addEventListener('click', () => handleNextAutomation());
     }
 
     function renderAutomationCanvasFromData() {
