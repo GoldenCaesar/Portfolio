@@ -10112,6 +10112,9 @@ function displayToast(messageElement) {
             return;
         }
 
+        const notePreviewOverlay = document.getElementById('note-preview-overlay');
+        const characterPreviewOverlay = document.getElementById('character-preview-overlay');
+
         const historyEntry = {
             cardId: cardToActivate.dataset.cardId,
             previousState: {
