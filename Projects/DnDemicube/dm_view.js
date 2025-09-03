@@ -12393,12 +12393,155 @@ function getDragAfterElement(container, y) {
                 }
                 if (targetTabId === 'footer-quests') {
                     renderActiveQuestsInFooter();
+                } else if (targetTabId === 'footer-automation') {
+                    renderAutomationFooter();
                 }
             }
         });
     }
 
     let selectedFooterQuestId = null;
+
+    function renderAutomationFooterMain(branchName) {
+        const mainPane = document.getElementById('footer-automation-main');
+        if (!mainPane) return;
+
+        mainPane.innerHTML = ''; // Clear content
+
+        const branchData = automationBranches[branchName];
+        if (!branchData) {
+            mainPane.innerHTML = '<p class="footer-placeholder">Branch data not found.</p>';
+            return;
+        }
+
+        const cardList = document.createElement('div');
+        cardList.className = 'automation-cards-list';
+
+        const mainAutomationCanvas = document.getElementById('automation-canvas');
+        const startLine = mainAutomationCanvas.querySelector('#automation-start-line');
+        let startLineRendered = false;
+
+        // Function to render the start line
+        const renderStartLine = () => {
+            const startLineIndicator = document.createElement('div');
+            startLineIndicator.className = 'automation-start-line';
+            startLineIndicator.textContent = '--- Start Next ---';
+            startLineIndicator.style.cssText = 'text-align: center; font-weight: bold; color: #a0b4c9; border-top: 2px dashed #a0b4c9; border-bottom: 2px dashed #a0b4c9; margin: 5px 0; padding: 5px 0;';
+            cardList.appendChild(startLineIndicator);
+            startLineRendered = true;
+        };
+
+        // If start line is at the very beginning
+        if (startLine && !startLine.previousElementSibling) {
+            renderStartLine();
+        }
+
+        branchData.forEach(cardData => {
+            // Check if the start line should be rendered before this card
+            if (startLine && !startLineRendered) {
+                const nextCardOnCanvas = startLine.nextElementSibling;
+                if (nextCardOnCanvas && nextCardOnCanvas.querySelector('.automation-card-label')?.textContent === cardData.labelText) {
+                    renderStartLine();
+                }
+            }
+
+            const card = document.createElement('div');
+            card.className = cardData.cardClass.includes('module-card-dm') ? 'quest-footer-card' : 'quest-footer-card selected'; // Simple visual distinction
+            card.textContent = cardData.dataset.title || cardData.labelText;
+            cardList.appendChild(card);
+        });
+
+        // If start line is at the very end
+        if (startLine && !startLine.nextElementSibling && !startLineRendered) {
+            renderStartLine();
+        }
+
+        mainPane.appendChild(cardList);
+    }
+
+    function syncAutomationControls() {
+        const originalBeginBtn = document.getElementById('begin-automation-button');
+        const originalActiveControls = document.getElementById('automation-active-controls');
+        const originalBranchList = document.getElementById('automation-branches-list');
+
+        const footerAutomationTab = document.getElementById('footer-automation');
+        if (!footerAutomationTab || !footerAutomationTab.classList.contains('active')) {
+            return; // Don't sync if the tab isn't visible
+        }
+
+        const footerBeginBtn = document.getElementById('footer-begin-automation-button');
+        const footerActiveControls = document.getElementById('footer-automation-active-controls');
+        const footerBranchList = document.getElementById('footer-automation-branches-list');
+        const mainPane = document.getElementById('footer-automation-main');
+
+        if (!originalBeginBtn || !footerBeginBtn) return;
+
+        // Sync button visibility
+        footerBeginBtn.style.display = originalBeginBtn.style.display;
+        footerActiveControls.style.display = originalActiveControls.style.display;
+
+        // Sync branch list content and selection
+        footerBranchList.innerHTML = originalBranchList.innerHTML;
+        let selectedBranchName = null;
+        const selectedLi = originalBranchList.querySelector('li.selected');
+
+        // Clear previous selections in footer
+        footerBranchList.querySelectorAll('li').forEach(li => li.classList.remove('selected'));
+
+        if (selectedLi) {
+            selectedBranchName = selectedLi.querySelector('span').textContent;
+            const footerSelectedLi = Array.from(footerBranchList.querySelectorAll('li')).find(li => li.querySelector('span')?.textContent === selectedBranchName);
+            if (footerSelectedLi) {
+                footerSelectedLi.classList.add('selected');
+            }
+        }
+
+        // Sync main pane content
+        if (selectedBranchName) {
+            renderAutomationFooterMain(selectedBranchName);
+        } else {
+            mainPane.innerHTML = '<p class="footer-placeholder">No automation branch selected.</p>';
+        }
+    }
+
+    function renderAutomationFooter() {
+        const leftPane = document.getElementById('footer-automation-left');
+        if (!leftPane) return;
+
+        leftPane.innerHTML = `
+            <h3>Controls</h3>
+            <div id="footer-automation-controls" style="margin-bottom: 10px; display: flex; justify-content: space-around;">
+                <button id="footer-begin-automation-button" style="display: none;">Begin</button>
+                <div id="footer-automation-active-controls" style="display: flex; justify-content: space-between; width: 100%;">
+                    <button id="footer-previous-automation-button">Previous</button>
+                    <button id="footer-stop-automation-button">Stop</button>
+                    <button id="footer-next-automation-button">Next</button>
+                </div>
+            </div>
+            <h3>Branches</h3>
+            <ul id="footer-automation-branches-list" style="list-style-type: none; padding: 0; max-height: 150px; overflow-y: auto;"></ul>
+        `;
+
+        // Add event listeners
+        document.getElementById('footer-begin-automation-button').addEventListener('click', () => document.getElementById('begin-automation-button').click());
+        document.getElementById('footer-previous-automation-button').addEventListener('click', () => document.getElementById('previous-automation-button').click());
+        document.getElementById('footer-stop-automation-button').addEventListener('click', () => document.getElementById('stop-automation-button').click());
+        document.getElementById('footer-next-automation-button').addEventListener('click', () => document.getElementById('next-automation-button').click());
+
+        document.getElementById('footer-automation-branches-list').addEventListener('click', (e) => {
+            const li = e.target.closest('li');
+            if (li) {
+                const branchName = li.querySelector('span').textContent;
+                const originalBranchList = document.getElementById('automation-branches-list');
+                const originalLi = Array.from(originalBranchList.querySelectorAll('li')).find(item => item.querySelector('span')?.textContent === branchName);
+                if (originalLi) {
+                    originalLi.click(); // This will trigger the original logic, including re-rendering the main canvas
+                }
+            }
+        });
+
+        syncAutomationControls(); // Initial sync
+    }
 
     function renderActiveQuestsInFooter() {
         const activeQuestsList = document.getElementById('footer-active-quests-list');
@@ -12787,5 +12930,34 @@ function getDragAfterElement(container, y) {
                 }
             }
         });
+    }
+
+    // --- Automation Footer Sync Observer ---
+    let syncTimeout;
+    const observer = new MutationObserver((mutations) => {
+        // Use a timeout to debounce the sync call, as many mutations can fire at once.
+        clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+            const footerAutomationTab = document.getElementById('footer-automation');
+            if (footerAutomationTab && footerAutomationTab.classList.contains('active')) {
+                syncAutomationControls();
+            }
+        }, 50); // A small delay is usually enough to batch updates.
+    });
+
+    const automationControls = document.getElementById('automation-controls');
+    const automationBranchesList = document.getElementById('automation-branches-list');
+    const automationCanvas = document.getElementById('automation-canvas');
+
+    const observerConfig = { attributes: true, childList: true, subtree: true };
+
+    if (automationControls) {
+        observer.observe(automationControls, observerConfig);
+    }
+    if (automationBranchesList) {
+        observer.observe(automationBranchesList, observerConfig);
+    }
+    if (automationCanvas) {
+        observer.observe(automationCanvas, observerConfig);
     }
 });
