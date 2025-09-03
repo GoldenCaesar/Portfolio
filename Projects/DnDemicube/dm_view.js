@@ -12532,10 +12532,17 @@ function getDragAfterElement(container, y) {
             const li = e.target.closest('li');
             if (li) {
                 const branchName = li.querySelector('span').textContent;
-                const originalBranchList = document.getElementById('automation-branches-list');
-                const originalLi = Array.from(originalBranchList.querySelectorAll('li')).find(item => item.querySelector('span')?.textContent === branchName);
-                if (originalLi) {
-                    originalLi.click(); // This will trigger the original logic, including re-rendering the main canvas
+                if (automationBranches[branchName]) {
+                    loadAndRenderAutomationBranch(branchName);
+
+                    // Manually update selection in the main list to keep UI in sync
+                    const mainList = document.getElementById('automation-branches-list');
+                    if (mainList) {
+                        const currentSelected = mainList.querySelector('.selected');
+                        if (currentSelected) currentSelected.classList.remove('selected');
+                        const liToSelect = Array.from(mainList.querySelectorAll('li')).find(item => item.querySelector('span')?.textContent === branchName);
+                        if (liToSelect) liToSelect.classList.add('selected');
+                    }
                 }
             }
         });
@@ -12811,15 +12818,28 @@ function getDragAfterElement(container, y) {
             listItem.appendChild(deleteBtn);
 
             listItem.addEventListener('click', () => {
+                // Add selection logic here
+                const currentSelected = automationBranchesList.querySelector('.selected');
+                if (currentSelected) currentSelected.classList.remove('selected');
+                listItem.classList.add('selected');
+
                 if (confirm(`This will replace the current automation canvas. Are you sure you want to load the "${branchName}" branch?`)) {
-                    automationCanvasData = JSON.parse(JSON.stringify(automationBranches[branchName]));
-                    renderAutomationCanvasFromData();
+                    loadAndRenderAutomationBranch(branchName);
+                } else {
+                    // Revert selection on cancel
+                    listItem.classList.remove('selected');
                 }
             });
 
             automationBranchesList.appendChild(listItem);
         }
     }
+
+function loadAndRenderAutomationBranch(branchName) {
+    if (!automationBranches[branchName]) return;
+    automationCanvasData = JSON.parse(JSON.stringify(automationBranches[branchName]));
+    renderAutomationCanvasFromData();
+}
 
     if (saveAutomationBranchButton) {
         saveAutomationBranchButton.addEventListener('click', () => {
