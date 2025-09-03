@@ -13302,4 +13302,40 @@ function loadAndRenderAutomationBranch(branchName) {
     if (automationCanvas) {
         observer.observe(automationCanvas, observerConfig);
     }
+
+    // Settings Overlay Logic
+    const settingsButton = document.getElementById('settings-button');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsWindow = document.getElementById('settings-window');
+    const settingsCategoryButtons = document.querySelectorAll('.settings-category-button');
+    const settingsCategoryContents = document.querySelectorAll('.settings-category-content');
+
+    if (settingsButton && settingsOverlay && settingsWindow) {
+        settingsButton.addEventListener('click', () => {
+            settingsOverlay.style.display = 'flex';
+        });
+
+        settingsOverlay.addEventListener('click', (event) => {
+            // If the click is on the overlay background, not the window itself
+            if (event.target === settingsOverlay) {
+                settingsOverlay.style.display = 'none';
+            }
+        });
+
+        settingsCategoryButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const category = button.dataset.category;
+
+                // Update button active state
+                settingsCategoryButtons.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.category === category);
+                });
+
+                // Update content active state
+                settingsCategoryContents.forEach(content => {
+                    content.classList.toggle('active', content.id === `${category}-content`);
+                });
+            });
+        });
+    }
 });

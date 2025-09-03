@@ -65,6 +65,7 @@
             <div class="sidebar-section">
                 <h3>Player View</h3>
                 <button id="open-player-view-button">Open Player View</button>
+                <button id="settings-button" style="margin-top: 10px;">Settings</button>
             </div>
         </div>
 
@@ -246,6 +247,25 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="dm_view.js"></script>
     <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+
+    <div id="settings-overlay" style="display: none;">
+        <div id="settings-window">
+            <div id="settings-sidebar">
+                <button class="settings-category-button active" data-category="import-export">Import/Export</button>
+                <button class="settings-category-button" data-category="ai-features">AI Features</button>
+            </div>
+            <div id="settings-content">
+                <div class="settings-category-content active" id="import-export-content">
+                    <h2>Import/Export Settings</h2>
+                    <!-- Content for Import/Export settings -->
+                </div>
+                <div class="settings-category-content" id="ai-features-content">
+                    <h2>AI Features</h2>
+                    <!-- Content for AI features -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="polygon-context-menu" class="context-menu" style="display: none; position: absolute;">
         <ul>
