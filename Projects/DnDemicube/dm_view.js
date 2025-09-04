@@ -13427,63 +13427,46 @@ function loadAndRenderAutomationBranch(branchName) {
         function revertObject(obj) {
             if (Array.isArray(obj)) {
                 obj.forEach(revertObject);
-            } else if (obj !== null && typeof obj === 'object') {
-                // Revert primary ID first
-                if (obj.id && typeof obj.id === 'string') {
-                    if (obj.id.startsWith('Character_')) {
-                        obj.id = reverseMaps.characters[obj.id] || obj.id;
-                    } else if (obj.id.startsWith('Note_')) {
-                        obj.id = reverseMaps.notes[obj.id] || obj.id;
-                    } else if (obj.id.startsWith('Story_Beat_')) {
-                        obj.id = reverseMaps.quests[obj.id] || obj.id;
-                    }
-                }
+                return;
+            }
+            if (obj === null || typeof obj !== 'object') {
+                return;
+            }
 
-                // Revert content placeholders
-                if (obj.hasOwnProperty('content') && obj.title) { // Note heuristic
-                    const imagePlaceholderRegex = /!\[(.*?)\]\((Image_in_Note_\d+_\d+)\)/g;
-                    obj.content = obj.content.replace(imagePlaceholderRegex, (match, altText, placeholder) => {
-                        const dataUrl = importExportIdMaps.noteImages[placeholder];
-                        return dataUrl ? `![${altText}](${dataUrl})` : match;
-                    });
+            // Handle special content replacement first, as these are properties of the object itself.
+            if (obj.hasOwnProperty('content') && obj.title) { // Note heuristic
+                const imagePlaceholderRegex = /!\[(.*?)\]\((Image_in_Note_\d+_\d+)\)/g;
+                obj.content = obj.content.replace(imagePlaceholderRegex, (match, altText, placeholder) => {
+                    const dataUrl = importExportIdMaps.noteImages[placeholder];
+                    return dataUrl ? `![${altText || 'Embedded Image'}](${dataUrl})` : match;
+                });
+            }
+            if (obj.linkedPdf) { // Character heuristic
+                const pdfInfo = importExportIdMaps.characterPdfs[obj.linkedPdf];
+                if (pdfInfo) {
+                    obj.pdfData = pdfInfo.pdfData;
+                    obj.pdfFileName = pdfInfo.pdfFileName;
                 }
-                if (obj.linkedPdf) { // Character heuristic
-                    const pdfInfo = importExportIdMaps.characterPdfs[obj.linkedPdf];
-                    if (pdfInfo) {
-                        obj.pdfData = pdfInfo.pdfData;
-                        obj.pdfFileName = pdfInfo.pdfFileName;
-                    }
-                    delete obj.linkedPdf;
-                }
+                delete obj.linkedPdf;
+            }
 
-                // Recurse through all properties of the object
-                for (const key in obj) {
-                    if (obj.hasOwnProperty(key)) {
-                        if (key !== 'pdfData' && key !== 'pdfFileName') {
-                            revertObject(obj[key]);
+            // Now, iterate over all keys to revert string-based IDs and recurse into nested objects.
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    const value = obj[key];
+
+                    if (typeof value === 'string') {
+                        if (value.startsWith('Character_')) {
+                            obj[key] = reverseMaps.characters[value] || value;
+                        } else if (value.startsWith('Note_')) {
+                            obj[key] = reverseMaps.notes[value] || value;
+                        } else if (value.startsWith('Story_Beat_')) {
+                            obj[key] = reverseMaps.quests[value] || value;
                         }
+                    } else if (typeof value === 'object') {
+                        // It's a nested object or array, recurse into it.
+                        revertObject(value);
                     }
-                }
-
-                // Revert foreign keys (after recursion has processed any nested objects)
-                if (obj.characterId && typeof obj.characterId === 'string' && obj.characterId.startsWith('Character_')) {
-                    obj.characterId = reverseMaps.characters[obj.characterId] || obj.characterId;
-                }
-                if (obj.parentIds) {
-                    obj.parentIds = obj.parentIds.map(pid => (typeof pid === 'string' && pid.startsWith('Story_Beat_')) ? (reverseMaps.quests[pid] || pid) : pid);
-                }
-                if (obj.associatedNPCs) {
-                    obj.associatedNPCs.forEach(npc => {
-                        if (npc.id && typeof npc.id === 'string' && npc.id.startsWith('Character_')) {
-                            npc.id = reverseMaps.characters[npc.id] || npc.id;
-                        }
-                    });
-                }
-                if (obj.linkedNoteId && typeof obj.linkedNoteId === 'string' && obj.linkedNoteId.startsWith('Note_')) {
-                    obj.linkedNoteId = reverseMaps.notes[obj.linkedNoteId] || obj.linkedNoteId;
-                }
-                if (obj.linkedCharacterId && typeof obj.linkedCharacterId === 'string' && obj.linkedCharacterId.startsWith('Character_')) {
-                    obj.linkedCharacterId = reverseMaps.characters[obj.linkedCharacterId] || obj.linkedCharacterId;
                 }
             }
         }
