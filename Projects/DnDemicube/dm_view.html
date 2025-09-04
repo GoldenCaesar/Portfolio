@@ -7,6 +7,30 @@
     <link rel="icon" type="image/x-icon" href="../../assets/Demicube.png">
     <link rel="stylesheet" href="dm_view.css">
     <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            -webkit-animation: spin 2s linear infinite; /* Safari */
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+
+        /* Safari */
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
     <div id="sidebar">
@@ -244,6 +268,8 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
     <script src="dm_view.js"></script>
     <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
 
@@ -255,7 +281,10 @@
             </div>
             <div id="settings-content">
                 <div class="settings-category-content active" id="import-export-content">
-                    <div class="import-export-controls">
+                    <div id="import-export-loader">
+                        <div class="loader"></div>
+                    </div>
+                    <div class="import-export-controls" style="display: none;">
                         <button data-type="all">All</button>
                         <button data-type="characters">Characters</button>
                         <button data-type="notes">Notes</button>
@@ -263,12 +292,12 @@
                         <button data-type="initiatives">Initiatives</button>
                         <button data-type="automation">Automation</button>
                     </div>
-                    <div class="import-export-main">
+                    <div class="import-export-main" style="display: none;">
                         <div class="import-export-list">
                             <!-- Items will be populated here by JS -->
                         </div>
                         <div class="import-export-preview">
-                            <textarea></textarea>
+                            <div id="json-editor"></div>
                             <div class="import-export-buttons">
                                 <button id="save-export-button">Save</button>
                                 <button id="copy-export-button">Copy</button>
