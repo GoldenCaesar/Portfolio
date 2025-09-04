@@ -154,6 +154,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const diceRollerIcon = document.getElementById('dice-roller-icon');
     const dmFloatingFooter = document.getElementById('dm-floating-footer');
     const dmToolsList = document.getElementById('dm-tools-list');
+    const footerInitiativeControls = document.getElementById('footer-initiative-controls');
+    const footerPrevTurnButton = document.getElementById('footer-prev-turn-button');
+    const footerStopInitiativeButton = document.getElementById('footer-stop-initiative-button');
+    const footerNextTurnButton = document.getElementById('footer-next-turn-button');
+    const footerWanderControls = document.getElementById('footer-wander-controls');
+    const footerStopWanderButton = document.getElementById('footer-stop-wander-button');
     const diceRollerOverlay = document.getElementById('dice-roller-overlay');
     const diceRollerCloseButton = document.getElementById('dice-roller-close-button');
     const diceDialogueRecord = document.getElementById('dice-dialogue-record');
@@ -6626,6 +6632,7 @@ function getTightBoundingBox(img) {
             (noteContextMenu.style.display === 'block' && noteContextMenu.contains(event.target)) ||
             (characterContextMenu.style.display === 'block' && characterContextMenu.contains(event.target)) ||
             (mapToolsContextMenu.style.display === 'block' && mapToolsContextMenu.contains(event.target)) ||
+            (viewModeMapContextMenu.style.display === 'block' && viewModeMapContextMenu.contains(event.target)) ||
             Array.from(document.querySelectorAll('.dynamic-context-menu')).some(menu => menu.contains(event.target));
 
 
@@ -6634,6 +6641,7 @@ function getTightBoundingBox(img) {
             noteContextMenu.style.display = 'none';
             characterContextMenu.style.display = 'none';
             mapToolsContextMenu.style.display = 'none';
+            viewModeMapContextMenu.style.display = 'none';
             document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
 
             // Reset selection states
@@ -8059,6 +8067,7 @@ function getTightBoundingBox(img) {
                         character.savedRolls = [];
                     }
                     character.savedRolls.push(event.data.roll);
+                    propagateCharacterUpdate(selectedCharacterId);
                     loadCharacterIntoEditor(selectedCharacterId); // Reload to show the new roll
                 }
             }
@@ -8696,15 +8705,38 @@ function displayToast(messageElement) {
         });
     }
 
+    function updateFooterControlsVisibility() {
+        const isFooterVisible = dmFloatingFooter.classList.contains('visible');
+
+        if (footerInitiativeControls) {
+            footerInitiativeControls.style.display = (initiativeTurn !== -1 && !isFooterVisible) ? 'flex' : 'none';
+        }
+        if (footerWanderControls) {
+            footerWanderControls.style.display = (isWandering && !isFooterVisible) ? 'block' : 'none';
+        }
+    }
+
     if (diceRollerIcon) {
         diceRollerIcon.addEventListener('click', (event) => {
             event.stopPropagation();
             if (dmFloatingFooter) {
                 dmFloatingFooter.classList.toggle('visible');
-                // Optional: send state to player view if footer visibility should be synced
-                // sendDiceIconMenuStateToPlayerView(dmFloatingFooter.classList.contains('visible'));
+                updateFooterControlsVisibility();
             }
         });
+    }
+
+    if (footerPrevTurnButton && prevTurnButton) {
+        footerPrevTurnButton.addEventListener('click', () => prevTurnButton.click());
+    }
+    if (footerNextTurnButton && nextTurnButton) {
+        footerNextTurnButton.addEventListener('click', () => nextTurnButton.click());
+    }
+    if (footerStopInitiativeButton && startInitiativeButton) {
+        footerStopInitiativeButton.addEventListener('click', () => startInitiativeButton.click());
+    }
+    if (footerStopWanderButton && wanderButton) {
+        footerStopWanderButton.addEventListener('click', () => wanderButton.click());
     }
 
     if (dmToolsList) {
@@ -9273,6 +9305,7 @@ function displayToast(messageElement) {
             }
             updatePreviousButtonState();
         }
+        updateFooterControlsVisibility();
     }
 
     if(startInitiativeButton) {
@@ -9356,6 +9389,7 @@ function displayToast(messageElement) {
             createLogEntry({ type: 'system', message: "Characters are Wandering" }, automationActionId);
             sendInitiativeDataToPlayerView();
         }
+        updateFooterControlsVisibility();
     }
 
     if (wanderButton) {
@@ -9377,6 +9411,7 @@ function displayToast(messageElement) {
                 highlightActiveTurn();
                 requestFogOfWarUpdate();
                 sendInitiativeDataToPlayerView();
+                updateFooterControlsVisibility();
             }
         });
     }
@@ -9388,6 +9423,7 @@ function displayToast(messageElement) {
                 highlightActiveTurn();
                 requestFogOfWarUpdate();
                 sendInitiativeDataToPlayerView();
+                updateFooterControlsVisibility();
             }
         });
     }
