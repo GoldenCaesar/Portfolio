@@ -11645,6 +11645,45 @@ function getDragAfterElement(container, y) {
         }
     }
 
+    function initializeImportExport() {
+        const loader = document.getElementById('import-export-loader');
+        const controls = document.querySelector('.import-export-controls');
+        const main = document.querySelector('.import-export-main');
+
+        // This function is now only for the first time setup
+        if (isImportExportInitialized) return;
+
+        setTimeout(() => {
+            // Initialize CodeMirror Editor
+            const editorDiv = document.getElementById('json-editor');
+            if (editorDiv) {
+                jsonEditor = CodeMirror(editorDiv, {
+                    value: "Select a category to view JSON data...",
+                    mode:  {name: "javascript", json: true},
+                    lineNumbers: true,
+                    theme: "default" // Or a dark theme if you add the CSS for it
+                });
+            }
+
+            // Default to the 'all' view on first load
+            handleImportExportSelection('all');
+            const allButton = controls.querySelector('button[data-type="all"]');
+            if (allButton) {
+                allButton.classList.add('active');
+            }
+
+            loader.style.display = 'none';
+            controls.style.display = 'flex';
+            main.style.display = 'flex';
+            isImportExportInitialized = true;
+
+            // Refresh the editor to ensure it's rendered correctly
+            if (jsonEditor) {
+                setTimeout(() => jsonEditor.refresh(), 10);
+            }
+        }, 50); // A small delay allows the browser to render the loader before the JS gets busy
+    }
+
     const createContextMenu = (e, options) => {
         // Hide all static context menus
         document.querySelectorAll('.context-menu[id]').forEach(menu => menu.style.display = 'none');
@@ -13221,10 +13260,15 @@ function loadAndRenderAutomationBranch(branchName) {
     const importExportControls = document.querySelector('.import-export-controls');
     const importExportList = document.querySelector('.import-export-list');
     const importExportPreview = document.querySelector('.import-export-preview textarea');
+    let isImportExportInitialized = false;
+    let jsonEditor = null;
 
     if (settingsButton && settingsOverlay && settingsWindow) {
         settingsButton.addEventListener('click', () => {
             settingsOverlay.style.display = 'flex';
+            if (!isImportExportInitialized) {
+                initializeImportExport();
+            }
         });
 
         settingsOverlay.addEventListener('click', (event) => {
@@ -13268,7 +13312,7 @@ function loadAndRenderAutomationBranch(branchName) {
     function handleImportExportSelection(type) {
         // Clear previous content
         importExportList.innerHTML = '';
-        importExportPreview.value = '';
+        if (jsonEditor) jsonEditor.setValue('');
 
         switch(type) {
             case 'all':
@@ -13279,7 +13323,7 @@ function loadAndRenderAutomationBranch(branchName) {
                     initiatives: savedInitiatives,
                     automation: automationBranches
                 };
-                importExportPreview.value = JSON.stringify(allData, null, 2);
+                if (jsonEditor) jsonEditor.setValue(JSON.stringify(allData, null, 2));
 
                 importExportList.innerHTML = `
                     <p>Characters: ${charactersData.length}</p>
@@ -13295,7 +13339,7 @@ function loadAndRenderAutomationBranch(branchName) {
             case 'notes':
                 renderCategorizedList(notesData, 'title', 'id', type);
                 break;
-            case 'story_beats':
+            case 'story-beats':
                 renderCategorizedList(quests, 'name', 'id', type);
                 break;
             case 'initiatives':
@@ -13333,7 +13377,7 @@ function loadAndRenderAutomationBranch(branchName) {
                 } else {
                     itemData = dataArray.find(d => d[idKey] == li.dataset.id);
                 }
-                importExportPreview.value = JSON.stringify(itemData, null, 2);
+                if (jsonEditor) jsonEditor.setValue(JSON.stringify(itemData, null, 2));
             });
             ul.appendChild(li);
         });
@@ -13349,25 +13393,20 @@ function loadAndRenderAutomationBranch(branchName) {
 
     if (copyExportButton) {
         copyExportButton.addEventListener('click', () => {
-            importExportPreview.select();
-            navigator.clipboard.writeText(importExportPreview.value).then(() => {
+            if (!jsonEditor) return;
+            navigator.clipboard.writeText(jsonEditor.getValue()).then(() => {
                 alert('Copied to clipboard!');
             }).catch(err => {
                 console.error('Could not copy text: ', err);
-                // Fallback for older browsers
-                try {
-                    document.execCommand('copy');
-                    alert('Copied to clipboard!');
-                } catch (e) {
-                    alert('Failed to copy to clipboard.');
-                }
+                alert('Failed to copy to clipboard.');
             });
         });
     }
 
     function handleSaveExport() {
         try {
-            const data = JSON.parse(importExportPreview.value);
+            if (!jsonEditor) return;
+            const data = JSON.parse(jsonEditor.getValue());
             const selectedButton = document.querySelector('.import-export-controls button.active');
             const selectedListItem = importExportList.querySelector('li.selected');
 
