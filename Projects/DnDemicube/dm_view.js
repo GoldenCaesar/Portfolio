@@ -13522,11 +13522,38 @@ function loadAndRenderAutomationBranch(branchName) {
         }
     }
 
+    function getExampleJsonForType(type) {
+        switch (type) {
+            case 'notes':
+                return {
+                    id: "Note_new",
+                    title: "Example Note",
+                    content: "This is an example note. You can use **markdown**!"
+                };
+            case 'characters':
+                 return {
+                    id: "Character_new",
+                    name: "New Character",
+                    sheetData: {},
+                    notes: "Character notes go here."
+                };
+            case 'story-beats':
+                return {
+                    id: "Story_Beat_new",
+                    name: "New Story Beat",
+                    parentIds: [],
+                    description: "A new adventure begins."
+                };
+            default:
+                return { message: `No example available for type: ${type}` };
+        }
+    }
+
     function handleImportExportSelection(type) {
         importExportList.innerHTML = '';
-        if (jsonEditor) jsonEditor.setValue('Select an item to view its JSON data...');
-
         const userFriendlyData = generateUserFriendlyData(type);
+        let dataToRender = [];
+        let fullDataObject = {};
 
         switch(type) {
             case 'all':
@@ -13538,51 +13565,76 @@ function loadAndRenderAutomationBranch(branchName) {
                     <p>Initiatives: ${Object.keys(savedInitiatives).length}</p>
                     <p>Automation: ${Object.keys(automationBranches).length}</p>
                 `;
-                break;
+                return; // Exit here for 'all' type
             case 'characters':
-                renderCategorizedList(userFriendlyData, 'name', 'id', type);
+                dataToRender = userFriendlyData;
                 break;
             case 'notes':
-                renderCategorizedList(userFriendlyData, 'title', 'id', type);
+                dataToRender = userFriendlyData;
                 break;
             case 'story-beats':
-                renderCategorizedList(userFriendlyData, 'name', 'id', type);
+                dataToRender = userFriendlyData;
                 break;
             case 'initiatives':
-                const initiativesArray = Object.keys(userFriendlyData).map(name => ({ name }));
-                renderCategorizedList(initiativesArray, 'name', 'name', type, userFriendlyData);
+                dataToRender = Object.keys(userFriendlyData).map(name => ({ name }));
+                fullDataObject = userFriendlyData;
                 break;
             case 'automation':
-                const automationArray = Object.keys(userFriendlyData).map(name => ({ name }));
-                renderCategorizedList(automationArray, 'name', 'name', type, userFriendlyData);
+                dataToRender = Object.keys(userFriendlyData).map(name => ({ name }));
+                fullDataObject = userFriendlyData;
                 break;
+        }
+
+        if (dataToRender.length === 0 && (type === 'notes' || type === 'characters' || type === 'story-beats')) {
+            const example = getExampleJsonForType(type);
+            if (jsonEditor) jsonEditor.setValue(JSON.stringify(example, null, 2));
+            renderCategorizedList([], 'name', 'id', type, null, true); // Pass a flag for example mode
+        } else {
+            renderCategorizedList(dataToRender, type === 'notes' ? 'title' : 'name', type === 'initiatives' || type === 'automation' ? 'name' : 'id', type, fullDataObject);
         }
     }
 
-    function renderCategorizedList(dataArray, nameKey, idKey, type, fullData) {
+    function renderCategorizedList(dataArray, nameKey, idKey, type, fullData, isExample = false) {
         const ul = document.createElement('ul');
-        dataArray.forEach(item => {
-            const li = document.createElement('li');
-            li.textContent = item[nameKey];
-            li.dataset.id = item[idKey];
-            li.style.cursor = 'pointer';
-            li.addEventListener('click', () => {
-                const currentSelected = ul.querySelector('.selected');
-                if (currentSelected) {
-                    currentSelected.classList.remove('selected');
-                }
-                li.classList.add('selected');
 
-                let itemData;
-                if (type === 'initiatives' || type === 'automation') {
-                    itemData = fullData[item.name];
-                } else {
-                    itemData = dataArray.find(d => d[idKey] == li.dataset.id);
+        if (isExample) {
+            const li = document.createElement('li');
+            li.textContent = `Example ${type.charAt(0).toUpperCase() + type.slice(1, -1)}`;
+            li.dataset.id = 'example-item';
+            li.style.cursor = 'pointer';
+            li.classList.add('selected'); // Pre-select the example
+            li.addEventListener('click', () => {
+                const exampleJson = getExampleJsonForType(type);
+                if (jsonEditor) {
+                    jsonEditor.setValue(JSON.stringify(exampleJson, null, 2));
                 }
-                if (jsonEditor) jsonEditor.setValue(JSON.stringify(itemData, null, 2));
             });
             ul.appendChild(li);
-        });
+        } else {
+            dataArray.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item[nameKey];
+                li.dataset.id = item[idKey];
+                li.style.cursor = 'pointer';
+                li.addEventListener('click', () => {
+                    const currentSelected = ul.querySelector('.selected');
+                    if (currentSelected) {
+                        currentSelected.classList.remove('selected');
+                    }
+                    li.classList.add('selected');
+
+                    let itemData;
+                    if (type === 'initiatives' || type === 'automation') {
+                        itemData = fullData[item.name];
+                    } else {
+                        itemData = dataArray.find(d => d[idKey] == li.dataset.id);
+                    }
+                    if (jsonEditor) jsonEditor.setValue(JSON.stringify(itemData, null, 2));
+                });
+                ul.appendChild(li);
+            });
+        }
+        importExportList.innerHTML = ''; // Clear previous content
         importExportList.appendChild(ul);
     }
 
@@ -13609,90 +13661,136 @@ function loadAndRenderAutomationBranch(branchName) {
         try {
             if (!jsonEditor) return;
             const userFriendlyJSON = jsonEditor.getValue();
-            const data = revertToInternalIds(JSON.parse(userFriendlyJSON));
+            const parsedData = JSON.parse(userFriendlyJSON);
+
             const selectedButton = document.querySelector('.import-export-controls button.active');
             const selectedListItem = importExportList.querySelector('li.selected');
+            const saveType = selectedButton ? selectedButton.dataset.type : null;
 
-            let saveType = selectedButton ? selectedButton.dataset.type : null;
+            // If a single item is selected in the list, we are updating that specific item.
+            if (selectedListItem && !Array.isArray(parsedData)) {
+                const friendlyId = selectedListItem.dataset.id;
+                const internalId = importExportIdMaps.reverse[saveType] ? importExportIdMaps.reverse[saveType][friendlyId] : null;
 
-            if (saveType === 'all') {
-                if (confirm("This will overwrite all campaign data with the provided JSON. Are you sure?")) {
-                    charactersData = data.characters || [];
-                    notesData = data.notes || [];
-                    quests = data.storyBeats || [];
-                    savedInitiatives = data.initiatives || {};
-                    automationBranches = data.automation || {};
-                    alert('All data has been updated.');
-                    renderAllLists();
-                    renderSavedInitiativesList();
-                    renderAutomationBranches();
-                    initStoryTree();
-                }
-            } else if (saveType === 'characters') {
-                 if (Array.isArray(data)) {
-                    charactersData = data;
-                    alert(`All characters have been overwritten.`);
-                 } else {
-                    const index = charactersData.findIndex(c => c.id === data.id);
-                    if (index !== -1) {
-                        charactersData[index] = data;
-                        alert(`Character "${data.name}" has been updated.`);
-                    } else {
-                        if (confirm(`Character with ID ${data.id} not found. Add as new character?`)) {
+                if (internalId) {
+                    // The user is editing a known item. We force the ID to match the original internal ID.
+                    const dataToUpdate = revertToInternalIds(parsedData);
+                    dataToUpdate.id = internalId; // Ensure the ID is the original internal one.
+
+                    switch (saveType) {
+                        case 'notes':
+                            const noteIndex = notesData.findIndex(n => n.id === internalId);
+                            if (noteIndex !== -1) {
+                                notesData[noteIndex] = dataToUpdate;
+                                alert(`Note "${dataToUpdate.title}" has been updated.`);
+                            }
+                            break;
+                        case 'characters':
+                            const charIndex = charactersData.findIndex(c => c.id === internalId);
+                            if (charIndex !== -1) {
+                                charactersData[charIndex] = dataToUpdate;
+                                alert(`Character "${dataToUpdate.name}" has been updated.`);
+                            }
+                            break;
+                        case 'story-beats':
+                             const questIndex = quests.findIndex(q => q.id === internalId);
+                            if (questIndex !== -1) {
+                                quests[questIndex] = dataToUpdate;
+                                alert(`Story Beat "${dataToUpdate.name}" has been updated.`);
+                            }
+                            break;
+                        // Initiatives and Automation are handled as whole objects, not single items.
+                    }
+                } else {
+                    // This case handles saving a *new* item that was created from an example.
+                    const data = revertToInternalIds(parsedData);
+                    if (saveType === 'notes') {
+                        if (confirm(`Save as a new note?`)) {
+                            data.id = Date.now();
+                            notesData.push(data);
+                        }
+                    } else if (saveType === 'characters') {
+                         if (confirm(`Save as a new character?`)) {
+                            data.id = Date.now();
                             charactersData.push(data);
                         }
-                    }
-                 }
-                 renderCharactersList();
-                 if (selectedCharacterId && charactersData.some(c => c.id === selectedCharacterId)) {
-                    loadCharacterIntoEditor(selectedCharacterId);
-                 }
-            } else if (saveType === 'notes') {
-                if (Array.isArray(data)) {
-                    notesData = data;
-                    alert(`All notes have been overwritten.`);
-                } else {
-                    const index = notesData.findIndex(n => n.id === data.id);
-                    if (index !== -1) {
-                        notesData[index] = data;
-                        alert(`Note "${data.title}" has been updated.`);
-                    } else {
-                         if (confirm(`Note with ID ${data.id} not found. Add as new note?`)) {
-                            notesData.push(data);
-                         }
-                    }
-                }
-                renderNotesList();
-                if (selectedNoteId && notesData.some(n => n.id === selectedNoteId)) {
-                    loadNoteIntoEditor(selectedNoteId);
-                }
-            } else if (saveType === 'story-beats') {
-                if (Array.isArray(data)) {
-                    quests = data;
-                    alert(`All story beats have been overwritten.`);
-                } else {
-                    const index = quests.findIndex(q => q.id === data.id);
-                    if (index !== -1) {
-                        quests[index] = data;
-                        alert(`Story Beat "${data.name}" has been updated.`);
-                    } else {
-                        if (confirm(`Story Beat with ID ${data.id} not found. Add as new story beat?`)) {
-                            quests.push(data);
+                    } else if (saveType === 'story-beats') {
+                        if (confirm(`Save as a new story beat?`)) {
+                            const data = revertToInternalIds(parsedData);
+                            const newQuest = {
+                                // Start with defaults from initStoryTree
+                                parentIds: [],
+                                x: 0,
+                                y: 0,
+                                questStatus: 'Available',
+                                questType: [],
+                                startingTriggers: [],
+                                associatedMaps: [],
+                                associatedNPCs: [],
+                                failureTriggers: [],
+                                successTriggers: [],
+                                detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
+                                storyDuration: '',
+                                difficulty: 0,
+                                storySteps: [],
+                                // Overwrite with data from editor
+                                ...data,
+                                id: nextQuestId++, // Ensure a unique internal ID
+                            };
+                            quests.push(newQuest);
+                            alert(`Story Beat "${newQuest.name}" has been created.`);
                         }
                     }
+                     handleImportExportSelection(saveType);
                 }
-                initStoryTree();
-            } else if (saveType === 'initiatives') {
-                savedInitiatives = data;
-                alert(`All saved initiatives have been overwritten.`);
-                renderSavedInitiativesList();
-            } else if (saveType === 'automation') {
-                automationBranches = data;
-                alert(`All automation branches have been overwritten.`);
-                renderAutomationBranches();
             } else {
-                alert("Could not determine the data type to save. Please select a category.");
+                // This block handles overwriting an entire category or all data.
+                const data = revertToInternalIds(parsedData);
+                 if (saveType === 'all') {
+                    if (confirm("This will overwrite all campaign data with the provided JSON. Are you sure?")) {
+                        charactersData = data.characters || [];
+                        notesData = data.notes || [];
+                        quests = data.storyBeats || [];
+                        savedInitiatives = data.initiatives || {};
+                        automationBranches = data.automation || {};
+                        alert('All data has been updated.');
+                    }
+                } else if (saveType === 'characters' && Array.isArray(data)) {
+                    charactersData = data;
+                    alert(`All characters have been overwritten.`);
+                } else if (saveType === 'notes' && Array.isArray(data)) {
+                    notesData = data;
+                    alert(`All notes have been overwritten.`);
+                } else if (saveType === 'story-beats' && Array.isArray(data)) {
+                    quests = data;
+                    alert(`All story beats have been overwritten.`);
+                } else if (saveType === 'initiatives') {
+                    savedInitiatives = data;
+                    alert(`All saved initiatives have been overwritten.`);
+                } else if (saveType === 'automation') {
+                    automationBranches = data;
+                    alert(`All automation branches have been overwritten.`);
+                } else {
+                     alert("Could not determine the data type to save. Please select a category.");
+                     return;
+                }
             }
+
+            // Refresh all relevant UI elements after any change.
+            renderAllLists();
+            renderSavedInitiativesList();
+            renderAutomationBranches();
+            initStoryTree();
+             if (selectedNoteId && notesData.some(n => n.id === selectedNoteId)) {
+                loadNoteIntoEditor(selectedNoteId);
+            }
+            if (selectedCharacterId && charactersData.some(c => c.id === selectedCharacterId)) {
+                loadCharacterIntoEditor(selectedCharacterId);
+            }
+            // Re-render the import/export list to reflect the changes.
+            if(saveType) handleImportExportSelection(saveType);
+
+
         } catch (e) {
             alert('Invalid JSON. Please correct it and try again.');
             console.error('Error parsing JSON on save:', e);
