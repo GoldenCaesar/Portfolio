@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DnD 5e Character Sheet</title>
+    <link rel="stylesheet" href="character_sheet.css">
+</head>
+<body>
+    <div class="character-sheet">
+        <section class="header">
+            <div class="char-info">
+                <div class="char-name">
+                    <label for="char-name-input">Character Name</label>
+                    <input type="text" id="char-name-input" name="char_name">
+                </div>
+            <div class="char-portrait">
+                <img id="portrait-preview" src="#" alt="Character Portrait Preview" style="display: none;">
+                <input type="file" id="portrait-upload" accept="image/*" style="display: none;">
+                <label for="portrait-upload" class="portrait-upload-label">Upload Portrait</label>
+                <div class="visibility-toggle" style="margin-top: 5px; text-align: center;">
+                    <input type="checkbox" id="details-visibility-toggle" name="details_visibility_toggle" checked>
+                    <label for="details-visibility-toggle" style="font-size: 0.8em;">Show Details to Players</label>
+                </div>
+            </div>
+                <div class="char-details">
+                    <div>
+                        <label for="class-level-input">Class & Level</label>
+                    <input type="text" id="class-level-input" name="class_level">
+                </div>
+                <div>
+                    <label for="background-input">Background</label>
+                    <input type="text" id="background-input" name="background">
+                </div>
+                <div>
+                    <label for="player-name-input">Player Name</label>
+                    <input type="text" id="player-name-input" name="player_name">
+                </div>
+                <div>
+                    <label for="race-input">Race/Species</label>
+                    <input type="text" id="race-input" name="race">
+                </div>
+                <div>
+                    <label for="alignment-input">Alignment</label>
+                    <input type="text" id="alignment-input" name="alignment">
+                </div>
+                <div>
+                    <label for="xp-input">Experience Points</label>
+                    <input type="text" id="xp-input" name="xp">
+                </div>
+            </div>
+        </section>
+
+        <section class="main-stats">
+            <div class="attributes">
+                <div class="attr-box">
+                    <label for="strength-score">Strength</label>
+                    <input type="text" id="strength-score" name="strength_score" class="attr-score">
+                    <div class="attr-modifier" id="strength-modifier">+0</div>
+                </div>
+                <div class="attr-box">
+                    <label for="dexterity-score">Dexterity</label>
+                    <input type="text" id="dexterity-score" name="dexterity_score" class="attr-score">
+                    <div class="attr-modifier" id="dexterity-modifier">+0</div>
+                </div>
+                <div class="attr-box">
+                    <label for="constitution-score">Constitution</label>
+                    <input type="text" id="constitution-score" name="constitution_score" class="attr-score">
+                    <div class="attr-modifier" id="constitution-modifier">+0</div>
+                </div>
+                <div class="attr-box">
+                    <label for="intelligence-score">Intelligence</label>
+                    <input type="text" id="intelligence-score" name="intelligence_score" class="attr-score">
+                    <div class="attr-modifier" id="intelligence-modifier">+0</div>
+                </div>
+                <div class="attr-box">
+                    <label for="wisdom-score">Wisdom</label>
+                    <input type="text" id="wisdom-score" name="wisdom_score" class="attr-score">
+                    <div class="attr-modifier" id="wisdom-modifier">+0</div>
+                </div>
+                <div class="attr-box">
+                    <label for="charisma-score">Charisma</label>
+                    <input type="text" id="charisma-score" name="charisma_score" class="attr-score">
+                    <div class="attr-modifier" id="charisma-modifier">+0</div>
+                </div>
+            </div>
+            <div class="saving-throws">
+                <h3>Saving Throws</h3>
+            </div>
+            <div class="skills">
+                <h3>Skills</h3>
+            </div>
+        </section>
+
+        <section class="combat-info">
+            <div class="armor-class">
+                <label for="ac">Armor Class</label>
+                <input type="text" id="ac" name="ac">
+            </div>
+            <div class="initiative">
+                <label for="initiative">Initiative</label>
+                <input type="text" id="initiative" name="initiative">
+            </div>
+            <div class="speed">
+                <label for="speed">Speed</label>
+                <input type="text" id="speed" name="speed">
+            </div>
+            <div class="hit-points">
+                <div>
+                    <label for="hp-max">Hit Point Maximum</label>
+                    <input type="text" id="hp-max" name="hp_max">
+                </div>
+                <div>
+                    <label for="hp-current">Current Hit Points</label>
+                    <input type="text" id="hp-current" name="hp_current">
+                </div>
+                <div>
+                    <label for="hp-temp">Temporary Hit Points</label>
+                    <input type="text" id="hp-temp" name="hp_temp">
+                </div>
+            </div>
+            <div class="hit-dice">
+                <div>
+                    <label for="hit-dice-total">Hit Dice</label>
+                    <input type="text" id="hit-dice-total" name="hit_dice_total">
+                </div>
+            </div>
+            <div class="death-saves">
+                <h3>Death Saves</h3>
+                <div>
+                    <span>Successes</span>
+                    <input type="checkbox" name="death_success_1">
+                    <input type="checkbox" name="death_success_2">
+                    <input type="checkbox" name="death_success_3">
+                </div>
+                <div>
+                    <span>Failures</span>
+                    <input type="checkbox" name="death_fail_1">
+                    <input type="checkbox" name="death_fail_2">
+                    <input type="checkbox" name="death_fail_3">
+                </div>
+            </div>
+        </section>
+
+        <div class="passive-skills">
+            <label for="proficiency-bonus">Proficiency Bonus</label>
+            <input type="text" id="proficiency-bonus" name="proficiency_bonus">
+            <label for="passive-perception">Passive Perception</label>
+            <input type="text" id="passive-perception" name="passive_perception">
+            <label for="passive-insight">Passive Insight</label>
+            <input type="text" id="passive-insight" name="passive_insight">
+            <label for="passive-investigation">Passive Investigation</label>
+            <input type="text" id="passive-investigation" name="passive_investigation">
+        </div>
+
+        <div class="proficiencies-languages">
+            <label for="armor-proficiencies">Armor Proficiencies</label>
+            <textarea id="armor-proficiencies" name="armor_proficiencies"></textarea>
+            <label for="weapon-proficiencies">Weapon Proficiencies</label>
+            <textarea id="weapon-proficiencies" name="weapon_proficiencies"></textarea>
+            <label for="tool-proficiencies">Tool Proficiencies</label>
+            <textarea id="tool-proficiencies" name="tool_proficiencies"></textarea>
+            <label for="languages">Languages</label>
+            <textarea id="languages" name="languages"></textarea>
+        </div>
+
+        <section class="attacks-spellcasting">
+            <h3>Attacks & Spellcasting</h3>
+            <textarea name="attacks_and_spellcasting" rows="10" style="width: 95%;"></textarea>
+        </section>
+
+        <section class="features-traits">
+            <h3>Features & Traits</h3>
+            <textarea name="features_and_traits" rows="10" style="width: 95%;"></textarea>
+        </section>
+
+        <section class="equipment">
+            <h3>Equipment</h3>
+            <textarea name="equipment" rows="10" style="width: 95%;"></textarea>
+        </section>
+
+        <section class="character-appearance">
+            <h3>Character Appearance</h3>
+            <textarea name="character_appearance"></textarea>
+        </section>
+
+        <section class="character-backstory">
+            <h3>Character Backstory</h3>
+            <textarea name="character_backstory"></textarea>
+        </section>
+
+        <section class="personality">
+            <div>
+                <label>Personality Traits</label>
+                <textarea name="personality_traits"></textarea>
+            </div>
+            <div>
+                <label>Ideals</label>
+                <textarea name="ideals"></textarea>
+            </div>
+            <div>
+                <label>Bonds</label>
+                <textarea name="bonds"></textarea>
+            </div>
+            <div>
+                <label>Flaws</label>
+                <textarea name="flaws"></textarea>
+            </div>
+        </section>
+    </div>
+    <script src="character_sheet.js"></script>
+</body>
+</html>

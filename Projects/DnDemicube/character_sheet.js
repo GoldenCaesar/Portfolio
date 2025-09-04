@@ -1,0 +1,463 @@
+document.addEventListener('DOMContentLoaded', function() {
+    const attributes = {
+        'strength': document.getElementById('strength-score'),
+        'dexterity': document.getElementById('dexterity-score'),
+        'constitution': document.getElementById('constitution-score'),
+        'intelligence': document.getElementById('intelligence-score'),
+        'wisdom': document.getElementById('wisdom-score'),
+        'charisma': document.getElementById('charisma-score')
+    };
+
+    const modifiers = {
+        'strength': document.getElementById('strength-modifier'),
+        'dexterity': document.getElementById('dexterity-modifier'),
+        'constitution': document.getElementById('constitution-modifier'),
+        'intelligence': document.getElementById('intelligence-modifier'),
+        'wisdom': document.getElementById('wisdom-modifier'),
+        'charisma': document.getElementById('charisma-modifier')
+    };
+
+    const savingThrowsContainer = document.querySelector('.saving-throws');
+    const skillsContainer = document.querySelector('.skills');
+
+    const savingThrowAttrs = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
+    const skills = {
+        'Acrobatics': 'dexterity',
+        'Animal Handling': 'wisdom',
+        'Arcana': 'intelligence',
+        'Athletics': 'strength',
+        'Deception': 'charisma',
+        'History': 'intelligence',
+        'Insight': 'wisdom',
+        'Intimidation': 'charisma',
+        'Investigation': 'intelligence',
+        'Medicine': 'wisdom',
+        'Nature': 'intelligence',
+        'Perception': 'wisdom',
+        'Performance': 'charisma',
+        'Persuasion': 'charisma',
+        'Religion': 'intelligence',
+        'Sleight of Hand': 'dexterity',
+        'Stealth': 'dexterity',
+        'Survival': 'wisdom'
+    };
+
+    function calculateModifier(score) {
+        let mod = Math.floor((score - 10) / 2);
+        return mod >= 0 ? '+' + mod : mod;
+    }
+
+    function updateAllModifiers() {
+        for (const attr in attributes) {
+            let score = parseInt(attributes[attr].value) || 10;
+            modifiers[attr].textContent = calculateModifier(score);
+        }
+        updateSavingThrows();
+        updateSkills();
+    }
+
+    function getProficiencyBonus() {
+        return parseInt(document.getElementById('proficiency-bonus').value) || 0;
+    }
+
+    function updateSavingThrows() {
+        const profBonus = getProficiencyBonus();
+        savingThrowAttrs.forEach(attr => {
+            const checkbox = document.getElementById(`save-${attr}-prof`);
+            const modInput = document.getElementById(`save-${attr}-mod`);
+            const attrMod = parseInt(modifiers[attr].textContent);
+            let totalMod = attrMod;
+            if (checkbox.checked) {
+                totalMod += profBonus;
+            }
+            modInput.value = totalMod >= 0 ? '+' + totalMod : totalMod;
+        });
+    }
+
+    function updateSkills() {
+        const profBonus = getProficiencyBonus();
+        for (const skill in skills) {
+            const attr = skills[skill];
+            const checkbox = document.getElementById(`skill-${skill.replace(/\s+/g, '-').toLowerCase()}-prof`);
+            const modInput = document.getElementById(`skill-${skill.replace(/\s+/g, '-').toLowerCase()}-mod`);
+            const attrMod = parseInt(modifiers[attr].textContent);
+            let totalMod = attrMod;
+            if (checkbox.checked) {
+                totalMod += profBonus;
+            }
+            modInput.value = totalMod >= 0 ? '+' + totalMod : totalMod;
+        }
+    }
+
+    function createSavingThrow(attr) {
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <input type="checkbox" id="save-${attr}-prof" name="save_${attr}_prof">
+            <label for="save-${attr}-prof">${attr.charAt(0).toUpperCase() + attr.slice(1)}</label>
+            <input type="text" id="save-${attr}-mod" name="save_${attr}_mod" readonly>
+        `;
+        savingThrowsContainer.appendChild(div);
+        document.getElementById(`save-${attr}-prof`).addEventListener('change', updateSavingThrows);
+    }
+
+    function createSkill(skill, attr) {
+        const skillId = skill.replace(/\s+/g, '-').toLowerCase();
+        const div = document.createElement('div');
+        div.classList.add('skill-entry', 'clickable');
+        div.innerHTML = `
+            <input type="checkbox" id="skill-${skillId}-prof" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_prof">
+            <label for="skill-${skillId}-prof">${skill} (${attr.slice(0, 3).toUpperCase()})</label>
+            <input type="text" id="skill-${skillId}-mod" name="skill_${skill.replace(/\s+/g, '_').toLowerCase()}_mod" readonly>
+        `;
+        skillsContainer.appendChild(div);
+
+        document.getElementById(`skill-${skillId}-prof`).addEventListener('change', updateSkills);
+
+        div.addEventListener('click', (event) => {
+            if (event.target.type === 'checkbox') return;
+            const modInput = document.getElementById(`skill-${skillId}-mod`);
+            const modifier = modInput.value;
+            window.parent.postMessage({
+                type: 'skillRoll',
+                skillName: skill,
+                modifier: modifier
+            }, '*');
+        });
+    }
+
+    savingThrowAttrs.forEach(createSavingThrow);
+    for (const skill in skills) {
+        createSkill(skill, skills[skill]);
+    }
+
+    for (const attr in attributes) {
+        attributes[attr].addEventListener('input', updateAllModifiers);
+    }
+
+    // Add click event listeners for stat rolls
+    for (const attr in attributes) {
+        const attrBox = attributes[attr].closest('.attr-box');
+        if (attrBox) {
+            // Capitalize the first letter of the attribute for the roll name
+            const statName = attr.charAt(0).toUpperCase() + attr.slice(1);
+
+            attrBox.addEventListener('click', (event) => {
+                // Avoid triggering a roll when the user is editing the score
+                if (event.target.tagName === 'INPUT') {
+                    return;
+                }
+
+                const modifier = modifiers[attr].textContent;
+
+                if (!modifier || isNaN(parseInt(modifier))) {
+                    return; // Don't roll if modifier is not set or is invalid
+                }
+
+                // Post a message to the parent window (dm_view.html) to perform the roll
+                window.parent.postMessage({
+                    type: 'statRoll',
+                    rollName: `${statName} Check`,
+                    modifier: modifier
+                }, '*');
+            });
+        }
+    }
+
+    document.getElementById('proficiency-bonus').addEventListener('input', () => {
+        updateSavingThrows();
+        updateSkills();
+    });
+
+    updateAllModifiers();
+
+    function clearSheetFields() {
+        const inputs = document.querySelectorAll('input, textarea');
+        inputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else if (input.type !== 'button' && input.type !== 'submit') { // Avoid clearing button text
+                input.value = '';
+            }
+        });
+    }
+
+    const detailsVisibilityToggle = document.getElementById('details-visibility-toggle');
+
+    if (detailsVisibilityToggle) {
+        detailsVisibilityToggle.addEventListener('change', function() {
+            window.parent.postMessage({
+                type: 'characterDetailsVisibilityChange',
+                isDetailsVisible: this.checked
+            }, '*');
+        });
+    }
+
+    const visionCheckbox = document.getElementById('vision-checkbox');
+    if (visionCheckbox) {
+        visionCheckbox.addEventListener('change', function() {
+            window.parent.postMessage({
+                type: 'characterVisionChange',
+                vision: this.checked
+            }, '*');
+        });
+    }
+
+    const rollsList = document.getElementById('character-sheet-rolls-list');
+    const addRollNameInput = document.getElementById('character-sheet-add-roll-name');
+    const addRollTagsSelect = document.getElementById('character-sheet-add-roll-tags');
+    const diceButtonsContainer = document.getElementById('character-sheet-dice-buttons');
+    const addRollModifierInput = document.getElementById('character-sheet-add-roll-modifier');
+    const saveRollBtn = document.getElementById('character-sheet-save-roll-btn');
+
+    let characterSavedRolls = [];
+    const sheetDiceCounts = {};
+
+    function formatDiceString(dice, modifier) {
+        let parts = [];
+        for (const die in dice) {
+            if (dice[die] > 0) {
+                parts.push(`${dice[die]}${die}`);
+            }
+        }
+        let str = parts.join(' + ');
+        if (modifier > 0) {
+            str += ` + ${modifier}`;
+        } else if (modifier < 0) {
+            str += ` - ${Math.abs(modifier)}`;
+        }
+        return str;
+    }
+
+    function renderSavedRolls() {
+        rollsList.innerHTML = '';
+        if (characterSavedRolls && characterSavedRolls.length > 0) {
+            characterSavedRolls.forEach((roll, index) => {
+                const li = document.createElement('li');
+                const diceString = formatDiceString(roll.dice, roll.modifier);
+                li.innerHTML = `
+                    <span class="roll-name">${roll.name} (${diceString})</span>
+                    <div class="roll-actions">
+                        <button class="roll-btn" data-action="roll" data-index="${index}">Roll</button>
+                        <button class="delete-roll-btn" data-action="delete" data-index="${index}">Del</button>
+                    </div>
+                `;
+                rollsList.appendChild(li);
+            });
+        }
+    }
+
+    function updateCompactDiceDisplay() {
+        const buttons = diceButtonsContainer.querySelectorAll('.dice-button-compact');
+        buttons.forEach(button => {
+            const die = button.dataset.die;
+            const count = sheetDiceCounts[die] || 0;
+            const countSpan = button.querySelector('.dice-count');
+            if (countSpan) {
+                countSpan.textContent = count > 0 ? `+${count}` : '';
+            }
+        });
+    }
+
+    if (diceButtonsContainer) {
+        diceButtonsContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die) {
+                sheetDiceCounts[die] = (sheetDiceCounts[die] || 0) + 1;
+                updateCompactDiceDisplay();
+            }
+        });
+
+        diceButtonsContainer.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            const button = event.target.closest('.dice-button-compact');
+            if (!button) return;
+            const die = button.dataset.die;
+            if (die && sheetDiceCounts[die] > 0) {
+                sheetDiceCounts[die]--;
+                updateCompactDiceDisplay();
+            }
+        });
+    }
+
+    if (saveRollBtn) {
+        saveRollBtn.addEventListener('click', () => {
+            const rollName = addRollNameInput.value.trim();
+            if (!rollName) {
+                alert('Please enter a name for the roll.');
+                return;
+            }
+            const hasDice = Object.values(sheetDiceCounts).some(count => count > 0);
+            if (!hasDice) {
+                alert('Please select at least one die to save.');
+                return;
+            }
+            const newRoll = {
+                name: rollName,
+                dice: { ...sheetDiceCounts },
+                modifier: parseInt(addRollModifierInput.value, 10) || 0,
+                tags: [addRollTagsSelect.value]
+            };
+
+            window.parent.postMessage({ type: 'saveCharacterRoll', roll: newRoll }, '*');
+
+            // Reset form
+            addRollNameInput.value = '';
+            for (const die in sheetDiceCounts) {
+                sheetDiceCounts[die] = 0;
+            }
+            updateCompactDiceDisplay();
+            addRollModifierInput.value = '0';
+        });
+    }
+
+    if (rollsList) {
+        rollsList.addEventListener('click', (event) => {
+            const button = event.target;
+            const action = button.dataset.action;
+            const index = parseInt(button.dataset.index, 10);
+
+            if (!action || isNaN(index)) return;
+
+            if (action === 'delete') {
+                window.parent.postMessage({ type: 'deleteCharacterRoll', index: index }, '*');
+            } else if (action === 'roll') {
+                const savedRoll = characterSavedRolls[index];
+                window.parent.postMessage({ type: 'characterSheetRoll', rollData: savedRoll }, '*');
+            }
+        });
+    }
+
+    if (addRollTagsSelect) {
+        addRollTagsSelect.addEventListener('change', () => {
+            const selectedTag = addRollTagsSelect.value;
+            const attributeMatch = selectedTag.match(/^(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)$/);
+
+            if (attributeMatch) {
+                const attribute = attributeMatch[0].toLowerCase();
+                const statName = attribute.charAt(0).toUpperCase() + attribute.slice(1);
+
+                addRollNameInput.value = `${statName} Check`;
+
+                // Reset dice and add a d20
+                for (const die in sheetDiceCounts) {
+                    sheetDiceCounts[die] = 0;
+                }
+                sheetDiceCounts['d20'] = 1;
+                updateCompactDiceDisplay();
+
+                // Set modifier
+                const modifierValue = modifiers[attribute].textContent;
+                addRollModifierInput.value = parseInt(modifierValue, 10) || 0;
+            }
+        });
+    }
+
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'loadCharacterSheet') {
+            clearSheetFields();
+            const data = event.data.data;
+            for (const key in data) {
+                const element = document.getElementsByName(key)[0];
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = data[key];
+                    } else {
+                        element.value = data[key];
+                    }
+                }
+            }
+            updateAllModifiers();
+
+            if (data.character_portrait) {
+                portraitPreview.src = data.character_portrait;
+                portraitPreview.style.display = 'block';
+            } else {
+                portraitPreview.src = '#';
+                portraitPreview.style.display = 'none';
+            }
+
+            if (detailsVisibilityToggle) {
+                detailsVisibilityToggle.checked = typeof data.isDetailsVisible === 'boolean' ? data.isDetailsVisible : true;
+            }
+            if (visionCheckbox) {
+                visionCheckbox.checked = typeof data.vision === 'boolean' ? data.vision : true;
+            }
+            characterSavedRolls = data.savedRolls || [];
+            renderSavedRolls();
+        } else if (event.data.type === 'characterVisionChange_from_dm') {
+            if (visionCheckbox) {
+                visionCheckbox.checked = event.data.vision;
+            }
+        } else if (event.data.type === 'requestSheetData') {
+            const sheetData = {};
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                if (input.name) {
+                    if (input.type === 'checkbox') {
+                        sheetData[input.name] = input.checked;
+                    } else {
+                        sheetData[input.name] = input.value;
+                    }
+                }
+            });
+
+            for (const attr in modifiers) {
+                sheetData[`${attr}_modifier`] = modifiers[attr].textContent;
+            }
+
+            if (portraitPreview.style.display !== 'none') {
+                sheetData['character_portrait'] = portraitPreview.src;
+            }
+            sheetData.savedRolls = characterSavedRolls;
+            window.parent.postMessage({ type: 'saveCharacterSheet', data: sheetData }, '*');
+        } else if (event.data.type === 'clearCharacterSheet') {
+            clearSheetFields();
+            portraitPreview.src = '#';
+            portraitPreview.style.display = 'none';
+            updateAllModifiers();
+        } else if (event.data.type === 'requestSheetDataForView') {
+            const sheetData = {};
+            const inputs = document.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                if (input.name) {
+                    if (input.type === 'checkbox') {
+                        sheetData[input.name] = input.checked;
+                    } else {
+                        sheetData[input.name] = input.value;
+                    }
+                }
+            });
+
+            // Manually add modifiers to the sheetData
+            for (const attr in modifiers) {
+                sheetData[`${attr}_modifier`] = modifiers[attr].textContent;
+            }
+
+            if (portraitPreview.style.display !== 'none') {
+                sheetData['character_portrait'] = portraitPreview.src;
+            }
+             sheetData.savedRolls = characterSavedRolls;
+
+            window.parent.postMessage({ type: 'sheetDataForView', data: sheetData }, '*');
+        }
+    });
+
+    window.parent.postMessage({ type: 'characterSheetReady' }, '*');
+
+    const portraitUpload = document.getElementById('portrait-upload');
+    const portraitPreview = document.getElementById('portrait-preview');
+
+    portraitUpload.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                portraitPreview.src = e.target.result;
+                portraitPreview.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+});
