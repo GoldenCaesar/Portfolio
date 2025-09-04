@@ -744,20 +744,23 @@ function propagateCharacterUpdate(characterId) {
         return;
     }
 
-    // 1. Propagate changes to all instances in the active initiative list
+    // 1. Propagate changes to the original character instance in the active initiative list
     activeInitiative.forEach(activeChar => {
-        if (activeChar.id === characterId) {
+        // Only update the original, not the token copies
+        if (activeChar.id === characterId && !activeChar.isTokenCopy) {
             // Update properties from the master character
             activeChar.name = masterCharacter.name;
             activeChar.isDetailsVisible = masterCharacter.isDetailsVisible;
             activeChar.vision = masterCharacter.vision;
-            activeChar.sheetData = masterCharacter.sheetData;
+            activeChar.sheetData = masterCharacter.sheetData; // Re-link sheet data to get all updates
         }
     });
 
-    // 2. Propagate changes to any active tokens on the map
+    // 2. Propagate changes to the original character's token on the map
     initiativeTokens.forEach(token => {
-        if (token.characterId === characterId) {
+        // Find the corresponding character in initiative to check if it's a copy
+        const linkedChar = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (token.characterId === characterId && linkedChar && !linkedChar.isTokenCopy) {
             token.name = masterCharacter.name;
             token.playerName = masterCharacter.sheetData.player_name;
             token.portrait = masterCharacter.sheetData.character_portrait;
@@ -4999,11 +5002,14 @@ function getTightBoundingBox(img) {
                 const charactersFolder = zip.folder("characters");
                 if (activeInitiative.length > 0) {
                     activeInitiative.forEach(activeChar => {
-                        const mainChar = charactersData.find(c => c.id === activeChar.id);
-                        if (mainChar) {
-                            if (!mainChar.sheetData) mainChar.sheetData = {};
-                            mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
-                            mainChar.savedRolls = activeChar.savedRolls;
+                        // Only sync back HP from the original character, not from token copies.
+                        if (!activeChar.isTokenCopy) {
+                            const mainChar = charactersData.find(c => c.id === activeChar.id);
+                            if (mainChar) {
+                                if (!mainChar.sheetData) mainChar.sheetData = {};
+                                mainChar.sheetData.hp_current = activeChar.sheetData.hp_current;
+                                mainChar.savedRolls = activeChar.savedRolls;
+                            }
                         }
                     });
                 }
@@ -6122,10 +6128,13 @@ function getTightBoundingBox(img) {
             if (characterInInitiative) {
                 characterInInitiative.sheetData.hp_current = newHp;
 
-                const mainCharacter = charactersData.find(c => c.id === characterInInitiative.id);
-                if (mainCharacter) {
-                    if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
-                    mainCharacter.sheetData.hp_current = newHp;
+                // Only update the master character sheet if this is not a temporary token copy
+                if (!characterInInitiative.isTokenCopy) {
+                    const mainCharacter = charactersData.find(c => c.id === characterInInitiative.id);
+                    if (mainCharacter) {
+                        if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                        mainCharacter.sheetData.hp_current = newHp;
+                    }
                 }
 
                 if (selectedMapFileName) {
@@ -8847,6 +8856,32 @@ function displayToast(messageElement) {
         return total;
     }
 
+    function addCharacterToInitiative(character) {
+        const characterId = character.id;
+        const existingInstances = activeInitiative.filter(c => c.id === characterId);
+        const count = existingInstances.length;
+
+        if (count === 0) {
+            // First instance: shallow copy, linked to the original character sheet.
+            const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now(), isTokenCopy: false };
+            activeInitiative.push(newInitiativeCharacter);
+        } else {
+            // Subsequent instances: deep copy, becomes a temporary token.
+            const newInitiativeCharacter = JSON.parse(JSON.stringify(character));
+
+            newInitiativeCharacter.uniqueId = Date.now() + Math.random(); // Use random to ensure uniqueness
+            newInitiativeCharacter.isTokenCopy = true;
+
+            const firstName = character.name.split(' ')[0];
+            newInitiativeCharacter.name = `Token${count} ${firstName}`;
+
+            newInitiativeCharacter.initiative = null; // Reset initiative for the new token
+
+            activeInitiative.push(newInitiativeCharacter);
+        }
+        renderActiveInitiativeList();
+    }
+
     function renderInitiativeMasterList() {
         if (!masterCharacterList) return;
         masterCharacterList.innerHTML = '';
@@ -8855,9 +8890,7 @@ function displayToast(messageElement) {
             card.dataset.characterId = character.id;
             card.style.cursor = 'pointer';
             card.addEventListener('click', () => {
-                const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() };
-                activeInitiative.push(newInitiativeCharacter);
-                renderActiveInitiativeList();
+                addCharacterToInitiative(character);
             });
             masterCharacterList.appendChild(card);
         });
@@ -8947,11 +8980,9 @@ function displayToast(messageElement) {
             } else {
                 const character = charactersData.find(c => c.id == characterId);
                 if (character) {
-                    const newInitiativeCharacter = { ...character, initiative: null, uniqueId: Date.now() };
-                    activeInitiative.push(newInitiativeCharacter);
+                    addCharacterToInitiative(character);
                 }
             }
-            renderActiveInitiativeList();
         });
 
         activeInitiativeList.addEventListener('dragenter', e => {
@@ -8996,11 +9027,13 @@ function displayToast(messageElement) {
                     // Update the character in the active initiative list
                     charInInitiative.sheetData.hp_current = newHp;
 
-                    // Find and update the corresponding character in the master list
-                    const mainCharacter = charactersData.find(c => c.id === charInInitiative.id);
-                    if (mainCharacter) {
-                        if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
-                        mainCharacter.sheetData.hp_current = newHp;
+                    // Find and update the corresponding character in the master list, but only if it's not a temporary copy.
+                    if (!charInInitiative.isTokenCopy) {
+                        const mainCharacter = charactersData.find(c => c.id === charInInitiative.id);
+                        if (mainCharacter) {
+                            if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                            mainCharacter.sheetData.hp_current = newHp;
+                        }
                     }
 
                     // Let the player view know about the change
