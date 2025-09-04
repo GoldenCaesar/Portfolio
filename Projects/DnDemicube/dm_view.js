@@ -3144,6 +3144,7 @@ function getTightBoundingBox(img) {
                 btnLinkChildMap.textContent = 'Cancel Drawing Link';
                 drawingCanvas.style.pointerEvents = 'auto';
                 dmCanvas.style.cursor = 'crosshair';
+                drawingCanvas.style.cursor = 'crosshair';
                 alert("Click on the map to start drawing a polygon for the link. Click the first point to close the shape.");
                 updateButtonStates();
             }
