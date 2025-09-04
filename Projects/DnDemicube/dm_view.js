@@ -6323,10 +6323,12 @@ function getTightBoundingBox(img) {
                             const newHp = currentHp - totalSum;
                             targetCharacter.sheetData.hp_current = newHp;
 
-                            const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
-                            if (mainCharacter) {
-                                if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
-                                mainCharacter.sheetData.hp_current = newHp;
+                            if (!targetCharacter.isTokenCopy) {
+                                const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
+                                if (mainCharacter) {
+                                    if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                                    mainCharacter.sheetData.hp_current = newHp;
+                                }
                             }
 
                             addLogEntry({
@@ -6356,10 +6358,12 @@ function getTightBoundingBox(img) {
                             const newHp = currentHp + totalSum;
                             targetCharacter.sheetData.hp_current = newHp;
 
-                            const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
-                            if (mainCharacter) {
-                                if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
-                                mainCharacter.sheetData.hp_current = newHp;
+                            if (!targetCharacter.isTokenCopy) {
+                                const mainCharacter = charactersData.find(c => c.id === targetCharacter.id);
+                                if (mainCharacter) {
+                                    if (!mainCharacter.sheetData) mainCharacter.sheetData = {};
+                                    mainCharacter.sheetData.hp_current = newHp;
+                                }
                             }
 
                             addLogEntry({
