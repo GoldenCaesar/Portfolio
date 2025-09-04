@@ -13670,7 +13670,8 @@ function loadAndRenderAutomationBranch(branchName) {
             // If a single item is selected in the list, we are updating that specific item.
             if (selectedListItem && !Array.isArray(parsedData)) {
                 const friendlyId = selectedListItem.dataset.id;
-                const internalId = importExportIdMaps.reverse[saveType] ? importExportIdMaps.reverse[saveType][friendlyId] : null;
+                const mapType = saveType === 'story-beats' ? 'quests' : saveType;
+                const internalId = importExportIdMaps.reverse[mapType] ? importExportIdMaps.reverse[mapType][friendlyId] : null;
 
                 if (internalId) {
                     // The user is editing a known item. We force the ID to match the original internal ID.
@@ -13765,6 +13766,16 @@ function loadAndRenderAutomationBranch(branchName) {
                     quests = data;
                     alert(`All story beats have been overwritten.`);
                 } else if (saveType === 'initiatives') {
+                    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+                        alert("Invalid format for Initiatives. It should be an object mapping names to arrays of participants.");
+                        return;
+                    }
+                    for (const key in data) {
+                        if (!Array.isArray(data[key])) {
+                            alert(`Invalid format for initiative "${key}". It should be an array of participants.`);
+                            return;
+                        }
+                    }
                     savedInitiatives = data;
                     alert(`All saved initiatives have been overwritten.`);
                 } else if (saveType === 'automation') {
