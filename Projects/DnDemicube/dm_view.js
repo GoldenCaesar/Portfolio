@@ -13306,6 +13306,8 @@ function loadAndRenderAutomationBranch(branchName) {
             notes: {},
             characters: {},
             quests: {},
+            noteImages: {},
+            characterPdfs: {},
         };
 
         // 1. Create mappings for all relevant types first
@@ -13335,11 +13337,38 @@ function loadAndRenderAutomationBranch(branchName) {
         };
 
         friendlyData.characters.forEach(character => {
-            character.id = importExportIdMaps.characters[character.id];
+            const originalId = character.id;
+            const friendlyId = importExportIdMaps.characters[originalId];
+            character.id = friendlyId;
+
+            if (character.pdfData) {
+                const placeholder = `PDF_for_${friendlyId}`;
+                const originalCharacter = charactersData.find(c => c.id === originalId);
+                if (originalCharacter) {
+                    importExportIdMaps.characterPdfs[placeholder] = {
+                        pdfData: originalCharacter.pdfData,
+                        pdfFileName: originalCharacter.pdfFileName
+                    };
+                    character.linkedPdf = placeholder;
+                }
+                delete character.pdfData;
+                delete character.pdfFileName;
+            }
         });
 
         friendlyData.notes.forEach(note => {
-            note.id = importExportIdMaps.notes[note.id];
+            const friendlyId = importExportIdMaps.notes[note.id];
+            note.id = friendlyId;
+
+            if (note.content) {
+                let imageCounter = 1;
+                const imageRegex = /!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
+                note.content = note.content.replace(imageRegex, (match, altText, dataUrl) => {
+                    const placeholder = `Image_in_${friendlyId}_${imageCounter++}`;
+                    importExportIdMaps.noteImages[placeholder] = dataUrl;
+                    return `![${altText || 'Embedded Image'}](${placeholder})`;
+                });
+            }
         });
 
         friendlyData.quests.forEach(quest => {
@@ -13399,6 +13428,7 @@ function loadAndRenderAutomationBranch(branchName) {
             if (Array.isArray(obj)) {
                 obj.forEach(revertObject);
             } else if (obj !== null && typeof obj === 'object') {
+                // Revert primary ID first
                 if (obj.id && typeof obj.id === 'string') {
                     if (obj.id.startsWith('Character_')) {
                         obj.id = reverseMaps.characters[obj.id] || obj.id;
@@ -13408,12 +13438,39 @@ function loadAndRenderAutomationBranch(branchName) {
                         obj.id = reverseMaps.quests[obj.id] || obj.id;
                     }
                 }
-                 if (obj.characterId && typeof obj.characterId === 'string' && obj.characterId.startsWith('Character_')) {
-                    obj.characterId = reverseMaps.characters[obj.characterId] || obj.characterId;
+
+                // Revert content placeholders
+                if (obj.hasOwnProperty('content') && obj.title) { // Note heuristic
+                    const imagePlaceholderRegex = /!\[(.*?)\]\((Image_in_Note_\d+_\d+)\)/g;
+                    obj.content = obj.content.replace(imagePlaceholderRegex, (match, altText, placeholder) => {
+                        const dataUrl = importExportIdMaps.noteImages[placeholder];
+                        return dataUrl ? `![${altText}](${dataUrl})` : match;
+                    });
+                }
+                if (obj.linkedPdf) { // Character heuristic
+                    const pdfInfo = importExportIdMaps.characterPdfs[obj.linkedPdf];
+                    if (pdfInfo) {
+                        obj.pdfData = pdfInfo.pdfData;
+                        obj.pdfFileName = pdfInfo.pdfFileName;
+                    }
+                    delete obj.linkedPdf;
                 }
 
+                // Recurse through all properties of the object
+                for (const key in obj) {
+                    if (obj.hasOwnProperty(key)) {
+                        if (key !== 'pdfData' && key !== 'pdfFileName') {
+                            revertObject(obj[key]);
+                        }
+                    }
+                }
+
+                // Revert foreign keys (after recursion has processed any nested objects)
+                if (obj.characterId && typeof obj.characterId === 'string' && obj.characterId.startsWith('Character_')) {
+                    obj.characterId = reverseMaps.characters[obj.characterId] || obj.characterId;
+                }
                 if (obj.parentIds) {
-                    obj.parentIds = obj.parentIds.map(pid => reverseMaps.quests[pid] || pid);
+                    obj.parentIds = obj.parentIds.map(pid => (typeof pid === 'string' && pid.startsWith('Story_Beat_')) ? (reverseMaps.quests[pid] || pid) : pid);
                 }
                 if (obj.associatedNPCs) {
                     obj.associatedNPCs.forEach(npc => {
@@ -13427,12 +13484,6 @@ function loadAndRenderAutomationBranch(branchName) {
                 }
                 if (obj.linkedCharacterId && typeof obj.linkedCharacterId === 'string' && obj.linkedCharacterId.startsWith('Character_')) {
                     obj.linkedCharacterId = reverseMaps.characters[obj.linkedCharacterId] || obj.linkedCharacterId;
-                }
-
-                for (const key in obj) {
-                    if (obj.hasOwnProperty(key)) {
-                        revertObject(obj[key]);
-                    }
                 }
             }
         }
