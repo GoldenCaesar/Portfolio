@@ -11683,42 +11683,38 @@ function getDragAfterElement(container, y) {
     }
 
     function initializeImportExport() {
-        const loader = document.getElementById('import-export-loader');
-        const controls = document.querySelector('.import-export-controls');
-        const main = document.querySelector('.import-export-main');
-
-        // This function is now only for the first time setup
-        if (isImportExportInitialized) return;
-
-        setTimeout(() => {
-            // Initialize CodeMirror Editor
-            const editorDiv = document.getElementById('json-editor');
-            if (editorDiv) {
-                jsonEditor = CodeMirror(editorDiv, {
-                    value: "Select a category to view JSON data...",
-                    mode:  {name: "javascript", json: true},
-                    lineNumbers: true,
-                    theme: "default" // Or a dark theme if you add the CSS for it
-                });
-            }
-
-            // Default to the 'all' view on first load
-            handleImportExportSelection('all');
-            const allButton = controls.querySelector('button[data-type="all"]');
-            if (allButton) {
-                allButton.classList.add('active');
-            }
-
-            loader.style.display = 'none';
-            controls.style.display = 'flex';
-            main.style.display = 'flex';
-            isImportExportInitialized = true;
-
-            // Refresh the editor to ensure it's rendered correctly
+        if (isImportExportInitialized) {
+            // If already initialized, just refresh the view
+            const activeType = document.querySelector('.import-export-controls button.active')?.dataset.type || 'all';
+            handleImportExportSelection(activeType);
             if (jsonEditor) {
-                setTimeout(() => jsonEditor.refresh(), 10);
+                setTimeout(() => jsonEditor.refresh(), 1);
             }
-        }, 50); // A small delay allows the browser to render the loader before the JS gets busy
+            return;
+        }
+
+        const editorDiv = document.getElementById('json-editor');
+        if (editorDiv) {
+            jsonEditor = CodeMirror(editorDiv, {
+                value: "Select a category to view JSON data...",
+                mode: { name: "javascript", json: true },
+                lineNumbers: true,
+                theme: "default"
+            });
+        }
+
+        const controls = document.querySelector('.import-export-controls');
+        const allButton = controls.querySelector('button[data-type="all"]');
+        if (allButton) {
+            allButton.classList.add('active');
+        }
+
+        handleImportExportSelection('all');
+        isImportExportInitialized = true;
+
+        if (jsonEditor) {
+            setTimeout(() => jsonEditor.refresh(), 1);
+        }
     }
 
     const createContextMenu = (e, options) => {
@@ -13301,179 +13297,6 @@ function loadAndRenderAutomationBranch(branchName) {
     let importExportIdMaps = {};
     let jsonEditor = null;
 
-    function generateUserFriendlyData(dataType) {
-        importExportIdMaps = {
-            notes: {},
-            characters: {},
-            quests: {},
-            noteImages: {},
-            characterPdfs: {},
-        };
-
-        // 1. Create mappings for all relevant types first
-        notesData.forEach((note, index) => {
-            importExportIdMaps.notes[note.id] = `Note_${index + 1}`;
-        });
-        charactersData.forEach((character, index) => {
-            importExportIdMaps.characters[character.id] = `Character_${index + 1}`;
-        });
-        quests.forEach((quest, index) => {
-            importExportIdMaps.quests[quest.id] = `Story_Beat_${index + 1}`;
-        });
-
-        const reverseMaps = {
-            notes: Object.fromEntries(Object.entries(importExportIdMaps.notes).map(a => a.reverse())),
-            characters: Object.fromEntries(Object.entries(importExportIdMaps.characters).map(a => a.reverse())),
-            quests: Object.fromEntries(Object.entries(importExportIdMaps.quests).map(a => a.reverse())),
-        };
-        importExportIdMaps.reverse = reverseMaps;
-
-        const friendlyData = {
-            characters: JSON.parse(JSON.stringify(charactersData)),
-            notes: JSON.parse(JSON.stringify(notesData)),
-            quests: JSON.parse(JSON.stringify(quests)),
-            initiatives: JSON.parse(JSON.stringify(savedInitiatives)),
-            automation: JSON.parse(JSON.stringify(automationBranches)),
-        };
-
-        friendlyData.characters.forEach(character => {
-            const originalId = character.id;
-            const friendlyId = importExportIdMaps.characters[originalId];
-            character.id = friendlyId;
-
-            if (character.pdfData) {
-                const placeholder = `PDF_for_${friendlyId}`;
-                const originalCharacter = charactersData.find(c => c.id === originalId);
-                if (originalCharacter) {
-                    importExportIdMaps.characterPdfs[placeholder] = {
-                        pdfData: originalCharacter.pdfData,
-                        pdfFileName: originalCharacter.pdfFileName
-                    };
-                    character.linkedPdf = placeholder;
-                }
-                delete character.pdfData;
-                delete character.pdfFileName;
-            }
-        });
-
-        friendlyData.notes.forEach(note => {
-            const friendlyId = importExportIdMaps.notes[note.id];
-            note.id = friendlyId;
-
-            if (note.content) {
-                let imageCounter = 1;
-                const imageRegex = /!\[(.*?)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
-                note.content = note.content.replace(imageRegex, (match, altText, dataUrl) => {
-                    const placeholder = `Image_in_${friendlyId}_${imageCounter++}`;
-                    importExportIdMaps.noteImages[placeholder] = dataUrl;
-                    return `![${altText || 'Embedded Image'}](${placeholder})`;
-                });
-            }
-        });
-
-        friendlyData.quests.forEach(quest => {
-            quest.id = importExportIdMaps.quests[quest.id];
-            if (quest.parentIds) {
-                quest.parentIds = quest.parentIds.map(pid => importExportIdMaps.quests[pid] || pid);
-            }
-            if (quest.associatedNPCs) {
-                quest.associatedNPCs.forEach(npc => {
-                    npc.id = importExportIdMaps.characters[npc.id] || npc.id;
-                });
-            }
-        });
-
-        for (const initiativeName in friendlyData.initiatives) {
-            friendlyData.initiatives[initiativeName].forEach(participant => {
-                if (participant.id) {
-                    participant.id = importExportIdMaps.characters[participant.id] || participant.id;
-                }
-                if (participant.characterId) {
-                    participant.characterId = importExportIdMaps.characters[participant.characterId] || participant.characterId;
-                }
-            });
-        }
-
-        if (dataType === 'all') {
-            return {
-                characters: friendlyData.characters,
-                notes: friendlyData.notes,
-                storyBeats: friendlyData.quests,
-                initiatives: friendlyData.initiatives,
-                automation: friendlyData.automation,
-            };
-        } else if (dataType === 'characters') {
-            return friendlyData.characters;
-        } else if (dataType === 'notes') {
-            return friendlyData.notes;
-        } else if (dataType === 'story-beats') {
-            return friendlyData.quests;
-        } else if (dataType === 'initiatives') {
-            return friendlyData.initiatives;
-        } else if (dataType === 'automation') {
-            return friendlyData.automation;
-        }
-        return {};
-    }
-
-    function revertToInternalIds(userFriendlyData) {
-        if (!importExportIdMaps.reverse) {
-            console.error("Cannot revert IDs. Reverse map not found.");
-            return userFriendlyData;
-        }
-        const reverseMaps = importExportIdMaps.reverse;
-        let dataToRevert = JSON.parse(JSON.stringify(userFriendlyData));
-
-        function revertObject(obj) {
-            if (Array.isArray(obj)) {
-                obj.forEach(revertObject);
-                return;
-            }
-            if (obj === null || typeof obj !== 'object') {
-                return;
-            }
-
-            // Handle special content replacement first, as these are properties of the object itself.
-            if (obj.hasOwnProperty('content') && obj.title) { // Note heuristic
-                const imagePlaceholderRegex = /!\[(.*?)\]\((Image_in_Note_\d+_\d+)\)/g;
-                obj.content = obj.content.replace(imagePlaceholderRegex, (match, altText, placeholder) => {
-                    const dataUrl = importExportIdMaps.noteImages[placeholder];
-                    return dataUrl ? `![${altText || 'Embedded Image'}](${dataUrl})` : match;
-                });
-            }
-            if (obj.linkedPdf) { // Character heuristic
-                const pdfInfo = importExportIdMaps.characterPdfs[obj.linkedPdf];
-                if (pdfInfo) {
-                    obj.pdfData = pdfInfo.pdfData;
-                    obj.pdfFileName = pdfInfo.pdfFileName;
-                }
-                delete obj.linkedPdf;
-            }
-
-            // Now, iterate over all keys to revert string-based IDs and recurse into nested objects.
-            for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                    const value = obj[key];
-
-                    if (typeof value === 'string') {
-                        if (value.startsWith('Character_')) {
-                            obj[key] = reverseMaps.characters[value] || value;
-                        } else if (value.startsWith('Note_')) {
-                            obj[key] = reverseMaps.notes[value] || value;
-                        } else if (value.startsWith('Story_Beat_')) {
-                            obj[key] = reverseMaps.quests[value] || value;
-                        }
-                    } else if (typeof value === 'object') {
-                        // It's a nested object or array, recurse into it.
-                        revertObject(value);
-                    }
-                }
-            }
-        }
-
-        revertObject(dataToRevert);
-        return dataToRevert;
-    }
 
 
     if (settingsButton && settingsOverlay && settingsWindow) {
@@ -13522,122 +13345,127 @@ function loadAndRenderAutomationBranch(branchName) {
         }
     }
 
-    function getExampleJsonForType(type) {
-        switch (type) {
-            case 'notes':
-                return {
-                    id: "Note_new",
-                    title: "Example Note",
-                    content: "This is an example note. You can use **markdown**!"
-                };
-            case 'characters':
-                 return {
-                    id: "Character_new",
-                    name: "New Character",
-                    sheetData: {},
-                    notes: "Character notes go here."
-                };
-            case 'story-beats':
-                return {
-                    id: "Story_Beat_new",
-                    name: "New Story Beat",
-                    parentIds: [],
-                    description: "A new adventure begins."
-                };
-            default:
-                return { message: `No example available for type: ${type}` };
-        }
-    }
-
     function handleImportExportSelection(type) {
         importExportList.innerHTML = '';
-        const userFriendlyData = generateUserFriendlyData(type);
-        let dataToRender = [];
-        let fullDataObject = {};
+        if (jsonEditor) {
+            jsonEditor.setValue("Select an item from the list to view its JSON data.");
+            jsonEditor.setOption("readOnly", true);
+        }
+
+        let dataToRender, nameKey, idKey, fullDataObject;
 
         switch(type) {
             case 'all':
-                if (jsonEditor) jsonEditor.setValue(JSON.stringify(userFriendlyData, null, 2));
+                if (jsonEditor) {
+                    const allData = {
+                        characters: charactersData,
+                        notes: notesData,
+                        storyBeats: quests,
+                        initiatives: savedInitiatives,
+                        automation: automationBranches,
+                        assets: assetsByPath,
+                        assetFavorites: assetFavorites,
+                        settings: {
+                            dmRenderQuality: dmRenderQuality,
+                            playerRenderQuality: playerRenderQuality,
+                            mapIconSize: mapIconSize
+                        },
+                    };
+                    jsonEditor.setValue(JSON.stringify(allData, null, 2));
+                    jsonEditor.setOption("readOnly", false);
+                }
                 importExportList.innerHTML = `
                     <p>Characters: ${charactersData.length}</p>
                     <p>Notes: ${notesData.length}</p>
                     <p>Story Beats: ${quests.length}</p>
                     <p>Initiatives: ${Object.keys(savedInitiatives).length}</p>
-                    <p>Automation: ${Object.keys(automationBranches).length}</p>
+                    <p>Automation Branches: ${Object.keys(automationBranches).length}</p>
                 `;
-                return; // Exit here for 'all' type
+                return;
             case 'characters':
-                dataToRender = userFriendlyData;
+                dataToRender = charactersData;
+                nameKey = 'name';
+                idKey = 'id';
                 break;
             case 'notes':
-                dataToRender = userFriendlyData;
+                dataToRender = notesData;
+                nameKey = 'title';
+                idKey = 'id';
                 break;
             case 'story-beats':
-                dataToRender = userFriendlyData;
+                dataToRender = quests;
+                nameKey = 'name';
+                idKey = 'id';
                 break;
             case 'initiatives':
-                dataToRender = Object.keys(userFriendlyData).map(name => ({ name }));
-                fullDataObject = userFriendlyData;
+                dataToRender = Object.keys(savedInitiatives).map(name => ({ name: name }));
+                nameKey = 'name';
+                idKey = 'name';
+                fullDataObject = savedInitiatives;
                 break;
             case 'automation':
-                dataToRender = Object.keys(userFriendlyData).map(name => ({ name }));
-                fullDataObject = userFriendlyData;
+                dataToRender = Object.keys(automationBranches).map(name => ({ name: name }));
+                nameKey = 'name';
+                idKey = 'name';
+                fullDataObject = automationBranches;
                 break;
         }
 
-        if (dataToRender.length === 0 && (type === 'notes' || type === 'characters' || type === 'story-beats')) {
-            const example = getExampleJsonForType(type);
-            if (jsonEditor) jsonEditor.setValue(JSON.stringify(example, null, 2));
-            renderCategorizedList([], 'name', 'id', type, null, true); // Pass a flag for example mode
-        } else {
-            renderCategorizedList(dataToRender, type === 'notes' ? 'title' : 'name', type === 'initiatives' || type === 'automation' ? 'name' : 'id', type, fullDataObject);
-        }
+        renderItemBrowser(dataToRender, nameKey, idKey, type, fullDataObject);
     }
 
-    function renderCategorizedList(dataArray, nameKey, idKey, type, fullData, isExample = false) {
+    function renderItemBrowser(dataArray, nameKey, idKey, type, fullDataObject) {
         const ul = document.createElement('ul');
+        importExportList.innerHTML = ''; // Clear previous content
 
-        if (isExample) {
+        if (!dataArray || dataArray.length === 0) {
+            importExportList.innerHTML = `<p class="sidebar-placeholder">No items found for this category.</p>`;
+            if (jsonEditor) {
+                jsonEditor.setValue(`{
+    "message": "No items in this category. You can add one from the main interface or paste a valid JSON object here and save it."
+}`);
+                jsonEditor.setOption("readOnly", false);
+            }
+            return;
+        }
+
+        dataArray.forEach(item => {
             const li = document.createElement('li');
-            li.textContent = `Example ${type.charAt(0).toUpperCase() + type.slice(1, -1)}`;
-            li.dataset.id = 'example-item';
+            li.textContent = item[nameKey];
+            li.dataset.id = item[idKey];
             li.style.cursor = 'pointer';
-            li.classList.add('selected'); // Pre-select the example
+
             li.addEventListener('click', () => {
-                const exampleJson = getExampleJsonForType(type);
+                const currentSelected = ul.querySelector('.selected');
+                if (currentSelected) {
+                    currentSelected.classList.remove('selected');
+                }
+                li.classList.add('selected');
+
+                let itemData;
+                if (type === 'initiatives' || type === 'automation') {
+                    itemData = fullDataObject[item.name];
+                } else {
+                    // For arrays of objects, find by the idKey
+                    itemData = dataArray.find(d => String(d[idKey]) === String(li.dataset.id));
+                }
+
                 if (jsonEditor) {
-                    jsonEditor.setValue(JSON.stringify(exampleJson, null, 2));
+                    jsonEditor.setValue(JSON.stringify(itemData, null, 2));
+                    jsonEditor.setOption("readOnly", false); // Make editor writable when an item is selected
+                    setTimeout(() => jsonEditor.refresh(), 1);
                 }
             });
             ul.appendChild(li);
-        } else {
-            dataArray.forEach(item => {
-                const li = document.createElement('li');
-                li.textContent = item[nameKey];
-                li.dataset.id = item[idKey];
-                li.style.cursor = 'pointer';
-                li.addEventListener('click', () => {
-                    const currentSelected = ul.querySelector('.selected');
-                    if (currentSelected) {
-                        currentSelected.classList.remove('selected');
-                    }
-                    li.classList.add('selected');
+        });
 
-                    let itemData;
-                    if (type === 'initiatives' || type === 'automation') {
-                        itemData = fullData[item.name];
-                    } else {
-                        itemData = dataArray.find(d => d[idKey] == li.dataset.id);
-                    }
-                    if (jsonEditor) jsonEditor.setValue(JSON.stringify(itemData, null, 2));
-                });
-                ul.appendChild(li);
-            });
-        }
-        importExportList.innerHTML = ''; // Clear previous content
         importExportList.appendChild(ul);
-    }
 
+        // Select the first item by default
+        if (ul.firstChild) {
+            ul.firstChild.click();
+        }
+    }
     const saveExportButton = document.getElementById('save-export-button');
     const copyExportButton = document.getElementById('copy-export-button');
 
@@ -13658,152 +13486,92 @@ function loadAndRenderAutomationBranch(branchName) {
     }
 
     function handleSaveExport() {
-        try {
-            if (!jsonEditor) return;
-            const userFriendlyJSON = jsonEditor.getValue();
-            const parsedData = JSON.parse(userFriendlyJSON);
+        if (!jsonEditor) return;
 
+        try {
+            const editedJson = JSON.parse(jsonEditor.getValue());
             const selectedButton = document.querySelector('.import-export-controls button.active');
-            const selectedListItem = importExportList.querySelector('li.selected');
             const saveType = selectedButton ? selectedButton.dataset.type : null;
 
-            // If a single item is selected in the list, we are updating that specific item.
-            if (selectedListItem && !Array.isArray(parsedData)) {
-                const friendlyId = selectedListItem.dataset.id;
-                const mapType = saveType === 'story-beats' ? 'quests' : saveType;
-                const internalId = importExportIdMaps.reverse[mapType] ? importExportIdMaps.reverse[mapType][friendlyId] : null;
+            if (!saveType) {
+                alert("Could not determine data type. Please select a category.");
+                return;
+            }
 
-                if (internalId) {
-                    // The user is editing a known item. We force the ID to match the original internal ID.
-                    const dataToUpdate = revertToInternalIds(parsedData);
-                    dataToUpdate.id = internalId; // Ensure the ID is the original internal one.
-
-                    switch (saveType) {
-                        case 'notes':
-                            const noteIndex = notesData.findIndex(n => n.id === internalId);
-                            if (noteIndex !== -1) {
-                                notesData[noteIndex] = dataToUpdate;
-                                alert(`Note "${dataToUpdate.title}" has been updated.`);
-                            }
-                            break;
-                        case 'characters':
-                            const charIndex = charactersData.findIndex(c => c.id === internalId);
-                            if (charIndex !== -1) {
-                                charactersData[charIndex] = dataToUpdate;
-                                alert(`Character "${dataToUpdate.name}" has been updated.`);
-                            }
-                            break;
-                        case 'story-beats':
-                             const questIndex = quests.findIndex(q => q.id === internalId);
-                            if (questIndex !== -1) {
-                                quests[questIndex] = dataToUpdate;
-                                alert(`Story Beat "${dataToUpdate.name}" has been updated.`);
-                            }
-                            break;
-                        // Initiatives and Automation are handled as whole objects, not single items.
-                    }
-                } else {
-                    // This case handles saving a *new* item that was created from an example.
-                    const data = revertToInternalIds(parsedData);
-                    if (saveType === 'notes') {
-                        if (confirm(`Save as a new note?`)) {
-                            data.id = Date.now();
-                            notesData.push(data);
-                        }
-                    } else if (saveType === 'characters') {
-                         if (confirm(`Save as a new character?`)) {
-                            data.id = Date.now();
-                            charactersData.push(data);
-                        }
-                    } else if (saveType === 'story-beats') {
-                        if (confirm(`Save as a new story beat?`)) {
-                            const data = revertToInternalIds(parsedData);
-                            const newQuest = {
-                                // Start with defaults from initStoryTree
-                                parentIds: [],
-                                x: 0,
-                                y: 0,
-                                questStatus: 'Available',
-                                questType: [],
-                                startingTriggers: [],
-                                associatedMaps: [],
-                                associatedNPCs: [],
-                                failureTriggers: [],
-                                successTriggers: [],
-                                detailedRewards: { xp: 0, loot: '', magicItems: '', information: '' },
-                                storyDuration: '',
-                                difficulty: 0,
-                                storySteps: [],
-                                // Overwrite with data from editor
-                                ...data,
-                                id: nextQuestId++, // Ensure a unique internal ID
-                            };
-                            quests.push(newQuest);
-                            alert(`Story Beat "${newQuest.name}" has been created.`);
-                        }
-                    }
-                     handleImportExportSelection(saveType);
+            if (saveType === 'all') {
+                if (confirm("This will overwrite all campaign data. Are you sure?")) {
+                    charactersData = editedJson.characters || [];
+                    notesData = editedJson.notes || [];
+                    quests = editedJson.storyBeats || [];
+                    savedInitiatives = editedJson.initiatives || {};
+                    automationBranches = editedJson.automation || {};
+                    // Potentially load settings and other data points here as well
+                    alert("All campaign data has been overwritten.");
                 }
             } else {
-                // This block handles overwriting an entire category or all data.
-                const data = revertToInternalIds(parsedData);
-                 if (saveType === 'all') {
-                    if (confirm("This will overwrite all campaign data with the provided JSON. Are you sure?")) {
-                        charactersData = data.characters || [];
-                        notesData = data.notes || [];
-                        quests = data.storyBeats || [];
-                        savedInitiatives = data.initiatives || {};
-                        automationBranches = data.automation || {};
-                        alert('All data has been updated.');
+                const selectedListItem = importExportList.querySelector('li.selected');
+                if (selectedListItem) {
+                    // Updating an existing item
+                    const itemId = selectedListItem.dataset.id;
+                    let dataArray, idKey;
+
+                    switch (saveType) {
+                        case 'characters': dataArray = charactersData; idKey = 'id'; break;
+                        case 'notes': dataArray = notesData; idKey = 'id'; break;
+                        case 'story-beats': dataArray = quests; idKey = 'id'; break;
+                        case 'initiatives':
+                            savedInitiatives[itemId] = editedJson;
+                            alert(`Initiative "${itemId}" has been updated.`);
+                            break;
+                        case 'automation':
+                            automationBranches[itemId] = editedJson;
+                             alert(`Automation Branch "${itemId}" has been updated.`);
+                            break;
                     }
-                } else if (saveType === 'characters' && Array.isArray(data)) {
-                    charactersData = data;
-                    alert(`All characters have been overwritten.`);
-                } else if (saveType === 'notes' && Array.isArray(data)) {
-                    notesData = data;
-                    alert(`All notes have been overwritten.`);
-                } else if (saveType === 'story-beats' && Array.isArray(data)) {
-                    quests = data;
-                    alert(`All story beats have been overwritten.`);
-                } else if (saveType === 'initiatives') {
-                    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-                        alert("Invalid format for Initiatives. It should be an object mapping names to arrays of participants.");
-                        return;
-                    }
-                    for (const key in data) {
-                        if (!Array.isArray(data[key])) {
-                            alert(`Invalid format for initiative "${key}". It should be an array of participants.`);
-                            return;
+
+                    if (dataArray) {
+                        const itemIndex = dataArray.findIndex(d => String(d[idKey]) === String(itemId));
+                        if (itemIndex !== -1) {
+                            dataArray[itemIndex] = editedJson;
+                            alert(`Item "${itemId}" has been updated.`);
+                        } else {
+                             if (confirm(`Item with ID "${itemId}" not found. Save as a new item?`)) {
+                                if (!editedJson.id) editedJson.id = Date.now();
+                                dataArray.push(editedJson);
+                                alert("New item saved.");
+                            }
                         }
                     }
-                    savedInitiatives = data;
-                    alert(`All saved initiatives have been overwritten.`);
-                } else if (saveType === 'automation') {
-                    automationBranches = data;
-                    alert(`All automation branches have been overwritten.`);
                 } else {
-                     alert("Could not determine the data type to save. Please select a category.");
-                     return;
+                    // Adding a new item
+                     if (confirm("No item selected. Save as a new item?")) {
+                        let dataArray, idKey;
+                         switch (saveType) {
+                            case 'characters': dataArray = charactersData; idKey = 'id'; break;
+                            case 'notes': dataArray = notesData; idKey = 'id'; break;
+                            case 'story-beats': dataArray = quests; idKey = 'id'; break;
+                            default:
+                                alert(`Cannot add a new item of type "${saveType}" from here.`);
+                                return;
+                        }
+                         if (!editedJson[idKey]) {
+                             editedJson[idKey] = Date.now() + Math.random(); // Ensure unique ID
+                         }
+                        dataArray.push(editedJson);
+                        alert("New item saved.");
+                    }
                 }
             }
 
-            // Refresh all relevant UI elements after any change.
+            // Refresh UI
             renderAllLists();
             renderSavedInitiativesList();
             renderAutomationBranches();
-            initStoryTree();
-             if (selectedNoteId && notesData.some(n => n.id === selectedNoteId)) {
-                loadNoteIntoEditor(selectedNoteId);
-            }
-            if (selectedCharacterId && charactersData.some(c => c.id === selectedCharacterId)) {
-                loadCharacterIntoEditor(selectedCharacterId);
-            }
-            // Re-render the import/export list to reflect the changes.
-            if(saveType) handleImportExportSelection(saveType);
-
+            initStoryTree(); // Re-initializes the story tree visualization
+            handleImportExportSelection(saveType); // Refresh the import/export view
 
         } catch (e) {
-            alert('Invalid JSON. Please correct it and try again.');
+            alert('Invalid JSON format. Please correct it and try again.');
             console.error('Error parsing JSON on save:', e);
         }
     }
