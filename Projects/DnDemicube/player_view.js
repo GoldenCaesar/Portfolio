@@ -190,7 +190,7 @@ function drawGrid() {
     gridCtx.translate(originX, originY);
     gridCtx.scale(scale, scale);
 
-    gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
     gridCtx.lineWidth = 1 / scale;
 
     const gridSize = currentGridData.scale;
