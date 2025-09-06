@@ -4802,7 +4802,7 @@ function getTightBoundingBox(img) {
             const mapData = detailedMapData.get(selectedMapFileName);
             if (!mapData) return;
 
-            if (!activeAssetTool) { // Prevent panning if an asset tool is active
+            if (!activeAssetTool && !isGridToolActive) { // Prevent panning if an asset tool or grid tool is active
                 isPanning = true;
                 panStartX = e.clientX - mapData.transform.originX;
                 panStartY = e.clientY - mapData.transform.originY;
