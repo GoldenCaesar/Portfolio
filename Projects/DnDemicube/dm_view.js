@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterContextMenu = document.getElementById('character-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const viewModeMapContextMenu = document.getElementById('view-mode-map-context-menu');
+    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
     const displayedFileNames = new Set();
 
     // Shadow tool elements
@@ -6789,9 +6790,8 @@ function getTightBoundingBox(img) {
                     console.log('Right-clicked on character icon:', selectedCharacterForContextMenu);
                     overlayClicked = true;
                     break;
-                } else if (overlay.type === 'lightSource' && isPointInLightSource(imageCoords, overlay)) {
+                } else if (overlay.type === 'lightSource' && isPointInLightSource(imageCoords, overlay) && selectedMapData.mode === 'view') {
                     selectedLightSourceForContextMenu = overlay;
-                    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
                     const visionToggle = document.getElementById('light-source-vision-toggle');
                     const visionFtInput = document.getElementById('light-source-vision-ft-input');
 
@@ -6863,6 +6863,7 @@ function getTightBoundingBox(img) {
             (characterContextMenu.style.display === 'block' && characterContextMenu.contains(event.target)) ||
             (mapToolsContextMenu.style.display === 'block' && mapToolsContextMenu.contains(event.target)) ||
             (viewModeMapContextMenu.style.display === 'block' && viewModeMapContextMenu.contains(event.target)) ||
+            (lightSourceContextMenu.style.display === 'block' && lightSourceContextMenu.contains(event.target)) ||
             Array.from(document.querySelectorAll('.dynamic-context-menu')).some(menu => menu.contains(event.target));
 
 
@@ -6872,12 +6873,14 @@ function getTightBoundingBox(img) {
             characterContextMenu.style.display = 'none';
             mapToolsContextMenu.style.display = 'none';
             viewModeMapContextMenu.style.display = 'none';
+            lightSourceContextMenu.style.display = 'none';
             document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
 
             // Reset selection states
             selectedPolygonForContextMenu = null;
             selectedNoteForContextMenu = null;
             selectedCharacterForContextMenu = null;
+            selectedLightSourceForContextMenu = null;
         }
 
         if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
