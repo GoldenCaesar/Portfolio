@@ -2618,7 +2618,7 @@ function getTightBoundingBox(img) {
                 const handleName = getHandleForPoint(imageCoords, asset);
                 if (handleName) {
                     isDraggingAssetHandle = true;
-                    selectedPlacedAsset = asset; // Set the global for the move handler
+                    // selectedPlacedAsset = asset; // Set the global for the move handler
                     draggedHandleInfo = {
                         name: handleName,
                         initialAsset: { ...asset, position: { ...asset.position } },
@@ -3432,7 +3432,7 @@ function getTightBoundingBox(img) {
                 updateAssetPreview();
             } else { // If we are turning select mode OFF
                 // Deselect any placed asset
-                selectedPlacedAsset = null;
+                selectedPlacedAssets = [];
                 updateAssetPreview(); // This will hide the preview
                 if (selectedMapFileName) {
                     displayMapOnCanvas(selectedMapFileName); // Redraw to remove selection box
@@ -3785,7 +3785,7 @@ function getTightBoundingBox(img) {
 
                         // 5. Remove the placed assets from the overlays
                         mapData.overlays = mapData.overlays.filter(o => o.type !== 'placedAsset');
-                        selectedPlacedAsset = null;
+                        selectedPlacedAssets = [];
 
                         // 6. Redraw the canvas with the new, flattened map
                         displayMapOnCanvas(selectedMapFileName);
@@ -4899,12 +4899,13 @@ function getTightBoundingBox(img) {
 
                 const { name, initialAsset, initialMouseCoords } = draggedHandleInfo;
                 const assetCenter = initialAsset.position;
+                const assetToUpdate = selectedPlacedAssets[0];
 
                 if (name === 'rotate') {
                     const initialAngle = Math.atan2(initialMouseCoords.y - assetCenter.y, initialMouseCoords.x - assetCenter.x);
                     const currentAngle = Math.atan2(imageCoords.y - assetCenter.y, imageCoords.x - assetCenter.x);
                     const angleDelta = currentAngle - initialAngle;
-                    selectedPlacedAsset.rotation = initialAsset.rotation + angleDelta;
+                    assetToUpdate.rotation = initialAsset.rotation + angleDelta;
                 } else {
                     // Handle uniform scaling based on distance from center
                     const initialDist = Math.sqrt(Math.pow(initialMouseCoords.x - assetCenter.x, 2) + Math.pow(initialMouseCoords.y - assetCenter.y, 2));
@@ -4917,12 +4918,12 @@ function getTightBoundingBox(img) {
                         // Prevent scaling down to nothing or inverting
                         if (newScale < 0.1) newScale = 0.1;
 
-                        selectedPlacedAsset.scale = newScale;
+                        assetToUpdate.scale = newScale;
                     }
                 }
 
                 requestRedraw(); // Redraw to show the change
-                updateAssetPreview(selectedPlacedAsset); // Update the preview pane in real-time
+                updateAssetPreview(assetToUpdate); // Update the preview pane in real-time
                 return;
             }
 
@@ -5001,8 +5002,8 @@ function getTightBoundingBox(img) {
 
                 } else {
                      // Update cursor for asset selection mode
-                    if (activeAssetTool === 'select' && selectedPlacedAsset) {
-                        const handleName = getHandleForPoint(imageCoords, selectedPlacedAsset);
+                    if (activeAssetTool === 'select' && selectedPlacedAssets.length === 1) {
+                        const handleName = getHandleForPoint(imageCoords, selectedPlacedAssets[0]);
                         mapContainer.style.cursor = handleName ? 'grab' : 'pointer';
                     } else if (activeAssetTool === 'select') {
                         mapContainer.style.cursor = 'pointer';
