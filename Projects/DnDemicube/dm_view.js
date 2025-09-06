@@ -795,6 +795,13 @@ function propagateCharacterUpdate(characterId) {
     }
     requestFogOfWarUpdate();
     sendInitiativeDataToPlayerView();
+
+    if (selectedCharacterId === characterId && characterSheetIframe.contentWindow) {
+        characterSheetIframe.contentWindow.postMessage({
+            type: 'characterVisionFtChange_from_dm',
+            visionRange: masterCharacter.sheetData.vision_ft
+        }, '*');
+    }
 }
 
     let animationFrameRequest = null;
@@ -1136,6 +1143,27 @@ function propagateCharacterUpdate(characterId) {
         });
     }
 
+    const tokenStatBlockVisionFtInput = document.getElementById('token-stat-block-vision-ft-input');
+    if (tokenStatBlockVisionFtInput) {
+        tokenStatBlockVisionFtInput.addEventListener('change', (event) => {
+            if (!selectedTokenForStatBlock) return;
+            const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
+            if (!character) return;
+
+            if (character.isTokenCopy) {
+                if (!character.sheetData) character.sheetData = {};
+                character.sheetData.vision_ft = event.target.value;
+            } else {
+                const masterCharacter = charactersData.find(c => c.id === character.id);
+                if (masterCharacter) {
+                    if (!masterCharacter.sheetData) masterCharacter.sheetData = {};
+                    masterCharacter.sheetData.vision_ft = event.target.value;
+                    propagateCharacterUpdate(masterCharacter.id);
+                }
+            }
+        });
+    }
+
 function getTightBoundingBox(img) {
     // Check cache first
     if (assetBoundingBoxCache[img.src]) {
@@ -1418,6 +1446,11 @@ function getTightBoundingBox(img) {
         }
         if (visionToggle) {
             visionToggle.checked = typeof character.vision === 'boolean' ? character.vision : true;
+        }
+
+        const visionFtInput = document.getElementById('token-stat-block-vision-ft-input');
+        if (visionFtInput) {
+            visionFtInput.value = character.sheetData.vision_ft || '60';
         }
 
         tokenStatBlockHp.value = character.sheetData.hp_current || 0;
@@ -5479,6 +5512,10 @@ function getTightBoundingBox(img) {
                 for (const incomingChar of campaignData.characters) {
                     const existingChar = charactersData.find(c => c.id === incomingChar.id);
                     if (!existingChar) {
+                        if (!incomingChar.sheetData) incomingChar.sheetData = {};
+                        if (typeof incomingChar.sheetData.vision_ft === 'undefined') {
+                            incomingChar.sheetData.vision_ft = '60';
+                        }
                         if (incomingChar.pdfFileName && charactersFolder) {
                             const pdfFile = charactersFolder.file(incomingChar.pdfFileName);
                             if (pdfFile) {
@@ -5806,6 +5843,12 @@ function getTightBoundingBox(img) {
             }
             if (typeof character.vision === 'undefined') {
                 character.vision = true;
+            }
+            if (!character.sheetData) {
+                character.sheetData = {};
+            }
+            if (typeof character.sheetData.vision_ft === 'undefined') {
+                character.sheetData.vision_ft = '60';
             }
         });
         selectedNoteId = campaignData.selectedNoteId || null;
@@ -8102,6 +8145,15 @@ function getTightBoundingBox(img) {
                 if (character) {
                     character.sheetData = event.data.data;
                     character.savedRolls = event.data.data.savedRolls;
+                    propagateCharacterUpdate(selectedCharacterId);
+                }
+            }
+        } else if (event.data.type === 'characterVisionFtChange') {
+            if (selectedCharacterId) {
+                const character = charactersData.find(c => c.id === selectedCharacterId);
+                if (character) {
+                    if (!character.sheetData) character.sheetData = {};
+                    character.sheetData.vision_ft = event.data.visionRange;
                     propagateCharacterUpdate(selectedCharacterId);
                 }
             }
@@ -13414,17 +13466,21 @@ function loadAndRenderAutomationBranch(branchName) {
             const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
             if (!character) return;
 
-            const masterCharacter = charactersData.find(c => c.id === character.id);
-            if (masterCharacter) {
-                masterCharacter.isDetailsVisible = event.target.checked;
-                propagateCharacterUpdate(masterCharacter.id);
+            if (character.isTokenCopy) {
+                character.isDetailsVisible = event.target.checked;
+            } else {
+                const masterCharacter = charactersData.find(c => c.id === character.id);
+                if (masterCharacter) {
+                    masterCharacter.isDetailsVisible = event.target.checked;
+                    propagateCharacterUpdate(masterCharacter.id);
 
-                // Sync with character sheet if it's the current one
-                if (selectedCharacterId === masterCharacter.id) {
-                    characterSheetIframe.contentWindow.postMessage({
-                        type: 'characterDetailsVisibilityChange',
-                        isDetailsVisible: event.target.checked
-                    }, '*');
+                    // Sync with character sheet if it's the current one
+                    if (selectedCharacterId === masterCharacter.id) {
+                        characterSheetIframe.contentWindow.postMessage({
+                            type: 'characterDetailsVisibilityChange',
+                            isDetailsVisible: event.target.checked
+                        }, '*');
+                    }
                 }
             }
         });
@@ -13437,17 +13493,21 @@ function loadAndRenderAutomationBranch(branchName) {
             const character = activeInitiative.find(c => c.uniqueId === selectedTokenForStatBlock.uniqueId);
             if (!character) return;
 
-            const masterCharacter = charactersData.find(c => c.id === character.id);
-            if (masterCharacter) {
-                masterCharacter.vision = event.target.checked;
-                propagateCharacterUpdate(masterCharacter.id);
+            if (character.isTokenCopy) {
+                character.vision = event.target.checked;
+            } else {
+                const masterCharacter = charactersData.find(c => c.id === character.id);
+                if (masterCharacter) {
+                    masterCharacter.vision = event.target.checked;
+                    propagateCharacterUpdate(masterCharacter.id);
 
-                // Sync with character sheet if it's the current one
-                if (selectedCharacterId === masterCharacter.id) {
-                    characterSheetIframe.contentWindow.postMessage({
-                        type: 'characterVisionChange_from_dm',
-                        vision: event.target.checked
-                    }, '*');
+                    // Sync with character sheet if it's the current one
+                    if (selectedCharacterId === masterCharacter.id) {
+                        characterSheetIframe.contentWindow.postMessage({
+                            type: 'characterVisionChange_from_dm',
+                            vision: event.target.checked
+                        }, '*');
+                    }
                 }
             }
         });

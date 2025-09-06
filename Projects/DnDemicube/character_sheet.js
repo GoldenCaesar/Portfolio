@@ -125,6 +125,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const visionFtInput = document.getElementById('vision-ft-input');
+    if (visionFtInput) {
+        visionFtInput.addEventListener('input', function() {
+            window.parent.postMessage({
+                type: 'characterVisionFtChange',
+                visionRange: this.value
+            }, '*');
+        });
+    }
+
     savingThrowAttrs.forEach(createSavingThrow);
     for (const skill in skills) {
         createSkill(skill, skills[skill]);
@@ -179,6 +189,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 input.value = '';
             }
         });
+        document.getElementById('vision-ft-input').value = '60';
+        document.getElementById('vision-checkbox').checked = true;
     }
 
     const detailsVisibilityToggle = document.getElementById('details-visibility-toggle');
@@ -358,6 +370,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (event.data.type === 'loadCharacterSheet') {
             clearSheetFields();
             const data = event.data.data;
+            if (typeof data.vision_ft === 'undefined' || data.vision_ft === null || data.vision_ft === '') {
+                data.vision_ft = '60';
+            }
             for (const key in data) {
                 const element = document.getElementsByName(key)[0];
                 if (element) {
@@ -389,6 +404,11 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (event.data.type === 'characterVisionChange_from_dm') {
             if (visionCheckbox) {
                 visionCheckbox.checked = event.data.vision;
+            }
+        } else if (event.data.type === 'characterVisionFtChange_from_dm') {
+            const visionFtInput = document.getElementById('vision-ft-input');
+            if (visionFtInput) {
+                visionFtInput.value = event.data.visionRange;
             }
         } else if (event.data.type === 'requestSheetData') {
             const sheetData = {};
