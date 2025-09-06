@@ -96,7 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterContextMenu = document.getElementById('character-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const viewModeMapContextMenu = document.getElementById('view-mode-map-context-menu');
-    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
     const displayedFileNames = new Set();
 
     // Shadow tool elements
@@ -6791,18 +6790,17 @@ function getTightBoundingBox(img) {
                     overlayClicked = true;
                     break;
                 } else if (overlay.type === 'lightSource' && isPointInLightSource(imageCoords, overlay)) {
-                    if (selectedMapData.mode === 'view') {
-                        selectedLightSourceForContextMenu = overlay;
-                        const visionToggle = document.getElementById('light-source-vision-toggle');
-                        const visionFtInput = document.getElementById('light-source-vision-ft-input');
+                    selectedLightSourceForContextMenu = overlay;
+                    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
+                    const visionToggle = document.getElementById('light-source-vision-toggle');
+                    const visionFtInput = document.getElementById('light-source-vision-ft-input');
 
-                        visionToggle.checked = overlay.vision;
-                        visionFtInput.value = overlay.vision_ft;
+                    visionToggle.checked = overlay.vision;
+                    visionFtInput.value = overlay.vision_ft;
 
-                        lightSourceContextMenu.style.left = `${event.pageX}px`;
-                        lightSourceContextMenu.style.top = `${event.pageY}px`;
-                        lightSourceContextMenu.style.display = 'block';
-                    }
+                    lightSourceContextMenu.style.left = `${event.pageX}px`;
+                    lightSourceContextMenu.style.top = `${event.pageY}px`;
+                    lightSourceContextMenu.style.display = 'block';
                     overlayClicked = true;
                     break;
                 }
@@ -6865,7 +6863,6 @@ function getTightBoundingBox(img) {
             (characterContextMenu.style.display === 'block' && characterContextMenu.contains(event.target)) ||
             (mapToolsContextMenu.style.display === 'block' && mapToolsContextMenu.contains(event.target)) ||
             (viewModeMapContextMenu.style.display === 'block' && viewModeMapContextMenu.contains(event.target)) ||
-            (lightSourceContextMenu.style.display === 'block' && lightSourceContextMenu.contains(event.target)) ||
             Array.from(document.querySelectorAll('.dynamic-context-menu')).some(menu => menu.contains(event.target));
 
 
@@ -6875,7 +6872,6 @@ function getTightBoundingBox(img) {
             characterContextMenu.style.display = 'none';
             mapToolsContextMenu.style.display = 'none';
             viewModeMapContextMenu.style.display = 'none';
-            lightSourceContextMenu.style.display = 'none';
             document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
 
             // Reset selection states
