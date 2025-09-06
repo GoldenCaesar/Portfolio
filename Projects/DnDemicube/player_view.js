@@ -119,68 +119,64 @@ let currentLightMapUrl = null;
 
 let shadowAnimationId = null;
 
+function drawPlayerVision() {
+    if (!shadowCanvas || !currentLightMapUrl) return;
+    const shadowCtx = shadowCanvas.getContext('2d');
+
+    const lightMapImg = new Image();
+    lightMapImg.onload = () => {
+        // This canvas acts as a "mask" to reveal the full-color map below.
+        // We fill it with a solid color, then punch holes in it where vision exists.
+        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+        shadowCtx.fillStyle = 'black'; // The color doesn't matter, just needs to be solid.
+        shadowCtx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+        shadowCtx.save();
+        shadowCtx.globalCompositeOperation = 'destination-out';
+        shadowCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        shadowCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        shadowCtx.drawImage(lightMapImg, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+        shadowCtx.restore();
+    };
+    lightMapImg.src = currentLightMapUrl;
+}
+
+
 function drawFogOfWar() {
-    if (!fogCanvas || !currentMapImage) {
+    if (!fogCanvas || !currentFogOfWarUrl || !currentMapImage) {
         if (fogCanvas) fogCanvas.getContext('2d').clearRect(0, 0, fogCanvas.width, fogCanvas.height);
         return;
     }
     const fCtx = fogCanvas.getContext('2d');
+    const fogImg = new Image();
+    fogImg.onload = () => {
+        // This canvas shows unexplored areas as black and explored-but-unseen areas as grey.
+        fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
 
-    // This function now handles all layers of fog and shadow.
-    // The final result on this canvas will be a layer that obscures the main map.
-    // - Unexplored areas will be solid black.
-    // - Explored-but-dark areas will be a semi-transparent grey.
-    // - Currently visible areas will be fully transparent, revealing the color map below.
+        // 1. Start with a black canvas for unexplored areas.
+        fCtx.fillStyle = 'black';
+        fCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
 
-    // 1. Start with a semi-transparent grey overlay. This is the "explored-but-dark" state.
-    fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-    fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    fCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
+        // 2. Punch holes in the black for all explored areas (past and present).
+        fCtx.save();
+        fCtx.globalCompositeOperation = 'destination-out';
+        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.restore();
 
-    // 2. Draw the "unexplored" mask on top.
-    // The fogOfWarDataUrl is a black image with transparent holes for explored areas.
-    if (currentFogOfWarUrl) {
-        const fogImg = new Image();
-        fogImg.onload = () => {
-            fCtx.save();
-            fCtx.globalCompositeOperation = 'source-over'; // Draw on top
-            fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-            fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-            fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
-            fCtx.restore();
-
-            // 3. Punch holes for currently visible areas.
-            // The lightMapDataUrl is a black image with transparent holes for lit areas.
-            // By using 'destination-out', we punch holes in our fog/shadow layer.
-            if (currentLightMapUrl) {
-                const lightMapImg = new Image();
-                lightMapImg.onload = () => {
-                    fCtx.save();
-                    fCtx.globalCompositeOperation = 'destination-out';
-                    fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-                    fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-                    fCtx.drawImage(lightMapImg, 0, 0, currentMapImage.width, currentMapImage.height);
-                    fCtx.restore();
-                };
-                lightMapImg.src = currentLightMapUrl;
-            }
-        };
-        fogImg.src = currentFogOfWarUrl;
-    } else {
-        // If there's no fog data, just punch holes for vision.
-        if (currentLightMapUrl) {
-            const lightMapImg = new Image();
-            lightMapImg.onload = () => {
-                fCtx.save();
-                fCtx.globalCompositeOperation = 'destination-out';
-                fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-                fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-                fCtx.drawImage(lightMapImg, 0, 0, currentMapImage.width, currentMapImage.height);
-                fCtx.restore();
-            };
-            lightMapImg.src = currentLightMapUrl;
-        }
-    }
+        // 3. Draw the greyed-out map image underneath the remaining black parts.
+        fCtx.save();
+        fCtx.globalCompositeOperation = 'destination-over';
+        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        fCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        fCtx.globalCompositeOperation = 'source-atop';
+        fCtx.fillRect(0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.restore();
+    };
+    fogImg.src = currentFogOfWarUrl;
 }
 
 function getPolygonSignedArea(polygon) {
@@ -267,6 +263,12 @@ function resizePlayerCanvas() {
     playerCanvas.style.top = `${top}px`;
     playerCanvas.style.left = `${left}px`;
 
+    if (shadowCanvas) {
+        shadowCanvas.width = newWidth;
+        shadowCanvas.height = newHeight;
+        shadowCanvas.style.top = `${top}px`;
+        shadowCanvas.style.left = `${left}px`;
+    }
     if (gridCanvas) {
         gridCanvas.width = newWidth;
         gridCanvas.height = newHeight;
@@ -544,6 +546,7 @@ window.addEventListener('message', (event) => {
                     recalculateAndApplyTransform();
                     drawMapAndOverlays();
                     drawFogOfWar();
+                    drawPlayerVision();
                 }
                 break;
             // Note: 'polygonVisibilityUpdate' from DM is largely superseded by DM sending
@@ -702,7 +705,7 @@ window.addEventListener('message', (event) => {
                 break;
             case 'lightMapUpdate':
                 currentLightMapUrl = data.lightMapDataUrl;
-                drawFogOfWar();
+                drawPlayerVision();
                 break;
             case 'fogOfWarUpdate':
                 currentFogOfWarUrl = data.fogOfWarDataUrl;

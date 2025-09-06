@@ -6322,36 +6322,7 @@ function getTightBoundingBox(img) {
         if (playerWindow && !playerWindow.closed && selectedMapFileName) {
             const mapData = detailedMapData.get(selectedMapFileName);
             if (mapData && mapData.mode === 'view' && lightMapCanvas) {
-                // To fix the inversion issue, we must send a clean "light map" (where light is opaque)
-                // instead of the DM's "shadow map" (where shadows are opaque).
-
-                // 1. Create a temporary canvas to process the DM's shadow map.
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = lightMapCanvas.width;
-                tempCanvas.height = lightMapCanvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-
-                // 2. Draw the DM's shadow map onto it. This map has transparent areas for light
-                // and semi-transparent black for shadows.
-                tempCtx.drawImage(lightMapCanvas, 0, 0);
-
-                // 3. Create the final "light map" to send to the player.
-                const playerLightMapCanvas = document.createElement('canvas');
-                playerLightMapCanvas.width = lightMapCanvas.width;
-                playerLightMapCanvas.height = lightMapCanvas.height;
-                const pLightCtx = playerLightMapCanvas.getContext('2d');
-
-                // 4. Fill it with a solid color. This represents the light.
-                pLightCtx.fillStyle = 'black';
-                pLightCtx.fillRect(0, 0, playerLightMapCanvas.width, playerLightMapCanvas.height);
-
-                // 5. Use 'destination-out' to punch holes where the shadows are.
-                // The result is a canvas that is opaque black only where light is.
-                pLightCtx.globalCompositeOperation = 'destination-out';
-                pLightCtx.drawImage(tempCanvas, 0, 0);
-
-                // 6. Send this new, clean light map to the player.
-                const lightMapDataUrl = playerLightMapCanvas.toDataURL();
+                const lightMapDataUrl = lightMapCanvas.toDataURL();
                 playerWindow.postMessage({
                     type: 'lightMapUpdate',
                     lightMapDataUrl: lightMapDataUrl
