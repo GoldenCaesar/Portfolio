@@ -115,29 +115,49 @@ let lightMapCtx = null;
 let isLightMapDirty = true;
 let renderQuality = 0.5; // Default quality, will be updated by DM
 let currentFogOfWarUrl = null;
+let currentLightMapUrl = null;
 
 let shadowAnimationId = null;
 
+function drawPlayerVision() {
+    if (!shadowCanvas || !currentLightMapUrl) return;
+    const shadowCtx = shadowCanvas.getContext('2d');
+
+    const lightMapImg = new Image();
+    lightMapImg.onload = () => {
+        // This canvas acts as a "mask" to reveal the full-color map below.
+        // We fill it with a solid color, then punch holes in it where vision exists.
+        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+        shadowCtx.fillStyle = 'black'; // The color doesn't matter, just needs to be solid.
+        shadowCtx.fillRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+        shadowCtx.save();
+        shadowCtx.globalCompositeOperation = 'destination-out';
+        shadowCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        shadowCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        shadowCtx.drawImage(lightMapImg, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+        shadowCtx.restore();
+    };
+    lightMapImg.src = currentLightMapUrl;
+}
+
+
 function drawFogOfWar() {
-    if (!fCtx || !currentFogOfWarUrl || !currentMapImage) {
-        if (fCtx) fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
+    if (!fogCanvas || !currentFogOfWarUrl || !currentMapImage) {
+        if (fogCanvas) fogCanvas.getContext('2d').clearRect(0, 0, fogCanvas.width, fogCanvas.height);
         return;
     }
-
+    const fCtx = fogCanvas.getContext('2d');
     const fogImg = new Image();
     fogImg.onload = () => {
-        // First, draw the greyed-out version of the map. This is our "historical" view.
+        // This canvas shows unexplored areas as black and explored-but-unseen areas as grey.
         fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
-        fCtx.save();
-        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-        fCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
-        fCtx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        fCtx.globalCompositeOperation = 'source-atop';
-        fCtx.fillRect(0, 0, currentMapImage.width, currentMapImage.height);
-        fCtx.restore();
 
-        // Now, use the fog mask from the DM to "cut out" the unexplored areas.
+        // 1. Start with a black canvas for unexplored areas.
+        fCtx.fillStyle = 'black';
+        fCtx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
+
+        // 2. Punch holes in the black for all explored areas (past and present).
         fCtx.save();
         fCtx.globalCompositeOperation = 'destination-out';
         fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
@@ -145,15 +165,16 @@ function drawFogOfWar() {
         fCtx.drawImage(fogImg, 0, 0, currentMapImage.width, currentMapImage.height);
         fCtx.restore();
 
-        // Finally, clear the fog from areas that are currently visible.
-        if (lightMapCanvas) {
-            fCtx.save();
-            fCtx.globalCompositeOperation = 'destination-in';
-            fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
-            fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
-            fCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
-            fCtx.restore();
-        }
+        // 3. Draw the greyed-out map image underneath the remaining black parts.
+        fCtx.save();
+        fCtx.globalCompositeOperation = 'destination-over';
+        fCtx.translate(currentMapTransform.originX, currentMapTransform.originY);
+        fCtx.scale(currentMapTransform.scale, currentMapTransform.scale);
+        fCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        fCtx.globalCompositeOperation = 'source-atop';
+        fCtx.fillRect(0, 0, currentMapImage.width, currentMapImage.height);
+        fCtx.restore();
     };
     fogImg.src = currentFogOfWarUrl;
 }
@@ -310,193 +331,8 @@ function getLineIntersection(p1, p2) {
     return null;
 }
 
-function recalculateLightMap_Player() {
-    if (!isLightMapDirty) return;
-
-    if (!currentMapDisplayData.img) {
-        if (lightMapCtx) {
-            lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-        }
-        isLightMapDirty = false;
-        return;
-    }
-
-    const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * renderQuality);
-    const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * renderQuality);
-
-    if (!lightMapCanvas || lightMapCanvas.width !== requiredWidth || lightMapCanvas.height !== requiredHeight) {
-        lightMapCanvas = document.createElement('canvas');
-        lightMapCanvas.width = requiredWidth;
-        lightMapCanvas.height = requiredHeight;
-        lightMapCtx = lightMapCanvas.getContext('2d');
-    }
-
-    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
-    const tokenLightSources = initiativeTokens
-        .filter(token => token.vision !== false)
-        .map(token => ({
-            type: 'lightSource',
-            position: { x: token.x, y: token.y },
-            radius: 40 // A reasonable default radius for a token
-        }));
-    const lightSources = [...dmLightSources, ...tokenLightSources];
-    const walls = currentOverlays.filter(o => o.type === 'wall');
-    const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
-    // Smart objects are only visible to the DM, so we don't filter them here for the player.
-    const smartObjects = currentOverlays.filter(o => o.type === 'smart_object');
-
-    lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)'; // Full black for player fog of war
-    lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-
-    const lightScale = renderQuality;
-    const imgWidth = currentMapDisplayData.imgWidth;
-    const imgHeight = currentMapDisplayData.imgHeight;
-
-    const allSegments = [];
-    walls.forEach(wall => {
-        for (let i = 0; i < wall.points.length - 1; i++) {
-            allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
-        }
-    });
-    closedDoors.forEach(door => {
-        allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door });
-    });
-    smartObjects.forEach(object => {
-        for (let i = 0; i < object.polygon.length - 1; i++) {
-            allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
-        }
-    });
-
-    allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
-    allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
-    allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
-    allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
-
-    const allVertices = [];
-    allSegments.forEach(seg => {
-        allVertices.push(seg.p1, seg.p2);
-    });
-
-    lightSources.forEach(light => {
-        const visiblePoints = [];
-        const angles = new Set();
-
-        let lightIsInsideObject = false;
-        for (const so of smartObjects) {
-            if (isPointInPolygon(light.position, so.polygon)) {
-                lightIsInsideObject = true;
-                break;
-            }
-        }
-
-        allVertices.forEach(vertex => {
-            const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
-            angles.add(angle - 0.0001);
-            angles.add(angle);
-            angles.add(angle + 0.0001);
-        });
-
-        const sortedAngles = Array.from(angles).sort((a, b) => a - b);
-
-        sortedAngles.forEach(angle => {
-            const ray = {
-                x1: light.position.x,
-                y1: light.position.y,
-                x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
-                y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
-            };
-
-            let closestIntersection = null;
-            let minDistance = Infinity;
-
-            allSegments.forEach(segment => {
-                const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
-                if (intersectionPoint) {
-                    let ignoreThisIntersection = false;
-                    if (segment.parent.type === 'smart_object') {
-                        const p1 = segment.p1;
-                        const p2 = segment.p2;
-                        const normal = { x: p2.y - p1.y, y: p1.x - p2.x }; // Outward-facing normal for clockwise polygons
-                        const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
-                        const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
-
-                        if (!lightIsInsideObject && dot > 0) {
-                            ignoreThisIntersection = true;
-                        }
-                    }
-
-                    if (!ignoreThisIntersection) {
-                        const distance = Math.sqrt(Math.pow(intersectionPoint.x - light.position.x, 2) + Math.pow(intersectionPoint.y - light.position.y, 2));
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestIntersection = intersectionPoint;
-                        }
-                    }
-                }
-            });
-
-            if (closestIntersection) {
-                visiblePoints.push(closestIntersection);
-            } else {
-                visiblePoints.push({ x: ray.x2, y: ray.y2 });
-            }
-        });
-
-        lightMapCtx.save();
-        lightMapCtx.globalCompositeOperation = 'destination-out';
-        lightMapCtx.beginPath();
-        if (visiblePoints.length > 0) {
-            const firstPoint = visiblePoints[0];
-            lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
-            visiblePoints.forEach(point => {
-                lightMapCtx.lineTo(point.x * lightScale, point.y * lightScale);
-            });
-            lightMapCtx.closePath();
-            lightMapCtx.fill();
-        }
-        lightMapCtx.restore();
-    });
-
-    isLightMapDirty = false;
-}
-
-
-function animateShadows() {
-    if (!shadowAnimationId) return;
-
-    if (isLightMapDirty) {
-        recalculateLightMap_Player();
-    }
-
-    const shadowCtx = shadowCanvas.getContext('2d');
-    shadowCanvas.width = playerCanvas.width;
-    shadowCanvas.height = playerCanvas.height;
-    shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-
-    if (lightMapCanvas) {
-        const { scale, originX, originY } = currentMapTransform;
-        shadowCtx.save();
-        shadowCtx.translate(originX, originY);
-        shadowCtx.scale(scale, scale);
-        shadowCtx.imageSmoothingEnabled = false;
-        shadowCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
-        shadowCtx.restore();
-    }
-
-    requestAnimationFrame(animateShadows);
-}
-
-function toggleShadowAnimation(start) {
-    if (start && !shadowAnimationId) {
-        shadowAnimationId = requestAnimationFrame(animateShadows);
-    } else if (!start && shadowAnimationId) {
-        cancelAnimationFrame(shadowAnimationId);
-        shadowAnimationId = null;
-        const shadowCtx = shadowCanvas.getContext('2d');
-        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-    }
-}
+// Player-side shadow and lighting calculations are now removed.
+// The player view will receive a light map directly from the DM.
 
 function drawMapAndOverlays() {
     console.log('drawMapAndOverlays called. Transform:', JSON.stringify(currentMapTransform));
@@ -685,9 +521,6 @@ window.addEventListener('message', (event) => {
                             recalculateAndApplyTransform();
                         }
                         drawMapAndOverlays(); // This draws the main map
-
-                        isLightMapDirty = true;
-                        toggleShadowAnimation(data.active);
                     };
                     img.onerror = () => {
                         drawPlaceholder("Error loading map.");
@@ -713,6 +546,7 @@ window.addEventListener('message', (event) => {
                     recalculateAndApplyTransform();
                     drawMapAndOverlays();
                     drawFogOfWar();
+                    drawPlayerVision();
                 }
                 break;
             // Note: 'polygonVisibilityUpdate' from DM is largely superseded by DM sending
@@ -868,6 +702,10 @@ window.addEventListener('message', (event) => {
             case 'gridUpdate':
                 currentGridData = data.gridData;
                 drawMapAndOverlays();
+                break;
+            case 'lightMapUpdate':
+                currentLightMapUrl = data.lightMapDataUrl;
+                drawPlayerVision();
                 break;
             case 'fogOfWarUpdate':
                 currentFogOfWarUrl = data.fogOfWarDataUrl;
