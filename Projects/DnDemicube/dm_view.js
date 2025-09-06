@@ -372,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
     let selectedNoteForContextMenu = null;
     let selectedCharacterForContextMenu = null;
+    let selectedLightSourceForContextMenu = null;
 let linkingNoteForAutomationCard = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
@@ -1710,7 +1711,7 @@ function getTightBoundingBox(img) {
             } else if (overlay.type === 'lightSource' && overlay.position) {
                 const canvasX = (overlay.position.x * scale) + originX;
                 const canvasY = (overlay.position.y * scale) + originY;
-                const radius = (overlay.radius || 15) * scale;
+                const radius = (overlay.vision_ft || 20) / (gridData[selectedMapFileName]?.sqft || 5) * (gridData[selectedMapFileName]?.scale || 50) * scale;
                 drawingCtx.fillStyle = 'rgba(255, 255, 0, 0.7)';
                 drawingCtx.beginPath();
                 drawingCtx.arc(canvasX, canvasY, radius, 0, Math.PI * 2);
@@ -2112,8 +2113,10 @@ function getTightBoundingBox(img) {
         } else if (activeShadowTool === 'lightSource') {
             const newLight = {
                 type: 'lightSource',
+                id: Date.now(),
                 position: { x: mouseX, y: mouseY },
-                radius: 15 // Default radius
+                vision: true,
+                vision_ft: 20,
             };
             mapData.overlays.push(newLight);
             isLightMapDirty = true;
@@ -3006,6 +3009,14 @@ function getTightBoundingBox(img) {
         const dy = point.y - token.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return distance <= tokenRadius;
+    }
+
+    function isPointInLightSource(point, lightSource) {
+        const radius = (lightSource.vision_ft || 20) / (gridData[selectedMapFileName]?.sqft || 5) * (gridData[selectedMapFileName]?.scale || 50);
+        const dx = point.x - lightSource.position.x;
+        const dy = point.y - lightSource.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) * (currentMapDisplayData.scale || 1);
+        return distance <= radius;
     }
 
     function isPointInPlacedAsset(point, asset) {
@@ -6656,6 +6667,7 @@ function getTightBoundingBox(img) {
         document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
+        selectedLightSourceForContextMenu = null;
 
         if (!selectedMapFileName) {
             return;
@@ -6775,6 +6787,20 @@ function getTightBoundingBox(img) {
                     characterContextMenu.style.top = `${event.pageY}px`;
                     characterContextMenu.style.display = 'block';
                     console.log('Right-clicked on character icon:', selectedCharacterForContextMenu);
+                    overlayClicked = true;
+                    break;
+                } else if (overlay.type === 'lightSource' && isPointInLightSource(imageCoords, overlay)) {
+                    selectedLightSourceForContextMenu = overlay;
+                    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
+                    const visionToggle = document.getElementById('light-source-vision-toggle');
+                    const visionFtInput = document.getElementById('light-source-vision-ft-input');
+
+                    visionToggle.checked = overlay.vision;
+                    visionFtInput.value = overlay.vision_ft;
+
+                    lightSourceContextMenu.style.left = `${event.pageX}px`;
+                    lightSourceContextMenu.style.top = `${event.pageY}px`;
+                    lightSourceContextMenu.style.display = 'block';
                     overlayClicked = true;
                     break;
                 }
@@ -8131,6 +8157,25 @@ function getTightBoundingBox(img) {
                 }
             }
             characterContextMenu.style.display = 'none';
+        });
+    }
+
+    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
+    if (lightSourceContextMenu) {
+        lightSourceContextMenu.addEventListener('change', (event) => {
+            if (!selectedLightSourceForContextMenu) return;
+
+            const visionToggle = document.getElementById('light-source-vision-toggle');
+            const visionFtInput = document.getElementById('light-source-vision-ft-input');
+
+            selectedLightSourceForContextMenu.vision = visionToggle.checked;
+            selectedLightSourceForContextMenu.vision_ft = parseInt(visionFtInput.value, 10) || 0;
+
+            const mapData = detailedMapData.get(selectedMapFileName);
+            if (mapData) {
+                drawOverlays(mapData.overlays);
+            }
+            isLightMapDirty = true;
         });
     }
 
