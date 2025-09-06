@@ -1711,7 +1711,7 @@ function getTightBoundingBox(img) {
             } else if (overlay.type === 'lightSource' && overlay.position) {
                 const canvasX = (overlay.position.x * scale) + originX;
                 const canvasY = (overlay.position.y * scale) + originY;
-                const radius = (overlay.vision_ft || 20) / (gridData[selectedMapFileName]?.sqft || 5) * (gridData[selectedMapFileName]?.scale || 50) * scale;
+                const radius = (overlay.radius || 15) * scale;
                 drawingCtx.fillStyle = 'rgba(255, 255, 0, 0.7)';
                 drawingCtx.beginPath();
                 drawingCtx.arc(canvasX, canvasY, radius, 0, Math.PI * 2);
@@ -3012,10 +3012,10 @@ function getTightBoundingBox(img) {
     }
 
     function isPointInLightSource(point, lightSource) {
-        const radius = (lightSource.vision_ft || 20) / (gridData[selectedMapFileName]?.sqft || 5) * (gridData[selectedMapFileName]?.scale || 50);
+        const radius = 15;
         const dx = point.x - lightSource.position.x;
         const dy = point.y - lightSource.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy) * (currentMapDisplayData.scale || 1);
+        const distance = Math.sqrt(dx * dx + dy * dy);
         return distance <= radius;
     }
 
