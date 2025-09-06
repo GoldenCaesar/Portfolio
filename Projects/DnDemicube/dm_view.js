@@ -2027,7 +2027,6 @@ function getTightBoundingBox(img) {
             lightMapCtx.restore();
         });
 
-        sendLightMapToPlayerView();
         isLightMapDirty = false;
     }
 
@@ -6313,19 +6312,6 @@ function getTightBoundingBox(img) {
                 playerWindow.postMessage({
                     type: 'gridUpdate',
                     gridData: playerGridData
-                }, '*');
-            }
-        }
-    }
-
-    function sendLightMapToPlayerView() {
-        if (playerWindow && !playerWindow.closed && selectedMapFileName) {
-            const mapData = detailedMapData.get(selectedMapFileName);
-            if (mapData && mapData.mode === 'view' && lightMapCanvas) {
-                const lightMapDataUrl = lightMapCanvas.toDataURL();
-                playerWindow.postMessage({
-                    type: 'lightMapUpdate',
-                    lightMapDataUrl: lightMapDataUrl
                 }, '*');
             }
         }
