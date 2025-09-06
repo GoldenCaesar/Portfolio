@@ -178,27 +178,27 @@
                     <label for="asset-chain-points">Chain Points</label>
                     <input type="range" id="asset-chain-points" min="0" max="100" step="1" value="0">
                 </div>
-                <div id="grid-controls-container" style="display: none; margin-top: 10px; border-top: 1px solid #4a5f7a; padding-top: 10px;">
-                    <div class="asset-preview-slider-container">
-                        <label for="grid-scale-slider">Grid Scale</label>
-                        <input type="range" id="grid-scale-slider" min="1" max="200" step="1" value="50">
-                        <span id="grid-scale-value">50</span>
-                    </div>
-                    <div class="asset-preview-slider-container">
-                        <label for="grid-sqft-input" style="white-space: nowrap;">sqft/grid</label>
-                        <input type="number" id="grid-sqft-input" value="5" style="width: 60px; text-align: center; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0;">
-                    </div>
-                    <div class="asset-preview-slider-container">
-                        <label for="grid-on-checkbox" style="white-space: nowrap;">Grid On</label>
-                        <input type="checkbox" id="grid-on-checkbox" style="margin-left: 5px;">
-                    </div>
+            </div>
+            <div id="grid-controls-container" style="display: none; margin-top: 10px; border-top: 1px solid #4a5f7a; padding-top: 10px;">
+                <div class="asset-preview-slider-container">
+                    <label for="grid-scale-slider">Grid Scale</label>
+                    <input type="range" id="grid-scale-slider" min="1" max="200" step="1" value="50">
+                    <span id="grid-scale-value">50</span>
+                </div>
+                <div class="asset-preview-slider-container">
+                    <label for="grid-sqft-input" style="white-space: nowrap;">sqft/grid</label>
+                    <input type="number" id="grid-sqft-input" value="5" style="width: 60px; text-align: center; background-color: #15191e; border: 1px solid #3f4c5a; color: #e0e0e0;">
+                </div>
+                <div class="asset-preview-slider-container">
+                    <label for="grid-on-checkbox" style="white-space: nowrap;">Grid On</label>
+                    <input type="checkbox" id="grid-on-checkbox" style="margin-left: 5px;">
                 </div>
             </div>
         </div>
-        <canvas id="dm-canvas"></canvas>
-        <canvas id="grid-canvas"></canvas>
-        <canvas id="shadow-canvas"></canvas>
-        <canvas id="drawing-canvas"></canvas>
+        <canvas id="dm-canvas" style="z-index: 1;"></canvas>
+        <canvas id="grid-canvas" style="z-index: 2; pointer-events: none;"></canvas>
+        <canvas id="shadow-canvas" style="z-index: 3; pointer-events: none;"></canvas>
+        <canvas id="drawing-canvas" style="z-index: 4; pointer-events: none;"></canvas>
     </div>
     <div id="automation-container" style="display: none; width: 100%;">
         <div id="modules-sidebar">
