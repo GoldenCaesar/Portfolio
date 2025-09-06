@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editMapsIcon = document.getElementById('edit-maps-icon');
     const dmCanvas = document.getElementById('dm-canvas');
     const shadowCanvas = document.getElementById('shadow-canvas');
+    const gridCanvas = document.getElementById('grid-canvas');
     const drawingCanvas = document.getElementById('drawing-canvas');
     const mapContainer = document.getElementById('map-container');
     const noteEditorContainer = document.getElementById('note-editor-container'); // New container for the editor
@@ -114,7 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAssetsFlatten = document.getElementById('btn-assets-flatten');
     const btnAssetsMerge = document.getElementById('btn-assets-merge');
     const btnAssetsDone = document.getElementById('btn-assets-done');
+    const btnAssetsGrid = document.getElementById('btn-assets-grid');
     const assetPreviewContainer = document.getElementById('asset-preview-container');
+    const gridControlsContainer = document.getElementById('grid-controls-container');
+    const gridScaleSlider = document.getElementById('grid-scale-slider');
+    const gridScaleValue = document.getElementById('grid-scale-value');
+    const gridSqftInput = document.getElementById('grid-sqft-input');
+    const gridOnCheckbox = document.getElementById('grid-on-checkbox');
     const assetPreviewImage = document.getElementById('asset-preview-image');
     const assetPreviewTitle = document.getElementById('asset-preview-title');
     const assetPreviewOpacitySlider = document.getElementById('asset-preview-opacity');
@@ -400,6 +407,11 @@ let linkingNoteForAutomationCard = null;
     let currentAssetPreviewTransform = { scale: 1, rotation: 0, opacity: 1 };
     let assetTransformHandles = {};
 let activeAssetTool = null; // Can be 'select', 'stamp', or 'chain'
+let isGridToolActive = false;
+let gridScale = 50;
+let gridSqft = 5;
+let isGridVisible = false;
+let gridData = {};
 let chainPointsAngle = 0; // In radians
 let isChaining = false;
 let lastStampedAssetEndpoint = null;
@@ -808,6 +820,7 @@ function propagateCharacterUpdate(characterId) {
 
         // Overlays are on a separate canvas, so they need their own redraw.
         drawOverlays(mapData.overlays);
+        drawGrid();
     }
 
     function requestRedraw() {
@@ -819,7 +832,7 @@ function propagateCharacterUpdate(characterId) {
 
     // Function to resize the canvas to fit its container
     function resizeCanvas() {
-        if (dmCanvas && shadowCanvas && drawingCanvas && mapContainer) {
+        if (dmCanvas && shadowCanvas && drawingCanvas && gridCanvas && mapContainer) {
             const style = window.getComputedStyle(mapContainer);
             const paddingLeft = parseFloat(style.paddingLeft) || 0;
             const paddingRight = parseFloat(style.paddingRight) || 0;
@@ -841,6 +854,8 @@ function propagateCharacterUpdate(characterId) {
             dmCanvas.height = canvasHeight;
             shadowCanvas.width = canvasWidth;
             shadowCanvas.height = canvasHeight;
+            gridCanvas.width = canvasWidth;
+            gridCanvas.height = canvasHeight;
             drawingCanvas.width = canvasWidth;
             drawingCanvas.height = canvasHeight;
 
@@ -856,13 +871,38 @@ function propagateCharacterUpdate(characterId) {
     }
 
     function displayMapOnCanvas(fileName) {
-        if (!dmCanvas || !shadowCanvas || !drawingCanvas || !mapContainer) {
+        if (gridData[fileName]) {
+            const savedGridData = gridData[fileName];
+            gridScale = savedGridData.scale;
+            gridSqft = savedGridData.sqft;
+            isGridVisible = savedGridData.visible;
+        } else {
+            // If no data for this map, create a default entry
+            gridScale = 50;
+            gridSqft = 5;
+            isGridVisible = false;
+            gridData[fileName] = {
+                scale: gridScale,
+                sqft: gridSqft,
+                visible: isGridVisible,
+            };
+        }
+
+        // Update UI controls to reflect the state of the current map
+        if (gridScaleSlider) gridScaleSlider.value = gridScale;
+        if (gridScaleValue) gridScaleValue.textContent = gridScale;
+        if (gridSqftInput) gridSqftInput.value = gridSqft;
+        if (gridOnCheckbox) gridOnCheckbox.checked = isGridVisible;
+
+        if (!dmCanvas || !shadowCanvas || !drawingCanvas || !gridCanvas || !mapContainer) {
             console.error("One or more canvas elements or map container not found!");
             return;
         }
 
         const shadowCtx = shadowCanvas.getContext('2d');
         shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+        const gridCtx = gridCanvas.getContext('2d');
+        gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
         const drawingCtx = drawingCanvas.getContext('2d');
         drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
@@ -1434,6 +1474,55 @@ function getTightBoundingBox(img) {
         tokenStatBlock.style.left = `${left}px`;
         tokenStatBlock.style.top = `${top}px`;
         sendTokenStatBlockStateToPlayerView(true, token, { left: left, top: top });
+    }
+
+    function drawGrid() {
+        if (!selectedMapFileName || !currentMapDisplayData.img) return;
+
+        const gridCtx = gridCanvas.getContext('2d');
+        gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+        if (!isGridVisible) return;
+
+        const mapData = detailedMapData.get(selectedMapFileName);
+        if (!mapData || !mapData.transform) return;
+
+        const {
+            scale,
+            originX,
+            originY
+        } = mapData.transform;
+        const {
+            imgWidth,
+            imgHeight
+        } = currentMapDisplayData;
+
+        gridCtx.save();
+        gridCtx.translate(originX, originY);
+        gridCtx.scale(scale, scale);
+
+        gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        gridCtx.lineWidth = 1 / scale; // Keep grid lines thin when zooming
+
+        const gridSize = gridScale;
+
+        // Vertical lines
+        for (let x = 0; x <= imgWidth; x += gridSize) {
+            gridCtx.beginPath();
+            gridCtx.moveTo(x, 0);
+            gridCtx.lineTo(x, imgHeight);
+            gridCtx.stroke();
+        }
+
+        // Horizontal lines
+        for (let y = 0; y <= imgHeight; y += gridSize) {
+            gridCtx.beginPath();
+            gridCtx.moveTo(0, y);
+            gridCtx.lineTo(imgWidth, y);
+            gridCtx.stroke();
+        }
+
+        gridCtx.restore();
     }
 
     function drawOverlays(overlays, isPlayerViewContext = false) {
@@ -3094,6 +3183,9 @@ function getTightBoundingBox(img) {
         // This block handles the full shutdown of the Assets tool.
         isAssetsMode = false;
         if(assetsToolsContainer) assetsToolsContainer.style.display = 'none';
+        isGridToolActive = false;
+        if(gridControlsContainer) gridControlsContainer.style.display = 'none';
+        if (btnAssetsGrid) btnAssetsGrid.classList.remove('active');
         if (footerAssetsTab) {
             footerAssetsTab.style.display = 'none';
             if (footerAssetsTab.classList.contains('active')) {
@@ -3313,7 +3405,8 @@ function getTightBoundingBox(img) {
         // Update button active states
         if (btnAssetsSelect) btnAssetsSelect.classList.toggle('active', activeAssetTool === 'select');
         if (btnAssetsStamp) btnAssetsStamp.classList.toggle('active', activeAssetTool === 'stamp');
-    if (btnAssetsChain) btnAssetsChain.classList.toggle('active', activeAssetTool === 'chain');
+        // if (btnAssetsGrid) btnAssetsGrid.classList.toggle('active', isGridToolActive);
+        if (btnAssetsChain) btnAssetsChain.classList.toggle('active', activeAssetTool === 'chain');
 
         // Update cursor style
         if (activeAssetTool === 'select') {
@@ -3351,6 +3444,46 @@ function getTightBoundingBox(img) {
     if (btnAssetsStamp) {
         btnAssetsStamp.addEventListener('click', () => {
             setActiveAssetTool('stamp');
+        });
+    }
+
+    if (btnAssetsGrid) {
+        btnAssetsGrid.addEventListener('click', () => {
+            isGridToolActive = !isGridToolActive;
+            gridControlsContainer.style.display = isGridToolActive ? 'block' : 'none';
+            btnAssetsGrid.classList.toggle('active', isGridToolActive);
+        });
+    }
+
+    if (gridScaleSlider) {
+        gridScaleSlider.addEventListener('input', (e) => {
+            gridScale = parseInt(e.target.value, 10);
+            gridScaleValue.textContent = gridScale;
+            if (gridData[selectedMapFileName]) {
+                gridData[selectedMapFileName].scale = gridScale;
+            }
+            drawGrid();
+            sendGridToPlayerView();
+        });
+    }
+
+    if (gridSqftInput) {
+        gridSqftInput.addEventListener('change', (e) => {
+            gridSqft = parseInt(e.target.value, 10);
+            if (gridData[selectedMapFileName]) {
+                gridData[selectedMapFileName].sqft = gridSqft;
+            }
+        });
+    }
+
+    if (gridOnCheckbox) {
+        gridOnCheckbox.addEventListener('change', (e) => {
+            isGridVisible = e.target.checked;
+            if (gridData[selectedMapFileName]) {
+                gridData[selectedMapFileName].visible = isGridVisible;
+            }
+            drawGrid();
+            sendGridToPlayerView();
         });
     }
 
@@ -4998,7 +5131,8 @@ function getTightBoundingBox(img) {
                         overlays: data.overlays,
                         mode: data.mode,
                         transform: data.transform,
-                        fogOfWarDataUrl: data.fogOfWarDataUrl
+                        fogOfWarDataUrl: data.fogOfWarDataUrl,
+                        grid: gridData[name] || null
                     };
                 }
                 campaignData.mapDefinitions = serializableDetailedMapData;
@@ -5406,6 +5540,9 @@ function getTightBoundingBox(img) {
                                     transform: definition.transform ? { ...definition.transform, initialized: true } : { scale: 1, originX: 0, originY: 0, initialized: false },
                                     fogOfWarDataUrl: definition.fogOfWarDataUrl || null
                                 });
+                                if (definition.grid) {
+                                    gridData[mapName] = definition.grid;
+                                }
                                 displayedFileNames.add(mapName);
                             });
                             imagePromises.push(promise);
@@ -5953,6 +6090,11 @@ function getTightBoundingBox(img) {
                                 width: dmCanvas.width / transform.scale,
                                 height: dmCanvas.height / transform.scale
                             };
+                            const gridInfo = gridData[mapFileName];
+                            const playerGridData = gridInfo ? {
+                                scale: gridInfo.scale,
+                                visible: gridInfo.visible
+                            } : null;
                             playerWindow.postMessage({
                                 type: 'loadMap',
                                 mapDataUrl: base64dataUrl,
@@ -5960,7 +6102,8 @@ function getTightBoundingBox(img) {
                                 viewRectangle: viewRectangle,
                                 dmCanvasWidth: dmCanvas.width,
                                 dmCanvasHeight: dmCanvas.height,
-                                active: mapData.mode === 'view'
+                                active: mapData.mode === 'view',
+                                gridData: playerGridData
                             }, '*');
                             console.log(`Sent map "${mapFileName}" and ${visibleOverlays.length} visible overlays to player view.`);
                         };
@@ -6100,6 +6243,22 @@ function getTightBoundingBox(img) {
                 characterToSend = censorCharacterDataForPlayerView(character);
             }
             playerWindow.postMessage({ type: 'tokenStatBlockState', show: show, character: characterToSend, position: position }, '*');
+        }
+    }
+
+    function sendGridToPlayerView() {
+        if (playerWindow && !playerWindow.closed && selectedMapFileName) {
+            const gridInfo = gridData[selectedMapFileName];
+            if (gridInfo) {
+                const playerGridData = {
+                    scale: gridInfo.scale,
+                    visible: gridInfo.visible
+                };
+                playerWindow.postMessage({
+                    type: 'gridUpdate',
+                    gridData: playerGridData
+                }, '*');
+            }
         }
     }
 
