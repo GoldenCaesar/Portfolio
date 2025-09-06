@@ -1915,7 +1915,7 @@ function getTightBoundingBox(img) {
         const smartObjects = mapData.overlays.filter(o => o.type === 'smart_object');
 
         lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-        lightMapCtx.fillStyle = 'rgba(0, 0, 0, 0.33)';
+        lightMapCtx.fillStyle = 'black';
         lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
 
         const lightScale = dmRenderQuality;

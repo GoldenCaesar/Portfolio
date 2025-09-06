@@ -267,6 +267,12 @@ function resizePlayerCanvas() {
     playerCanvas.style.top = `${top}px`;
     playerCanvas.style.left = `${left}px`;
 
+    if (shadowCanvas) {
+        shadowCanvas.width = newWidth;
+        shadowCanvas.height = newHeight;
+        shadowCanvas.style.top = `${top}px`;
+        shadowCanvas.style.left = `${left}px`;
+    }
     if (gridCanvas) {
         gridCanvas.width = newWidth;
         gridCanvas.height = newHeight;
