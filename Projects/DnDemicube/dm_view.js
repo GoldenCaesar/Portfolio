@@ -6791,7 +6791,7 @@ function getTightBoundingBox(img) {
                     overlayClicked = true;
                     break;
                 } else if (overlay.type === 'lightSource' && isPointInLightSource(imageCoords, overlay)) {
-                    if (selectedMapData.mode === 'view') {
+                    if (selectedMapData.mode === 'edit') {
                         selectedLightSourceForContextMenu = overlay;
                         const visionToggle = document.getElementById('light-source-vision-toggle');
                         const visionFtInput = document.getElementById('light-source-vision-ft-input');
