@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterContextMenu = document.getElementById('character-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const viewModeMapContextMenu = document.getElementById('view-mode-map-context-menu');
+    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
     const displayedFileNames = new Set();
 
     // Shadow tool elements
