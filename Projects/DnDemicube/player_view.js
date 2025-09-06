@@ -1,6 +1,7 @@
 const playerCanvas = document.getElementById('player-canvas');
 const fogCanvas = document.getElementById('fog-canvas');
 const shadowCanvas = document.getElementById('player-shadow-canvas');
+const gridCanvas = document.getElementById('grid-canvas');
 const playerMapContainer = document.getElementById('player-map-container');
 const pCtx = playerCanvas ? playerCanvas.getContext('2d') : null;
 const fCtx = fogCanvas ? fogCanvas.getContext('2d') : null;
@@ -91,6 +92,7 @@ let currentMapImage = null;
 let currentOverlays = [];
 let initiativeTokens = [];
 let currentMapTransform = { scale: 1, originX: 0, originY: 0 };
+let currentGridData = null;
 const imageCache = new Map();
 let dmCanvasAspectRatio = null;
 let lastViewRectangle = null;
@@ -169,6 +171,47 @@ function getPolygonSignedArea(polygon) {
     return area / 2;
 }
 
+function drawGrid() {
+    if (!gridCanvas || !currentMapImage || !currentGridData || !currentGridData.visible) {
+        if (gridCanvas) {
+            const gridCtx = gridCanvas.getContext('2d');
+            gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+        }
+        return;
+    }
+
+    const gridCtx = gridCanvas.getContext('2d');
+    gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+    const { scale, originX, originY } = currentMapTransform;
+    const { imgWidth, imgHeight } = currentMapDisplayData;
+
+    gridCtx.save();
+    gridCtx.translate(originX, originY);
+    gridCtx.scale(scale, scale);
+
+    gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    gridCtx.lineWidth = 1 / scale;
+
+    const gridSize = currentGridData.scale;
+
+    for (let x = 0; x <= imgWidth; x += gridSize) {
+        gridCtx.beginPath();
+        gridCtx.moveTo(x, 0);
+        gridCtx.lineTo(x, imgHeight);
+        gridCtx.stroke();
+    }
+
+    for (let y = 0; y <= imgHeight; y += gridSize) {
+        gridCtx.beginPath();
+        gridCtx.moveTo(0, y);
+        gridCtx.lineTo(imgWidth, y);
+        gridCtx.stroke();
+    }
+
+    gridCtx.restore();
+}
+
 function resizePlayerCanvas() {
     if (!playerMapContainer || !playerCanvas) return;
 
@@ -204,6 +247,12 @@ function resizePlayerCanvas() {
         shadowCanvas.height = newHeight;
         shadowCanvas.style.top = `${top}px`;
         shadowCanvas.style.left = `${left}px`;
+    }
+    if (gridCanvas) {
+        gridCanvas.width = newWidth;
+        gridCanvas.height = newHeight;
+        gridCanvas.style.top = `${top}px`;
+        gridCanvas.style.left = `${left}px`;
     }
     if (fogCanvas) {
         fogCanvas.width = newWidth;
@@ -472,6 +521,7 @@ function drawMapAndOverlays() {
 
     pCtx.drawImage(currentMapImage, 0, 0, currentMapImage.width, currentMapImage.height);
 
+    drawGrid();
     drawOverlays_PlayerView(currentOverlays);
 
     // Draw initiative tokens on top of everything else, still within the transformed context
@@ -626,6 +676,7 @@ window.addEventListener('message', (event) => {
                     img.onload = () => {
                         currentMapImage = img;
                         currentOverlays = data.overlays || [];
+                        currentGridData = data.gridData || null;
                         currentFogOfWarUrl = null; // Clear old fog data
                         if (fCtx) fCtx.clearRect(0, 0, fogCanvas.width, fogCanvas.height);
 
@@ -813,6 +864,10 @@ window.addEventListener('message', (event) => {
                     isLightMapDirty = true; // Recalculate with new quality
                     console.log(`Player view render quality updated to: ${renderQuality}`);
                 }
+                break;
+            case 'gridUpdate':
+                currentGridData = data.gridData;
+                drawMapAndOverlays();
                 break;
             case 'fogOfWarUpdate':
                 currentFogOfWarUrl = data.fogOfWarDataUrl;
