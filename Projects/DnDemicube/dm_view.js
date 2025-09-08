@@ -2048,6 +2048,14 @@ function getTightBoundingBox(img) {
             lightMapCtx.restore();
         });
 
+        // If grid is on, clip the light map to the darkvision radius
+        const darkvisionMask = createDarkvisionMask();
+        if (darkvisionMask) {
+            lightMapCtx.globalCompositeOperation = 'source-in';
+            lightMapCtx.drawImage(darkvisionMask, 0, 0, lightMapCanvas.width, lightMapCanvas.height);
+            lightMapCtx.globalCompositeOperation = 'source-over';
+        }
+
         isLightMapDirty = false;
     }
 
@@ -9850,6 +9858,48 @@ function displayToast(messageElement) {
         }
     }
 
+    function createDarkvisionMask() {
+        const mapGridData = gridData[selectedMapFileName];
+        if (!mapGridData || !mapGridData.visible || !currentMapDisplayData.img) {
+            return null;
+        }
+
+        const darkvisionMaskCanvas = document.createElement('canvas');
+        darkvisionMaskCanvas.width = currentMapDisplayData.imgWidth;
+        darkvisionMaskCanvas.height = currentMapDisplayData.imgHeight;
+        const maskCtx = darkvisionMaskCanvas.getContext('2d');
+        maskCtx.fillStyle = 'black';
+
+        const tokensWithVision = initiativeTokens.filter(token => {
+            const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+            return character && character.vision === true;
+        });
+
+        if (tokensWithVision.length === 0) {
+            return null;
+        }
+
+        tokensWithVision.forEach(token => {
+            const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+            if (character && character.sheetData) {
+                const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+                const gridSqftValue = mapGridData.sqft || 5;
+                const gridPixelSize = mapGridData.scale || 50;
+
+                if (visionFt > 0 && gridSqftValue > 0) {
+                    const visionRadiusInGridSquares = visionFt / gridSqftValue;
+                    const visionRadiusInPixels = visionRadiusInGridSquares * gridPixelSize;
+
+                    maskCtx.beginPath();
+                    maskCtx.arc(token.x, token.y, visionRadiusInPixels, 0, Math.PI * 2, true);
+                    maskCtx.fill();
+                }
+            }
+        });
+
+        return darkvisionMaskCanvas;
+    }
+
     function generateVisionMask() {
         const mapData = detailedMapData.get(selectedMapFileName);
         if (!mapData || !currentMapDisplayData.img) return null;
@@ -9979,6 +10029,15 @@ function displayToast(messageElement) {
             }
         });
         visionCtx.fill();
+
+        // If grid is on, clip the vision to the darkvision radius
+        const darkvisionMask = createDarkvisionMask();
+        if (darkvisionMask) {
+            visionCtx.globalCompositeOperation = 'source-in';
+            visionCtx.drawImage(darkvisionMask, 0, 0);
+            visionCtx.globalCompositeOperation = 'source-over'; // Reset for other operations
+        }
+
         return visionMaskCanvas;
     }
 
