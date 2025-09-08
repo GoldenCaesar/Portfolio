@@ -1903,11 +1903,15 @@ function getTightBoundingBox(img) {
         const dmLightSources = mapData.overlays.filter(o => o.type === 'lightSource');
         const tokenLightSources = initiativeTokens
             .filter(token => token.isDetailsVisible !== false)
-            .map(token => ({
-                type: 'lightSource',
-                position: { x: token.x, y: token.y },
-                radius: 40 // A reasonable default radius for a token
-            }));
+            .map(token => {
+                const character = charactersData.find(c => c.id === token.characterId);
+                return {
+                    type: 'lightSource',
+                    position: { x: token.x, y: token.y },
+                    radius: 40, // A reasonable default radius for a token
+                    character: character
+                };
+            });
         const lightSources = [...dmLightSources, ...tokenLightSources];
         const walls = mapData.overlays.filter(o => o.type === 'wall');
         const closedDoors = mapData.overlays.filter(o => o.type === 'door' && !o.isOpen);
@@ -1951,7 +1955,7 @@ function getTightBoundingBox(img) {
             const currentGridData = gridData[selectedMapFileName];
             let visionRadiusInPixels = null;
 
-            if (currentGridData && currentGridData.visible) {
+            if (character && character.sheetData && currentGridData && currentGridData.visible) {
                 const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
                 const gridSqft = parseInt(currentGridData.sqft, 10) || 5;
                 const gridScale = parseInt(currentGridData.scale, 10);
