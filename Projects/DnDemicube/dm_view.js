@@ -1129,6 +1129,28 @@ function propagateCharacterUpdate(characterId) {
         ctx.font = `${10 * scale}px sans-serif`;
         ctx.fillText(`(${token.playerName})`, canvasX, canvasY + size / 2 + (26 * scale));
         ctx.shadowBlur = 0;
+
+        // Draw darkvision circle if grid is on
+        const mapGridData = gridData[selectedMapFileName];
+        if (mapGridData && mapGridData.visible) {
+            const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+            if (character && character.sheetData) {
+                const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+                const gridSqftValue = mapGridData.sqft || 5;
+                const gridPixelSize = mapGridData.scale || 50;
+
+                if (visionFt > 0 && gridSqftValue > 0) {
+                    const visionRadiusInGridSquares = visionFt / gridSqftValue;
+                    const visionRadiusInPixels = visionRadiusInGridSquares * gridPixelSize * scale;
+
+                    ctx.beginPath();
+                    ctx.arc(canvasX, canvasY, visionRadiusInPixels, 0, Math.PI * 2, true);
+                    ctx.strokeStyle = 'orange';
+                    ctx.lineWidth = 2 * scale;
+                    ctx.stroke();
+                }
+            }
+        }
     }
 
     function updateCompactDiceDisplay() {
@@ -3495,8 +3517,9 @@ function getTightBoundingBox(img) {
             if (gridData[selectedMapFileName]) {
                 gridData[selectedMapFileName].scale = gridScale;
             }
-            drawGrid();
-            sendGridToPlayerView();
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
         });
     }
 
@@ -3505,6 +3528,9 @@ function getTightBoundingBox(img) {
             gridSqft = parseInt(e.target.value, 10);
             if (gridData[selectedMapFileName]) {
                 gridData[selectedMapFileName].sqft = gridSqft;
+            }
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
             }
         });
     }
@@ -3515,8 +3541,9 @@ function getTightBoundingBox(img) {
             if (gridData[selectedMapFileName]) {
                 gridData[selectedMapFileName].visible = isGridVisible;
             }
-            drawGrid();
-            sendGridToPlayerView();
+            if (selectedMapFileName) {
+                displayMapOnCanvas(selectedMapFileName);
+            }
         });
     }
 
