@@ -644,11 +644,18 @@ window.addEventListener('message', (event) => {
                 slideshowPlaylist = data.playlist;
                 currentSlideIndex = data.startIndex || 0;
 
+                slideshowActive = true;
+                playerMapContainer.style.display = 'none';
+                slideshowContainer.style.display = 'flex';
+
                 if (slideshowPlaylist && slideshowPlaylist.length > 0) {
-                    slideshowActive = true;
-                    playerMapContainer.style.display = 'none';
-                    slideshowContainer.style.display = 'flex';
                     animateSlideshow();
+                } else {
+                    // Display a placeholder message if there's no playlist
+                    portraitImg.style.display = 'none';
+                    portraitInitials.style.display = 'none';
+                    authorText.textContent = '';
+                    quoteText.textContent = "The DM is currently editing the map...";
                 }
                 break;
             case 'loadMap':
