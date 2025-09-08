@@ -1947,6 +1947,19 @@ function getTightBoundingBox(img) {
         });
 
         lightSources.forEach(light => {
+            const character = light.character;
+            const currentGridData = gridData[selectedMapFileName];
+            let visionRadiusInPixels = null;
+
+            if (currentGridData && currentGridData.visible) {
+                const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+                const gridSqft = parseInt(currentGridData.sqft, 10) || 5;
+                const gridScale = parseInt(currentGridData.scale, 10);
+
+                if (visionFt > 0 && gridSqft > 0 && gridScale > 0) {
+                    visionRadiusInPixels = (visionFt / gridSqft) * gridScale;
+                }
+            }
             const visiblePoints = [];
             const angles = new Set();
 
@@ -2004,11 +2017,27 @@ function getTightBoundingBox(img) {
                     }
                 });
 
+                let endpoint = null;
                 if (closestIntersection) {
-                    visiblePoints.push(closestIntersection);
+                    if (visionRadiusInPixels !== null && minDistance > visionRadiusInPixels) {
+                        endpoint = {
+                            x: light.position.x + visionRadiusInPixels * Math.cos(angle),
+                            y: light.position.y + visionRadiusInPixels * Math.sin(angle)
+                        };
+                    } else {
+                        endpoint = closestIntersection;
+                    }
                 } else {
-                    visiblePoints.push({ x: ray.x2, y: ray.y2 });
+                    if (visionRadiusInPixels !== null) {
+                        endpoint = {
+                            x: light.position.x + visionRadiusInPixels * Math.cos(angle),
+                            y: light.position.y + visionRadiusInPixels * Math.sin(angle)
+                        };
+                    } else {
+                        endpoint = { x: ray.x2, y: ray.y2 };
+                    }
                 }
+                visiblePoints.push(endpoint);
             });
 
             lightMapCtx.save();
@@ -9832,14 +9861,16 @@ function displayToast(messageElement) {
         visionMaskCanvas.height = currentMapDisplayData.imgHeight;
         const visionCtx = visionMaskCanvas.getContext('2d');
 
-        const lightSources = initiativeTokens
-            .filter(token => {
-                const character = charactersData.find(c => c.id === token.characterId);
-                return character && character.vision === true;
-            })
-            .map(token => ({
-                position: { x: token.x, y: token.y }
-            }));
+        const lightSources = initiativeTokens.reduce((acc, token) => {
+            const character = charactersData.find(c => c.id === token.characterId);
+            if (character && character.vision === true) {
+                acc.push({
+                    position: { x: token.x, y: token.y },
+                    character: character
+                });
+            }
+            return acc;
+        }, []);
 
         if (lightSources.length === 0) return null;
 
