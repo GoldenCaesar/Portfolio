@@ -310,47 +310,72 @@ function getLineIntersection(p1, p2) {
     return null;
 }
 
-function recalculateLightMap_Player() {
-    if (!isLightMapDirty) return;
+function createDarkvisionMask_Player() {
+    if (!currentGridData || !currentGridData.visible || !currentMapDisplayData.img) {
+        return null;
+    }
 
-    if (!currentMapDisplayData.img) {
-        if (lightMapCtx) {
-            lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+    const darkvisionMaskCanvas = document.createElement('canvas');
+    darkvisionMaskCanvas.width = currentMapDisplayData.imgWidth;
+    darkvisionMaskCanvas.height = currentMapDisplayData.imgHeight;
+    const maskCtx = darkvisionMaskCanvas.getContext('2d');
+    maskCtx.fillStyle = 'black';
+
+    const tokensWithVision = initiativeTokens.filter(token => {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        return character && character.vision === true;
+    });
+
+    if (tokensWithVision.length === 0) {
+        return null;
+    }
+
+    tokensWithVision.forEach(token => {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (character && character.sheetData) {
+            const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+            const gridSqftValue = currentGridData.sqft || 5;
+            const gridPixelSize = currentGridData.scale || 50;
+
+            if (visionFt > 0 && gridSqftValue > 0) {
+                const visionRadiusInGridSquares = visionFt / gridSqftValue;
+                const visionRadiusInPixels = visionRadiusInGridSquares * gridPixelSize;
+
+                maskCtx.beginPath();
+                maskCtx.arc(token.x, token.y, visionRadiusInPixels, 0, Math.PI * 2, true);
+                maskCtx.fill();
+            }
         }
-        isLightMapDirty = false;
-        return;
-    }
+    });
 
-    const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * renderQuality);
-    const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * renderQuality);
+    return darkvisionMaskCanvas;
+}
 
-    if (!lightMapCanvas || lightMapCanvas.width !== requiredWidth || lightMapCanvas.height !== requiredHeight) {
-        lightMapCanvas = document.createElement('canvas');
-        lightMapCanvas.width = requiredWidth;
-        lightMapCanvas.height = requiredHeight;
-        lightMapCtx = lightMapCanvas.getContext('2d');
-    }
+function generateVisionMask_Player() {
+    if (!currentOverlays || !currentMapDisplayData.img) return null;
 
-    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource');
-    const tokenLightSources = initiativeTokens
+    const visionMaskCanvas = document.createElement('canvas');
+    visionMaskCanvas.width = currentMapDisplayData.imgWidth;
+    visionMaskCanvas.height = currentMapDisplayData.imgHeight;
+    const visionCtx = visionMaskCanvas.getContext('2d');
+
+    const lightSources = initiativeTokens
         .filter(token => token.vision !== false)
         .map(token => ({
-            type: 'lightSource',
-            position: { x: token.x, y: token.y },
-            radius: 40 // A reasonable default radius for a token
+            position: { x: token.x, y: token.y }
         }));
-    const lightSources = [...dmLightSources, ...tokenLightSources];
+
+    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource').map(light => ({
+        position: { x: light.position.x, y: light.position.y }
+    }));
+
+    const allLightSources = [...lightSources, ...dmLightSources];
+
+    if (allLightSources.length === 0) return null;
+
     const walls = currentOverlays.filter(o => o.type === 'wall');
     const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
     const smartObjects = currentOverlays.filter(o => o.type === 'smart_object');
-
-    lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)';
-    lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-
-    const lightScale = renderQuality;
-    const imgWidth = currentMapDisplayData.imgWidth;
-    const imgHeight = currentMapDisplayData.imgHeight;
 
     const allSegments = [];
     walls.forEach(wall => {
@@ -365,8 +390,11 @@ function recalculateLightMap_Player() {
         for (let i = 0; i < object.polygon.length - 1; i++) {
             allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
         }
+        allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
     });
 
+    const imgWidth = currentMapDisplayData.imgWidth;
+    const imgHeight = currentMapDisplayData.imgHeight;
     allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
     allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
     allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
@@ -377,7 +405,10 @@ function recalculateLightMap_Player() {
         allVertices.push(seg.p1, seg.p2);
     });
 
-    lightSources.forEach(light => {
+    visionCtx.fillStyle = 'black';
+    visionCtx.beginPath();
+
+    allLightSources.forEach(light => {
         const visiblePoints = [];
         const angles = new Set();
 
@@ -419,7 +450,6 @@ function recalculateLightMap_Player() {
                         const normal = { x: p2.y - p1.y, y: p1.x - p2.x };
                         const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
                         const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
-
                         if (!lightIsInsideObject && dot > 0) {
                             ignoreThisIntersection = true;
                         }
@@ -442,27 +472,62 @@ function recalculateLightMap_Player() {
             }
         });
 
-        lightMapCtx.save();
-        lightMapCtx.globalCompositeOperation = 'destination-out';
-        lightMapCtx.beginPath();
         if (visiblePoints.length > 0) {
             const firstPoint = visiblePoints[0];
-            lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
+            visionCtx.moveTo(firstPoint.x, firstPoint.y);
             visiblePoints.forEach(point => {
-                lightMapCtx.lineTo(point.x * lightScale, point.y * lightScale);
+                visionCtx.lineTo(point.x, point.y);
             });
-            lightMapCtx.closePath();
-            lightMapCtx.fill();
+            visionCtx.closePath();
         }
-        lightMapCtx.restore();
     });
+    visionCtx.fill();
 
-    const visionMask = generateVisionMask(currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight, currentOverlays, currentGridData, initiativeTokens, activeInitiative);
+    const darkvisionMask = createDarkvisionMask_Player();
+    if (darkvisionMask) {
+        visionCtx.globalCompositeOperation = 'source-in';
+        visionCtx.drawImage(darkvisionMask, 0, 0);
+        visionCtx.globalCompositeOperation = 'source-over';
+    }
+
+    return visionMaskCanvas;
+}
+
+
+function recalculateLightMap_Player() {
+    if (!isLightMapDirty) return;
+
+    if (!currentMapDisplayData.img) {
+        if (lightMapCtx) {
+            lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        }
+        isLightMapDirty = false;
+        return;
+    }
+
+    const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * renderQuality);
+    const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * renderQuality);
+
+    if (!lightMapCanvas || lightMapCanvas.width !== requiredWidth || lightMapCanvas.height !== requiredHeight) {
+        lightMapCanvas = document.createElement('canvas');
+        lightMapCanvas.width = requiredWidth;
+        lightMapCanvas.height = requiredHeight;
+        lightMapCtx = lightMapCanvas.getContext('2d');
+    }
+
+    // Player view starts with full black.
+    lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)';
+    lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+
+    // Generate the vision mask which includes line-of-sight and darkvision limits.
+    const visionMask = generateVisionMask_Player();
+
     if (visionMask) {
-        lightMapCtx.save();
+        // Use 'destination-out' to erase the parts of the black overlay that are visible.
         lightMapCtx.globalCompositeOperation = 'destination-out';
         lightMapCtx.drawImage(visionMask, 0, 0, lightMapCanvas.width, lightMapCanvas.height);
-        lightMapCtx.restore();
+        lightMapCtx.globalCompositeOperation = 'source-over'; // Reset composite operation
     }
 
     isLightMapDirty = false;
