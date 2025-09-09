@@ -310,56 +310,13 @@ function getLineIntersection(p1, p2) {
     return null;
 }
 
-function getLosPolygon(lightPos, allSegments, allVertices, imgWidth, imgHeight) {
-    const visiblePoints = [];
-    const angles = new Set();
-    const lightIsInsideObject = false; // Simplified for player view
-
-    allVertices.forEach(vertex => {
-        const angle = Math.atan2(vertex.y - lightPos.y, vertex.x - lightPos.x);
-        angles.add(angle - 0.0001);
-        angles.add(angle);
-        angles.add(angle + 0.0001);
-    });
-
-    const sortedAngles = Array.from(angles).sort((a, b) => a - b);
-
-    sortedAngles.forEach(angle => {
-        const ray = {
-            x1: lightPos.x,
-            y1: lightPos.y,
-            x2: lightPos.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
-            y2: lightPos.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
-        };
-
-        let closestIntersection = null;
-        let minDistance = Infinity;
-
-        allSegments.forEach(segment => {
-            const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
-            if (intersectionPoint) {
-                const distance = Math.sqrt(Math.pow(intersectionPoint.x - lightPos.x, 2) + Math.pow(intersectionPoint.y - lightPos.y, 2));
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestIntersection = intersectionPoint;
-                }
-            }
-        });
-
-        if (closestIntersection) {
-            visiblePoints.push(closestIntersection);
-        } else {
-            visiblePoints.push({ x: ray.x2, y: ray.y2 });
-        }
-    });
-    return visiblePoints;
-}
-
 function recalculateLightMap_Player() {
     if (!isLightMapDirty) return;
 
     if (!currentMapDisplayData.img) {
-        if (lightMapCtx) lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        if (lightMapCtx) {
+            lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        }
         isLightMapDirty = false;
         return;
     }
@@ -486,51 +443,18 @@ function recalculateLightMap_Player() {
             }
         });
 
-            const tempLightCanvas = document.createElement('canvas');
-            tempLightCanvas.width = lightMapCanvas.width;
-            tempLightCanvas.height = lightMapCanvas.height;
-            const tempLightCtx = tempLightCanvas.getContext('2d');
-
-            tempLightCtx.fillStyle = 'black';
-            tempLightCtx.beginPath();
+        lightMapCtx.save();
+        lightMapCtx.globalCompositeOperation = 'destination-out';
+        lightMapCtx.beginPath();
         if (visiblePoints.length > 0) {
             const firstPoint = visiblePoints[0];
-                tempLightCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
+            lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
             visiblePoints.forEach(point => {
-                    tempLightCtx.lineTo(point.x * lightScale, point.y * lightScale);
+                lightMapCtx.lineTo(point.x * lightScale, point.y * lightScale);
             });
-                tempLightCtx.closePath();
-                tempLightCtx.fill();
+            lightMapCtx.closePath();
+            lightMapCtx.fill();
         }
-
-            if (light.dimlight_enabled) {
-                if (currentGridData && currentGridData.visible) {
-                    const radiusFt = light.dimlight_radius_ft || 0;
-                    const gridSqftValue = currentGridData.sqft || 5;
-                    const gridPixelSize = currentGridData.scale || 50;
-
-                    if (radiusFt > 0 && gridSqftValue > 0) {
-                        const radiusInGridSquares = radiusFt / gridSqftValue;
-                        const radiusInPixels = radiusInGridSquares * gridPixelSize;
-
-                        const dimlightMaskCanvas = document.createElement('canvas');
-                        dimlightMaskCanvas.width = lightMapCanvas.width;
-                        dimlightMaskCanvas.height = lightMapCanvas.height;
-                        const maskCtx = dimlightMaskCanvas.getContext('2d');
-                        maskCtx.fillStyle = 'black';
-                        maskCtx.beginPath();
-                        maskCtx.arc(light.position.x * lightScale, light.position.y * lightScale, radiusInPixels * lightScale, 0, Math.PI * 2, true);
-                        maskCtx.fill();
-
-                        tempLightCtx.globalCompositeOperation = 'source-in';
-                        tempLightCtx.drawImage(dimlightMaskCanvas, 0, 0);
-                    }
-                }
-            }
-
-            lightMapCtx.save();
-            lightMapCtx.globalCompositeOperation = 'destination-out';
-            lightMapCtx.drawImage(tempLightCanvas, 0, 0);
         lightMapCtx.restore();
     });
 
