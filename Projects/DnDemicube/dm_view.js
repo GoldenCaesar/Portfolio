@@ -1922,15 +1922,7 @@ function getTightBoundingBox(img) {
             lightMapCtx = lightMapCanvas.getContext('2d');
         }
 
-        const dmLightSources = mapData.overlays.filter(o => o.type === 'lightSource');
-        const tokenLightSources = initiativeTokens
-            .filter(token => token.isDetailsVisible !== false)
-            .map(token => ({
-                type: 'lightSource',
-                position: { x: token.x, y: token.y },
-                radius: 40 // A reasonable default radius for a token
-            }));
-        const lightSources = [...dmLightSources, ...tokenLightSources];
+        const lightSources = mapData.overlays.filter(o => o.type === 'lightSource');
         const walls = mapData.overlays.filter(o => o.type === 'wall');
         const closedDoors = mapData.overlays.filter(o => o.type === 'door' && !o.isOpen);
         const smartObjects = mapData.overlays.filter(o => o.type === 'smart_object');
@@ -1956,6 +1948,7 @@ function getTightBoundingBox(img) {
             for (let i = 0; i < object.polygon.length - 1; i++) {
                 allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
             }
+             allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
         });
 
         allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
@@ -2048,12 +2041,14 @@ function getTightBoundingBox(img) {
             lightMapCtx.restore();
         });
 
-        // If grid is on, clip the light map to the darkvision radius
-        const darkvisionMask = createDarkvisionMask();
-        if (darkvisionMask) {
-            lightMapCtx.globalCompositeOperation = 'source-in';
-            lightMapCtx.drawImage(darkvisionMask, 0, 0, lightMapCanvas.width, lightMapCanvas.height);
-            lightMapCtx.globalCompositeOperation = 'source-over';
+        // Carve out vision from tokens, which is already clipped by darkvision
+        const tokenVisionMask = generateVisionMask();
+        if (tokenVisionMask) {
+            lightMapCtx.save();
+            lightMapCtx.globalCompositeOperation = 'destination-out';
+            // Scale the mask to the quality of the lightmap
+            lightMapCtx.drawImage(tokenVisionMask, 0, 0, lightMapCanvas.width, lightMapCanvas.height);
+            lightMapCtx.restore();
         }
 
         isLightMapDirty = false;
@@ -9911,7 +9906,7 @@ function displayToast(messageElement) {
 
         const lightSources = initiativeTokens
             .filter(token => {
-                const character = charactersData.find(c => c.id === token.characterId);
+                const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
                 return character && character.vision === true;
             })
             .map(token => ({
