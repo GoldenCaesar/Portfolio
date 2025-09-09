@@ -94,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const polygonContextMenu = document.getElementById('polygon-context-menu');
     const noteContextMenu = document.getElementById('note-context-menu');
     const characterContextMenu = document.getElementById('character-context-menu');
+    const lightSourceContextMenu = document.getElementById('light-source-context-menu');
     const mapToolsContextMenu = document.getElementById('map-tools-context-menu');
     const viewModeMapContextMenu = document.getElementById('view-mode-map-context-menu');
     const displayedFileNames = new Set();
@@ -372,6 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPolygonForContextMenu = null; // Added: To store right-clicked polygon info
     let selectedNoteForContextMenu = null;
     let selectedCharacterForContextMenu = null;
+    let selectedLightSourceForContextMenu = null;
 let linkingNoteForAutomationCard = null;
     let isChangingChildMapForPolygon = false; // Added: State for "Change Child Map" action
     let isRedrawingPolygon = false; // Added: State for "Redraw Polygon" action
@@ -2033,18 +2035,52 @@ function getTightBoundingBox(img) {
                 }
             });
 
-            lightMapCtx.save();
-            lightMapCtx.globalCompositeOperation = 'destination-out';
-            lightMapCtx.beginPath();
+            const tempLightCanvas = document.createElement('canvas');
+            tempLightCanvas.width = lightMapCanvas.width;
+            tempLightCanvas.height = lightMapCanvas.height;
+            const tempLightCtx = tempLightCanvas.getContext('2d');
+
+            tempLightCtx.fillStyle = 'black';
+            tempLightCtx.beginPath();
             if (visiblePoints.length > 0) {
                 const firstPoint = visiblePoints[0];
-                lightMapCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
+                tempLightCtx.moveTo(firstPoint.x * lightScale, firstPoint.y * lightScale);
                 visiblePoints.forEach(point => {
-                    lightMapCtx.lineTo(point.x * lightScale, point.y * lightScale);
+                    tempLightCtx.lineTo(point.x * lightScale, point.y * lightScale);
                 });
-                lightMapCtx.closePath();
-                lightMapCtx.fill();
+                tempLightCtx.closePath();
+                tempLightCtx.fill();
             }
+
+            if (light.dimlight_enabled) {
+                const mapGridData = gridData[selectedMapFileName];
+                if (mapGridData && mapGridData.visible) {
+                    const radiusFt = light.dimlight_radius_ft || 0;
+                    const gridSqftValue = mapGridData.sqft || 5;
+                    const gridPixelSize = mapGridData.scale || 50;
+
+                    if (radiusFt > 0 && gridSqftValue > 0) {
+                        const radiusInGridSquares = radiusFt / gridSqftValue;
+                        const radiusInPixels = radiusInGridSquares * gridPixelSize;
+
+                        const dimlightMaskCanvas = document.createElement('canvas');
+                        dimlightMaskCanvas.width = lightMapCanvas.width;
+                        dimlightMaskCanvas.height = lightMapCanvas.height;
+                        const maskCtx = dimlightMaskCanvas.getContext('2d');
+                        maskCtx.fillStyle = 'black';
+                        maskCtx.beginPath();
+                        maskCtx.arc(light.position.x * lightScale, light.position.y * lightScale, radiusInPixels * lightScale, 0, Math.PI * 2, true);
+                        maskCtx.fill();
+
+                        tempLightCtx.globalCompositeOperation = 'source-in';
+                        tempLightCtx.drawImage(dimlightMaskCanvas, 0, 0);
+                    }
+                }
+            }
+
+            lightMapCtx.save();
+            lightMapCtx.globalCompositeOperation = 'destination-out';
+            lightMapCtx.drawImage(tempLightCanvas, 0, 0);
             lightMapCtx.restore();
         });
 
@@ -2534,6 +2570,56 @@ function getTightBoundingBox(img) {
             }
         }
     });
+
+    if (lightSourceContextMenu) {
+        lightSourceContextMenu.addEventListener('click', (event) => {
+            const action = event.target.dataset.action || event.target.parentElement.dataset.action;
+            const lightSourceOverlay = selectedLightSourceForContextMenu?.overlay;
+
+            if (!lightSourceOverlay) return;
+
+            if (action === 'delete-light-source') {
+                event.stopPropagation();
+                if (confirm('Are you sure you want to delete this light source?')) {
+                    const mapData = detailedMapData.get(selectedMapFileName);
+                    if (mapData && mapData.overlays) {
+                        const index = mapData.overlays.indexOf(lightSourceOverlay);
+                        if (index > -1) {
+                            mapData.overlays.splice(index, 1);
+                            isLightMapDirty = true;
+                            displayMapOnCanvas(selectedMapFileName);
+                        }
+                    }
+                }
+                lightSourceContextMenu.style.display = 'none';
+                selectedLightSourceForContextMenu = null;
+            }
+        });
+
+        const dimlightCheckbox = document.getElementById('dimlight-checkbox');
+        const dimlightRadiusInput = document.getElementById('dimlight-radius-input');
+
+        dimlightCheckbox.addEventListener('change', () => {
+            const lightSourceOverlay = selectedLightSourceForContextMenu?.overlay;
+            if (!lightSourceOverlay) return;
+
+            lightSourceOverlay.dimlight_enabled = dimlightCheckbox.checked;
+            dimlightRadiusInput.disabled = !dimlightCheckbox.checked;
+            isLightMapDirty = true;
+            // Redraw to apply changes immediately
+            if (selectedMapFileName) displayMapOnCanvas(selectedMapFileName);
+        });
+
+        dimlightRadiusInput.addEventListener('change', () => {
+            const lightSourceOverlay = selectedLightSourceForContextMenu?.overlay;
+            if (!lightSourceOverlay) return;
+
+            lightSourceOverlay.dimlight_radius_ft = parseInt(dimlightRadiusInput.value, 10) || 0;
+            isLightMapDirty = true;
+            // Redraw to apply changes immediately
+            if (selectedMapFileName) displayMapOnCanvas(selectedMapFileName);
+        });
+    }
 
     dmCanvas.addEventListener('mousemove', (event) => {
         if (!isChaining || activeAssetTool !== 'chain') return;
@@ -3025,6 +3111,12 @@ function getTightBoundingBox(img) {
         const charPos = characterOverlay.position;
         return point.x >= charPos.x - iconSize / 2 && point.x <= charPos.x + iconSize / 2 &&
                point.y >= charPos.y - iconSize / 2 && point.y <= charPos.y + iconSize / 2;
+    }
+
+    function isPointInLightSource(point, lightOverlay) {
+        const lightRadiusInImagePixels = (lightOverlay.radius || 15);
+        const distance = Math.sqrt(Math.pow(point.x - lightOverlay.position.x, 2) + Math.pow(point.y - lightOverlay.position.y, 2));
+        return distance < lightRadiusInImagePixels;
     }
 
     function isPointInToken(point, token) {
@@ -5588,13 +5680,22 @@ function getTightBoundingBox(img) {
                 for (const mapName in campaignData.mapDefinitions) {
                     const definition = campaignData.mapDefinitions[mapName];
 
-                    // Backward compatibility: Ensure smart object polygons are clockwise
+                    // Backward compatibility: Ensure smart object polygons are clockwise and light sources have dimlight properties
                     if (definition.overlays) {
                         definition.overlays.forEach(overlay => {
                             if (overlay.type === 'smart_object' && Array.isArray(overlay.polygon) && overlay.polygon.length > 0) {
                                 const area = getPolygonSignedArea(overlay.polygon);
                                 if (area > 0) { // It's counter-clockwise, reverse it
                                     overlay.polygon.reverse();
+                                }
+                            }
+                            // Add dimlight properties to light sources from older saves
+                            if (overlay.type === 'lightSource') {
+                                if (typeof overlay.dimlight_enabled === 'undefined') {
+                                    overlay.dimlight_enabled = false;
+                                }
+                                if (typeof overlay.dimlight_radius_ft === 'undefined') {
+                                    overlay.dimlight_radius_ft = 0;
                                 }
                             }
                         });
@@ -5983,13 +6084,22 @@ function getTightBoundingBox(img) {
             for (const mapName in campaignData.mapDefinitions) {
                 const definition = campaignData.mapDefinitions[mapName];
 
-                // Backward compatibility: Ensure smart object polygons are clockwise
+                // Backward compatibility: Ensure smart object polygons are clockwise and light sources have dimlight properties
                 if (definition.overlays) {
                     definition.overlays.forEach(overlay => {
                         if (overlay.type === 'smart_object' && Array.isArray(overlay.polygon) && overlay.polygon.length > 0) {
                             const area = getPolygonSignedArea(overlay.polygon);
                             if (area > 0) { // It's counter-clockwise, reverse it
                                 overlay.polygon.reverse();
+                            }
+                        }
+                        // Add dimlight properties to light sources from older saves
+                        if (overlay.type === 'lightSource') {
+                            if (typeof overlay.dimlight_enabled === 'undefined') {
+                                overlay.dimlight_enabled = false;
+                            }
+                            if (typeof overlay.dimlight_radius_ft === 'undefined') {
+                                overlay.dimlight_radius_ft = 0;
                             }
                         }
                     });
@@ -6172,6 +6282,7 @@ function getTightBoundingBox(img) {
                             const gridInfo = gridData[mapFileName];
                             const playerGridData = gridInfo ? {
                                 scale: gridInfo.scale,
+                                sqft: gridInfo.sqft,
                                 visible: gridInfo.visible
                             } : null;
                             playerWindow.postMessage({
@@ -6331,6 +6442,7 @@ function getTightBoundingBox(img) {
             if (gridInfo) {
                 const playerGridData = {
                     scale: gridInfo.scale,
+                    sqft: gridInfo.sqft,
                     visible: gridInfo.visible
                 };
                 playerWindow.postMessage({
@@ -6687,10 +6799,13 @@ function getTightBoundingBox(img) {
         polygonContextMenu.style.display = 'none';
         noteContextMenu.style.display = 'none';
         characterContextMenu.style.display = 'none';
+        lightSourceContextMenu.style.display = 'none';
         mapToolsContextMenu.style.display = 'none';
         document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
         selectedPolygonForContextMenu = null;
         selectedNoteForContextMenu = null;
+        selectedCharacterForContextMenu = null;
+        selectedLightSourceForContextMenu = null;
 
         if (!selectedMapFileName) {
             return;
@@ -6812,6 +6927,28 @@ function getTightBoundingBox(img) {
                     console.log('Right-clicked on character icon:', selectedCharacterForContextMenu);
                     overlayClicked = true;
                     break;
+                } else if (overlay.type === 'lightSource' && isPointInLightSource(imageCoords, overlay)) {
+                    if (selectedMapData.mode !== 'view') {
+                        alert("Light source properties can only be changed in Active (View) mode.");
+                        return;
+                    }
+                    selectedLightSourceForContextMenu = {
+                        overlay: overlay
+                    };
+                    const dimlightCheckbox = document.getElementById('dimlight-checkbox');
+                    const dimlightRadiusInput = document.getElementById('dimlight-radius-input');
+
+                    dimlightCheckbox.checked = overlay.dimlight_enabled || false;
+                    dimlightRadiusInput.value = overlay.dimlight_radius_ft || 0;
+
+                    dimlightRadiusInput.disabled = !dimlightCheckbox.checked;
+
+                    lightSourceContextMenu.style.left = `${event.pageX}px`;
+                    lightSourceContextMenu.style.top = `${event.pageY}px`;
+                    lightSourceContextMenu.style.display = 'block';
+
+                    overlayClicked = true;
+                    break;
                 }
             }
         }
@@ -6870,6 +7007,7 @@ function getTightBoundingBox(img) {
             (polygonContextMenu.style.display === 'block' && polygonContextMenu.contains(event.target)) ||
             (noteContextMenu.style.display === 'block' && noteContextMenu.contains(event.target)) ||
             (characterContextMenu.style.display === 'block' && characterContextMenu.contains(event.target)) ||
+            (lightSourceContextMenu.style.display === 'block' && lightSourceContextMenu.contains(event.target)) ||
             (mapToolsContextMenu.style.display === 'block' && mapToolsContextMenu.contains(event.target)) ||
             (viewModeMapContextMenu.style.display === 'block' && viewModeMapContextMenu.contains(event.target)) ||
             Array.from(document.querySelectorAll('.dynamic-context-menu')).some(menu => menu.contains(event.target));
@@ -6879,6 +7017,7 @@ function getTightBoundingBox(img) {
             polygonContextMenu.style.display = 'none';
             noteContextMenu.style.display = 'none';
             characterContextMenu.style.display = 'none';
+            lightSourceContextMenu.style.display = 'none';
             mapToolsContextMenu.style.display = 'none';
             viewModeMapContextMenu.style.display = 'none';
             document.querySelectorAll('.dynamic-context-menu').forEach(menu => menu.remove());
@@ -6887,6 +7026,7 @@ function getTightBoundingBox(img) {
             selectedPolygonForContextMenu = null;
             selectedNoteForContextMenu = null;
             selectedCharacterForContextMenu = null;
+            selectedLightSourceForContextMenu = null;
         }
 
         if (tokenStatBlock.style.display === 'block' && !tokenStatBlock.contains(event.target) && !dmCanvas.contains(event.target)) {
@@ -9908,17 +10048,14 @@ function displayToast(messageElement) {
         visionMaskCanvas.width = currentMapDisplayData.imgWidth;
         visionMaskCanvas.height = currentMapDisplayData.imgHeight;
         const visionCtx = visionMaskCanvas.getContext('2d');
+        visionCtx.fillStyle = 'black'; // The final mask should be black where vision is, transparent otherwise
 
-        const lightSources = initiativeTokens
-            .filter(token => {
-                const character = charactersData.find(c => c.id === token.characterId);
-                return character && character.vision === true;
-            })
-            .map(token => ({
-                position: { x: token.x, y: token.y }
-            }));
+        const tokensWithVision = initiativeTokens.filter(token => {
+            const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+            return character && character.vision === true;
+        });
 
-        if (lightSources.length === 0) return null;
+        if (tokensWithVision.length === 0) return null;
 
         const walls = mapData.overlays.filter(o => o.type === 'wall');
         const closedDoors = mapData.overlays.filter(o => o.type === 'door' && !o.isOpen);
@@ -9926,18 +10063,12 @@ function displayToast(messageElement) {
 
         const allSegments = [];
         walls.forEach(wall => {
-            for (let i = 0; i < wall.points.length - 1; i++) {
-                allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
-            }
+            for (let i = 0; i < wall.points.length - 1; i++) allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
         });
-        closedDoors.forEach(door => {
-            allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door });
-        });
+        closedDoors.forEach(door => allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door }));
         smartObjects.forEach(object => {
-            for (let i = 0; i < object.polygon.length - 1; i++) {
-                allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
-            }
-             allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
+            for (let i = 0; i < object.polygon.length - 1; i++) allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
+            allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
         });
 
         const imgWidth = currentMapDisplayData.imgWidth;
@@ -9948,95 +10079,106 @@ function displayToast(messageElement) {
         allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
 
         const allVertices = [];
-        allSegments.forEach(seg => {
-            allVertices.push(seg.p1, seg.p2);
+        allSegments.forEach(seg => allVertices.push(seg.p1, seg.p2));
+
+        // --- 1. Calculate World Lit Area ---
+        const litAreaCanvas = document.createElement('canvas');
+        litAreaCanvas.width = visionMaskCanvas.width;
+        litAreaCanvas.height = visionMaskCanvas.height;
+        const litAreaCtx = litAreaCanvas.getContext('2d');
+        litAreaCtx.fillStyle = 'black';
+
+        const dmLightSources = mapData.overlays.filter(o => o.type === 'lightSource');
+        dmLightSources.forEach(light => {
+            const lightLosPolygon = getLosPolygon(light.position, allSegments, allVertices, imgWidth, imgHeight);
+
+            const tempLightCanvas = document.createElement('canvas');
+            tempLightCanvas.width = visionMaskCanvas.width;
+            tempLightCanvas.height = visionMaskCanvas.height;
+            const tempLightCtx = tempLightCanvas.getContext('2d');
+            tempLightCtx.fillStyle = 'black';
+            tempLightCtx.beginPath();
+            if (lightLosPolygon.length > 0) {
+                const firstPoint = lightLosPolygon[0];
+                tempLightCtx.moveTo(firstPoint.x, firstPoint.y);
+                lightLosPolygon.forEach(p => tempLightCtx.lineTo(p.x, p.y));
+                tempLightCtx.closePath();
+                tempLightCtx.fill();
+            }
+
+            if (light.dimlight_enabled && gridData[selectedMapFileName] && gridData[selectedMapFileName].visible) {
+                const mapGridData = gridData[selectedMapFileName];
+                const radiusFt = light.dimlight_radius_ft || 0;
+                const gridSqftValue = mapGridData.sqft || 5;
+                const gridPixelSize = mapGridData.scale || 50;
+                if (radiusFt > 0 && gridSqftValue > 0) {
+                    const radiusInPixels = (radiusFt / gridSqftValue) * gridPixelSize;
+                    const maskCanvas = document.createElement('canvas');
+                    maskCanvas.width = visionMaskCanvas.width;
+                    maskCanvas.height = visionMaskCanvas.height;
+                    const maskCtx = maskCanvas.getContext('2d');
+                    maskCtx.fillStyle = 'black';
+                    maskCtx.beginPath();
+                    maskCtx.arc(light.position.x, light.position.y, radiusInPixels, 0, Math.PI * 2);
+                    maskCtx.fill();
+                    tempLightCtx.globalCompositeOperation = 'source-in';
+                    tempLightCtx.drawImage(maskCanvas, 0, 0);
+                }
+            }
+            litAreaCtx.drawImage(tempLightCanvas, 0, 0);
         });
 
-        visionCtx.fillStyle = 'black';
-        visionCtx.beginPath();
+        // --- 2. Calculate and apply vision for each token ---
+        tokensWithVision.forEach(token => {
+            const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+            if (!character) return;
 
-        lightSources.forEach(light => {
-            const visiblePoints = [];
-            const angles = new Set();
+            const tokenLosPolygon = getLosPolygon(token, allSegments, allVertices, imgWidth, imgHeight);
 
-            let lightIsInsideObject = false;
-            for (const so of smartObjects) {
-                if (isPointInPolygon(light.position, so.polygon)) {
-                    lightIsInsideObject = true;
-                    break;
+            const tokenVisionShapeCanvas = document.createElement('canvas');
+            tokenVisionShapeCanvas.width = visionMaskCanvas.width;
+            tokenVisionShapeCanvas.height = visionMaskCanvas.height;
+            const visionShapeCtx = tokenVisionShapeCanvas.getContext('2d');
+            visionShapeCtx.fillStyle = 'black';
+
+            // Draw darkvision circle first
+            const mapGridData = gridData[selectedMapFileName];
+            if (mapGridData && mapGridData.visible && character.sheetData) {
+                const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+                if (visionFt > 0) {
+                    const gridSqftValue = mapGridData.sqft || 5;
+                    const gridPixelSize = mapGridData.scale || 50;
+                    const visionRadiusInPixels = (visionFt / gridSqftValue) * gridPixelSize;
+                    visionShapeCtx.beginPath();
+                    visionShapeCtx.arc(token.x, token.y, visionRadiusInPixels, 0, Math.PI * 2);
+                    visionShapeCtx.fill();
                 }
             }
 
-            allVertices.forEach(vertex => {
-                const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
-                angles.add(angle - 0.0001);
-                angles.add(angle);
-                angles.add(angle + 0.0001);
-            });
+            // Union with the world lit area
+            visionShapeCtx.drawImage(litAreaCanvas, 0, 0);
 
-            const sortedAngles = Array.from(angles).sort((a, b) => a - b);
-
-            sortedAngles.forEach(angle => {
-                const ray = {
-                    x1: light.position.x,
-                    y1: light.position.y,
-                    x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
-                    y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
-                };
-
-                let closestIntersection = null;
-                let minDistance = Infinity;
-
-                allSegments.forEach(segment => {
-                    const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
-                    if (intersectionPoint) {
-                        let ignoreThisIntersection = false;
-                        if (segment.parent.type === 'smart_object') {
-                            const p1 = segment.p1;
-                            const p2 = segment.p2;
-                            const normal = { x: p2.y - p1.y, y: p1.x - p2.x };
-                            const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
-                            const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
-                            if (!lightIsInsideObject && dot > 0) {
-                                ignoreThisIntersection = true;
-                            }
-                        }
-
-                        if (!ignoreThisIntersection) {
-                            const distance = Math.sqrt(Math.pow(intersectionPoint.x - light.position.x, 2) + Math.pow(intersectionPoint.y - light.position.y, 2));
-                            if (distance < minDistance) {
-                                minDistance = distance;
-                                closestIntersection = intersectionPoint;
-                            }
-                        }
-                    }
-                });
-
-                if (closestIntersection) {
-                    visiblePoints.push(closestIntersection);
-                } else {
-                    visiblePoints.push({ x: ray.x2, y: ray.y2 });
-                }
-            });
-
-            if (visiblePoints.length > 0) {
-                const firstPoint = visiblePoints[0];
-                visionCtx.moveTo(firstPoint.x, firstPoint.y);
-                visiblePoints.forEach(point => {
-                    visionCtx.lineTo(point.x, point.y);
-                });
-                visionCtx.closePath();
+            // Now intersect this combined shape with the token's LOS
+            const tokenLosCanvas = document.createElement('canvas');
+            tokenLosCanvas.width = visionMaskCanvas.width;
+            tokenLosCanvas.height = visionMaskCanvas.height;
+            const losCtx = tokenLosCanvas.getContext('2d');
+            losCtx.fillStyle = 'black';
+            losCtx.beginPath();
+            if (tokenLosPolygon.length > 0) {
+                const firstPoint = tokenLosPolygon[0];
+                losCtx.moveTo(firstPoint.x, firstPoint.y);
+                tokenLosPolygon.forEach(p => losCtx.lineTo(p.x, p.y));
+                losCtx.closePath();
+                losCtx.fill();
             }
-        });
-        visionCtx.fill();
 
-        // If grid is on, clip the vision to the darkvision radius
-        const darkvisionMask = createDarkvisionMask();
-        if (darkvisionMask) {
-            visionCtx.globalCompositeOperation = 'source-in';
-            visionCtx.drawImage(darkvisionMask, 0, 0);
-            visionCtx.globalCompositeOperation = 'source-over'; // Reset for other operations
-        }
+            visionShapeCtx.globalCompositeOperation = 'source-in';
+            visionShapeCtx.drawImage(tokenLosCanvas, 0, 0);
+
+            // Add this token's final vision to the main vision mask
+            visionCtx.drawImage(tokenVisionShapeCanvas, 0, 0);
+        });
 
         return visionMaskCanvas;
     }
