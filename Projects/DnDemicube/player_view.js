@@ -342,11 +342,10 @@ function recalculateLightMap_Player() {
     const lightSources = [...dmLightSources, ...tokenLightSources];
     const walls = currentOverlays.filter(o => o.type === 'wall');
     const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
-    // Smart objects are only visible to the DM, so we don't filter them here for the player.
     const smartObjects = currentOverlays.filter(o => o.type === 'smart_object');
 
     lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
-    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)'; // Full black for player fog of war
+    lightMapCtx.fillStyle = 'rgba(0, 0, 0, 1)';
     lightMapCtx.fillRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
 
     const lightScale = renderQuality;
@@ -417,7 +416,7 @@ function recalculateLightMap_Player() {
                     if (segment.parent.type === 'smart_object') {
                         const p1 = segment.p1;
                         const p2 = segment.p2;
-                        const normal = { x: p2.y - p1.y, y: p1.x - p2.x }; // Outward-facing normal for clockwise polygons
+                        const normal = { x: p2.y - p1.y, y: p1.x - p2.x };
                         const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
                         const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
 
@@ -457,6 +456,14 @@ function recalculateLightMap_Player() {
         }
         lightMapCtx.restore();
     });
+
+    const visionMask = generateVisionMask(currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight, currentOverlays, currentGridData, initiativeTokens, activeInitiative);
+    if (visionMask) {
+        lightMapCtx.save();
+        lightMapCtx.globalCompositeOperation = 'destination-out';
+        lightMapCtx.drawImage(visionMask, 0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        lightMapCtx.restore();
+    }
 
     isLightMapDirty = false;
 }
