@@ -590,13 +590,6 @@ function generateVisionMask_Player() {
         }
     }
 
-    tokensWithVision.forEach(token => {
-        const minRadius = currentGridData ? currentGridData.scale / 2 : 25;
-        combinedCtx.beginPath();
-        combinedCtx.arc(token.x, token.y, minRadius, 0, Math.PI * 2);
-        combinedCtx.fill();
-    });
-
     return combinedVisionCanvas;
 }
 
