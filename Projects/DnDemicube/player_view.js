@@ -359,7 +359,7 @@ function generateVisionMask_Player() {
     visionMaskCanvas.height = currentMapDisplayData.imgHeight;
     const visionCtx = visionMaskCanvas.getContext('2d');
 
-    const lightSources = initiativeTokens
+    const tokensWithVision = initiativeTokens
         .filter(token => token.vision !== false)
         .map(token => ({
             position: { x: token.x, y: token.y }
@@ -368,10 +368,6 @@ function generateVisionMask_Player() {
     const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource').map(light => ({
         position: { x: light.position.x, y: light.position.y }
     }));
-
-    const allLightSources = [...lightSources, ...dmLightSources];
-
-    if (allLightSources.length === 0) return null;
 
     const walls = currentOverlays.filter(o => o.type === 'wall');
     const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
@@ -392,6 +388,44 @@ function generateVisionMask_Player() {
         }
         allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
     });
+
+    const visibleDmLightSources = [];
+    if (tokensWithVision.length > 0) {
+        dmLightSources.forEach(light => {
+            let isVisible = false;
+            for (const token of tokensWithVision) {
+                let hasLineOfSight = true;
+                for (const segment of allSegments) {
+                    const p1 = { x1: token.position.x, y1: token.position.y, x2: light.position.x, y2: light.position.y };
+                    const p2 = { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y };
+                    const dX = p1.x2 - p1.x1;
+                    const dY = p1.y2 - p1.y1;
+                    const dX2 = p2.x2 - p2.x1;
+                    const dY2 = p2.y2 - p2.y1;
+                    const denominator = dX * dY2 - dY * dX2;
+                    if (denominator !== 0) {
+                        const t = ((p2.x1 - p1.x1) * dY2 - (p2.y1 - p1.y1) * dX2) / denominator;
+                        const u = -((p1.x1 - p2.x1) * dY - (p1.y1 - p2.y1) * dX) / denominator;
+                        if (t > 0 && t < 1 && u > 0 && u < 1) {
+                            hasLineOfSight = false;
+                            break;
+                        }
+                    }
+                }
+                if (hasLineOfSight) {
+                    isVisible = true;
+                    break;
+                }
+            }
+            if (isVisible) {
+                visibleDmLightSources.push(light);
+            }
+        });
+    }
+
+    const allLightSources = [...tokensWithVision, ...visibleDmLightSources];
+
+    if (allLightSources.length === 0) return null;
 
     const imgWidth = currentMapDisplayData.imgWidth;
     const imgHeight = currentMapDisplayData.imgHeight;
