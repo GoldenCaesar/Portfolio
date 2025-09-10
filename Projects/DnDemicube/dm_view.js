@@ -2119,68 +2119,83 @@ function getTightBoundingBox(img) {
         allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
         allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
 
-        const combinedVisionCanvas = document.createElement('canvas');
-        combinedVisionCanvas.width = currentMapDisplayData.imgWidth;
-        combinedVisionCanvas.height = currentMapDisplayData.imgHeight;
-        const combinedCtx = combinedVisionCanvas.getContext('2d');
-        combinedCtx.fillStyle = 'black';
 
-        // 1. Draw light source visibility first.
         const lightSourceMask = generateLightSourceMask();
-        if (lightSourceMask) {
-            combinedCtx.drawImage(lightSourceMask, 0, 0);
-        }
 
         const tokensWithVision = initiativeTokens.filter(token => {
             const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
             return character && character.vision === true;
         });
 
-        // 2. Add token vision on top.
+        if (tokensWithVision.length === 0) {
+            return lightSourceMask; // If no tokens have vision, the only visible areas are those with lights for the DM. FOW won't update.
+        }
+
+        const combinedVisionCanvas = document.createElement('canvas');
+        combinedVisionCanvas.width = currentMapDisplayData.imgWidth;
+        combinedVisionCanvas.height = currentMapDisplayData.imgHeight;
+        const combinedCtx = combinedVisionCanvas.getContext('2d');
+        combinedCtx.fillStyle = 'black';
+
         for (const token of tokensWithVision) {
             const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
             if (!character) continue;
 
             const tokenPosition = { x: token.x, y: token.y };
+
             const losPoints = calculateTokenVisionPolygon(tokenPosition, allSegments);
 
-            if (losPoints.length === 0) continue;
-
-            // Create a temporary canvas for this token's vision.
-            const tokenVisionCanvas = document.createElement('canvas');
-            tokenVisionCanvas.width = combinedVisionCanvas.width;
-            tokenVisionCanvas.height = combinedVisionCanvas.height;
-            const tokenVisionCtx = tokenVisionCanvas.getContext('2d');
-            tokenVisionCtx.fillStyle = 'black';
-
-            // Draw the line-of-sight polygon.
-            tokenVisionCtx.beginPath();
-            tokenVisionCtx.moveTo(losPoints[0].x, losPoints[0].y);
+            // Create a canvas for the token's LOS polygon
+            const losCanvas = document.createElement('canvas');
+            losCanvas.width = combinedVisionCanvas.width;
+            losCanvas.height = combinedVisionCanvas.height;
+            const losCtx = losCanvas.getContext('2d');
+            losCtx.fillStyle = 'black';
+            losCtx.beginPath();
+            losCtx.moveTo(losPoints[0].x, losPoints[0].y);
             for (let i = 1; i < losPoints.length; i++) {
-                tokenVisionCtx.lineTo(losPoints[i].x, losPoints[i].y);
+                losCtx.lineTo(losPoints[i].x, losPoints[i].y);
             }
-            tokenVisionCtx.closePath();
-            tokenVisionCtx.fill();
+            losCtx.closePath();
+            losCtx.fill();
 
-            // If grid is on, apply darkvision radius by clipping the LoS polygon.
+            // Handle darkvision part
             const mapGridData = gridData[selectedMapFileName];
             if (mapGridData && mapGridData.visible) {
                 const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
                 if (visionFt > 0 && mapGridData.sqft > 0) {
                     const visionRadiusInPixels = (visionFt / mapGridData.sqft) * mapGridData.scale;
 
-                    // Use 'source-in' to effectively clip the existing LoS polygon.
-                    tokenVisionCtx.globalCompositeOperation = 'source-in';
-                    tokenVisionCtx.fillStyle = 'black'; // Color doesn't matter for masking op
-                    tokenVisionCtx.beginPath();
-                    tokenVisionCtx.arc(tokenPosition.x, tokenPosition.y, visionRadiusInPixels, 0, Math.PI * 2);
-                    tokenVisionCtx.fill();
+                    const darkvisionLOSCanvas = document.createElement('canvas');
+                    darkvisionLOSCanvas.width = combinedVisionCanvas.width;
+                    darkvisionLOSCanvas.height = combinedVisionCanvas.height;
+                    const dvLosCtx = darkvisionLOSCanvas.getContext('2d');
+                    dvLosCtx.drawImage(losCanvas, 0, 0);
+                    dvLosCtx.globalCompositeOperation = 'source-in';
+                    dvLosCtx.fillStyle = 'black';
+                    dvLosCtx.beginPath();
+                    dvLosCtx.arc(tokenPosition.x, tokenPosition.y, visionRadiusInPixels, 0, Math.PI * 2);
+                    dvLosCtx.fill();
+
+                    // Add to the main combined canvas
+                    combinedCtx.drawImage(darkvisionLOSCanvas, 0, 0);
                 }
             }
 
-            // Add this token's vision to the combined mask.
-            // Default 'source-over' operation correctly unions the visibility areas.
-            combinedCtx.drawImage(tokenVisionCanvas, 0, 0);
+            // Handle seeing lit areas
+            if (lightSourceMask) {
+                const litAreasVisibleCanvas = document.createElement('canvas');
+                litAreasVisibleCanvas.width = combinedVisionCanvas.width;
+                litAreasVisibleCanvas.height = combinedVisionCanvas.height;
+                const litCtx = litAreasVisibleCanvas.getContext('2d');
+
+                litCtx.drawImage(lightSourceMask, 0, 0);
+                litCtx.globalCompositeOperation = 'source-in';
+                litCtx.drawImage(losCanvas, 0, 0);
+
+                // Add to the main combined canvas
+                combinedCtx.drawImage(litAreasVisibleCanvas, 0, 0);
+            }
         }
 
         return combinedVisionCanvas;
