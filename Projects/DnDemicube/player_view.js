@@ -427,15 +427,19 @@ function calculateTokenVisionPolygon(sourcePosition, allSegments) {
     return visiblePoints;
 }
 
-function generateCombinedLOSMask() {
-    const tokensWithVision = initiativeTokens.filter(token => {
-        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-        return character && character.vision === true;
-    });
+function generateLightSourceMask() {
+    if (!currentOverlays || !currentMapDisplayData.img) return null;
 
-    if (tokensWithVision.length === 0) {
-        return null;
-    }
+    const lightSourceMaskCanvas = document.createElement('canvas');
+    lightSourceMaskCanvas.width = currentMapDisplayData.imgWidth;
+    lightSourceMaskCanvas.height = currentMapDisplayData.imgHeight;
+    const lightSourceCtx = lightSourceMaskCanvas.getContext('2d');
+
+    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource').map(light => ({
+        position: { x: light.position.x, y: light.position.y }
+    }));
+
+    if (dmLightSources.length === 0) return null;
 
     const walls = currentOverlays.filter(o => o.type === 'wall');
     const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
@@ -464,67 +468,136 @@ function generateCombinedLOSMask() {
     allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
     allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
 
-    const losMaskCanvas = document.createElement('canvas');
-    losMaskCanvas.width = imgWidth;
-    losMaskCanvas.height = imgHeight;
-    const losCtx = losMaskCanvas.getContext('2d');
-    losCtx.fillStyle = 'black';
-    losCtx.beginPath();
+    lightSourceCtx.fillStyle = 'black';
+    lightSourceCtx.beginPath();
 
-    tokensWithVision.forEach(token => {
-        const losPoints = calculateTokenVisionPolygon({ x: token.x, y: token.y }, allSegments);
-        if (losPoints.length > 0) {
-            losCtx.moveTo(losPoints[0].x, losPoints[0].y);
-            for (let i = 1; i < losPoints.length; i++) {
-                losCtx.lineTo(losPoints[i].x, losPoints[i].y);
-            }
-            losCtx.closePath();
+    dmLightSources.forEach(light => {
+        const visiblePoints = calculateTokenVisionPolygon(light.position, allSegments);
+
+        if (visiblePoints.length > 0) {
+            const firstPoint = visiblePoints[0];
+            lightSourceCtx.moveTo(firstPoint.x, firstPoint.y);
+            visiblePoints.forEach(point => {
+                lightSourceCtx.lineTo(point.x, point.y);
+            });
+            lightSourceCtx.closePath();
         }
     });
-    losCtx.fill();
+    lightSourceCtx.fill();
 
-    return losMaskCanvas;
+    return lightSourceMaskCanvas;
 }
 
 function generateVisionMask_Player() {
     if (!currentOverlays || !currentMapDisplayData.img) return null;
 
-    // 1. Create a mask with all potential light sources (DM lights + player darkvision)
-    const lightAndDarkvisionMask = document.createElement('canvas');
-    lightAndDarkvisionMask.width = currentMapDisplayData.imgWidth;
-    lightAndDarkvisionMask.height = currentMapDisplayData.imgHeight;
-    const ldCtx = lightAndDarkvisionMask.getContext('2d');
-    ldCtx.fillStyle = 'black';
+    const walls = currentOverlays.filter(o => o.type === 'wall');
+    const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
+    const smartObjects = currentOverlays.filter(o => o.type === 'smart_object');
+
+    const allSegments = [];
+    walls.forEach(wall => {
+        for (let i = 0; i < wall.points.length - 1; i++) {
+            allSegments.push({ p1: wall.points[i], p2: wall.points[i + 1], parent: wall });
+        }
+    });
+    closedDoors.forEach(door => {
+        allSegments.push({ p1: door.points[0], p2: door.points[1], parent: door });
+    });
+    smartObjects.forEach(object => {
+        for (let i = 0; i < object.polygon.length - 1; i++) {
+            allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
+        }
+         allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
+    });
+    const imgWidth = currentMapDisplayData.imgWidth;
+    const imgHeight = currentMapDisplayData.imgHeight;
+    allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
+
 
     const lightSourceMask = generateLightSourceMask();
-    if (lightSourceMask) {
-        ldCtx.drawImage(lightSourceMask, 0, 0);
-    }
-    const darkvisionMask = createDarkvisionMask_Player();
-    if (darkvisionMask) {
-        ldCtx.globalCompositeOperation = 'source-over';
-        ldCtx.drawImage(darkvisionMask, 0, 0);
-    }
 
-    // 2. Create a mask with the combined line-of-sight of all player tokens
-    const combinedLOSMask = generateCombinedLOSMask();
+    const tokensWithVision = initiativeTokens.filter(token => {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        return character && character.vision === true;
+    });
 
-    // 3. If there's no LOS, there's no vision.
-    if (!combinedLOSMask) {
-        // If there are no tokens with vision, we should still see static lights.
-        // The combinedLOSMask would be null, but we should return the pure light source mask.
-        const tokensWithVision = initiativeTokens.filter(token => {
-            const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-            return character && character.vision === true;
-        });
-        return tokensWithVision.length === 0 ? lightSourceMask : null;
+    if (tokensWithVision.length === 0) {
+        return lightSourceMask;
     }
 
-    // 4. Intersect the two masks. The final mask is where LOS overlaps with a light/darkvision area.
-    ldCtx.globalCompositeOperation = 'source-in';
-    ldCtx.drawImage(combinedLOSMask, 0, 0);
+    const combinedVisionCanvas = document.createElement('canvas');
+    combinedVisionCanvas.width = currentMapDisplayData.imgWidth;
+    combinedVisionCanvas.height = currentMapDisplayData.imgHeight;
+    const combinedCtx = combinedVisionCanvas.getContext('2d');
+    combinedCtx.fillStyle = 'black';
+    combinedCtx.globalCompositeOperation = 'source-over';
 
-    return lightAndDarkvisionMask;
+
+    for (const token of tokensWithVision) {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (!character) continue;
+
+        const tokenPosition = { x: token.x, y: token.y };
+
+        const losPoints = calculateTokenVisionPolygon(tokenPosition, allSegments);
+
+        // Create a canvas for the token's LOS polygon
+        const losCanvas = document.createElement('canvas');
+        losCanvas.width = combinedVisionCanvas.width;
+        losCanvas.height = combinedVisionCanvas.height;
+        const losCtx = losCanvas.getContext('2d');
+        losCtx.fillStyle = 'black';
+        losCtx.beginPath();
+        losCtx.moveTo(losPoints[0].x, losPoints[0].y);
+        for (let i = 1; i < losPoints.length; i++) {
+            losCtx.lineTo(losPoints[i].x, losPoints[i].y);
+        }
+        losCtx.closePath();
+        losCtx.fill();
+
+        // Handle darkvision part
+        if (currentGridData && currentGridData.visible) {
+            const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+            if (visionFt > 0 && currentGridData.sqft > 0) {
+                const visionRadiusInPixels = (visionFt / currentGridData.sqft) * currentGridData.scale;
+
+                const darkvisionLOSCanvas = document.createElement('canvas');
+                darkvisionLOSCanvas.width = combinedVisionCanvas.width;
+                darkvisionLOSCanvas.height = combinedVisionCanvas.height;
+                const dvLosCtx = darkvisionLOSCanvas.getContext('2d');
+                dvLosCtx.drawImage(losCanvas, 0, 0);
+                dvLosCtx.globalCompositeOperation = 'source-in';
+                dvLosCtx.fillStyle = 'black';
+                dvLosCtx.beginPath();
+                dvLosCtx.arc(tokenPosition.x, tokenPosition.y, visionRadiusInPixels, 0, Math.PI * 2);
+                dvLosCtx.fill();
+
+                // Add to the main combined canvas
+                combinedCtx.drawImage(darkvisionLOSCanvas, 0, 0);
+            }
+        }
+
+        // Handle seeing lit areas
+        if (lightSourceMask) {
+            const litAreasVisibleCanvas = document.createElement('canvas');
+            litAreasVisibleCanvas.width = combinedVisionCanvas.width;
+            litAreasVisibleCanvas.height = combinedVisionCanvas.height;
+            const litCtx = litAreasVisibleCanvas.getContext('2d');
+
+            litCtx.drawImage(lightSourceMask, 0, 0);
+            litCtx.globalCompositeOperation = 'source-in';
+            litCtx.drawImage(losCanvas, 0, 0);
+
+            // Add to the main combined canvas
+            combinedCtx.drawImage(litAreasVisibleCanvas, 0, 0);
+        }
+    }
+
+    return combinedVisionCanvas;
 }
 
 
