@@ -516,20 +516,17 @@ function generateVisionMask_Player() {
     tokenVisionCanvas.height = visionMaskCanvas.height;
     const tokenVisionCtx = tokenVisionCanvas.getContext('2d');
     tokenVisionCtx.fillStyle = 'black';
+    tokenVisionCtx.beginPath();
+    tokensWithVision.forEach(light => {
+        calculateAndDrawVisionForSource(light, tokenVisionCtx);
+    });
+    tokenVisionCtx.fill();
 
-    if (tokensWithVision.length > 0) {
-        tokenVisionCtx.beginPath();
-        tokensWithVision.forEach(light => {
-            calculateAndDrawVisionForSource(light, tokenVisionCtx);
-        });
-        tokenVisionCtx.fill();
-
-        const darkvisionMask = createDarkvisionMask_Player();
-        if (darkvisionMask) {
-            tokenVisionCtx.globalCompositeOperation = 'source-in';
-            tokenVisionCtx.drawImage(darkvisionMask, 0, 0);
-            tokenVisionCtx.globalCompositeOperation = 'source-over';
-        }
+    const darkvisionMask = createDarkvisionMask_Player();
+    if (darkvisionMask) {
+        tokenVisionCtx.globalCompositeOperation = 'source-in';
+        tokenVisionCtx.drawImage(darkvisionMask, 0, 0);
+        tokenVisionCtx.globalCompositeOperation = 'source-over';
     }
 
     visionCtx.drawImage(tokenVisionCanvas, 0, 0);
