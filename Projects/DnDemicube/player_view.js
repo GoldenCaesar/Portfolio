@@ -389,6 +389,18 @@ function generateVisionMask_Player() {
         allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
     });
 
+    const imgWidth = currentMapDisplayData.imgWidth;
+    const imgHeight = currentMapDisplayData.imgHeight;
+    allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
+    allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
+
+    const allVertices = [];
+    allSegments.forEach(seg => {
+        allVertices.push(seg.p1, seg.p2);
+    });
+
     const visibleDmLightSources = [];
     if (tokensWithVision.length > 0) {
         dmLightSources.forEach(light => {
@@ -423,26 +435,9 @@ function generateVisionMask_Player() {
         });
     }
 
-    const allLightSources = [...tokensWithVision, ...visibleDmLightSources];
+    if (tokensWithVision.length === 0 && visibleDmLightSources.length === 0) return null;
 
-    if (allLightSources.length === 0) return null;
-
-    const imgWidth = currentMapDisplayData.imgWidth;
-    const imgHeight = currentMapDisplayData.imgHeight;
-    allSegments.push({ p1: { x: 0, y: 0 }, p2: { x: imgWidth, y: 0 }, parent: { type: 'boundary' } });
-    allSegments.push({ p1: { x: imgWidth, y: 0 }, p2: { x: imgWidth, y: imgHeight }, parent: { type: 'boundary' } });
-    allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
-    allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
-
-    const allVertices = [];
-    allSegments.forEach(seg => {
-        allVertices.push(seg.p1, seg.p2);
-    });
-
-    visionCtx.fillStyle = 'black';
-    visionCtx.beginPath();
-
-    allLightSources.forEach(light => {
+    const calculateAndDrawVisionForSource = (light, targetCtx) => {
         const visiblePoints = [];
         const angles = new Set();
 
@@ -508,20 +503,41 @@ function generateVisionMask_Player() {
 
         if (visiblePoints.length > 0) {
             const firstPoint = visiblePoints[0];
-            visionCtx.moveTo(firstPoint.x, firstPoint.y);
+            targetCtx.moveTo(firstPoint.x, firstPoint.y);
             visiblePoints.forEach(point => {
-                visionCtx.lineTo(point.x, point.y);
+                targetCtx.lineTo(point.x, point.y);
             });
-            visionCtx.closePath();
+            targetCtx.closePath();
         }
+    };
+
+    const tokenVisionCanvas = document.createElement('canvas');
+    tokenVisionCanvas.width = visionMaskCanvas.width;
+    tokenVisionCanvas.height = visionMaskCanvas.height;
+    const tokenVisionCtx = tokenVisionCanvas.getContext('2d');
+    tokenVisionCtx.fillStyle = 'black';
+    tokenVisionCtx.beginPath();
+    tokensWithVision.forEach(light => {
+        calculateAndDrawVisionForSource(light, tokenVisionCtx);
     });
-    visionCtx.fill();
+    tokenVisionCtx.fill();
 
     const darkvisionMask = createDarkvisionMask_Player();
     if (darkvisionMask) {
-        visionCtx.globalCompositeOperation = 'source-in';
-        visionCtx.drawImage(darkvisionMask, 0, 0);
-        visionCtx.globalCompositeOperation = 'source-over';
+        tokenVisionCtx.globalCompositeOperation = 'source-in';
+        tokenVisionCtx.drawImage(darkvisionMask, 0, 0);
+        tokenVisionCtx.globalCompositeOperation = 'source-over';
+    }
+
+    visionCtx.drawImage(tokenVisionCanvas, 0, 0);
+
+    if (visibleDmLightSources.length > 0) {
+        visionCtx.fillStyle = 'black';
+        visionCtx.beginPath();
+        visibleDmLightSources.forEach(light => {
+            calculateAndDrawVisionForSource(light, visionCtx);
+        });
+        visionCtx.fill();
     }
 
     return visionMaskCanvas;
