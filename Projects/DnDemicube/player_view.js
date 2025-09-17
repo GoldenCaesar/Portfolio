@@ -810,6 +810,20 @@ window.addEventListener('message', (event) => {
                         drawMapAndOverlays(); // This draws the main map
 
                         isLightMapDirty = true;
+                        recalculateLightMap_Player(); // Force immediate calculation
+
+                        const shadowCtx = shadowCanvas.getContext('2d');
+                        shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+                        if (lightMapCanvas) {
+                            const { scale, originX, originY } = currentMapTransform;
+                            shadowCtx.save();
+                            shadowCtx.translate(originX, originY);
+                            shadowCtx.scale(scale, scale);
+                            shadowCtx.imageSmoothingEnabled = false;
+                            shadowCtx.drawImage(lightMapCanvas, 0, 0, currentMapDisplayData.imgWidth, currentMapDisplayData.imgHeight);
+                            shadowCtx.restore();
+                        }
+
                         toggleShadowAnimation(data.active);
                     };
                     img.onerror = () => {
