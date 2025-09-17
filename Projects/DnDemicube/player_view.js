@@ -310,65 +310,83 @@ function getLineIntersection(p1, p2) {
     return null;
 }
 
-function createDarkvisionMask_Player() {
-    if (!currentGridData || !currentGridData.visible || !currentMapDisplayData.img) {
-        return null;
-    }
+function calculateTokenVisionPolygon(sourcePosition, allSegments) {
+    const imgWidth = currentMapDisplayData.imgWidth;
+    const imgHeight = currentMapDisplayData.imgHeight;
 
-    const darkvisionMaskCanvas = document.createElement('canvas');
-    darkvisionMaskCanvas.width = currentMapDisplayData.imgWidth;
-    darkvisionMaskCanvas.height = currentMapDisplayData.imgHeight;
-    const maskCtx = darkvisionMaskCanvas.getContext('2d');
-    maskCtx.fillStyle = 'black';
-
-    const tokensWithVision = initiativeTokens.filter(token => {
-        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-        return character && character.vision === true;
+    const allVertices = [];
+    allSegments.forEach(seg => {
+        allVertices.push(seg.p1, seg.p2);
     });
 
-    if (tokensWithVision.length === 0) {
-        return null;
+    const visiblePoints = [];
+    const angles = new Set();
+
+    const smartObjects = allSegments.map(s => s.parent).filter(p => p.type === 'smart_object');
+    let sourceIsInsideObject = false;
+    for (const so of smartObjects) {
+        if (isPointInPolygon(sourcePosition, so.polygon)) {
+            sourceIsInsideObject = true;
+            break;
+        }
     }
 
-    tokensWithVision.forEach(token => {
-        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-        if (character && character.sheetData) {
-            const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
-            const gridSqftValue = currentGridData.sqft || 5;
-            const gridPixelSize = currentGridData.scale || 50;
+    allVertices.forEach(vertex => {
+        const angle = Math.atan2(vertex.y - sourcePosition.y, vertex.x - sourcePosition.x);
+        angles.add(angle - 0.0001);
+        angles.add(angle);
+        angles.add(angle + 0.0001);
+    });
 
-            if (visionFt > 0 && gridSqftValue > 0) {
-                const visionRadiusInGridSquares = visionFt / gridSqftValue;
-                const visionRadiusInPixels = visionRadiusInGridSquares * gridPixelSize;
+    const sortedAngles = Array.from(angles).sort((a, b) => a - b);
 
-                maskCtx.beginPath();
-                maskCtx.arc(token.x, token.y, visionRadiusInPixels, 0, Math.PI * 2, true);
-                maskCtx.fill();
+    sortedAngles.forEach(angle => {
+        const ray = {
+            x1: sourcePosition.x,
+            y1: sourcePosition.y,
+            x2: sourcePosition.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
+            y2: sourcePosition.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
+        };
+
+        let closestIntersection = null;
+        let minDistance = Infinity;
+
+        allSegments.forEach(segment => {
+            const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
+            if (intersectionPoint) {
+                let ignoreThisIntersection = false;
+                if (segment.parent.type === 'smart_object') {
+                    const p1 = segment.p1;
+                    const p2 = segment.p2;
+                    const normal = { x: p2.y - p1.y, y: p1.x - p2.x };
+                    const lightVector = { x: intersectionPoint.x - sourcePosition.x, y: intersectionPoint.y - sourcePosition.y };
+                    const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
+                    if (!sourceIsInsideObject && dot > 0) {
+                        ignoreThisIntersection = true;
+                    }
+                }
+
+                if (!ignoreThisIntersection) {
+                    const distance = Math.sqrt(Math.pow(intersectionPoint.x - sourcePosition.x, 2) + Math.pow(intersectionPoint.y - sourcePosition.y, 2));
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestIntersection = intersectionPoint;
+                    }
+                }
             }
+        });
+
+        if (closestIntersection) {
+            visiblePoints.push(closestIntersection);
+        } else {
+            visiblePoints.push({ x: ray.x2, y: ray.y2 });
         }
     });
 
-    return darkvisionMaskCanvas;
+    return visiblePoints;
 }
 
-function generateVisionMask_Player() {
-    if (!currentOverlays || !currentMapDisplayData.img) return null;
-
-    const visionMaskCanvas = document.createElement('canvas');
-    visionMaskCanvas.width = currentMapDisplayData.imgWidth;
-    visionMaskCanvas.height = currentMapDisplayData.imgHeight;
-    const visionCtx = visionMaskCanvas.getContext('2d');
-
-    const tokensWithVision = initiativeTokens
-        .filter(token => token.vision !== false)
-        .map(token => ({
-            position: { x: token.x, y: token.y }
-        }));
-
-    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource').map(light => ({
-        position: { x: light.position.x, y: light.position.y }
-    }));
-
+function _createWallSegments() {
     const walls = currentOverlays.filter(o => o.type === 'wall');
     const closedDoors = currentOverlays.filter(o => o.type === 'door' && !o.isOpen);
     const smartObjects = currentOverlays.filter(o => o.type === 'smart_object');
@@ -386,7 +404,7 @@ function generateVisionMask_Player() {
         for (let i = 0; i < object.polygon.length - 1; i++) {
             allSegments.push({ p1: object.polygon[i], p2: object.polygon[i + 1], parent: object });
         }
-        allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
+         allSegments.push({ p1: object.polygon[object.polygon.length - 1], p2: object.polygon[0], parent: object });
     });
 
     const imgWidth = currentMapDisplayData.imgWidth;
@@ -396,151 +414,127 @@ function generateVisionMask_Player() {
     allSegments.push({ p1: { x: imgWidth, y: imgHeight }, p2: { x: 0, y: imgHeight }, parent: { type: 'boundary' } });
     allSegments.push({ p1: { x: 0, y: imgHeight }, p2: { x: 0, y: 0 }, parent: { type: 'boundary' } });
 
-    const allVertices = [];
-    allSegments.forEach(seg => {
-        allVertices.push(seg.p1, seg.p2);
-    });
+    return allSegments;
+}
 
-    const visibleDmLightSources = [];
-    if (tokensWithVision.length > 0) {
-        dmLightSources.forEach(light => {
-            let isVisible = false;
-            for (const token of tokensWithVision) {
-                let hasLineOfSight = true;
-                for (const segment of allSegments) {
-                    const p1 = { x1: token.position.x, y1: token.position.y, x2: light.position.x, y2: light.position.y };
-                    const p2 = { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y };
-                    const dX = p1.x2 - p1.x1;
-                    const dY = p1.y2 - p1.y1;
-                    const dX2 = p2.x2 - p2.x1;
-                    const dY2 = p2.y2 - p2.y1;
-                    const denominator = dX * dY2 - dY * dX2;
-                    if (denominator !== 0) {
-                        const t = ((p2.x1 - p1.x1) * dY2 - (p2.y1 - p1.y1) * dX2) / denominator;
-                        const u = -((p1.x1 - p2.x1) * dY - (p1.y1 - p2.y1) * dX) / denominator;
-                        if (t > 0 && t < 1 && u > 0 && u < 1) {
-                            hasLineOfSight = false;
-                            break;
-                        }
-                    }
-                }
-                if (hasLineOfSight) {
-                    isVisible = true;
-                    break;
-                }
-            }
-            if (isVisible) {
-                visibleDmLightSources.push(light);
-            }
-        });
-    }
+function generateLightSourceMask() {
+    if (!currentOverlays || !currentMapDisplayData.img) return null;
 
-    if (tokensWithVision.length === 0 && visibleDmLightSources.length === 0) return null;
+    const lightSourceMaskCanvas = document.createElement('canvas');
+    lightSourceMaskCanvas.width = currentMapDisplayData.imgWidth;
+    lightSourceMaskCanvas.height = currentMapDisplayData.imgHeight;
+    const lightSourceCtx = lightSourceMaskCanvas.getContext('2d');
 
-    const calculateAndDrawVisionForSource = (light, targetCtx) => {
-        const visiblePoints = [];
-        const angles = new Set();
+    const dmLightSources = currentOverlays.filter(o => o.type === 'lightSource').map(light => ({
+        position: { x: light.position.x, y: light.position.y }
+    }));
 
-        let lightIsInsideObject = false;
-        for (const so of smartObjects) {
-            if (isPointInPolygon(light.position, so.polygon)) {
-                lightIsInsideObject = true;
-                break;
-            }
-        }
+    if (dmLightSources.length === 0) return null;
 
-        allVertices.forEach(vertex => {
-            const angle = Math.atan2(vertex.y - light.position.y, vertex.x - light.position.x);
-            angles.add(angle - 0.0001);
-            angles.add(angle);
-            angles.add(angle + 0.0001);
-        });
+    const allSegments = _createWallSegments();
 
-        const sortedAngles = Array.from(angles).sort((a, b) => a - b);
+    lightSourceCtx.fillStyle = 'black';
+    lightSourceCtx.beginPath();
 
-        sortedAngles.forEach(angle => {
-            const ray = {
-                x1: light.position.x,
-                y1: light.position.y,
-                x2: light.position.x + (imgWidth + imgHeight) * 2 * Math.cos(angle),
-                y2: light.position.y + (imgWidth + imgHeight) * 2 * Math.sin(angle)
-            };
-
-            let closestIntersection = null;
-            let minDistance = Infinity;
-
-            allSegments.forEach(segment => {
-                const intersectionPoint = getLineIntersection(ray, { x1: segment.p1.x, y1: segment.p1.y, x2: segment.p2.x, y2: segment.p2.y });
-                if (intersectionPoint) {
-                    let ignoreThisIntersection = false;
-                    if (segment.parent.type === 'smart_object') {
-                        const p1 = segment.p1;
-                        const p2 = segment.p2;
-                        const normal = { x: p2.y - p1.y, y: p1.x - p2.x };
-                        const lightVector = { x: intersectionPoint.x - light.position.x, y: intersectionPoint.y - light.position.y };
-                        const dot = (lightVector.x * normal.x) + (lightVector.y * normal.y);
-                        if (!lightIsInsideObject && dot > 0) {
-                            ignoreThisIntersection = true;
-                        }
-                    }
-
-                    if (!ignoreThisIntersection) {
-                        const distance = Math.sqrt(Math.pow(intersectionPoint.x - light.position.x, 2) + Math.pow(intersectionPoint.y - light.position.y, 2));
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestIntersection = intersectionPoint;
-                        }
-                    }
-                }
-            });
-
-            if (closestIntersection) {
-                visiblePoints.push(closestIntersection);
-            } else {
-                visiblePoints.push({ x: ray.x2, y: ray.y2 });
-            }
-        });
+    dmLightSources.forEach(light => {
+        const visiblePoints = calculateTokenVisionPolygon(light.position, allSegments);
 
         if (visiblePoints.length > 0) {
             const firstPoint = visiblePoints[0];
-            targetCtx.moveTo(firstPoint.x, firstPoint.y);
+            lightSourceCtx.moveTo(firstPoint.x, firstPoint.y);
             visiblePoints.forEach(point => {
-                targetCtx.lineTo(point.x, point.y);
+                lightSourceCtx.lineTo(point.x, point.y);
             });
-            targetCtx.closePath();
+            lightSourceCtx.closePath();
         }
-    };
-
-    const tokenVisionCanvas = document.createElement('canvas');
-    tokenVisionCanvas.width = visionMaskCanvas.width;
-    tokenVisionCanvas.height = visionMaskCanvas.height;
-    const tokenVisionCtx = tokenVisionCanvas.getContext('2d');
-    tokenVisionCtx.fillStyle = 'black';
-    tokenVisionCtx.beginPath();
-    tokensWithVision.forEach(light => {
-        calculateAndDrawVisionForSource(light, tokenVisionCtx);
     });
-    tokenVisionCtx.fill();
+    lightSourceCtx.fill();
 
-    const darkvisionMask = createDarkvisionMask_Player();
-    if (darkvisionMask) {
-        tokenVisionCtx.globalCompositeOperation = 'source-in';
-        tokenVisionCtx.drawImage(darkvisionMask, 0, 0);
-        tokenVisionCtx.globalCompositeOperation = 'source-over';
+    return lightSourceMaskCanvas;
+}
+
+function generateVisionMask_Player() {
+    if (!currentOverlays || !currentMapDisplayData.img) return null;
+
+    const allSegments = _createWallSegments();
+    const lightSourceMask = generateLightSourceMask();
+
+    const tokensWithVision = initiativeTokens.filter(token => {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        return character && character.vision === true;
+    });
+
+    if (tokensWithVision.length === 0) {
+        return lightSourceMask;
     }
 
-    visionCtx.drawImage(tokenVisionCanvas, 0, 0);
+    const combinedVisionCanvas = document.createElement('canvas');
+    combinedVisionCanvas.width = currentMapDisplayData.imgWidth;
+    combinedVisionCanvas.height = currentMapDisplayData.imgHeight;
+    const combinedCtx = combinedVisionCanvas.getContext('2d');
+    combinedCtx.fillStyle = 'black';
 
-    if (visibleDmLightSources.length > 0) {
-        visionCtx.fillStyle = 'black';
-        visionCtx.beginPath();
-        visibleDmLightSources.forEach(light => {
-            calculateAndDrawVisionForSource(light, visionCtx);
-        });
-        visionCtx.fill();
+    for (const token of tokensWithVision) {
+        const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
+        if (!character || !character.sheetData) continue;
+
+        const tokenPosition = { x: token.x, y: token.y };
+        const losPoints = calculateTokenVisionPolygon(tokenPosition, allSegments);
+
+        if (losPoints.length === 0) continue;
+
+        const losCanvas = document.createElement('canvas');
+        losCanvas.width = combinedVisionCanvas.width;
+        losCanvas.height = combinedVisionCanvas.height;
+        const losCtx = losCanvas.getContext('2d');
+        losCtx.fillStyle = 'black';
+        losCtx.beginPath();
+        losCtx.moveTo(losPoints[0].x, losPoints[0].y);
+        for (let i = 1; i < losPoints.length; i++) {
+            losCtx.lineTo(losPoints[i].x, losPoints[i].y);
+        }
+        losCtx.closePath();
+        losCtx.fill();
+
+        // Handle darkvision part
+        const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
+        if (currentGridData && currentGridData.visible && visionFt > 0) {
+            const gridSqftValue = currentGridData.sqft || 5;
+            const gridPixelSize = currentGridData.scale || 50;
+            const visionRadiusInPixels = (visionFt / gridSqftValue) * gridPixelSize;
+
+            const darkvisionLOSCanvas = document.createElement('canvas');
+            darkvisionLOSCanvas.width = combinedVisionCanvas.width;
+            darkvisionLOSCanvas.height = combinedVisionCanvas.height;
+            const dvLosCtx = darkvisionLOSCanvas.getContext('2d');
+            dvLosCtx.drawImage(losCanvas, 0, 0);
+            dvLosCtx.globalCompositeOperation = 'source-in';
+            dvLosCtx.fillStyle = 'black';
+            dvLosCtx.beginPath();
+            dvLosCtx.arc(tokenPosition.x, tokenPosition.y, visionRadiusInPixels, 0, Math.PI * 2);
+            dvLosCtx.fill();
+
+            // Add this token's darkvision to the combined mask
+            combinedCtx.drawImage(darkvisionLOSCanvas, 0, 0);
+        }
+
+        // Handle seeing lit areas
+        if (lightSourceMask) {
+            const litAreasVisibleCanvas = document.createElement('canvas');
+            litAreasVisibleCanvas.width = combinedVisionCanvas.width;
+            litAreasVisibleCanvas.height = combinedVisionCanvas.height;
+            const litCtx = litAreasVisibleCanvas.getContext('2d');
+
+            litCtx.drawImage(lightSourceMask, 0, 0);
+            litCtx.globalCompositeOperation = 'source-in';
+            litCtx.drawImage(losCanvas, 0, 0);
+
+            // Add the visible lit areas to the combined mask
+            combinedCtx.drawImage(litAreasVisibleCanvas, 0, 0);
+        }
     }
 
-    return visionMaskCanvas;
+    return combinedVisionCanvas;
 }
 
 
