@@ -321,17 +321,16 @@ function createDarkvisionMask_Player() {
     const maskCtx = darkvisionMaskCanvas.getContext('2d');
     maskCtx.fillStyle = 'black';
 
-    const tokensWithDarkvision = initiativeTokens.filter(token => {
+    const tokensWithVision = initiativeTokens.filter(token => {
         const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-        const visionFt = parseInt(character?.sheetData?.vision_ft, 10) || 0;
-        return character && character.vision === true && visionFt > 0;
+        return character && character.vision === true;
     });
 
-    if (tokensWithDarkvision.length === 0) {
+    if (tokensWithVision.length === 0) {
         return null;
     }
 
-    tokensWithDarkvision.forEach(token => {
+    tokensWithVision.forEach(token => {
         const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
         if (character && character.sheetData) {
             const visionFt = parseInt(character.sheetData.vision_ft, 10) || 0;
@@ -523,30 +522,23 @@ function generateVisionMask_Player() {
     });
     tokenVisionCtx.fill();
 
-    const lightSourceCanvas = document.createElement('canvas');
-    lightSourceCanvas.width = visionMaskCanvas.width;
-    lightSourceCanvas.height = visionMaskCanvas.height;
-    const lightSourceCtx = lightSourceCanvas.getContext('2d');
-    if (visibleDmLightSources.length > 0) {
-        lightSourceCtx.fillStyle = 'black';
-        lightSourceCtx.beginPath();
-        visibleDmLightSources.forEach(light => {
-            calculateAndDrawVisionForSource(light, lightSourceCtx);
-        });
-        lightSourceCtx.fill();
+    const darkvisionMask = createDarkvisionMask_Player();
+    if (darkvisionMask) {
+        tokenVisionCtx.globalCompositeOperation = 'source-in';
+        tokenVisionCtx.drawImage(darkvisionMask, 0, 0);
+        tokenVisionCtx.globalCompositeOperation = 'source-over';
     }
 
     visionCtx.drawImage(tokenVisionCanvas, 0, 0);
-    visionCtx.globalCompositeOperation = 'source-in';
-    visionCtx.drawImage(lightSourceCanvas, 0, 0);
 
-    const darkvisionMask = createDarkvisionMask_Player();
-    if (darkvisionMask) {
-        visionCtx.globalCompositeOperation = 'lighter';
-        visionCtx.drawImage(darkvisionMask, 0, 0);
+    if (visibleDmLightSources.length > 0) {
+        visionCtx.fillStyle = 'black';
+        visionCtx.beginPath();
+        visibleDmLightSources.forEach(light => {
+            calculateAndDrawVisionForSource(light, visionCtx);
+        });
+        visionCtx.fill();
     }
-
-    visionCtx.globalCompositeOperation = 'source-over';
 
     return visionMaskCanvas;
 }
