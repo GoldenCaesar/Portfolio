@@ -13491,6 +13491,18 @@ function getDragAfterElement(container, y) {
         html += `<h4>Description</h4>`;
         html += `<p style="font-size: 0.9em;">${quest.description || 'No description provided.'}</p>`;
 
+        // Associated Maps
+        html += `<h4>Associated Maps</h4>`;
+        if (quest.associatedMaps && quest.associatedMaps.length > 0) {
+            html += `<ul class="quest-maps-list">`;
+            quest.associatedMaps.forEach(mapName => {
+                html += `<li>${mapName}</li>`;
+            });
+            html += `</ul>`;
+        } else {
+            html += `<p class="footer-placeholder">None</p>`;
+        }
+
         // Story Steps
         html += `<h4>Story Steps</h4>`;
         if (quest.storySteps && quest.storySteps.length > 0) {
