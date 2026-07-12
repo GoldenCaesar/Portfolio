@@ -2213,6 +2213,16 @@ function getTightBoundingBox(img) {
             return;
         }
 
+        // If there are no light sources, do not render any shadows
+        const hasLightSource = mapData.overlays && mapData.overlays.some(o => o.type === 'lightSource');
+        if (!hasLightSource) {
+            if (lightMapCtx) {
+                lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+            }
+            isLightMapDirty = false;
+            return;
+        }
+
         const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * dmRenderQuality);
         const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * dmRenderQuality);
 
