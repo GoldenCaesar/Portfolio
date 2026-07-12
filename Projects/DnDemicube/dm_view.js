@@ -4588,6 +4588,7 @@ function getTightBoundingBox(img) {
         if (isDraggingToken) {
             isDraggingToken = false;
             draggedToken = null;
+            isLightMapDirty = true;
             requestFogOfWarUpdate();
             sendInitiativeDataToPlayerView();
         }
@@ -5193,9 +5194,6 @@ function getTightBoundingBox(img) {
                     draggedToken.y += dy;
                     dragStartX = imageCoords.x;
                     dragStartY = imageCoords.y;
-                    requestFogOfWarUpdate();
-                    // Set dirty flag because token positions affect player view lighting
-                    isLightMapDirty = true;
                     const mapData = detailedMapData.get(selectedMapFileName);
                     if (mapData) {
                         drawOverlays(mapData.overlays);
@@ -12330,6 +12328,22 @@ function getDragAfterElement(container, y) {
     };
 
     /**
+     * Updates the positions of existing cards during pan/drag without recreating DOM.
+     */
+    const updateCardPositions = () => {
+        quests.forEach(quest => {
+            const card = cardContainer.querySelector(`.card[data-id="${quest.id}"]`);
+            if (card) {
+                const x = originX + (quest.x * scale);
+                const y = originY + (quest.y * scale);
+                card.style.left = `${x}px`;
+                card.style.top = `${y}px`;
+                card.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            }
+        });
+    };
+
+    /**
      * Renders the HTML cards for each quest.
      */
     const renderCards = () => {
@@ -13061,13 +13075,13 @@ function getDragAfterElement(container, y) {
                 questToMove.x = newX;
                 questToMove.y = newY;
                 drawConnections();
-                renderCards();
+                updateCardPositions();
             }
         } else if (isPanning) {
             originX = e.clientX - panStartX;
             originY = e.clientY - panStartY;
             drawConnections();
-            renderCards();
+            updateCardPositions();
         }
     });
 
@@ -13085,7 +13099,7 @@ function getDragAfterElement(container, y) {
 
         scale = newScale;
         drawConnections();
-        renderCards();
+        updateCardPositions();
     });
 
     container.addEventListener('contextmenu', (e) => {
