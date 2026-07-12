@@ -461,11 +461,11 @@ function generateVisionMask_Player() {
 
     const tokensWithVision = initiativeTokens.filter(token => {
         const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-        return character && character.vision === true;
+        return character && character.vision === true && character.isDetailsVisible !== false;
     });
 
     if (tokensWithVision.length === 0) {
-        return lightSourceMask;
+        return null;
     }
 
     const combinedVisionCanvas = document.createElement('canvas');

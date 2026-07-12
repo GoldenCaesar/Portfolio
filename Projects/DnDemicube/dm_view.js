@@ -2124,11 +2124,11 @@ function getTightBoundingBox(img) {
 
         const tokensWithVision = initiativeTokens.filter(token => {
             const character = activeInitiative.find(c => c.uniqueId === token.uniqueId);
-            return character && character.vision === true;
+            return character && character.vision === true && character.isDetailsVisible !== false;
         });
 
         if (tokensWithVision.length === 0) {
-            return lightSourceMask; // If no tokens have vision, the only visible areas are those with lights for the DM. FOW won't update.
+            return null; // If no tokens have vision, return null so FOW isn't revealed globally by lights
         }
 
         const combinedVisionCanvas = document.createElement('canvas');
@@ -2231,7 +2231,12 @@ function getTightBoundingBox(img) {
 
         // Generate the combined line-of-sight and darkvision mask.
         // This mask represents all areas that should be fully visible (punched out).
-        const visionMask = generatePlayerVisionMask();
+        let visionMask = generatePlayerVisionMask();
+
+        // If there are no players with vision on the board, we still want the DM to see light sources
+        if (!visionMask) {
+            visionMask = generateLightSourceMask();
+        }
 
         if (visionMask) {
             // Use 'destination-out' to erase the parts of the light map that are visible.
