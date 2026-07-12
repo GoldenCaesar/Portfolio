@@ -6434,6 +6434,11 @@ function getTightBoundingBox(img) {
                 console.log(`Sent startSlideshow message to player view with playlist of ${slideshowPlaylist.length} items, starting at index ${slideshowCurrentIndex}.`);
             } else {
                 console.warn("Could not generate a slideshow playlist. No common stats or no characters.");
+                playerWindow.postMessage({
+                    type: 'startSlideshow',
+                    playlist: [],
+                    startIndex: 0
+                }, '*');
             }
         }
     }
@@ -9672,7 +9677,7 @@ function displayToast(messageElement) {
             initiativeTimers.style.display = 'flex';
             updateGameTimeTimer();
 
-            createLogEntry({ type: 'system', message: "Combat Started" }, automationActionId);
+            addLogEntry({ type: 'system', message: "Combat Started" }, automationActionId);
 
             startInitiativeButton.textContent = 'Stop Initiative';
             nextTurnButton.style.display = 'inline-block';
@@ -9755,7 +9760,7 @@ function displayToast(messageElement) {
             isWandering = false;
             wanderButton.textContent = 'Wander';
             initiativeTokens = [];
-            createLogEntry({ type: 'system', message: "Stopped Wandering" });
+            addLogEntry({ type: 'system', message: "Stopped Wandering" });
 
             // Hide token stat block on both DM and player views when wandering ends
             if (selectedTokenForStatBlock) {
@@ -9821,7 +9826,7 @@ function displayToast(messageElement) {
             }
 
             requestFogOfWarUpdate();
-            createLogEntry({ type: 'system', message: "Characters are Wandering" }, automationActionId);
+            addLogEntry({ type: 'system', message: "Characters are Wandering" }, automationActionId);
             sendInitiativeDataToPlayerView();
         }
         updateFooterControlsVisibility();
