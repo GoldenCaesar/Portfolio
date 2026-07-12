@@ -549,6 +549,16 @@ function recalculateLightMap_Player() {
         return;
     }
 
+    // If there are no light sources, do not render any shadows
+    const hasLightSource = currentOverlays && currentOverlays.some(o => o.type === 'lightSource');
+    if (!hasLightSource) {
+        if (lightMapCtx) {
+            lightMapCtx.clearRect(0, 0, lightMapCanvas.width, lightMapCanvas.height);
+        }
+        isLightMapDirty = false;
+        return;
+    }
+
     const requiredWidth = Math.floor(currentMapDisplayData.imgWidth * renderQuality);
     const requiredHeight = Math.floor(currentMapDisplayData.imgHeight * renderQuality);
 
